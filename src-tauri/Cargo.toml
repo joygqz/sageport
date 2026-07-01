@@ -1,0 +1,62 @@
+[package]
+name = "sageport"
+version = "0.1.0"
+description = "Sageport — an ops-focused SSH client with an AI assistant"
+authors = ["JoyGqz"]
+edition = "2021"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "sageport_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-opener = "2"
+tauri-plugin-os = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-clipboard-manager = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+
+# Async runtime
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util"] }
+
+# Persistence (ids/timestamps stored as TEXT -> Rust String, so no
+# compile-time DATABASE_URL coupling and no chrono/uuid row mapping).
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4" }
+
+# Crypto (used for the portable encrypted sync/export vault)
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+base64 = "0.22"
+
+# SSH (libssh2 bindings; vendored OpenSSL for portable builds)
+ssh2 = { version = "0.9", features = ["vendored-openssl"] }
+
+# Archive + gzip for compressed folder transfers (pure-Rust, no extra C deps).
+tar = "0.4"
+flate2 = "1"
+
+# HTTP client for the Anthropic Messages API (rustls to avoid an OpenSSL link
+# conflict with ssh2's vendored OpenSSL).
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Concurrency helpers
+parking_lot = "0.12"
+
+[features]
+# this feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]

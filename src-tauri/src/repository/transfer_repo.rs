@@ -1,0 +1,113 @@
+//! Data access for the persisted SFTP transfer history. A row is created when
+//! a transfer starts (`status = "active"`) and finalized once it settles
+//! (`"done"` | `"error"` | `"cancelled"`), so the history reflects transfers
+//! that were in flight when the app quit as still "active" — the frontend
+//! treats those the same as any other terminal state on load.
+
+use sqlx::SqlitePool;
+
+use crate::domain::now;
+use crate::error::AppResult;
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TransferRow {
+    pub id: String,
+    pub source_label: String,
+    pub source_path: String,
+    pub source_connection_id: Option<String>,
+    pub dest_path: String,
+    pub dest_connection_id: Option<String>,
+    pub total_bytes: i64,
+    pub transferred_bytes: i64,
+    pub status: String,
+    pub message: Option<String>,
+    pub started_at: String,
+    pub finished_at: Option<String>,
+}
+
+/// Insert a new "active" history row when a transfer starts.
+#[allow(clippy::too_many_arguments)]
+pub async fn create(
+    pool: &SqlitePool,
+    id: &str,
+    source_label: &str,
+    source_path: &str,
+    source_connection_id: Option<&str>,
+    dest_path: &str,
+    dest_connection_id: Option<&str>,
+) -> AppResult<()> {
+    let ts = now();
+    sqlx::query(
+        "INSERT INTO sftp_transfers
+            (id, source_label, source_path, source_connection_id, dest_path,
+             dest_connection_id, total_bytes, transferred_bytes, status, started_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'active', ?)",
+    )
+    .bind(id)
+    .bind(source_label)
+    .bind(source_path)
+    .bind(source_connection_id)
+    .bind(dest_path)
+    .bind(dest_connection_id)
+    .bind(&ts)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Finalize a transfer's row once it settles into a terminal status.
+pub async fn finish(
+    pool: &SqlitePool,
+    id: &str,
+    transferred_bytes: u64,
+    total_bytes: u64,
+    status: &str,
+    message: Option<&str>,
+) -> AppResult<()> {
+    let ts = now();
+    sqlx::query(
+        "UPDATE sftp_transfers
+         SET transferred_bytes = ?, total_bytes = ?, status = ?, message = ?, finished_at = ?
+         WHERE id = ?",
+    )
+    .bind(transferred_bytes as i64)
+    .bind(total_bytes as i64)
+    .bind(status)
+    .bind(message)
+    .bind(&ts)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Newest-first transfer history, capped at `limit` rows.
+pub async fn list(pool: &SqlitePool, limit: i64) -> AppResult<Vec<TransferRow>> {
+    let rows = sqlx::query_as::<_, TransferRow>(
+        "SELECT id, source_label, source_path, source_connection_id, dest_path,
+                dest_connection_id, total_bytes, transferred_bytes, status, message,
+                started_at, finished_at
+         FROM sftp_transfers
+         ORDER BY started_at DESC
+         LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
+    sqlx::query("DELETE FROM sftp_transfers WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn clear(pool: &SqlitePool) -> AppResult<()> {
+    sqlx::query("DELETE FROM sftp_transfers")
+        .execute(pool)
+        .await?;
+    Ok(())
+}

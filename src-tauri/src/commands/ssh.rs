@@ -1,0 +1,118 @@
+use tauri::{AppHandle, State};
+
+use crate::domain::{auth, Host};
+use crate::error::{AppError, AppResult};
+use crate::repository::{host_repo, identity_repo, key_repo};
+use crate::ssh::{AuthMethod, ConnectParams};
+use crate::state::AppState;
+
+/// Open an interactive SSH session for `host_id` under the caller-provided
+/// `session_id` (one per terminal tab). Progress arrives via `ssh://status`
+/// and output via `ssh://data` events.
+#[tauri::command]
+pub async fn ssh_connect(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+    host_id: String,
+    cols: u32,
+    rows: u32,
+) -> AppResult<()> {
+    let host = host_repo::get(&state.db, &host_id).await?;
+    let (username, auth) = resolve_credentials(&state, &host).await?;
+
+    let params = ConnectParams {
+        session_id,
+        host: host.address.clone(),
+        port: host.port as u16,
+        username,
+        auth,
+        cols,
+        rows,
+    };
+
+    state.ssh.connect(app, params)?;
+    host_repo::touch_last_used(&state.db, &host_id).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn ssh_send(
+    state: State<'_, AppState>,
+    session_id: String,
+    data: String,
+) -> AppResult<()> {
+    state.ssh.send_input(&session_id, data.into_bytes())
+}
+
+#[tauri::command]
+pub async fn ssh_resize(
+    state: State<'_, AppState>,
+    session_id: String,
+    cols: u32,
+    rows: u32,
+) -> AppResult<()> {
+    state.ssh.resize(&session_id, cols, rows)
+}
+
+#[tauri::command]
+pub async fn ssh_disconnect(state: State<'_, AppState>, session_id: String) -> AppResult<()> {
+    state.ssh.close(&session_id)
+}
+
+/// Resolve effective username + auth method from a host, preferring a linked
+/// identity over inline fields. Secrets are read straight off the rows.
+pub(crate) async fn resolve_credentials(
+    state: &State<'_, AppState>,
+    host: &Host,
+) -> AppResult<(String, AuthMethod)> {
+    let (username, auth_type, key_id, password) = if let Some(identity_id) = &host.identity_id {
+        let identity = identity_repo::get(&state.db, identity_id).await?;
+        (
+            identity.username,
+            identity.auth_type,
+            identity.key_id,
+            identity.password,
+        )
+    } else {
+        let username = host
+            .username
+            .clone()
+            .ok_or_else(|| AppError::Invalid("host has no username".into()))?;
+        (
+            username,
+            host.auth_type
+                .clone()
+                .unwrap_or_else(|| auth::PASSWORD.to_string()),
+            host.key_id.clone(),
+            host.password.clone(),
+        )
+    };
+
+    let method = match auth_type.as_str() {
+        auth::PASSWORD => {
+            let password = password
+                .filter(|p| !p.is_empty())
+                .ok_or_else(|| AppError::Invalid("no password stored for this host".into()))?;
+            AuthMethod::Password(password)
+        }
+        auth::KEY => {
+            let key_id = key_id
+                .ok_or_else(|| AppError::Invalid("key auth selected but no key set".into()))?;
+            let key = key_repo::get(&state.db, &key_id).await?;
+            let private_key = key
+                .private_key
+                .filter(|k| !k.is_empty())
+                .ok_or_else(|| AppError::Invalid("no private key stored".into()))?;
+            AuthMethod::Key {
+                private_key,
+                public_key: key.public_key,
+                passphrase: key.passphrase.filter(|p| !p.is_empty()),
+            }
+        }
+        auth::AGENT => AuthMethod::Agent,
+        other => return Err(AppError::Invalid(format!("unknown auth type: {other}"))),
+    };
+
+    Ok((username, method))
+}

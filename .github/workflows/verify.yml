@@ -1,0 +1,33 @@
+name: Verify
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to check out
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: ./.github/actions/setup-linux-deps
+
+      - uses: ./.github/actions/setup-toolchain
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml

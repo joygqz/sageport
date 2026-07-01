@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Sageport</title>
+
+    <!--
+      Critical theme bootstrap. Runs before the app bundle (and before first
+      paint) so a window never flashes white while loading in dark mode.
+      The raw background colors mirror `--background` in styles/globals.css and
+      the storage key mirrors THEME_STORAGE_KEY in src/theme/dom.ts.
+    -->
+    <style>
+      html {
+        background-color: oklch(1 0 0);
+      }
+      html.dark {
+        background-color: oklch(0.165 0.013 255);
+      }
+      /*
+        Transparent OS windows (Spotlight-style launcher) must never paint an
+        opaque document background, or the window's rectangle reads as a frame
+        around the floating card. These rules are unlayered like the ones above
+        so they win over `html.dark`; the matching rules in globals.css live in
+        `@layer base` and would otherwise lose to this inline style.
+      */
+      html.transparent-window,
+      html.transparent-window.dark {
+        background-color: transparent;
+      }
+    </style>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("sageport.theme");
+          var mode =
+            stored === "light" || stored === "dark" || stored === "system"
+              ? stored
+              : "system";
+          var dark =
+            mode === "dark" ||
+            (mode === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var root = document.documentElement;
+          root.classList.toggle("dark", dark);
+          root.style.colorScheme = dark ? "dark" : "light";
+          // Flag transparent windows before first paint so the document stays
+          // transparent (mirrors the class set in main.tsx for the command view).
+          if (/^#\/?command(\?|$)/.test(window.location.hash)) {
+            root.classList.add("transparent-window");
+          }
+        } catch (e) {
+          /* localStorage/matchMedia unavailable — fall back to light. */
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

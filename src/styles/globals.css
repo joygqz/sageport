@@ -1,0 +1,252 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Enable class-based dark mode driven by ThemeProvider (.dark on <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens — semantic, theme-agnostic names.
+ * Values are overridden per theme below; components only ever reference
+ * the semantic Tailwind utilities (bg-background, text-muted-foreground, …).
+ */
+:root {
+  --radius: 0.625rem;
+
+  /* Light theme.
+   * Two-tone layout: content surfaces (workspace/terminal) are white; the
+   * chrome ring (title bar, sidebar, tab strip, panels) is a distinctly
+   * darker grey, and every module boundary is drawn with a crisp border. */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.22 0.02 255);
+
+  --surface: oklch(0.955 0.005 250);
+  --surface-foreground: oklch(0.3 0.02 255);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.02 255);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.02 255);
+
+  --primary: oklch(0.62 0.13 200);
+  --primary-foreground: oklch(0.99 0.01 200);
+
+  --secondary: oklch(0.935 0.01 250);
+  --secondary-foreground: oklch(0.3 0.02 255);
+
+  --muted: oklch(0.95 0.005 250);
+  --muted-foreground: oklch(0.52 0.02 255);
+
+  --accent: oklch(0.95 0.02 200);
+  --accent-foreground: oklch(0.3 0.05 200);
+
+  --destructive: oklch(0.58 0.21 25);
+  --destructive-foreground: oklch(0.99 0.01 25);
+
+  --success: oklch(0.65 0.16 150);
+  --warning: oklch(0.75 0.15 80);
+  --info: oklch(0.62 0.14 240);
+
+  --border: oklch(0.88 0.006 255);
+  --input: oklch(0.9 0.006 255);
+  --ring: oklch(0.62 0.13 200);
+
+  /* Chrome surfaces — unified with --surface, separated structurally. */
+  --sidebar: oklch(0.955 0.005 250);
+  --sidebar-foreground: oklch(0.3 0.02 255);
+  --sidebar-border: oklch(0.88 0.006 255);
+  --sidebar-accent: oklch(0.91 0.025 200);
+  --sidebar-accent-foreground: oklch(0.28 0.05 200);
+
+  /* Terminal surface */
+  --terminal-background: oklch(0.995 0.002 250);
+  --terminal-foreground: oklch(0.25 0.02 255);
+}
+
+.dark {
+  /* Dark.
+   * Two-tone layout: content surfaces (workspace/terminal) are the deepest;
+   * the chrome ring (title bar, sidebar, tab strip, panels) sits clearly
+   * lighter, and every module boundary is drawn with a crisp border. */
+  --background: oklch(0.17 0.012 255);
+  --foreground: oklch(0.93 0.01 250);
+
+  --surface: oklch(0.225 0.015 255);
+  --surface-foreground: oklch(0.93 0.01 250);
+
+  --card: oklch(0.255 0.017 255);
+  --card-foreground: oklch(0.93 0.01 250);
+
+  --popover: oklch(0.265 0.018 255);
+  --popover-foreground: oklch(0.93 0.01 250);
+
+  --primary: oklch(0.7 0.13 200);
+  --primary-foreground: oklch(0.18 0.03 200);
+
+  --secondary: oklch(0.29 0.018 255);
+  --secondary-foreground: oklch(0.9 0.01 250);
+
+  --muted: oklch(0.27 0.016 255);
+  --muted-foreground: oklch(0.66 0.015 255);
+
+  --accent: oklch(0.32 0.03 200);
+  --accent-foreground: oklch(0.9 0.04 200);
+
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.97 0.01 25);
+
+  --success: oklch(0.72 0.16 150);
+  --warning: oklch(0.8 0.15 80);
+  --info: oklch(0.68 0.13 240);
+
+  --border: oklch(0.33 0.015 255);
+  --input: oklch(0.34 0.016 255);
+  --ring: oklch(0.7 0.13 200);
+
+  --sidebar: oklch(0.225 0.015 255);
+  --sidebar-foreground: oklch(0.85 0.01 250);
+  --sidebar-border: oklch(0.33 0.015 255);
+  --sidebar-accent: oklch(0.32 0.03 200);
+  --sidebar-accent-foreground: oklch(0.9 0.04 200);
+
+  --terminal-background: oklch(0.165 0.012 255);
+  --terminal-foreground: oklch(0.9 0.01 250);
+}
+
+/* Map semantic tokens onto Tailwind's theme so utilities resolve at runtime */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+
+  --color-terminal-background: var(--terminal-background);
+  --color-terminal-foreground: var(--terminal-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:
+    "JetBrains Mono", "SFMono-Regular", ui-monospace, "Menlo", monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+
+  /*
+   * Transparent OS windows (e.g. the Spotlight-style launcher) must not paint
+   * an opaque document background, otherwise the window's rounded corners read
+   * as an opaque frame around the floating card.
+   */
+  html.transparent-window,
+  html.transparent-window body,
+  html.transparent-window #root {
+    background: transparent;
+  }
+
+  /*
+   * Desktop-app text selection: like a native app, chrome (buttons, labels,
+   * menus, headings) is not selectable. Selection is re-enabled below only for
+   * editable fields and content explicitly opted in with `select-text`.
+   */
+  :root {
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]),
+  .select-text,
+  .select-text * {
+    -webkit-user-select: text;
+    user-select: text;
+    cursor: auto;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
+  }
+
+  /* Thin, theme-aware scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: color-mix(
+      in oklch,
+      var(--color-muted-foreground) 35%,
+      transparent
+    );
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(
+      in oklch,
+      var(--color-muted-foreground) 55%,
+      transparent
+    );
+  }
+}
