@@ -24,8 +24,11 @@ export function TitleBar({
   return (
     <header
       data-tauri-drag-region
-      className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-surface pl-20 pr-3"
+      className="flex h-8 shrink-0 items-center gap-2 border-b border-border bg-surface pl-20 pr-2"
     >
+      <span className="pointer-events-none text-sm font-medium text-surface-foreground">
+        Sageport
+      </span>
       <div className="ml-auto flex items-center gap-1" data-tauri-drag-region>
         <Tooltip
           content={sftpOpen ? t("titleBar.hideSftp") : t("titleBar.showSftp")}
@@ -33,6 +36,7 @@ export function TitleBar({
           <Button
             variant={sftpOpen ? "secondary" : "ghost"}
             size="icon"
+            className="size-7"
             onClick={onToggleSftp}
           >
             <Folder />
@@ -42,6 +46,7 @@ export function TitleBar({
           <Button
             variant={aiOpen ? "secondary" : "ghost"}
             size="icon"
+            className="size-7"
             onClick={onToggleAi}
           >
             <Bot />
@@ -51,13 +56,19 @@ export function TitleBar({
           <Button
             variant="ghost"
             size="icon"
+            className="size-7"
             onClick={() => setMode(resolved === "dark" ? "light" : "dark")}
           >
             {resolved === "dark" ? <Sun /> : <Moon />}
           </Button>
         </Tooltip>
         <Tooltip content={t("titleBar.settings")}>
-          <Button variant="ghost" size="icon" onClick={onOpenSettings}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={onOpenSettings}
+          >
             <Settings />
           </Button>
         </Tooltip>

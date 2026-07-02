@@ -117,21 +117,17 @@ export function HostSidebar({
   return (
     <>
       <aside style={{ width }} className="flex shrink-0 flex-col bg-sidebar">
-        <div className="flex items-center gap-2 p-2.5">
+        <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border px-1.5">
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("sidebar.filterPlaceholder")}
-            className="h-8 bg-background"
+            className="h-7 bg-background"
           />
           <DropdownMenu>
             <Tooltip content={t("sidebar.add")}>
               <DropdownMenuTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="size-8 shrink-0"
-                >
+                <Button size="icon" variant="ghost" className="size-7 shrink-0">
                   <Plus />
                 </Button>
               </DropdownMenuTrigger>
@@ -150,7 +146,7 @@ export function HostSidebar({
         </div>
 
         <ScrollArea className="flex-1">
-          <div className="px-2 pb-4">
+          <div className="px-2 pb-4 pt-2">
             {isLoading ? (
               <p className="px-2 py-6 text-center text-xs text-muted-foreground">
                 {t("common.loading")}

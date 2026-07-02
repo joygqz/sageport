@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, History, X } from "lucide-react";
+import { ChevronDown, Folder, History, X } from "lucide-react";
 
 import { Button, Tooltip } from "@/components/ui";
 import { ResizeHandle } from "@/components/ui/resize-handle";
@@ -88,29 +88,29 @@ export function SftpPanel() {
         style={{ height }}
       >
         {/* Header */}
-        <div className="flex h-7 shrink-0 items-center gap-1 border-b border-border bg-surface px-2 select-none">
-          <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-surface px-2 select-none">
+          <Folder className="size-4 shrink-0 text-primary" />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {t("sftp.title")}
           </span>
-          <div className="flex-1" />
           <Tooltip content={t("sftp.history.title")}>
             <Button
               size="icon"
               variant="ghost"
-              className="size-5"
+              className="size-7 shrink-0"
               onClick={() => setHistoryOpen(true)}
             >
-              <History className="size-3.5" />
+              <History className="size-4" />
             </Button>
           </Tooltip>
           <Tooltip content={t("sftp.hide")}>
             <Button
               size="icon"
               variant="ghost"
-              className="size-5"
+              className="size-7 shrink-0"
               onClick={() => setVisible(false)}
             >
-              <ChevronDown className="size-3.5" />
+              <ChevronDown className="size-4" />
             </Button>
           </Tooltip>
         </div>

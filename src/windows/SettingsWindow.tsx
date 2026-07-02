@@ -63,7 +63,7 @@ export function SettingsWindow() {
     <div className="flex h-full flex-col bg-background">
       <header
         data-tauri-drag-region
-        className="flex h-10 shrink-0 items-center border-b border-sidebar-border bg-sidebar pl-20 text-sm font-medium text-sidebar-foreground"
+        className="flex h-8 shrink-0 items-center border-b border-border bg-surface pl-20 text-sm font-medium text-surface-foreground"
       >
         {t("windowTitles.settings")}
       </header>
@@ -91,7 +91,7 @@ export function SettingsWindow() {
           })}
         </aside>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {section === "appearance" && <AppearanceSection />}
           {section === "ai" && <AiSection />}
           {section === "keys" && <KeysSection />}
