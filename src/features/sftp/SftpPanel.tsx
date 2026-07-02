@@ -107,11 +107,12 @@ export function SftpPanel() {
         <div style={{ width: `${ratio * 100}%` }} className="flex min-w-0">
           <FilePane side="left" />
         </div>
-        <div
-          onPointerDown={startSplitDrag}
-          className="group relative w-1 shrink-0 cursor-col-resize select-none"
-        >
+        <div className="group relative z-10 w-0 shrink-0 select-none">
           <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-primary group-active:bg-primary" />
+          <div
+            onPointerDown={startSplitDrag}
+            className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize"
+          />
         </div>
         <div className="flex min-w-0 flex-1">
           <FilePane side="right" />

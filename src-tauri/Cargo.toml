@@ -46,6 +46,10 @@ base64 = "0.22"
 # SSH (libssh2 bindings; vendored OpenSSL for portable builds)
 ssh2 = { version = "0.9", features = ["vendored-openssl"] }
 
+# Pure-Rust SSH key generation/parsing (Ed25519, RSA, ECDSA; OpenSSH format,
+# optionally passphrase-encrypted) for the key manager's generate/import flow.
+ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "ecdsa", "p256", "p384", "p521", "encryption", "std"] }
+
 # Archive + gzip for compressed folder transfers (pure-Rust, no extra C deps).
 tar = "0.4"
 flate2 = "1"

@@ -238,9 +238,27 @@ export function FilePane({ side }: { side: PaneSide }) {
             title={t("sftp.noTabTitle")}
             description={t("sftp.noTabDescription")}
             action={
-              <Button size="sm" variant="secondary" onClick={() => void addLocalTab(side)}>
-                <Plus /> {t("sftp.local")}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="secondary">
+                    <Plus /> {t("sftp.newTab")}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="max-h-80 overflow-auto">
+                  <DropdownMenuItem onSelect={() => void addLocalTab(side)}>
+                    <HardDrive /> {t("sftp.local")}
+                  </DropdownMenuItem>
+                  {hosts.length > 0 && <DropdownMenuSeparator />}
+                  {hosts.map((host) => (
+                    <DropdownMenuItem
+                      key={host.id}
+                      onSelect={() => addRemoteTab(side, host)}
+                    >
+                      <Server /> {host.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             }
           />
         </div>
