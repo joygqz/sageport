@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Bot,
+  Info,
   KeyRound,
   Monitor,
   Moon,
@@ -24,6 +25,7 @@ import {
   useSetAiConfig,
 } from "@/features/ai/api";
 import type { AiConfig, AiProtocol } from "@/types/models";
+import { AboutSection } from "@/features/settings/AboutSection";
 import { IdentitiesSection } from "@/features/credentials/IdentitiesSection";
 import { KeysSection } from "@/features/credentials/KeysSection";
 import { SnippetsSection } from "@/features/snippets/SnippetsSection";
@@ -35,7 +37,8 @@ type SettingsSection =
   | "keys"
   | "identities"
   | "snippets"
-  | "sync";
+  | "sync"
+  | "about";
 
 export function SettingsWindow() {
   const { t } = useI18n();
@@ -52,6 +55,7 @@ export function SettingsWindow() {
     { id: "identities", labelKey: "settings.tabs.identities", icon: UserCog },
     { id: "snippets", labelKey: "settings.tabs.snippets", icon: ScrollText },
     { id: "sync", labelKey: "settings.tabs.sync", icon: RefreshCw },
+    { id: "about", labelKey: "settings.tabs.about", icon: Info },
   ];
 
   return (
@@ -93,6 +97,7 @@ export function SettingsWindow() {
           {section === "identities" && <IdentitiesSection />}
           {section === "snippets" && <SnippetsSection />}
           {section === "sync" && <SyncSection />}
+          {section === "about" && <AboutSection />}
         </div>
       </div>
     </div>

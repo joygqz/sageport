@@ -29,6 +29,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,5 +37,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVGQjU3OUU2NzUxOTlGREIKUldUYm54bDE1bm0xNzg1T1REcFZwRFl4a1l2OXNCSnRWazVRLzRMazVoMG9MbW1ydkRoSXp4dE8K",
+      "endpoints": [
+        "https://github.com/joygqz/sageport/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

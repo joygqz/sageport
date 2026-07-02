@@ -121,6 +121,7 @@ export const zhCN: Dictionary = {
       identities: "身份",
       snippets: "命令片段",
       sync: "同步",
+      about: "关于",
     },
     appearance: {
       theme: "主题",
@@ -210,6 +211,24 @@ export const zhCN: Dictionary = {
         title: "本地文件备份",
         description:
           "将加密保险库——主机、分组、身份、密钥、命令片段与应用设置——导出为你自己掌控的文件，或手动恢复。适合离线备份，或在不使用 GitHub 的情况下在设备间迁移。",
+      },
+    },
+    about: {
+      version: "版本 {version}",
+      update: {
+        idle: "检查 Sageport 是否有可用更新。",
+        checkButton: "检查更新",
+        checking: "正在检查更新…",
+        upToDate: "当前已是最新版本。",
+        available: "发现新版本 {version}。",
+        installButton: "下载并安装",
+        downloading: "正在下载…",
+        downloadingProgress: "正在下载… {percent}%",
+        installError: "更新失败",
+        ready: "版本 {version} 已下载，可以安装。",
+        readyBadge: "已就绪",
+        restartButton: "重启以完成更新",
+        error: "检查更新失败：{message}",
       },
     },
   },

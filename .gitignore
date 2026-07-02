@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Updater signing key (never commit — goes into GitHub Actions secrets instead)
+.updater-key-DO-NOT-COMMIT
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

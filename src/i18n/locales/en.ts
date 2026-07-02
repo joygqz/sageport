@@ -124,6 +124,7 @@ export const en = {
       identities: "Identities",
       snippets: "Snippets",
       sync: "Sync",
+      about: "About",
     },
     appearance: {
       theme: "Theme",
@@ -217,6 +218,24 @@ export const en = {
         title: "Local file backup",
         description:
           "Export the encrypted vault — hosts, groups, identities, keys, snippets and settings — to a file you control, or restore one manually. Handy for offline backups or moving between devices without GitHub.",
+      },
+    },
+    about: {
+      version: "Version {version}",
+      update: {
+        idle: "Check for the latest version of Sageport.",
+        checkButton: "Check for updates",
+        checking: "Checking for updates…",
+        upToDate: "You're on the latest version.",
+        available: "Version {version} is available.",
+        installButton: "Download and install",
+        downloading: "Downloading…",
+        downloadingProgress: "Downloading… {percent}%",
+        installError: "Update failed",
+        ready: "Version {version} is ready to install.",
+        readyBadge: "Ready",
+        restartButton: "Restart to update",
+        error: "Could not check for updates: {message}",
       },
     },
   },
