@@ -65,7 +65,6 @@ export const zhCN: Dictionary = {
     },
     emptyDir: "此文件夹为空",
     noTabTitle: "未打开标签",
-    noTabDescription: "打开本地或远程标签以浏览文件。",
     deleteConfirm: "确定删除“{name}”？此操作无法撤销。",
     mkdirError: "无法创建文件夹",
     renameError: "无法重命名",

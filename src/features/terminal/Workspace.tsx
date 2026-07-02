@@ -29,7 +29,7 @@ export function Workspace({ onNewHost }: { onNewHost: () => void }) {
 
   if (sessions.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-background">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-background">
         <EmptyState
           icon={TerminalSquare}
           title={t("workspace.emptyTitle")}
@@ -45,7 +45,7 @@ export function Workspace({ onNewHost }: { onNewHost: () => void }) {
   }
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col bg-background">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
       <div className="flex h-9 items-center gap-1 overflow-x-auto border-b border-border bg-surface px-1.5">
         {sessions.map((session) => (
           <TabItem

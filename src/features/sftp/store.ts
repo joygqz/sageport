@@ -167,7 +167,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
       }
     },
     setVisible: (v) => set({ visible: v }),
-    setHeight: (h) => set({ height: Math.max(160, Math.min(h, 900)) }),
+    setHeight: (h) => set({ height: Math.max(300, h) }),
     setRatio: (r) => set({ ratio: Math.max(0.2, Math.min(r, 0.8)) }),
 
     addLocalTab: async (side) => {

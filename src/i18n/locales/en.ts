@@ -67,7 +67,6 @@ export const en = {
     },
     emptyDir: "This folder is empty",
     noTabTitle: "No tab open",
-    noTabDescription: "Open a local or remote tab to browse files.",
     deleteConfirm: "Delete “{name}”? This cannot be undone.",
     mkdirError: "Could not create folder",
     renameError: "Could not rename",

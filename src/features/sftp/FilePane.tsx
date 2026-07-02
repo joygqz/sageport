@@ -112,9 +112,10 @@ export function FilePane({ side }: { side: PaneSide }) {
 
   return (
     <div
-      className="flex min-w-0 flex-1 flex-col"
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
       onDragOver={(e) => {
-        if (dragState.fromSide && dragState.fromSide !== side) e.preventDefault();
+        if (dragState.fromSide && dragState.fromSide !== side)
+          e.preventDefault();
       }}
       onDrop={(e) => {
         if (dragState.fromSide && dragState.fromSide !== side) {
@@ -126,7 +127,7 @@ export function FilePane({ side }: { side: PaneSide }) {
       }}
     >
       {/* Tab bar */}
-      <div className="flex h-8 items-center gap-1 overflow-x-auto border-b border-border bg-surface px-1.5">
+      <div className="flex h-8 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface px-1.5">
         {pane.tabs.map((tab) => (
           <div
             key={tab.id}
@@ -138,7 +139,9 @@ export function FilePane({ side }: { side: PaneSide }) {
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <span className={cn("size-1.5 rounded-full", statusColor[tab.status])} />
+            <span
+              className={cn("size-1.5 rounded-full", statusColor[tab.status])}
+            />
             {tab.kind === "local" ? (
               <HardDrive className="size-3" />
             ) : (
@@ -187,7 +190,7 @@ export function FilePane({ side }: { side: PaneSide }) {
       {active ? (
         <>
           {/* Path / actions toolbar */}
-          <div className="flex h-8 items-center gap-1 border-b border-border bg-background px-1.5">
+          <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border bg-background px-1.5">
             <Tooltip content={t("sftp.up")}>
               <Button
                 size="icon"
@@ -236,7 +239,6 @@ export function FilePane({ side }: { side: PaneSide }) {
           <EmptyState
             icon={HardDrive}
             title={t("sftp.noTabTitle")}
-            description={t("sftp.noTabDescription")}
             action={
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -244,7 +246,10 @@ export function FilePane({ side }: { side: PaneSide }) {
                     <Plus /> {t("sftp.newTab")}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="max-h-80 overflow-auto">
+                <DropdownMenuContent
+                  align="center"
+                  className="max-h-80 overflow-auto"
+                >
                   <DropdownMenuItem onSelect={() => void addLocalTab(side)}>
                     <HardDrive /> {t("sftp.local")}
                   </DropdownMenuItem>
