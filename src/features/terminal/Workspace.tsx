@@ -33,7 +33,6 @@ export function Workspace({ onNewHost }: { onNewHost: () => void }) {
         <EmptyState
           icon={TerminalSquare}
           title={t("workspace.emptyTitle")}
-          description={t("workspace.emptyDescription")}
           action={
             <Button size="sm" onClick={onNewHost}>
               {t("common.newHost")}

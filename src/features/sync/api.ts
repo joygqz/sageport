@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
 import { emitRefresh } from "@/lib/windows";
+import type { SyncConnectOutcome } from "@/types/models";
 
 const syncKey = ["sync", "config"] as const;
 const versionsKey = ["sync", "versions"] as const;
@@ -10,19 +11,25 @@ export function useSyncConfig() {
   return useQuery({ queryKey: syncKey, queryFn: ipc.sync.getConfig });
 }
 
-export function useSetSyncToken() {
+export function useSyncConnect() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (token: string) => ipc.sync.setToken(token),
-    onSuccess: () => qc.invalidateQueries({ queryKey: syncKey }),
-  });
-}
-
-export function useSetSyncPassphrase() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (passphrase: string) => ipc.sync.setPassphrase(passphrase),
-    onSuccess: () => qc.invalidateQueries({ queryKey: syncKey }),
+    mutationFn: ({
+      token,
+      passphrase,
+      force,
+    }: {
+      token: string;
+      passphrase: string;
+      force: boolean;
+    }) => ipc.sync.connect(token, passphrase, force),
+    onSuccess: (outcome: SyncConnectOutcome) => {
+      if (outcome.status !== "connected") return;
+      // A successful connect may have merged in an existing remote backup —
+      // every other open window needs to refetch, not just this one.
+      qc.invalidateQueries();
+      void emitRefresh();
+    },
   });
 }
 
@@ -73,14 +80,16 @@ export function useSyncRestoreVersion() {
 
 export function useSyncFileExport() {
   return useMutation({
-    mutationFn: (path: string) => ipc.sync.fileExport(path),
+    mutationFn: ({ path, passphrase }: { path: string; passphrase: string }) =>
+      ipc.sync.fileExport(path, passphrase),
   });
 }
 
 export function useSyncFileImport() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (path: string) => ipc.sync.fileImport(path),
+    mutationFn: ({ path, passphrase }: { path: string; passphrase: string }) =>
+      ipc.sync.fileImport(path, passphrase),
     onSuccess: () => {
       qc.invalidateQueries();
       void emitRefresh();

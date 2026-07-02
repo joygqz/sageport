@@ -115,12 +115,7 @@ export interface SshKeyInput {
 
 /** Algorithm choice for `keys.generate`. */
 export type SshKeyAlgorithm =
-  | "ed25519"
-  | "ecdsaP256"
-  | "ecdsaP384"
-  | "ecdsaP521"
-  | "rsa2048"
-  | "rsa4096";
+  "ed25519" | "ecdsaP256" | "ecdsaP384" | "ecdsaP521" | "rsa2048" | "rsa4096";
 
 export interface SshKeyGenerateInput {
   name: string;
@@ -219,6 +214,12 @@ export interface SyncConfig {
   /** ISO timestamp of the last successful push/restore, if any. */
   lastSyncedAt: string | null;
 }
+
+/** Result of `sync.connect`: either linked, or blocked on a passphrase that
+ * doesn't decrypt the account's existing backup (see `sync.connect`). */
+export type SyncConnectOutcome =
+  | { status: "connected"; gistId: string | null }
+  | { status: "passphraseMismatch"; gistId: string };
 
 /** One historical revision of the vault gist (see `sync.listVersions`). */
 export interface GistVersion {

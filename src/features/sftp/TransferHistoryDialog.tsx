@@ -99,7 +99,6 @@ export function TransferHistoryDialog({
           <EmptyState
             icon={History}
             title={t("sftp.history.empty")}
-            description={t("sftp.history.emptyDescription")}
           />
         )}
 

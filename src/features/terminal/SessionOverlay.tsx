@@ -32,9 +32,6 @@ export function SessionOverlay({
         <p className="text-sm font-medium text-foreground">
           {t("workspace.connecting", { host: title })}
         </p>
-        <p className="text-xs text-muted-foreground">
-          {t("workspace.connectingHint")}
-        </p>
       </Shell>
     );
   }
@@ -68,9 +65,6 @@ export function SessionOverlay({
         </span>
         <p className="text-sm font-medium text-foreground">
           {t("workspace.closed")}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {t("workspace.closedHint")}
         </p>
         <Button size="sm" variant="outline" onClick={onReconnect}>
           {t("workspace.reconnect")}

@@ -464,14 +464,10 @@ function CodeBlock({ code }: { code: string }) {
 
   const run = () => {
     if (!activeId) {
-      toast.error(
-        t("common.noActiveTerminalTitle"),
-        t("common.noActiveTerminalDescription"),
-      );
+      toast.error(t("common.noActiveTerminalTitle"));
       return;
     }
     void ipc.ssh.send(activeId, code + "\n").catch(() => {});
-    toast.success(t("common.sentToTerminal"));
   };
 
   return (

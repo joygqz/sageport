@@ -41,10 +41,7 @@ export default function App() {
       if (action.type === "run-command") {
         const activeId = useSessionStore.getState().activeId;
         if (!activeId) {
-          toast.error(
-            t("common.noActiveTerminalTitle"),
-            t("common.noActiveTerminalDescription"),
-          );
+          toast.error(t("common.noActiveTerminalTitle"));
           return;
         }
         void ipc.ssh.send(activeId, action.command + "\n").catch(() => {});

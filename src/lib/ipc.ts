@@ -29,6 +29,7 @@ import type {
   SshKeyInput,
   SshStatusEvent,
   SyncConfig,
+  SyncConnectOutcome,
   TransferEvent,
   TransferHistoryEntry,
 } from "@/types/models";
@@ -146,9 +147,9 @@ export const ipc = {
   },
   sync: {
     getConfig: () => invoke<SyncConfig>("sync_get_config"),
-    setToken: (token: string) => invoke<void>("sync_set_token", { token }),
-    setPassphrase: (passphrase: string) =>
-      invoke<void>("sync_set_passphrase", { passphrase }),
+    /** Link a device to a GitHub account; see `SyncConnectOutcome`. */
+    connect: (token: string, passphrase: string, force: boolean) =>
+      invoke<SyncConnectOutcome>("sync_connect", { token, passphrase, force }),
     disconnect: () => invoke<void>("sync_disconnect"),
     /** Merge remote + local, then push; resolves to the gist id. */
     push: () => invoke<string>("sync_push"),
@@ -157,8 +158,11 @@ export const ipc = {
     /** Destructive: replaces local data with the chosen revision. */
     restoreVersion: (sha: string) =>
       invoke<void>("sync_restore_gist_version", { sha }),
-    fileExport: (path: string) => invoke<void>("sync_file_export", { path }),
-    fileImport: (path: string) => invoke<void>("sync_file_import", { path }),
+    /** `passphrase` is entered manually each call and never persisted. */
+    fileExport: (path: string, passphrase: string) =>
+      invoke<void>("sync_file_export", { path, passphrase }),
+    fileImport: (path: string, passphrase: string) =>
+      invoke<void>("sync_file_import", { path, passphrase }),
   },
   ai: {
     getConfig: () => invoke<AiConfig>("ai_get_config"),

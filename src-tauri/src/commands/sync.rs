@@ -1,25 +1,37 @@
 //! Sync commands.
 //!
 //! Two manual paths, both built on the same encrypted snapshot:
-//!   * GitHub Gist — `sync_push` backs up (merge + push); `sync_list_gist_versions`
-//!     / `sync_restore_gist_version` browse and roll back to any prior backup.
-//!     The token, gist id and vault passphrase all live in the settings table
-//!     so the user configures them once instead of retyping a passphrase on
-//!     every operation.
+//!   * GitHub Gist — `sync_connect` links the token+passphrase pair and pulls
+//!     in whatever backup already exists; `sync_push` backs up (merge + push)
+//!     afterwards; `sync_list_gist_versions` / `sync_restore_gist_version`
+//!     browse and roll back to any prior backup. Once connected, the token,
+//!     gist id and passphrase are immutable from the UI — the only way to
+//!     change them is `sync_disconnect` followed by a fresh `sync_connect`.
 //!   * Local file — `sync_file_export` / `sync_file_import` for offline backup
-//!     and manual restore.
+//!     and manual restore. These take a passphrase supplied by the caller on
+//!     each call instead of the stored gist passphrase, so a local file can be
+//!     sealed with a secret independent of (and usable without) a configured
+//!     sync account.
 //!
 //! Gist discovery: the gist id is cached locally once known, but a device
 //! that only has the token (e.g. a fresh install) auto-discovers the vault
-//! gist created by another device on its first push/version-list, so
-//! multi-device sync doesn't require copying a gist id around by hand.
+//! gist created by another device on its first connect, so multi-device sync
+//! doesn't require copying a gist id around by hand.
+//!
+//! Connect safety: connecting to an account that already has a backup pulls
+//! and decrypts it with the given passphrase before anything is persisted.
+//! If decryption fails — the passphrase doesn't match what encrypted the
+//! remote data — `sync_connect` returns [`ConnectOutcome::PassphraseMismatch`]
+//! instead of an error, so the frontend can offer to either re-enter the
+//! passphrase or force-overwrite the remote backup with `force: true`.
 //!
 //! Push safety: pushing first pulls and merges whatever is already on the
 //! gist (last-write-wins, keyed on `updated_at`) so a push from a device that
 //! hasn't seen a teammate's edits can't silently clobber them. If the merge
-//! can't be completed — the gist was deleted, or the stored passphrase
-//! doesn't match what encrypted the remote data — the push is aborted with a
-//! clear error instead of overwriting the remote vault.
+//! can't be completed — the gist was deleted, or the remote data was
+//! re-encrypted with a different passphrase after this device connected —
+//! the push is aborted with a clear error instead of overwriting the remote
+//! vault.
 //!
 //! Restoring a specific version is a deliberate, destructive action: it
 //! replaces the local vault outright (see [`sync::restore_snapshot`]) instead
@@ -30,11 +42,12 @@ use std::path::PathBuf;
 
 use tauri::State;
 
+use crate::crypto;
 use crate::domain::now;
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 use crate::state::AppState;
-use crate::sync::{self, GistClient, GistVersion};
+use crate::sync::{self, GistClient, GistVersion, VaultSnapshot};
 
 const TOKEN_KEY: &str = "sync.gist.token";
 const GIST_ID_KEY: &str = "sync.gist.id";
@@ -109,33 +122,87 @@ pub async fn sync_get_config(state: State<'_, AppState>) -> AppResult<SyncConfig
     })
 }
 
-/// Store (or, when `token` is empty, clear) the GitHub personal access token.
-#[tauri::command]
-pub async fn sync_set_token(state: State<'_, AppState>, token: String) -> AppResult<()> {
-    let token = token.trim().to_string();
-    settings_repo::set(&state.db, TOKEN_KEY, &token).await?;
-    if token.is_empty() {
-        return Ok(());
-    }
-    // Best-effort discovery so a second device links up immediately after
-    // pasting its token, without needing a manual push first. Discovery
-    // failures (bad token, offline) are swallowed here — the real error will
-    // surface on the next explicit push/version list.
-    if read_gist_id(&state).await?.is_none() {
-        if let Ok(Some(id)) = GistClient::new(&token).find_vault_gist().await {
-            settings_repo::set(&state.db, GIST_ID_KEY, &id).await.ok();
-        }
-    }
-    Ok(())
+/// Outcome of [`sync_connect`]. Tagged so the frontend can branch without
+/// treating a passphrase mismatch as a hard error.
+#[derive(serde::Serialize)]
+#[serde(
+    tag = "status",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum ConnectOutcome {
+    /// Connected (and, if a remote backup existed, merged into the local
+    /// vault). `gist_id` is `None` when this is the first device to connect.
+    Connected { gist_id: Option<String> },
+    /// A backup already exists on the account but the given passphrase can't
+    /// decrypt it. Nothing was persisted — call again with `force: true` to
+    /// overwrite the remote backup, or retry with a different passphrase.
+    PassphraseMismatch { gist_id: String },
 }
 
-/// Store (or, when `passphrase` is empty, clear) the vault passphrase used to
-/// encrypt/decrypt every sync operation. Set once per device — it must match
-/// across devices that share a gist, or backups become unreadable to each
-/// other.
+/// Link this device to a GitHub account for sync. The token and passphrase
+/// are only persisted once resolved: if a backup already exists on the
+/// account, it's pulled and decrypted with `passphrase` first (and merged in
+/// on success). A decrypt failure is reported as
+/// [`ConnectOutcome::PassphraseMismatch`] instead of an error so nothing is
+/// left half-configured; pass `force: true` to skip verification and
+/// overwrite the remote backup with this device's local data instead.
+///
+/// Once connected, the token/gist/passphrase are immutable from the UI — call
+/// `sync_disconnect` first to reconnect with different credentials.
 #[tauri::command]
-pub async fn sync_set_passphrase(state: State<'_, AppState>, passphrase: String) -> AppResult<()> {
-    settings_repo::set(&state.db, PASSPHRASE_KEY, &passphrase).await
+pub async fn sync_connect(
+    state: State<'_, AppState>,
+    token: String,
+    passphrase: String,
+    force: bool,
+) -> AppResult<ConnectOutcome> {
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Err(AppError::Invalid("access token is required".into()));
+    }
+    if passphrase.is_empty() {
+        return Err(AppError::Invalid("passphrase is required".into()));
+    }
+
+    let client = GistClient::new(&token);
+    let gist_id = client.find_vault_gist().await?;
+
+    if let Some(id) = &gist_id {
+        if !force {
+            let envelope = client.pull(id).await?;
+            match crypto::decrypt(&envelope, &passphrase) {
+                Ok(bytes) => {
+                    let snapshot: VaultSnapshot = serde_json::from_slice(&bytes)?;
+                    sync::import_snapshot(&state.db, &snapshot).await?;
+                }
+                Err(AppError::Crypto(_)) => {
+                    return Ok(ConnectOutcome::PassphraseMismatch {
+                        gist_id: id.clone(),
+                    });
+                }
+                Err(err) => return Err(err),
+            }
+        }
+    }
+
+    settings_repo::set(&state.db, TOKEN_KEY, &token).await?;
+    settings_repo::set(&state.db, PASSPHRASE_KEY, &passphrase).await?;
+    if let Some(id) = &gist_id {
+        settings_repo::set(&state.db, GIST_ID_KEY, id).await?;
+    }
+
+    if force {
+        if let Some(id) = &gist_id {
+            let envelope = sync::export_encrypted(&state.db, &passphrase).await?;
+            client.push(Some(id), &envelope).await?;
+        }
+    }
+    if gist_id.is_some() {
+        mark_synced(&state).await?;
+    }
+
+    Ok(ConnectOutcome::Connected { gist_id })
 }
 
 /// Forget the token, gist id and passphrase (the remote gist itself is left
@@ -217,20 +284,33 @@ pub async fn sync_restore_gist_version(state: State<'_, AppState>, sha: String) 
     mark_synced(&state).await
 }
 
-/// Encrypt the full data set with the configured passphrase and write it to
-/// `path`.
+/// Encrypt the full data set with a caller-supplied passphrase and write it
+/// to `path`. Unlike the gist path, this passphrase is never persisted — the
+/// caller must supply it again for every export/import.
 #[tauri::command]
-pub async fn sync_file_export(state: State<'_, AppState>, path: String) -> AppResult<()> {
-    let passphrase = read_passphrase(&state).await?;
+pub async fn sync_file_export(
+    state: State<'_, AppState>,
+    path: String,
+    passphrase: String,
+) -> AppResult<()> {
+    if passphrase.is_empty() {
+        return Err(AppError::Invalid("passphrase is required".into()));
+    }
     let envelope = sync::export_encrypted(&state.db, &passphrase).await?;
     sync::write_envelope_file(&PathBuf::from(path), &envelope)
 }
 
-/// Read an encrypted vault from `path`, decrypt it with the configured
+/// Read an encrypted vault from `path`, decrypt it with a caller-supplied
 /// passphrase, and merge it into the local database (last-write-wins).
 #[tauri::command]
-pub async fn sync_file_import(state: State<'_, AppState>, path: String) -> AppResult<()> {
-    let passphrase = read_passphrase(&state).await?;
+pub async fn sync_file_import(
+    state: State<'_, AppState>,
+    path: String,
+    passphrase: String,
+) -> AppResult<()> {
+    if passphrase.is_empty() {
+        return Err(AppError::Invalid("passphrase is required".into()));
+    }
     let envelope = sync::read_envelope_file(&PathBuf::from(path))?;
     sync::import_encrypted(&state.db, &envelope, &passphrase).await
 }

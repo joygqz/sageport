@@ -21,9 +21,8 @@ import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import type { GistVersion } from "@/types/models";
 import {
-  useSetSyncPassphrase,
-  useSetSyncToken,
   useSyncConfig,
+  useSyncConnect,
   useSyncDisconnect,
   useSyncFileExport,
   useSyncFileImport,
@@ -36,9 +35,7 @@ export function SyncSection() {
   const { data: config } = useSyncConfig();
   return (
     <div className="flex flex-col gap-6">
-      <PassphraseCard />
-      <Separator />
-      <GistCard />
+      <ConnectCard />
       {!!config?.gistId && (
         <>
           <Separator />
@@ -46,188 +43,177 @@ export function SyncSection() {
         </>
       )}
       <Separator />
-      <FileBackupCard hasPassphrase={!!config?.hasPassphrase} />
+      <FileBackupCard />
     </div>
   );
 }
 
-function PassphraseCard() {
+function ConnectCard() {
   const { t } = useI18n();
   const { data: config } = useSyncConfig();
-  const setPassphrase = useSetSyncPassphrase();
-  const [value, setValue] = useState("");
-
-  const doSave = async () => {
-    try {
-      await setPassphrase.mutateAsync(value);
-      setValue("");
-      toast.success(t("settings.sync.passphrase.saved"));
-    } catch (err) {
-      toast.error(t("settings.sync.passphrase.saveError"), errorMessage(err));
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">
-          {t("settings.sync.passphrase.title")}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.sync.passphrase.description")}
-        </p>
-      </div>
-
-      <Field
-        label={t("settings.sync.passphrase.label")}
-        hint={
-          config?.hasPassphrase
-            ? t("settings.sync.passphrase.hintSaved")
-            : t("settings.sync.passphrase.hint")
-        }
-      >
-        <div className="flex gap-2">
-          <PasswordInput
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder={
-              config?.hasPassphrase ? "•••••••• (saved)" : "••••••••"
-            }
-            autoComplete="off"
-          />
-          <Button
-            onClick={doSave}
-            disabled={!value}
-            loading={setPassphrase.isPending}
-          >
-            {t("common.save")}
-          </Button>
-        </div>
-      </Field>
-    </div>
-  );
-}
-
-function GistCard() {
-  const { t } = useI18n();
-  const { data: config } = useSyncConfig();
-  const setToken = useSetSyncToken();
+  const connect = useSyncConnect();
   const disconnect = useSyncDisconnect();
   const push = useSyncPush();
-  const [token, setTokenValue] = useState("");
+  const [token, setToken] = useState("");
+  const [passphrase, setPassphrase] = useState("");
+  const [mismatchGistId, setMismatchGistId] = useState<string | null>(null);
 
-  const saveToken = async () => {
+  const doConnect = async (force: boolean) => {
     try {
-      await setToken.mutateAsync(token);
-      setTokenValue("");
-      toast.success(t("settings.sync.gist.tokenSaved"));
+      const outcome = await connect.mutateAsync({ token, passphrase, force });
+      if (outcome.status === "passphraseMismatch") {
+        setMismatchGistId(outcome.gistId);
+        return;
+      }
+      setMismatchGistId(null);
+      setToken("");
+      setPassphrase("");
     } catch (err) {
-      toast.error(t("settings.sync.gist.tokenSaveError"), errorMessage(err));
-    }
-  };
-
-  const doPush = async () => {
-    if (!config?.hasPassphrase) {
-      return toast.error(t("settings.sync.setPassphraseFirst"));
-    }
-    try {
-      await push.mutateAsync();
-      toast.success(
-        t("settings.sync.gist.pushedTitle"),
-        t("settings.sync.gist.pushedDescription"),
-      );
-    } catch (err) {
-      toast.error(t("settings.sync.gist.pushFailed"), errorMessage(err));
+      toast.error(t("settings.sync.connect.connectError"), errorMessage(err));
     }
   };
 
   const doDisconnect = async () => {
     try {
       await disconnect.mutateAsync();
-      toast.success(t("settings.sync.gist.disconnected"));
     } catch (err) {
-      toast.error(t("settings.sync.gist.disconnectError"), errorMessage(err));
+      toast.error(
+        t("settings.sync.connect.disconnectError"),
+        errorMessage(err),
+      );
     }
   };
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">
-          {t("settings.sync.gist.title")}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.sync.gist.description")}
-        </p>
-      </div>
+  const doPush = async () => {
+    try {
+      await push.mutateAsync();
+      toast.success(t("settings.sync.connect.pushedTitle"));
+    } catch (err) {
+      toast.error(t("settings.sync.connect.pushFailed"), errorMessage(err));
+    }
+  };
 
-      <Field
-        label={t("settings.sync.gist.tokenLabel")}
-        hint={
-          config?.hasToken
-            ? t("settings.sync.gist.tokenHintSaved")
-            : t("settings.sync.gist.tokenHint")
-        }
-      >
-        <div className="flex gap-2">
-          <PasswordInput
-            value={token}
-            onChange={(e) => setTokenValue(e.target.value)}
-            placeholder={config?.hasToken ? "•••••••• (saved)" : "ghp_…"}
-            autoComplete="off"
-          />
-          <Button
-            onClick={saveToken}
-            disabled={!token}
-            loading={setToken.isPending}
-          >
-            {t("common.save")}
-          </Button>
+  if (config?.hasToken) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3 className="text-sm font-medium text-foreground">
+            {t("settings.sync.connect.title")}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("settings.sync.connect.connectedHint")}
+          </p>
         </div>
-      </Field>
 
-      {config?.gistId && (
-        <p className="text-xs text-muted-foreground">
-          {t("settings.sync.gist.linkedLabel")}{" "}
-          <a
-            href={`https://gist.github.com/${config.gistId}`}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono text-foreground underline underline-offset-2"
-          >
-            {config.gistId.slice(0, 12)}…
-          </a>
-        </p>
-      )}
+        {config.gistId && (
+          <p className="text-xs text-muted-foreground">
+            {t("settings.sync.connect.linkedLabel")}{" "}
+            <a
+              href={`https://gist.github.com/${config.gistId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-foreground underline underline-offset-2"
+            >
+              {config.gistId.slice(0, 12)}…
+            </a>
+          </p>
+        )}
 
-      {config?.hasToken && (
         <p className="text-xs text-muted-foreground">
-          {t("settings.sync.gist.lastSyncedLabel")}{" "}
+          {t("settings.sync.connect.lastSyncedLabel")}{" "}
           {config.lastSyncedAt
             ? new Date(config.lastSyncedAt).toLocaleString()
-            : t("settings.sync.gist.neverSynced")}
+            : t("settings.sync.connect.neverSynced")}
         </p>
-      )}
 
-      <div className="flex gap-2">
-        <Button
-          variant="secondary"
-          onClick={doPush}
-          disabled={!config?.hasToken}
-          loading={push.isPending}
-        >
-          {t("settings.sync.gist.pushButton")}
-        </Button>
-        {config?.hasToken && (
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={doPush} loading={push.isPending}>
+            {t("settings.sync.connect.pushButton")}
+          </Button>
           <Button
             variant="ghost"
             onClick={doDisconnect}
             loading={disconnect.isPending}
           >
-            {t("settings.sync.gist.disconnectButton")}
+            {t("settings.sync.connect.disconnectButton")}
           </Button>
-        )}
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h3 className="text-sm font-medium text-foreground">
+          {t("settings.sync.connect.title")}
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {t("settings.sync.connect.description")}
+        </p>
+      </div>
+
+      <Field
+        label={t("settings.sync.connect.tokenLabel")}
+        hint={t("settings.sync.connect.tokenHint")}
+      >
+        <PasswordInput
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="ghp_…"
+          autoComplete="off"
+        />
+      </Field>
+
+      <Field
+        label={t("settings.sync.connect.passphraseLabel")}
+        hint={t("settings.sync.connect.passphraseHint")}
+      >
+        <PasswordInput
+          value={passphrase}
+          onChange={(e) => setPassphrase(e.target.value)}
+          placeholder="••••••••"
+          autoComplete="off"
+        />
+      </Field>
+
+      <div>
+        <Button
+          onClick={() => doConnect(false)}
+          disabled={!token || !passphrase}
+          loading={connect.isPending}
+        >
+          {t("settings.sync.connect.connectButton")}
+        </Button>
+      </div>
+
+      <Dialog
+        open={!!mismatchGistId}
+        onOpenChange={(open) => !open && setMismatchGistId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t("settings.sync.connect.mismatchTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("settings.sync.connect.mismatchDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setMismatchGistId(null)}>
+              {t("settings.sync.connect.mismatchCancelButton")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => doConnect(true)}
+              loading={connect.isPending}
+            >
+              {t("settings.sync.connect.mismatchForceButton")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -269,7 +255,6 @@ function VersionsCard() {
         <EmptyState
           icon={History}
           title={t("settings.sync.versions.empty")}
-          description={t("settings.sync.versions.emptyDescription")}
         />
       )}
 
@@ -329,10 +314,7 @@ function RestoreConfirmDialog({
     if (!target) return;
     try {
       await restore.mutateAsync(target.sha);
-      toast.success(
-        t("settings.sync.versions.restoredTitle"),
-        t("settings.sync.versions.restoredDescription"),
-      );
+      toast.success(t("settings.sync.versions.restoredTitle"));
       onOpenChange();
     } catch (err) {
       toast.error(t("settings.sync.versions.restoreFailed"), errorMessage(err));
@@ -367,14 +349,13 @@ function RestoreConfirmDialog({
   );
 }
 
-function FileBackupCard({ hasPassphrase }: { hasPassphrase: boolean }) {
+function FileBackupCard() {
   const { t } = useI18n();
   const fileExport = useSyncFileExport();
   const fileImport = useSyncFileImport();
+  const [action, setAction] = useState<"export" | "import" | null>(null);
 
-  const doExport = async () => {
-    if (!hasPassphrase)
-      return toast.error(t("settings.sync.setPassphraseFirst"));
+  const doExport = async (passphrase: string) => {
     const path = await save({
       title: t("settings.sync.exportDialogTitle"),
       defaultPath: "sageport-vault.json",
@@ -384,19 +365,14 @@ function FileBackupCard({ hasPassphrase }: { hasPassphrase: boolean }) {
     });
     if (!path) return;
     try {
-      await fileExport.mutateAsync(path);
-      toast.success(
-        t("settings.sync.exportedTitle"),
-        t("settings.sync.exportedDescription"),
-      );
+      await fileExport.mutateAsync({ path, passphrase });
+      toast.success(t("settings.sync.exportedTitle"));
     } catch (err) {
       toast.error(t("settings.sync.exportFailed"), errorMessage(err));
     }
   };
 
-  const doImport = async () => {
-    if (!hasPassphrase)
-      return toast.error(t("settings.sync.setPassphraseFirst"));
+  const doImport = async (passphrase: string) => {
     const selected = await open({
       title: t("settings.sync.importDialogTitle"),
       multiple: false,
@@ -407,14 +383,18 @@ function FileBackupCard({ hasPassphrase }: { hasPassphrase: boolean }) {
     const path = Array.isArray(selected) ? selected[0] : selected;
     if (!path) return;
     try {
-      await fileImport.mutateAsync(path);
-      toast.success(
-        t("settings.sync.importedTitle"),
-        t("settings.sync.importedDescription"),
-      );
+      await fileImport.mutateAsync({ path, passphrase });
+      toast.success(t("settings.sync.importedTitle"));
     } catch (err) {
       toast.error(t("settings.sync.importFailed"), errorMessage(err));
     }
+  };
+
+  const handleConfirm = async (passphrase: string) => {
+    const pending = action;
+    setAction(null);
+    if (pending === "export") await doExport(passphrase);
+    else if (pending === "import") await doImport(passphrase);
   };
 
   return (
@@ -427,22 +407,84 @@ function FileBackupCard({ hasPassphrase }: { hasPassphrase: boolean }) {
           {t("settings.sync.file.description")}
         </p>
       </div>
+
       <div className="flex gap-2">
         <Button
-          variant="secondary"
-          onClick={doExport}
+          onClick={() => setAction("export")}
           loading={fileExport.isPending}
         >
           {t("settings.sync.exportButton")}
         </Button>
         <Button
           variant="outline"
-          onClick={doImport}
+          onClick={() => setAction("import")}
           loading={fileImport.isPending}
         >
           {t("settings.sync.importButton")}
         </Button>
       </div>
+
+      <FilePassphraseDialog
+        open={action !== null}
+        onOpenChange={(open) => !open && setAction(null)}
+        onConfirm={handleConfirm}
+      />
     </div>
+  );
+}
+
+function FilePassphraseDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (passphrase: string) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <FilePassphraseForm
+          onCancel={() => onOpenChange(false)}
+          onConfirm={onConfirm}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Lives inside DialogContent so its state resets when the dialog closes. */
+function FilePassphraseForm({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: (passphrase: string) => void;
+}) {
+  const { t } = useI18n();
+  const [passphrase, setPassphrase] = useState("");
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{t("settings.sync.file.passphraseDialogTitle")}</DialogTitle>
+      </DialogHeader>
+      <PasswordInput
+        value={passphrase}
+        onChange={(e) => setPassphrase(e.target.value)}
+        placeholder="••••••••"
+        autoComplete="off"
+        autoFocus
+      />
+      <DialogFooter>
+        <Button variant="ghost" onClick={onCancel}>
+          {t("common.cancel")}
+        </Button>
+        <Button onClick={() => onConfirm(passphrase)} disabled={!passphrase}>
+          {t("settings.sync.file.passphraseDialogConfirm")}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

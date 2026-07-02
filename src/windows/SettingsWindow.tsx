@@ -211,10 +211,6 @@ function AiForm({ config }: { config: AiConfig }) {
         apiKey: apiKey || undefined,
       });
       setApiKey("");
-      toast.success(
-        t("settings.ai.savedTitle"),
-        t("settings.ai.savedDescription"),
-      );
     } catch (err) {
       toast.error(t("settings.ai.saveError"), errorMessage(err));
     }

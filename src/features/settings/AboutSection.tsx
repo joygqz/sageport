@@ -134,11 +134,7 @@ function UpdateStatus({ state }: { state: UpdateState }) {
   const { t } = useI18n();
 
   if (state.status === "idle") {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {t("settings.about.update.idle")}
-      </p>
-    );
+    return null;
   }
   if (state.status === "checking") {
     return (

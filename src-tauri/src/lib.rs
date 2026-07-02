@@ -87,8 +87,7 @@ pub fn run() {
             commands::sftp::sftp_transfer_history_clear,
             // sync
             commands::sync::sync_get_config,
-            commands::sync::sync_set_token,
-            commands::sync::sync_set_passphrase,
+            commands::sync::sync_connect,
             commands::sync::sync_disconnect,
             commands::sync::sync_push,
             commands::sync::sync_list_gist_versions,

@@ -54,7 +54,6 @@ export function IdentitiesSection() {
         password: authType === "password" && password ? password : null,
       });
       await emitRefresh();
-      toast.success(t("identities.addedTitle"), name.trim());
       reset();
     } catch (err) {
       toast.error(t("identities.addError"), errorMessage(err));
@@ -68,10 +67,7 @@ export function IdentitiesSection() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {t("identities.description")}
-        </p>
+      <div className="flex items-center justify-end">
         {!adding && (
           <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
             <Plus /> {t("identities.addIdentity")}
@@ -151,7 +147,6 @@ export function IdentitiesSection() {
         <EmptyState
           icon={UserCog}
           title={t("identities.emptyTitle")}
-          description={t("identities.emptyDescription")}
         />
       ) : (
         <div className="flex flex-col gap-1">

@@ -2,35 +2,46 @@
   <!--
     Sageport — master app icon (single source of truth).
     Edit this file, then run `pnpm icon` to regenerate every platform icon.
-    Motif: a terminal prompt `>_` (SSH / shell) on a teal→cyan "port" gradient.
-    Brand hue ≈ 200, matching the primary token in src/styles/globals.css.
+    Motif: the letter "S" drawn as a tunnel path between two endpoint ports
+    (local ↔ remote over SSH), teal→cyan stroke on deep graphite.
   -->
   <defs>
-    <!-- teal → cyan (terminal / network / port) -->
-    <linearGradient id="bg" x1="160" y1="120" x2="864" y2="904" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#2DD4BF"/>
-      <stop offset="0.55" stop-color="#0E9CB8"/>
-      <stop offset="1" stop-color="#0E7490"/>
+    <!-- deep graphite background -->
+    <linearGradient id="bg" x1="512" y1="80" x2="512" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#252E3B"/>
+      <stop offset="1" stop-color="#10141A"/>
     </linearGradient>
-    <!-- top-light overlay for subtle depth -->
-    <linearGradient id="sheen" x1="512" y1="80" x2="512" y2="620" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/>
+    <!-- teal → cyan along the path (terminal / network) -->
+    <linearGradient id="path" x1="648" y1="390" x2="376" y2="634" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5EEAD4"/>
+      <stop offset="0.5" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <!-- faint top light for depth -->
+    <linearGradient id="sheen" x1="512" y1="80" x2="512" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.07"/>
       <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
     </linearGradient>
-    <filter id="glyphShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#06323E" flood-opacity="0.28"/>
+    <filter id="glyphShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="22" flood-color="#000000" flood-opacity="0.35"/>
     </filter>
   </defs>
 
   <!-- rounded-squircle background (≈22% radius, iOS style) -->
-  <rect x="80" y="80" width="864" height="864" rx="200" fill="url(#bg)"/>
-  <rect x="80" y="80" width="864" height="864" rx="200" fill="url(#sheen)"/>
+  <rect x="80" y="80" width="864" height="864" rx="196" fill="url(#bg)"/>
+  <rect x="80" y="80" width="864" height="864" rx="196" fill="url(#sheen)"/>
+  <!-- hairline inner highlight for definition on dark desktops -->
+  <rect x="83" y="83" width="858" height="858" rx="193" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="3"/>
 
-  <!-- glyph: `>_` prompt -->
-  <g filter="url(#glyphShadow)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <!-- chevron -->
-    <polyline points="372,360 552,512 372,664" stroke-width="74"/>
-    <!-- cursor / underscore -->
-    <line x1="600" y1="664" x2="760" y2="664" stroke-width="74"/>
+  <!-- glyph: "S" as a tunnel path, twin elliptical arcs (rx 136 / ry 122 —
+       near-circular, so curvature stays even and the curve reads smooth).
+       Terminals stop at the ellipses' extreme x, flush with the opposite
+       bowl's outer edge; endpoints = ports -->
+  <g filter="url(#glyphShadow)">
+    <path d="M 648 390 A 136 122 0 1 0 512 512 A 136 122 0 1 1 376 634"
+          stroke="url(#path)" stroke-width="86" stroke-linecap="round"/>
+    <!-- endpoint ports -->
+    <circle cx="648" cy="390" r="30" fill="#FFFFFF"/>
+    <circle cx="376" cy="634" r="30" fill="#FFFFFF"/>
   </g>
 </svg>

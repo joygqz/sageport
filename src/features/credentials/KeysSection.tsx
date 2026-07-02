@@ -83,16 +83,12 @@ export function KeysSection() {
   const submitGenerate = async () => {
     if (!name.trim()) return toast.error(t("keys.nameRequired"));
     try {
-      const generated = await generateKey.mutateAsync({
+      await generateKey.mutateAsync({
         name: name.trim(),
         algorithm,
         passphrase: passphrase || null,
       });
       await emitRefresh();
-      toast.success(
-        t("keys.generatedTitle"),
-        `${generated.algorithm} · ${generated.fingerprint}`,
-      );
       reset();
     } catch (err) {
       toast.error(t("keys.addError"), errorMessage(err));
@@ -111,7 +107,6 @@ export function KeysSection() {
         passphrase: passphrase || null,
       });
       await emitRefresh();
-      toast.success(t("keys.addedTitle"), name.trim());
       reset();
     } catch (err) {
       toast.error(t("keys.addError"), errorMessage(err));
@@ -125,8 +120,7 @@ export function KeysSection() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{t("keys.description")}</p>
+      <div className="flex items-center justify-end">
         {mode === "closed" && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -156,7 +150,7 @@ export function KeysSection() {
               placeholder={t("keys.namePlaceholder")}
             />
           </Field>
-          <Field label={t("keys.algorithmLabel")} hint={t("keys.algorithmHint")}>
+          <Field label={t("keys.algorithmLabel")}>
             <Select
               value={algorithm}
               onChange={(e) => setAlgorithm(e.target.value as SshKeyAlgorithm)}
@@ -245,7 +239,6 @@ export function KeysSection() {
         <EmptyState
           icon={KeyRound}
           title={t("keys.emptyTitle")}
-          description={t("keys.emptyDescription")}
         />
       ) : (
         <div className="flex flex-col gap-1">

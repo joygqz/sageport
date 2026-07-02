@@ -101,16 +101,14 @@ export function HostSidebar({
   const onDeleteHost = async (host: Host) => {
     try {
       await deleteHost.mutateAsync(host.id);
-      toast.success(t("sidebar.hostDeleted"), host.label);
     } catch (err) {
       toast.error(t("sidebar.deleteError"), errorMessage(err));
     }
   };
 
-  const onDeleteGroup = async (id: string, name: string) => {
+  const onDeleteGroup = async (id: string) => {
     try {
       await deleteGroup.mutateAsync(id);
-      toast.success(t("sidebar.groupDeleted"), name);
     } catch (err) {
       toast.error(t("sidebar.deleteGroupError"), errorMessage(err));
     }
@@ -163,11 +161,6 @@ export function HostSidebar({
                 title={
                   query ? t("sidebar.noMatchesTitle") : t("sidebar.emptyTitle")
                 }
-                description={
-                  query
-                    ? t("sidebar.noMatchesDescription")
-                    : t("sidebar.emptyDescription")
-                }
                 action={
                   !query && (
                     <Button size="sm" onClick={onNewHost}>
@@ -193,7 +186,7 @@ export function HostSidebar({
                         }))
                       }
                       onEdit={() => void openGroupsWindow(section.id)}
-                      onDelete={() => onDeleteGroup(section.id, section.name)}
+                      onDelete={() => onDeleteGroup(section.id)}
                     />
                     {!isCollapsed &&
                       section.hosts.map((host) => (

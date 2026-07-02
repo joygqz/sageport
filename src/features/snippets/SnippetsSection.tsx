@@ -45,7 +45,6 @@ export function SnippetsSection() {
         description: description.trim() || null,
       });
       await emitRefresh();
-      toast.success(t("snippets.savedTitle"), name.trim());
       reset();
     } catch (err) {
       toast.error(t("snippets.saveError"), errorMessage(err));
@@ -65,10 +64,7 @@ export function SnippetsSection() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {t("snippets.description")}
-        </p>
+      <div className="flex items-center justify-end">
         {!adding && (
           <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
             <Plus /> {t("snippets.newSnippet")}
@@ -117,7 +113,6 @@ export function SnippetsSection() {
         <EmptyState
           icon={ScrollText}
           title={t("snippets.emptyTitle")}
-          description={t("snippets.emptyDescription")}
         />
       ) : (
         <div className="flex flex-col gap-1">
