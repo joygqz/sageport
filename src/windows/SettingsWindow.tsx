@@ -63,7 +63,7 @@ export function SettingsWindow() {
     <div className="flex h-full flex-col bg-background">
       <header
         data-tauri-drag-region
-        className="flex h-9 shrink-0 items-center border-b border-border bg-surface pl-20 text-sm font-medium text-surface-foreground"
+        className="flex h-9 shrink-0 items-center border-b border-border bg-surface pl-24 text-sm font-medium text-surface-foreground"
       >
         {t("windowTitles.settings")}
       </header>

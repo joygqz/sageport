@@ -24,7 +24,7 @@ export function TitleBar({
   return (
     <header
       data-tauri-drag-region
-      className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-surface pl-20 pr-2"
+      className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-surface pl-24 pr-2"
     >
       <span className="pointer-events-none text-sm font-medium text-surface-foreground">
         Sageport

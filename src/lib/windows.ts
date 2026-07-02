@@ -50,6 +50,10 @@ interface OpenOptions {
 async function openWindow(opts: OpenOptions) {
   const existing = await WebviewWindow.getByLabel(opts.label);
   if (existing) {
+    if (await existing.isMinimized()) {
+      await existing.unminimize();
+    }
+    await existing.show();
     await existing.setFocus();
     return;
   }
