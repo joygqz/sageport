@@ -1,20 +1,17 @@
-import { Bot, FolderSync, Moon, Search, Settings, Sun } from "lucide-react";
+import { Bot, FolderSync, Moon, Settings, Sun } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Kbd } from "@/components/ui/kbd";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { useTheme } from "@/theme/useTheme";
 
 export function TitleBar({
-  onOpenCommand,
   onOpenSettings,
   onToggleAi,
   aiOpen,
   onToggleSftp,
   sftpOpen,
 }: {
-  onOpenCommand: () => void;
   onOpenSettings: () => void;
   onToggleAi: () => void;
   aiOpen: boolean;
@@ -29,16 +26,7 @@ export function TitleBar({
       data-tauri-drag-region
       className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-surface pl-20 pr-3"
     >
-      <button
-        onClick={onOpenCommand}
-        className="mx-auto flex h-7 w-80 max-w-[45%] items-center gap-2 rounded-md bg-background px-2.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <Search className="size-3.5" />
-        <span>{t("titleBar.searchPlaceholder")}</span>
-        <Kbd className="ml-auto">⌘K</Kbd>
-      </button>
-
-      <div className="flex items-center gap-1" data-tauri-drag-region>
+      <div className="ml-auto flex items-center gap-1" data-tauri-drag-region>
         <Tooltip
           content={sftpOpen ? t("titleBar.hideSftp") : t("titleBar.showSftp")}
         >

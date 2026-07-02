@@ -4,10 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { Toaster } from "@/components/ui/toaster";
 import { ipc } from "@/lib/ipc";
-import { errorMessage, toast } from "@/lib/toast";
+import { toast } from "@/lib/toast";
 import {
   ACTION_EVENT,
-  openCommandWindow,
   openHostWindow,
   openSettingsWindow,
   type WindowAction,
@@ -35,18 +34,11 @@ export default function App() {
     [openSession],
   );
 
-  // Handle actions dispatched from other windows (e.g. the command palette).
+  // Handle actions dispatched from other windows (e.g. running a snippet).
   useEffect(() => {
-    const unlisten = listen<WindowAction>(ACTION_EVENT, async (e) => {
+    const unlisten = listen<WindowAction>(ACTION_EVENT, (e) => {
       const action = e.payload;
-      if (action.type === "open-host") {
-        try {
-          const host = await ipc.hosts.get(action.hostId);
-          openSession(host);
-        } catch (err) {
-          toast.error(t("app.openHostError"), errorMessage(err));
-        }
-      } else if (action.type === "run-command") {
+      if (action.type === "run-command") {
         const activeId = useSessionStore.getState().activeId;
         if (!activeId) {
           toast.error(
@@ -61,16 +53,13 @@ export default function App() {
     return () => {
       void unlisten.then((un) => un());
     };
-  }, [openSession, t]);
+  }, [t]);
 
   // Global keyboard shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
-      if (meta && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        void openCommandWindow();
-      } else if (meta && e.key.toLowerCase() === "n") {
+      if (meta && e.key.toLowerCase() === "n") {
         e.preventDefault();
         void openHostWindow();
       } else if (meta && e.key === ",") {
@@ -85,7 +74,6 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <TitleBar
-        onOpenCommand={() => void openCommandWindow()}
         onOpenSettings={() => void openSettingsWindow()}
         onToggleAi={() => setAiOpen((v) => !v)}
         aiOpen={aiOpen}

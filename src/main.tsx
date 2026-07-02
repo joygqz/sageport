@@ -3,7 +3,6 @@ import ReactDOM from "react-dom/client";
 
 import { AppProviders } from "@/app/providers";
 import App from "@/App";
-import { CommandWindow } from "@/windows/CommandWindow";
 import { GroupsWindow } from "@/windows/GroupsWindow";
 import { HostFormWindow } from "@/windows/HostFormWindow";
 import { SettingsWindow } from "@/windows/SettingsWindow";
@@ -22,11 +21,6 @@ function resolveView() {
       return <HostFormWindow hostId={id} />;
     case "groups":
       return <GroupsWindow groupId={id} />;
-    case "command":
-      // Spotlight-style launcher: a transparent OS window whose only visible
-      // surface is the rounded card, so the document must be transparent too.
-      document.documentElement.classList.add("transparent-window");
-      return <CommandWindow />;
     default:
       return <App />;
   }

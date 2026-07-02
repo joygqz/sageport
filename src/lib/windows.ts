@@ -25,9 +25,7 @@ function title(key: TKey): string {
   return translate(detectLocale(), key);
 }
 
-export type WindowAction =
-  | { type: "open-host"; hostId: string }
-  | { type: "run-command"; command: string };
+export type WindowAction = { type: "run-command"; command: string };
 
 interface OpenOptions {
   label: string;
@@ -105,26 +103,6 @@ export function openGroupsWindow(groupId?: string) {
       : title("windowTitles.newGroup"),
     width: 420,
     height: 220,
-    resizable: false,
-  });
-}
-
-export function openCommandWindow() {
-  return openWindow({
-    label: "command",
-    view: "command",
-    title: title("windowTitles.commandPalette"),
-    width: 640,
-    height: 440,
-    decorations: false,
-    alwaysOnTop: true,
-    transparent: true,
-    // The OS draws its native window shadow around the full rectangular
-    // frame, not clipped to the rounded card inside it — on an undecorated
-    // transparent window that shows up as a stray rectangular border/halo
-    // around the floating card. The card already paints its own shadow via
-    // Tailwind (`shadow-2xl`), so the native one is redundant and harmful.
-    shadow: false,
     resizable: false,
   });
 }

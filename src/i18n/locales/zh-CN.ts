@@ -32,11 +32,9 @@ export const zhCN: Dictionary = {
     newHost: "新建主机",
     newGroup: "新建分组",
     editGroup: "编辑分组",
-    commandPalette: "命令面板",
   },
 
   titleBar: {
-    searchPlaceholder: "搜索主机、运行命令…",
     showAi: "显示 AI 助手",
     hideAi: "隐藏 AI 助手",
     showSftp: "显示文件传输",
@@ -90,11 +88,6 @@ export const zhCN: Dictionary = {
     },
   },
 
-  commandPalette: {
-    searchPlaceholder: "搜索要连接的主机…",
-    noHosts: "未找到主机。",
-  },
-
   sidebar: {
     filterPlaceholder: "筛选主机…",
     add: "添加",
@@ -118,10 +111,6 @@ export const zhCN: Dictionary = {
     closed: "会话已结束",
     closedHint: "远程会话已关闭。",
     reconnect: "重新连接",
-  },
-
-  app: {
-    openHostError: "无法打开主机",
   },
 
   settings: {

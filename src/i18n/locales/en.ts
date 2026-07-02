@@ -34,11 +34,9 @@ export const en = {
     newHost: "New host",
     newGroup: "New group",
     editGroup: "Edit group",
-    commandPalette: "Command palette",
   },
 
   titleBar: {
-    searchPlaceholder: "Search hosts, run a command…",
     showAi: "Show AI assistant",
     hideAi: "Hide AI assistant",
     showSftp: "Show file transfer",
@@ -92,11 +90,6 @@ export const en = {
     },
   },
 
-  commandPalette: {
-    searchPlaceholder: "Search hosts to connect…",
-    noHosts: "No hosts found.",
-  },
-
   sidebar: {
     filterPlaceholder: "Filter hosts…",
     add: "Add",
@@ -121,10 +114,6 @@ export const en = {
     closed: "Session ended",
     closedHint: "The remote session has closed.",
     reconnect: "Reconnect",
-  },
-
-  app: {
-    openHostError: "Could not open host",
   },
 
   settings: {
