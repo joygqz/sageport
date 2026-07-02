@@ -106,9 +106,9 @@ fn is_tool_result_message(v: &Value) -> bool {
             .and_then(Value::as_array)
             .is_some_and(|blocks| {
                 !blocks.is_empty()
-                    && blocks.iter().all(|b| {
-                        b.get("type").and_then(Value::as_str) == Some("tool_result")
-                    })
+                    && blocks
+                        .iter()
+                        .all(|b| b.get("type").and_then(Value::as_str) == Some("tool_result"))
             })
 }
 

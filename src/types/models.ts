@@ -113,6 +113,36 @@ export interface SshKeyInput {
   passphrase?: string | null;
 }
 
+/** Algorithm choice for `keys.generate`. */
+export type SshKeyAlgorithm =
+  | "ed25519"
+  | "ecdsaP256"
+  | "ecdsaP384"
+  | "ecdsaP521"
+  | "rsa2048"
+  | "rsa4096";
+
+export interface SshKeyGenerateInput {
+  name: string;
+  algorithm: SshKeyAlgorithm;
+  passphrase?: string | null;
+}
+
+/** `keys.generate`'s response: the persisted key plus a one-time summary. */
+export interface GeneratedSshKey extends SshKey {
+  fingerprint: string;
+  algorithm: string;
+}
+
+/** A private key file read via `keys.importFile`, for prefilling the import form. */
+export interface KeyFile {
+  name: string;
+  privateKey: string;
+  publicKey: string | null;
+  fingerprint: string | null;
+  algorithm: string | null;
+}
+
 export interface SnippetInput {
   name: string;
   command: string;

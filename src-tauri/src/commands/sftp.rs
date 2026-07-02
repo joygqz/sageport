@@ -225,7 +225,8 @@ pub async fn fs_transfer(
         .spawn(move || {
             // `transfer` already emits a terminal done/error/cancelled event on
             // its own; here we just persist the outcome to history.
-            let outcome = sftp::transfer(&app, &mgr, &transfer_id, &source, &dest, compress, cancel);
+            let outcome =
+                sftp::transfer(&app, &mgr, &transfer_id, &source, &dest, compress, cancel);
             mgr.unregister_transfer(&transfer_id);
             tauri::async_runtime::block_on(async {
                 let _ = transfer_repo::finish(

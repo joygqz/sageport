@@ -3,6 +3,7 @@ use sqlx::SqlitePool;
 use crate::domain::{new_id, now, SshKey, SshKeyInput};
 use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
+use crate::sshkey;
 
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<SshKey>> {
     let rows = sqlx::query_as::<_, SshKey>(
@@ -21,7 +22,22 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<SshKey> {
         .ok_or_else(|| AppError::NotFound(format!("key {id}")))
 }
 
+/// Fill in `public_key` from the private key when the caller didn't supply
+/// one — e.g. a manually pasted/imported OpenSSH key with no sibling `.pub`
+/// file. Leaves unparseable key material untouched.
+fn with_derived_public_key(mut input: SshKeyInput) -> AppResult<SshKeyInput> {
+    if input.public_key.is_none() {
+        if let Some(private_key) = input.private_key.as_deref() {
+            if let Some(insight) = sshkey::inspect(private_key, input.passphrase.as_deref())? {
+                input.public_key = Some(insight.public_key);
+            }
+        }
+    }
+    Ok(input)
+}
+
 pub async fn create(pool: &SqlitePool, input: SshKeyInput) -> AppResult<SshKey> {
+    let input = with_derived_public_key(input)?;
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -42,13 +58,16 @@ pub async fn create(pool: &SqlitePool, input: SshKeyInput) -> AppResult<SshKey> 
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResult<SshKey> {
+    // Re-derive the public key when a new private key is sent without one,
+    // same as `create` — otherwise re-uploading just the private key would
+    // leave a stale public key behind.
+    let input = with_derived_public_key(input)?;
     let ts = now();
     let affected = sqlx::query(
-        "UPDATE keys SET name = ?, public_key = ?, updated_at = ?, revision = revision + 1
+        "UPDATE keys SET name = ?, updated_at = ?, revision = revision + 1
          WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(&input.name)
-    .bind(&input.public_key)
     .bind(&ts)
     .bind(id)
     .execute(pool)
@@ -58,7 +77,15 @@ pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResul
         return Err(AppError::NotFound(format!("key {id}")));
     }
 
-    // Only touch secret material when explicitly sent; empty clears it.
+    // Only touch secret/derived material when explicitly sent (or derived
+    // above); an empty string clears it, `None` leaves it untouched.
+    if input.public_key.is_some() {
+        sqlx::query("UPDATE keys SET public_key = ? WHERE id = ?")
+            .bind(none_if_empty(input.public_key.as_deref()))
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
     if input.private_key.is_some() {
         sqlx::query("UPDATE keys SET private_key = ? WHERE id = ?")
             .bind(none_if_empty(input.private_key.as_deref()))

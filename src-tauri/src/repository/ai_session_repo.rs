@@ -62,16 +62,14 @@ pub async fn save(
 ) -> AppResult<AiSessionRow> {
     let ts = now();
     let affected = if let Some(title) = title {
-        sqlx::query(
-            "UPDATE ai_sessions SET messages = ?, title = ?, updated_at = ? WHERE id = ?",
-        )
-        .bind(messages_json)
-        .bind(title)
-        .bind(&ts)
-        .bind(id)
-        .execute(pool)
-        .await?
-        .rows_affected()
+        sqlx::query("UPDATE ai_sessions SET messages = ?, title = ?, updated_at = ? WHERE id = ?")
+            .bind(messages_json)
+            .bind(title)
+            .bind(&ts)
+            .bind(id)
+            .execute(pool)
+            .await?
+            .rows_affected()
     } else {
         sqlx::query("UPDATE ai_sessions SET messages = ?, updated_at = ? WHERE id = ?")
             .bind(messages_json)

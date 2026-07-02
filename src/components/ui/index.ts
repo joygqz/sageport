@@ -9,7 +9,6 @@ export * from "./dialog";
 export * from "./dropdown-menu";
 export * from "./context-menu";
 export * from "./tooltip";
-export * from "./tabs";
 export * from "./scroll-area";
 export * from "./switch";
 export * from "./separator";

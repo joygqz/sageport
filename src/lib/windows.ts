@@ -2,6 +2,7 @@ import {
   getCurrentWebviewWindow,
   WebviewWindow,
 } from "@tauri-apps/api/webviewWindow";
+import type { TitleBarStyle } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 
 import { detectLocale } from "@/i18n/config";
@@ -40,6 +41,8 @@ interface OpenOptions {
   alwaysOnTop?: boolean;
   transparent?: boolean;
   shadow?: boolean;
+  titleBarStyle?: TitleBarStyle;
+  hiddenTitle?: boolean;
 }
 
 async function openWindow(opts: OpenOptions) {
@@ -61,6 +64,8 @@ async function openWindow(opts: OpenOptions) {
     alwaysOnTop: opts.alwaysOnTop ?? false,
     transparent: opts.transparent ?? false,
     shadow: opts.shadow ?? true,
+    titleBarStyle: opts.titleBarStyle,
+    hiddenTitle: opts.hiddenTitle,
     center: true,
     focus: true,
   });
@@ -74,6 +79,8 @@ export function openSettingsWindow() {
     title: title("windowTitles.settings"),
     width: 760,
     height: 580,
+    titleBarStyle: "overlay",
+    hiddenTitle: true,
   });
 }
 

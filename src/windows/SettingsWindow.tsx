@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
-
 import {
-  Button,
-  Field,
-  Input,
-  Select,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui";
+  Bot,
+  KeyRound,
+  Monitor,
+  Moon,
+  Palette,
+  RefreshCw,
+  ScrollText,
+  Sun,
+  UserCog,
+} from "lucide-react";
+
+import { Button, Field, Input, Select } from "@/components/ui";
 import { LOCALE_LABELS, LOCALES, useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -28,53 +29,72 @@ import { KeysSection } from "@/features/credentials/KeysSection";
 import { SnippetsSection } from "@/features/snippets/SnippetsSection";
 import { SyncSection } from "@/features/sync/SyncSection";
 
+type SettingsSection =
+  | "appearance"
+  | "ai"
+  | "keys"
+  | "identities"
+  | "snippets"
+  | "sync";
+
 export function SettingsWindow() {
   const { t } = useI18n();
+  const [section, setSection] = useState<SettingsSection>("appearance");
+
+  const items: {
+    id: SettingsSection;
+    labelKey: Parameters<typeof t>[0];
+    icon: typeof Palette;
+  }[] = [
+    { id: "appearance", labelKey: "settings.tabs.appearance", icon: Palette },
+    { id: "ai", labelKey: "settings.tabs.ai", icon: Bot },
+    { id: "keys", labelKey: "settings.tabs.keys", icon: KeyRound },
+    { id: "identities", labelKey: "settings.tabs.identities", icon: UserCog },
+    { id: "snippets", labelKey: "settings.tabs.snippets", icon: ScrollText },
+    { id: "sync", labelKey: "settings.tabs.sync", icon: RefreshCw },
+  ];
+
   return (
     <div className="flex h-full flex-col bg-background">
-      <Tabs defaultValue="appearance" className="flex min-h-0 flex-1 flex-col">
-        <TabsList className="m-3 mb-0">
-          <TabsTrigger value="appearance" className="flex-1">
-            {t("settings.tabs.appearance")}
-          </TabsTrigger>
-          <TabsTrigger value="ai" className="flex-1">
-            {t("settings.tabs.ai")}
-          </TabsTrigger>
-          <TabsTrigger value="keys" className="flex-1">
-            {t("settings.tabs.keys")}
-          </TabsTrigger>
-          <TabsTrigger value="identities" className="flex-1">
-            {t("settings.tabs.identities")}
-          </TabsTrigger>
-          <TabsTrigger value="snippets" className="flex-1">
-            {t("settings.tabs.snippets")}
-          </TabsTrigger>
-          <TabsTrigger value="sync" className="flex-1">
-            {t("settings.tabs.sync")}
-          </TabsTrigger>
-        </TabsList>
+      <header
+        data-tauri-drag-region
+        className="flex h-10 shrink-0 items-center border-b border-sidebar-border bg-sidebar pl-20 text-sm font-medium text-sidebar-foreground"
+      >
+        {t("windowTitles.settings")}
+      </header>
+
+      <div className="flex min-h-0 flex-1">
+        <aside className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-sidebar-border bg-sidebar p-2">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = section === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setSection(item.id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="truncate">{t(item.labelKey)}</span>
+              </button>
+            );
+          })}
+        </aside>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <TabsContent value="appearance">
-            <AppearanceSection />
-          </TabsContent>
-          <TabsContent value="ai">
-            <AiSection />
-          </TabsContent>
-          <TabsContent value="keys">
-            <KeysSection />
-          </TabsContent>
-          <TabsContent value="identities">
-            <IdentitiesSection />
-          </TabsContent>
-          <TabsContent value="snippets">
-            <SnippetsSection />
-          </TabsContent>
-          <TabsContent value="sync">
-            <SyncSection />
-          </TabsContent>
+          {section === "appearance" && <AppearanceSection />}
+          {section === "ai" && <AiSection />}
+          {section === "keys" && <KeysSection />}
+          {section === "identities" && <IdentitiesSection />}
+          {section === "snippets" && <SnippetsSection />}
+          {section === "sync" && <SyncSection />}
         </div>
-      </Tabs>
+      </div>
     </div>
   );
 }

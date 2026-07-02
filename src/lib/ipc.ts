@@ -11,6 +11,7 @@ import type {
   AiToolSpec,
   FileEntry,
   FsEndpoint,
+  GeneratedSshKey,
   GistVersion,
   Group,
   GroupInput,
@@ -18,11 +19,13 @@ import type {
   HostInput,
   Identity,
   IdentityInput,
+  KeyFile,
   SftpStatusEvent,
   Snippet,
   SnippetInput,
   SshDataEvent,
   SshKey,
+  SshKeyGenerateInput,
   SshKeyInput,
   SshStatusEvent,
   SyncConfig,
@@ -65,6 +68,11 @@ export const ipc = {
     update: (id: string, input: SshKeyInput) =>
       invoke<SshKey>("keys_update", { id, input }),
     remove: (id: string) => invoke<void>("keys_delete", { id }),
+    /** Generate a new keypair and persist it in one step. */
+    generate: (input: SshKeyGenerateInput) =>
+      invoke<GeneratedSshKey>("keys_generate", { input }),
+    /** Read a key file (and sibling `.pub`, if any) picked via the file dialog. */
+    importFile: (path: string) => invoke<KeyFile>("keys_import_file", { path }),
   },
   snippets: {
     list: () => invoke<Snippet[]>("snippets_list"),

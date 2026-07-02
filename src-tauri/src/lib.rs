@@ -7,6 +7,7 @@ mod error;
 mod repository;
 mod sftp;
 mod ssh;
+mod sshkey;
 mod state;
 mod sync;
 
@@ -53,6 +54,8 @@ pub fn run() {
             commands::keys::keys_create,
             commands::keys::keys_update,
             commands::keys::keys_delete,
+            commands::keys::keys_generate,
+            commands::keys::keys_import_file,
             // snippets
             commands::snippets::snippets_list,
             commands::snippets::snippets_create,

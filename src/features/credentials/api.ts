@@ -8,6 +8,7 @@ import { ipc } from "@/lib/ipc";
 import type {
   IdentityInput,
   SnippetInput,
+  SshKeyGenerateInput,
   SshKeyInput,
 } from "@/types/models";
 
@@ -42,6 +43,21 @@ export function useDeleteSshKey() {
   return useMutation({
     mutationFn: (id: string) => ipc.keys.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.sshKeys }),
+  });
+}
+
+export function useGenerateSshKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SshKeyGenerateInput) => ipc.keys.generate(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sshKeys }),
+  });
+}
+
+/** Reads a key file (and sibling `.pub`) for prefilling the import form; doesn't persist. */
+export function useImportSshKeyFile() {
+  return useMutation({
+    mutationFn: (path: string) => ipc.keys.importFile(path),
   });
 }
 

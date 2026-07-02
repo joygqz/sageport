@@ -30,3 +30,27 @@ pub struct SshKeyInput {
     #[serde(default)]
     pub passphrase: Option<String>,
 }
+
+/// Algorithm choice for `keys_generate`. Variant names serialize to the exact
+/// strings the frontend's `SshKeyAlgorithm` union uses (`rename_all =
+/// "camelCase"` turns `EcdsaP256` into `"ecdsaP256"`, `Rsa4096` into
+/// `"rsa4096"`, etc.).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum KeyAlgorithm {
+    Ed25519,
+    EcdsaP256,
+    EcdsaP384,
+    EcdsaP521,
+    Rsa2048,
+    Rsa4096,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshKeyGenerateInput {
+    pub name: String,
+    pub algorithm: KeyAlgorithm,
+    #[serde(default)]
+    pub passphrase: Option<String>,
+}
