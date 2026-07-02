@@ -1,92 +1,117 @@
+<div align="center">
+
+<img src="public/app-icon.png" alt="Sageport" width="96" height="96" />
+
 # Sageport
 
-An ops-focused **SSH client with an AI command assistant**, built with Tauri 2.
-Local-first storage, an OS-keychain-backed secret vault, and an encrypted
-export/import path that doubles as a zero-backend sync foundation. The UI takes
-cues from Termius: a host sidebar, tabbed terminals, a command palette, and a
-side panel assistant.
+**A modern, ops-focused SSH client with a built-in AI assistant**
 
-## Stack
+Connect, transfer, and troubleshoot — all in one window. Your data stays encrypted and yours alone.
 
-| Layer         | Choice                                                                |
-| ------------- | --------------------------------------------------------------------- |
-| Shell         | Tauri 2 (Rust)                                                        |
-| Frontend      | React 19 + TypeScript (strict), Vite                                  |
-| Styling       | Tailwind CSS v4 (CSS-first design tokens), light/dark/system theming  |
-| Components    | Self-owned library over Radix primitives + `class-variance-authority` |
-| Data fetching | TanStack Query                                                        |
-| Client state  | Zustand                                                               |
-| Terminal      | xterm.js (`@xterm/*`)                                                 |
-| SSH           | `ssh2` (libssh2, vendored OpenSSL)                                    |
-| Persistence   | SQLite via `sqlx` (+ migrations)                                      |
-| Secrets       | OS keychain via `keyring`                                             |
-| Vault crypto  | Argon2id + AES-256-GCM                                                |
-| AI            | Anthropic Messages API (`claude-opus-4-8`) via `reqwest`              |
+[![Latest release](https://img.shields.io/github/v/release/joygqz/sageport)](https://github.com/joygqz/sageport/releases/latest)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB)](https://tauri.app)
 
-## Architecture
+[Download](https://github.com/joygqz/sageport/releases/latest) · [Features](#features) · [Getting Started](#getting-started) · [Data & Security](#data--security)
 
-```
-src/                         # React frontend
-  app/        providers (QueryClient, Theme, Tooltip)
-  components/ ui/ (design system) + layout/ (TitleBar, CommandPalette)
-  features/   hosts/ terminal/ credentials/ ai/ settings/  (feature modules)
-  lib/        ipc.ts (typed Tauri facade), utils, toast store
-  theme/      ThemeProvider + tokens
-  types/      models.ts (mirror of Rust domain types)
+</div>
 
-src-tauri/src/               # Rust backend
-  commands/   thin Tauri command handlers
-  domain/     models + input payloads
-  repository/ SQL per aggregate (hosts, groups, identities, keys, snippets)
-  ssh/        thread-per-session manager over ssh2, streamed via events
-  secrets/    keychain wrapper (single source of secret naming)
-  crypto/     passphrase vault (Argon2id + AES-GCM)
-  sync/       SyncProvider trait, LocalFileProvider, LWW snapshot merge
-  ai/         Anthropic Messages API client
-  db/ state/ error/
-  migrations/ 0001_init.sql
-```
+---
 
-### Key design decisions
+## Why Sageport
 
-- **Sync-ready from day one.** Every row carries `id` (UUID), `created_at`,
-  `updated_at`, `deleted_at` (tombstone), and `revision`. Deletes are soft.
-  `sync::import_snapshot` does a last-write-wins merge keyed on `updated_at`, so
-  the same code path will drive multi-device sync once a remote `SyncProvider`
-  is added (the local file provider already works — point it at a synced folder).
-- **Secrets never touch the database.** Passwords, private keys, passphrases and
-  the AI API key live in the OS keychain, referenced by entity id.
-- **Typed IPC boundary.** All `invoke` calls go through `src/lib/ipc.ts`; the
-  TS types in `src/types/models.ts` mirror the Rust `serde` models (camelCase).
-- **SSH sessions** run one OS thread each, owning the blocking `ssh2` session and
-  bridging to the UI with `ssh://data` / `ssh://status` Tauri events.
+- **One workspace for everything** — Terminal, SFTP file management, command snippets, and SSH key management in a single interface. No more juggling separate tools.
+- **An AI assistant that sees your terminal** — The assistant reads your session output to help diagnose errors and suggest commands. Any command it wants to run on a server requires your explicit confirmation first.
+- **Seamless multi-device sync, zero backend** — Hosts, credentials, and snippets sync through an end-to-end encrypted private GitHub Gist. No account to register, no third-party server ever touches your data.
+- **Light and fast** — Built on Tauri: small installer, quick startup, low memory footprint.
 
-## Develop
+## Features
+
+### Terminal
+
+- GPU-accelerated rendering via xterm.js — smooth even under heavy output
+- Multiple concurrent sessions with instant switching
+- In-terminal search, clickable links, full Unicode support
+
+### Host Management
+
+- Organize hosts into groups; credentials (passwords, keys, identities) are decoupled from hosts and reusable
+- Built-in SSH key manager: generate or import Ed25519, RSA, and ECDSA keys in standard OpenSSH format, with optional passphrase protection
+
+### SFTP File Transfer
+
+- Browse, upload, and download remote files right from a session
+- Folders are automatically archived and compressed in transit — fast even with thousands of small files
+
+### Command Snippets
+
+- Save frequently used commands and send them to the active session with one click
+- Synced across devices along with the rest of your data
+
+### AI Assistant
+
+- Bring your own API key — works with Anthropic and any OpenAI-compatible endpoint, with a configurable base URL and model
+- The assistant can list sessions and read terminal output to troubleshoot with full context
+- Every remote command **always prompts for confirmation** — review or decline each one before it runs
+
+### Sync & Backup
+
+- One passphrase encrypts all your data, synced across devices via a private GitHub Gist
+- Export and import encrypted backup files for offline safekeeping
+- Conflicts resolve automatically with last-write-wins merging — nothing to sort out by hand
+
+### Interface
+
+- Light and dark modes with five accent themes: monochrome, indigo, cyan, forest, and amber
+- English and Simplified Chinese localization
+- Automatic in-app updates
+
+## Installation
+
+Download the installer for your platform from the [latest release](https://github.com/joygqz/sageport/releases/latest):
+
+| Platform | Package |
+| --- | --- |
+| macOS | `.dmg` (Apple Silicon / Intel) |
+| Windows | `.msi` / `.exe` |
+| Linux | `.deb` / `.rpm` / `.AppImage` |
+
+No manual upgrades needed — the app notifies you when a new version is available.
+
+## Getting Started
+
+1. **Add a host** — Click "New Host" in the sidebar, enter the address and port, and choose password or key authentication.
+2. **Connect** — Double-click a host to open a terminal session. Open as many sessions per host as you need.
+3. **Transfer files** — Open the SFTP panel in a session to upload and download files.
+4. **Set up the AI assistant (optional)** — In Settings, enter your API key (Anthropic or any OpenAI-compatible service) and pick a model.
+5. **Enable sync (optional)** — In Settings → Sync, provide a GitHub token and a sync passphrase. Enter the same passphrase on another device to pull your entire configuration.
+
+## Data & Security
+
+- **Local-first**: All data lives in a local SQLite database. No cloud service required.
+- **End-to-end encryption**: Sync and backups derive a key from your passphrase (Argon2) and encrypt with AES-256-GCM. Only ciphertext reaches the Gist; your passphrase never leaves the device. **If you lose the passphrase, the data cannot be recovered — keep it safe.**
+- **Commands under your control**: Every remote command initiated by the AI assistant runs only after you approve it.
+- **Open source**: The entire codebase is open for audit.
+
+## Development
+
+Tech stack: Tauri 2 + Rust · React 19 + TypeScript · Tailwind CSS
 
 ```bash
+# Prerequisites: Rust, Node.js, pnpm
 pnpm install
-pnpm tauri dev      # run the desktop app
+
+# Development mode
+pnpm tauri dev
+
+# Build installers
+pnpm tauri build
 ```
 
-Useful scripts:
+Useful scripts: `pnpm lint` (linting), `pnpm typecheck` (type checking), `pnpm format` (formatting).
 
-```bash
-pnpm typecheck      # tsc --noEmit
-pnpm lint           # eslint
-pnpm build          # frontend production build (tsc + vite)
-cargo check         # (in src-tauri/) Rust check
-```
+Issues and pull requests are welcome.
 
-## Using the AI assistant
+## License
 
-Open **Settings → AI**, paste an Anthropic API key (stored in your keychain),
-and pick a model. The side panel (toolbar robot icon) then answers ops
-questions, returns commands in code blocks, and can copy them or run them in the
-active terminal.
-
-## Roadmap
-
-- Remote `SyncProvider` implementations (self-hosted backend / WebDAV / S3).
-- Identities & SSH key management UI (backend + storage already in place).
-- Agentic AI mode that reads terminal output and executes multi-step tasks.
-- SFTP, port forwarding, known-hosts verification.
+[GPL-3.0](LICENSE)
