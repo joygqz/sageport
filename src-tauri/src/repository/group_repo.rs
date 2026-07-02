@@ -59,9 +59,32 @@ pub async fn update(pool: &SqlitePool, id: &str, input: GroupInput) -> AppResult
     get(pool, id).await
 }
 
-/// Soft-delete (tombstone) so the change can propagate through sync.
-pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
+/// Soft-delete (tombstone) so the change can propagate through sync. When
+/// `delete_hosts` is set, hosts in the group are tombstoned along with it;
+/// otherwise they are moved to ungrouped rather than left pointing at a
+/// deleted group.
+pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResult<()> {
     let ts = now();
+    if delete_hosts {
+        sqlx::query(
+            "UPDATE hosts SET deleted_at = ?, updated_at = ?, revision = revision + 1
+             WHERE group_id = ? AND deleted_at IS NULL",
+        )
+        .bind(&ts)
+        .bind(&ts)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    } else {
+        sqlx::query(
+            "UPDATE hosts SET group_id = NULL, updated_at = ?, revision = revision + 1
+             WHERE group_id = ? AND deleted_at IS NULL",
+        )
+        .bind(&ts)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    }
     sqlx::query(
         "UPDATE groups SET deleted_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
     )

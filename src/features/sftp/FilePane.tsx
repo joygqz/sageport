@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { ask } from "@tauri-apps/plugin-dialog";
 import {
   ArrowUp,
   FolderPlus,
@@ -12,6 +11,7 @@ import {
 
 import {
   Button,
+  ConfirmDialog,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -20,6 +20,7 @@ import {
   EmptyState,
   Input,
   Tooltip,
+  type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
@@ -60,6 +61,7 @@ export function FilePane({ side }: { side: PaneSide }) {
   const { data: hosts = [] } = useHosts();
 
   const [prompt, setPrompt] = useState<PromptState | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const active = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
 
   const onMkdir = (tab: SftpTab) =>
@@ -97,17 +99,27 @@ export function FilePane({ side }: { side: PaneSide }) {
     });
 
   const onDelete = async (tab: SftpTab, entry: FileEntry) => {
-    const ok = await ask(t("sftp.deleteConfirm", { name: entry.name }), {
-      title: t("common.delete"),
-      kind: "warning",
-    });
-    if (!ok) return;
     try {
       await ipc.sftp.remove(tab.connectionId, entry.path, entry.kind === "dir");
       await refresh(side, tab.id);
     } catch (err) {
       toast.error(t("sftp.deleteError"), errorMessage(err));
     }
+  };
+
+  const confirmDelete = (tab: SftpTab, entry: FileEntry) => {
+    setConfirmState({
+      title: t("common.delete"),
+      description: t("sftp.deleteConfirm", { name: entry.name }),
+      cancelLabel: t("common.cancel"),
+      actions: [
+        {
+          label: t("common.delete"),
+          variant: "destructive",
+          onSelect: () => void onDelete(tab, entry),
+        },
+      ],
+    });
   };
 
   return (
@@ -132,6 +144,14 @@ export function FilePane({ side }: { side: PaneSide }) {
           <div
             key={tab.id}
             onClick={() => setActive(side, tab.id)}
+            onDoubleClick={() => {
+              if (tab.kind === "local") {
+                void addLocalTab(side);
+                return;
+              }
+              const host = hosts.find((h) => h.id === tab.hostId);
+              if (host) addRemoteTab(side, host);
+            }}
             className={cn(
               "group flex h-6 cursor-default items-center gap-1.5 rounded px-2 text-xs",
               tab.id === pane.activeTabId
@@ -231,7 +251,7 @@ export function FilePane({ side }: { side: PaneSide }) {
             side={side}
             tab={active}
             onRename={(entry) => onRename(active, entry)}
-            onDelete={(entry) => void onDelete(active, entry)}
+            onDelete={(entry) => confirmDelete(active, entry)}
           />
         </>
       ) : (
@@ -270,6 +290,7 @@ export function FilePane({ side }: { side: PaneSide }) {
       )}
 
       <PromptDialog state={prompt} onClose={() => setPrompt(null)} />
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </div>
   );
 }

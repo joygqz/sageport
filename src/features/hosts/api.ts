@@ -65,7 +65,8 @@ export function useUpdateGroup() {
 export function useDeleteGroup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => ipc.groups.remove(id),
+    mutationFn: ({ id, deleteHosts }: { id: string; deleteHosts: boolean }) =>
+      ipc.groups.remove(id, deleteHosts),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: hostKeys.groups });
       qc.invalidateQueries({ queryKey: hostKeys.hosts });

@@ -45,7 +45,8 @@ export const ipc = {
     create: (input: GroupInput) => invoke<Group>("groups_create", { input }),
     update: (id: string, input: GroupInput) =>
       invoke<Group>("groups_update", { id, input }),
-    remove: (id: string) => invoke<void>("groups_delete", { id }),
+    remove: (id: string, deleteHosts: boolean) =>
+      invoke<void>("groups_delete", { id, deleteHosts }),
   },
   hosts: {
     list: () => invoke<Host[]>("hosts_list"),

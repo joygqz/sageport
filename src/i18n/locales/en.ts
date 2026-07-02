@@ -76,6 +76,7 @@ export const en = {
       empty: "No transfers yet",
       clear: "Clear",
       clearConfirm: "Clear all transfer history? This cannot be undone.",
+      deleteConfirm: "Remove this entry from the transfer history?",
       clearError: "Could not update history",
       loadError: "Could not load transfer history",
       status: {
@@ -95,6 +96,14 @@ export const en = {
     ungrouped: "Ungrouped",
     deleteError: "Could not delete host",
     deleteGroupError: "Could not delete group",
+    deleteHostTitle: "Delete host",
+    deleteHostConfirm: "Delete host \"{label}\"? This cannot be undone.",
+    deleteGroupTitle: "Delete group",
+    deleteGroupConfirm: "Delete group \"{name}\"? This cannot be undone.",
+    deleteGroupWithHostsConfirm:
+      "Group \"{name}\" contains {count} host(s). Choose what to do with them.",
+    deleteGroupKeepHosts: "Delete group only",
+    deleteGroupAndHosts: "Delete group and hosts",
   },
 
   workspace: {
@@ -162,6 +171,10 @@ export const en = {
         pushedTitle: "Vault backed up",
         pushFailed: "Backup failed",
         disconnectError: "Could not disconnect",
+        disconnectConfirmTitle: "Disconnect sync?",
+        disconnectConfirmDescription:
+          "This device will stop backing up to and restoring from the linked Gist. The remote backup itself is not deleted.",
+        disconnectConfirmButton: "Disconnect",
         mismatchTitle: "Passphrase doesn't match the existing backup",
         mismatchDescription:
           "This passphrase can't decrypt the existing backup. Re-enter it, or overwrite the remote backup with local data.",
@@ -253,6 +266,9 @@ export const en = {
     emptyTitle: "No identities yet",
     nameUsernameRequired: "Name and username are required",
     addError: "Could not add identity",
+    deleteConfirmTitle: "Delete identity",
+    deleteConfirmDescription:
+      "Delete identity \"{name}\"? Hosts using it may fail to connect until you assign new credentials. This cannot be undone.",
   },
 
   snippets: {
@@ -267,6 +283,9 @@ export const en = {
     emptyTitle: "No snippets yet",
     nameCommandRequired: "Name and command are required",
     saveError: "Could not save snippet",
+    deleteConfirmTitle: "Delete snippet",
+    deleteConfirmDescription:
+      "Delete snippet \"{name}\"? This cannot be undone.",
   },
 
   keys: {
@@ -302,6 +321,9 @@ export const en = {
     emptyTitle: "No keys yet",
     nameKeyRequired: "Name and private key are required",
     addError: "Could not add key",
+    deleteConfirmTitle: "Delete key",
+    deleteConfirmDescription:
+      "Delete key \"{name}\"? Hosts or identities using it may fail to connect until you assign a new one. This cannot be undone.",
   },
 
   groups: {
@@ -323,6 +345,9 @@ export const en = {
     noSessions: "No chat history yet",
     untitledChat: "New chat",
     renameSession: "Rename chat",
+    deleteSessionConfirmTitle: "Delete chat",
+    deleteSessionConfirmDescription:
+      "Delete \"{title}\"? This cannot be undone.",
     askTitle: "Ask the agent",
     askDescription: "It can inspect and act on your terminal sessions.",
     thinking: "Working…",

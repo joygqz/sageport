@@ -1,9 +1,10 @@
-import { ask } from "@tauri-apps/plugin-dialog";
+import { useState } from "react";
 import { History, HardDrive, Server, Trash2 } from "lucide-react";
 
 import {
   Badge,
   Button,
+  ConfirmDialog,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -12,6 +13,7 @@ import {
   ScrollArea,
   Spinner,
   Tooltip,
+  type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
@@ -44,13 +46,9 @@ export function TransferHistoryDialog({
   const { data: entries, isLoading, isError } = useTransferHistory(open);
   const deleteOne = useDeleteTransferHistory();
   const clearAll = useClearTransferHistory();
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const onClear = async () => {
-    const ok = await ask(t("sftp.history.clearConfirm"), {
-      title: t("sftp.history.title"),
-      kind: "warning",
-    });
-    if (!ok) return;
     try {
       await clearAll.mutateAsync();
     } catch (err) {
@@ -66,6 +64,36 @@ export function TransferHistoryDialog({
     }
   };
 
+  const confirmClear = () => {
+    setConfirmState({
+      title: t("sftp.history.title"),
+      description: t("sftp.history.clearConfirm"),
+      cancelLabel: t("common.cancel"),
+      actions: [
+        {
+          label: t("sftp.history.clear"),
+          variant: "destructive",
+          onSelect: () => void onClear(),
+        },
+      ],
+    });
+  };
+
+  const confirmDeleteOne = (id: string) => {
+    setConfirmState({
+      title: t("common.delete"),
+      description: t("sftp.history.deleteConfirm"),
+      cancelLabel: t("common.cancel"),
+      actions: [
+        {
+          label: t("common.delete"),
+          variant: "destructive",
+          onSelect: () => void onDeleteOne(id),
+        },
+      ],
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[70vh] max-w-2xl flex-col gap-4">
@@ -76,7 +104,7 @@ export function TransferHistoryDialog({
               size="sm"
               variant="ghost"
               className="mr-6 text-muted-foreground hover:text-destructive"
-              onClick={() => void onClear()}
+              onClick={confirmClear}
             >
               <Trash2 /> {t("sftp.history.clear")}
             </Button>
@@ -154,7 +182,7 @@ export function TransferHistoryDialog({
                       size="icon"
                       variant="ghost"
                       className="size-6 shrink-0 opacity-0 group-hover:opacity-100"
-                      onClick={() => void onDeleteOne(e.id)}
+                      onClick={() => confirmDeleteOne(e.id)}
                     >
                       <Trash2 className="size-3.5" />
                     </Button>
@@ -165,6 +193,7 @@ export function TransferHistoryDialog({
           </ScrollArea>
         )}
       </DialogContent>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </Dialog>
   );
 }

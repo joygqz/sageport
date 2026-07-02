@@ -25,6 +25,10 @@ pub async fn groups_update(
 }
 
 #[tauri::command]
-pub async fn groups_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
-    group_repo::delete(&state.db, &id).await
+pub async fn groups_delete(
+    state: State<'_, AppState>,
+    id: String,
+    delete_hosts: bool,
+) -> AppResult<()> {
+    group_repo::delete(&state.db, &id, delete_hosts).await
 }

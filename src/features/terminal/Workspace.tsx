@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { useHosts } from "@/features/hosts/api";
 import { SessionOverlay } from "./SessionOverlay";
 import { TerminalView } from "./Terminal";
 import {
@@ -22,7 +23,9 @@ const statusColor: Record<SessionStatus, string> = {
 
 export function Workspace({ onNewHost }: { onNewHost: () => void }) {
   const { t } = useI18n();
-  const { sessions, activeId, setActive, close, reconnect } = useSessionStore();
+  const { sessions, activeId, setActive, open, close, reconnect } =
+    useSessionStore();
+  const { data: hosts = [] } = useHosts();
 
   if (sessions.length === 0) {
     return (
@@ -50,6 +53,10 @@ export function Workspace({ onNewHost }: { onNewHost: () => void }) {
             active={session.id === activeId}
             onSelect={() => setActive(session.id)}
             onClose={() => close(session.id)}
+            onDuplicate={() => {
+              const host = hosts.find((h) => h.id === session.hostId);
+              if (host) open(host);
+            }}
           />
         ))}
       </div>
@@ -89,15 +96,18 @@ function TabItem({
   active,
   onSelect,
   onClose,
+  onDuplicate,
 }: {
   session: TerminalSession;
   active: boolean;
   onSelect: () => void;
   onClose: () => void;
+  onDuplicate: () => void;
 }) {
   return (
     <div
       onClick={onSelect}
+      onDoubleClick={onDuplicate}
       className={cn(
         "group flex h-7 cursor-default items-center gap-2 rounded-md px-2.5 text-xs font-medium transition-colors",
         active

@@ -10,7 +10,6 @@ import {
   SquarePen,
   Terminal as TerminalIcon,
   Trash2,
-  User,
   X,
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -18,6 +17,7 @@ import remarkGfm from "remark-gfm";
 
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog, type ConfirmState } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +89,7 @@ export function AiPanel({
   const [renameTarget, setRenameTarget] = useState<AiSessionSummary | null>(
     null,
   );
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -123,6 +124,23 @@ export function AiPanel({
   };
 
   const activeTitle = sessions.find((s) => s.id === activeId)?.title;
+
+  const confirmDeleteSession = (session: AiSessionSummary) => {
+    setConfirmState({
+      title: t("ai.deleteSessionConfirmTitle"),
+      description: t("ai.deleteSessionConfirmDescription", {
+        title: session.title || t("ai.untitledChat"),
+      }),
+      cancelLabel: t("common.cancel"),
+      actions: [
+        {
+          label: t("common.delete"),
+          variant: "destructive",
+          onSelect: () => void deleteSession(session.id),
+        },
+      ],
+    });
+  };
 
   return (
     <>
@@ -195,7 +213,7 @@ export function AiPanel({
                           className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
-                            void deleteSession(s.id);
+                            confirmDeleteSession(s);
                           }}
                         >
                           <Trash2 className="size-3.5" />
@@ -309,6 +327,7 @@ export function AiPanel({
         onClose={() => setRenameTarget(null)}
         onRename={renameSession}
       />
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }
@@ -402,33 +421,21 @@ function Bubble({
   role: "user" | "assistant";
   content: string;
 }) {
-  const isUser = role === "user";
+  if (role === "user") {
+    return (
+      <div className="rounded-lg bg-accent/60 px-3 py-2">
+        <p className="whitespace-pre-wrap break-words text-sm">{content}</p>
+      </div>
+    );
+  }
   return (
-    <div className="flex gap-2.5">
-      <div
-        className={cn(
-          "flex size-6 shrink-0 items-center justify-center rounded-full",
-          isUser ? "bg-secondary" : "bg-primary/15 text-primary",
-        )}
+    <div className="min-w-0 space-y-2">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={MARKDOWN_COMPONENTS}
       >
-        {isUser ? (
-          <User className="size-3.5" />
-        ) : (
-          <Sparkles className="size-3.5" />
-        )}
-      </div>
-      <div className="min-w-0 flex-1 space-y-2 pt-0.5">
-        {isUser ? (
-          <p className="whitespace-pre-wrap break-words text-sm">{content}</p>
-        ) : (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={MARKDOWN_COMPONENTS}
-          >
-            {content}
-          </ReactMarkdown>
-        )}
-      </div>
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

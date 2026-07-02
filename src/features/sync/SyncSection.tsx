@@ -5,6 +5,7 @@ import { History, RotateCcw } from "lucide-react";
 import {
   Badge,
   Button,
+  ConfirmDialog,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,6 +17,7 @@ import {
   PasswordInput,
   Separator,
   Spinner,
+  type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
@@ -57,6 +59,7 @@ function ConnectCard() {
   const [token, setToken] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [mismatchGistId, setMismatchGistId] = useState<string | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   const doConnect = async (force: boolean) => {
     try {
@@ -83,6 +86,21 @@ function ConnectCard() {
       );
     }
   };
+
+  const disconnectConfirmState: ConfirmState | null = confirmDisconnect
+    ? {
+        title: t("settings.sync.connect.disconnectConfirmTitle"),
+        description: t("settings.sync.connect.disconnectConfirmDescription"),
+        cancelLabel: t("common.cancel"),
+        actions: [
+          {
+            label: t("settings.sync.connect.disconnectConfirmButton"),
+            variant: "destructive",
+            onSelect: () => void doDisconnect(),
+          },
+        ],
+      }
+    : null;
 
   const doPush = async () => {
     try {
@@ -132,12 +150,17 @@ function ConnectCard() {
           </Button>
           <Button
             variant="ghost"
-            onClick={doDisconnect}
+            onClick={() => setConfirmDisconnect(true)}
             loading={disconnect.isPending}
           >
             {t("settings.sync.connect.disconnectButton")}
           </Button>
         </div>
+
+        <ConfirmDialog
+          state={disconnectConfirmState}
+          onClose={() => setConfirmDisconnect(false)}
+        />
       </div>
     );
   }
@@ -310,43 +333,31 @@ function RestoreConfirmDialog({
   const { t } = useI18n();
   const restore = useSyncRestoreVersion();
 
-  const confirm = async () => {
-    if (!target) return;
+  const confirm = async (sha: string) => {
     try {
-      await restore.mutateAsync(target.sha);
+      await restore.mutateAsync(sha);
       toast.success(t("settings.sync.versions.restoredTitle"));
-      onOpenChange();
     } catch (err) {
       toast.error(t("settings.sync.versions.restoreFailed"), errorMessage(err));
     }
   };
 
-  return (
-    <Dialog open={!!target} onOpenChange={(open) => !open && onOpenChange()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {t("settings.sync.versions.restoreConfirmTitle")}
-          </DialogTitle>
-          <DialogDescription>
-            {t("settings.sync.versions.restoreConfirmDescription")}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onOpenChange}>
-            {t("settings.sync.versions.cancelButton")}
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={confirm}
-            loading={restore.isPending}
-          >
-            {t("settings.sync.versions.restoreConfirmButton")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  const state: ConfirmState | null = target
+    ? {
+        title: t("settings.sync.versions.restoreConfirmTitle"),
+        description: t("settings.sync.versions.restoreConfirmDescription"),
+        cancelLabel: t("settings.sync.versions.cancelButton"),
+        actions: [
+          {
+            label: t("settings.sync.versions.restoreConfirmButton"),
+            variant: "destructive",
+            onSelect: () => void confirm(target.sha),
+          },
+        ],
+      }
+    : null;
+
+  return <ConfirmDialog state={state} onClose={onOpenChange} />;
 }
 
 function FileBackupCard() {

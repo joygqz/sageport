@@ -74,6 +74,7 @@ export const zhCN: Dictionary = {
       empty: "暂无传输记录",
       clear: "清空",
       clearConfirm: "确定清空全部传输历史？此操作无法撤销。",
+      deleteConfirm: "确定从传输历史中移除这条记录吗？",
       clearError: "无法更新历史记录",
       loadError: "无法加载传输历史",
       status: {
@@ -93,6 +94,14 @@ export const zhCN: Dictionary = {
     ungrouped: "未分组",
     deleteError: "无法删除主机",
     deleteGroupError: "无法删除分组",
+    deleteHostTitle: "删除主机",
+    deleteHostConfirm: "确定要删除主机「{label}」吗？此操作无法撤销。",
+    deleteGroupTitle: "删除分组",
+    deleteGroupConfirm: "确定要删除分组「{name}」吗？此操作无法撤销。",
+    deleteGroupWithHostsConfirm:
+      "分组「{name}」下有 {count} 台主机，请选择处理方式。",
+    deleteGroupKeepHosts: "仅删除分组",
+    deleteGroupAndHosts: "删除分组及主机",
   },
 
   workspace: {
@@ -160,6 +169,10 @@ export const zhCN: Dictionary = {
         pushedTitle: "保险库已备份",
         pushFailed: "备份失败",
         disconnectError: "无法断开连接",
+        disconnectConfirmTitle: "断开同步？",
+        disconnectConfirmDescription:
+          "断开后此设备将不再向关联的 Gist 备份或从中恢复，远程备份本身不会被删除。",
+        disconnectConfirmButton: "断开连接",
         mismatchTitle: "口令与现有备份不匹配",
         mismatchDescription:
           "此口令无法解密现有备份。请重新输入，或用本机数据覆盖远程备份。",
@@ -249,6 +262,9 @@ export const zhCN: Dictionary = {
     emptyTitle: "暂无身份",
     nameUsernameRequired: "名称和用户名为必填项",
     addError: "无法添加身份",
+    deleteConfirmTitle: "删除身份",
+    deleteConfirmDescription:
+      "确定删除身份「{name}」吗？使用该身份的主机在重新指定凭据前可能无法连接。此操作无法撤销。",
   },
 
   snippets: {
@@ -263,6 +279,8 @@ export const zhCN: Dictionary = {
     emptyTitle: "暂无命令片段",
     nameCommandRequired: "名称和命令为必填项",
     saveError: "无法保存片段",
+    deleteConfirmTitle: "删除命令片段",
+    deleteConfirmDescription: "确定删除片段「{name}」吗？此操作无法撤销。",
   },
 
   keys: {
@@ -298,6 +316,9 @@ export const zhCN: Dictionary = {
     emptyTitle: "暂无密钥",
     nameKeyRequired: "名称和私钥为必填项",
     addError: "无法添加密钥",
+    deleteConfirmTitle: "删除密钥",
+    deleteConfirmDescription:
+      "确定删除密钥「{name}」吗？使用该密钥的主机或身份在重新指定密钥前可能无法连接。此操作无法撤销。",
   },
 
   groups: {
@@ -318,6 +339,8 @@ export const zhCN: Dictionary = {
     noSessions: "暂无历史会话",
     untitledChat: "新会话",
     renameSession: "重命名会话",
+    deleteSessionConfirmTitle: "删除会话",
+    deleteSessionConfirmDescription: "确定删除「{title}」吗？此操作无法撤销。",
     askTitle: "向 Agent 提问",
     askDescription: "它可以查看并操作你的终端会话。",
     thinking: "处理中…",

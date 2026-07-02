@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2, UserCog } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog, type ConfirmState } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { emitRefresh } from "@/lib/windows";
-import type { AuthType } from "@/types/models";
+import type { AuthType, Identity } from "@/types/models";
 import {
   useCreateIdentity,
   useDeleteIdentity,
@@ -31,6 +32,7 @@ export function IdentitiesSection() {
   const [authType, setAuthType] = useState<AuthType>("password");
   const [password, setPassword] = useState("");
   const [keyId, setKeyId] = useState("");
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const reset = () => {
     setName("");
@@ -63,6 +65,23 @@ export function IdentitiesSection() {
   const remove = async (id: string) => {
     await deleteIdentity.mutateAsync(id);
     await emitRefresh();
+  };
+
+  const confirmRemove = (identity: Identity) => {
+    setConfirmState({
+      title: t("identities.deleteConfirmTitle"),
+      description: t("identities.deleteConfirmDescription", {
+        name: identity.name,
+      }),
+      cancelLabel: t("common.cancel"),
+      actions: [
+        {
+          label: t("common.delete"),
+          variant: "destructive",
+          onSelect: () => void remove(identity.id),
+        },
+      ],
+    });
   };
 
   return (
@@ -164,7 +183,7 @@ export function IdentitiesSection() {
                 size="icon"
                 variant="ghost"
                 className="ml-auto size-7"
-                onClick={() => remove(id.id)}
+                onClick={() => confirmRemove(id)}
               >
                 <Trash2 className="size-3.5" />
               </Button>
@@ -172,6 +191,7 @@ export function IdentitiesSection() {
           ))}
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </div>
   );
 }

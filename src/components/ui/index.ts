@@ -6,6 +6,7 @@ export * from "./textarea";
 export * from "./label";
 export * from "./field";
 export * from "./dialog";
+export * from "./confirm-dialog";
 export * from "./dropdown-menu";
 export * from "./context-menu";
 export * from "./tooltip";

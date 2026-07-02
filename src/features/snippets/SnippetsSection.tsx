@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Play, Plus, ScrollText, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog, type ConfirmState } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { emitAction, emitRefresh } from "@/lib/windows";
+import type { Snippet } from "@/types/models";
 import {
   useCreateSnippet,
   useDeleteSnippet,
@@ -26,6 +28,7 @@ export function SnippetsSection() {
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [description, setDescription] = useState("");
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const reset = () => {
     setName("");
@@ -54,6 +57,23 @@ export function SnippetsSection() {
   const remove = async (id: string) => {
     await deleteSnippet.mutateAsync(id);
     await emitRefresh();
+  };
+
+  const confirmRemove = (snippet: Snippet) => {
+    setConfirmState({
+      title: t("snippets.deleteConfirmTitle"),
+      description: t("snippets.deleteConfirmDescription", {
+        name: snippet.name,
+      }),
+      cancelLabel: t("common.cancel"),
+      actions: [
+        {
+          label: t("common.delete"),
+          variant: "destructive",
+          onSelect: () => void remove(snippet.id),
+        },
+      ],
+    });
   };
 
   // Snippets live in the Settings window; ask the main window to run it.
@@ -141,7 +161,7 @@ export function SnippetsSection() {
                 size="icon"
                 variant="ghost"
                 className="size-7"
-                onClick={() => remove(s.id)}
+                onClick={() => confirmRemove(s)}
               >
                 <Trash2 className="size-3.5" />
               </Button>
@@ -149,6 +169,7 @@ export function SnippetsSection() {
           ))}
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </div>
   );
 }

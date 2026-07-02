@@ -13,6 +13,7 @@ import {
 
 import {
   Button,
+  ConfirmDialog,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -27,6 +28,7 @@ import {
   ResizeHandle,
   ScrollArea,
   Tooltip,
+  type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -60,6 +62,7 @@ export function HostSidebar({
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [width, setWidth] = useState(288);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -98,7 +101,7 @@ export function HostSidebar({
     return ordered;
   }, [filtered, groups, searching, t]);
 
-  const onDeleteHost = async (host: Host) => {
+  const doDeleteHost = async (host: Host) => {
     try {
       await deleteHost.mutateAsync(host.id);
     } catch (err) {
@@ -106,12 +109,61 @@ export function HostSidebar({
     }
   };
 
-  const onDeleteGroup = async (id: string) => {
+  const onDeleteHost = (host: Host) => {
+    setConfirmState({
+      title: t("sidebar.deleteHostTitle"),
+      description: t("sidebar.deleteHostConfirm", { label: host.label }),
+      cancelLabel: t("common.cancel"),
+      actions: [
+        {
+          label: t("common.delete"),
+          variant: "destructive",
+          onSelect: () => void doDeleteHost(host),
+        },
+      ],
+    });
+  };
+
+  const doDeleteGroup = async (id: string, deleteHosts: boolean) => {
     try {
-      await deleteGroup.mutateAsync(id);
+      await deleteGroup.mutateAsync({ id, deleteHosts });
     } catch (err) {
       toast.error(t("sidebar.deleteGroupError"), errorMessage(err));
     }
+  };
+
+  const onDeleteGroup = (section: { id: string; name: string; hosts: Host[] }) => {
+    const hasHosts = section.hosts.length > 0;
+    setConfirmState({
+      title: t("sidebar.deleteGroupTitle"),
+      description: hasHosts
+        ? t("sidebar.deleteGroupWithHostsConfirm", {
+            name: section.name,
+            count: section.hosts.length,
+          })
+        : t("sidebar.deleteGroupConfirm", { name: section.name }),
+      cancelLabel: t("common.cancel"),
+      actions: hasHosts
+        ? [
+            {
+              label: t("sidebar.deleteGroupKeepHosts"),
+              variant: "outline",
+              onSelect: () => void doDeleteGroup(section.id, false),
+            },
+            {
+              label: t("sidebar.deleteGroupAndHosts"),
+              variant: "destructive",
+              onSelect: () => void doDeleteGroup(section.id, true),
+            },
+          ]
+        : [
+            {
+              label: t("common.delete"),
+              variant: "destructive",
+              onSelect: () => void doDeleteGroup(section.id, false),
+            },
+          ],
+    });
   };
 
   return (
@@ -173,7 +225,6 @@ export function HostSidebar({
                     <GroupSection
                       id={section.id}
                       name={section.name}
-                      count={section.hosts.length}
                       collapsed={isCollapsed}
                       onToggle={() =>
                         setCollapsed((c) => ({
@@ -182,7 +233,7 @@ export function HostSidebar({
                         }))
                       }
                       onEdit={() => void openGroupsWindow(section.id)}
-                      onDelete={() => onDeleteGroup(section.id)}
+                      onDelete={() => onDeleteGroup(section)}
                     />
                     {!isCollapsed &&
                       section.hosts.map((host) => (
@@ -206,6 +257,7 @@ export function HostSidebar({
         size={width}
         onResize={(w) => setWidth(clampWidth(w))}
       />
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }
@@ -213,7 +265,6 @@ export function HostSidebar({
 function GroupSection({
   id,
   name,
-  count,
   collapsed,
   onToggle,
   onEdit,
@@ -221,7 +272,6 @@ function GroupSection({
 }: {
   id: string;
   name: string;
-  count: number;
   collapsed: boolean;
   onToggle: () => void;
   onEdit: () => void;
@@ -242,7 +292,6 @@ function GroupSection({
           <ChevronDown className="size-3.5 shrink-0" />
         )}
         <span className="truncate">{name}</span>
-        <span className="ml-auto font-normal normal-case">{count}</span>
       </button>
       {isGroup && (
         <DropdownMenu>

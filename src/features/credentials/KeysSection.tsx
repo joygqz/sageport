@@ -5,6 +5,7 @@ import { Check, Copy, FileUp, KeyRound, Plus, Sparkles, Trash2 } from "lucide-re
 import {
   Badge,
   Button,
+  ConfirmDialog,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -15,6 +16,7 @@ import {
   PasswordInput,
   Select,
   Textarea,
+  type ConfirmState,
 } from "@/components/ui";
 import { useI18n, type TKey } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
@@ -53,6 +55,7 @@ export function KeysSection() {
   const [algorithm, setAlgorithm] = useState<SshKeyAlgorithm>("ed25519");
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const reset = () => {
     setMode("closed");
@@ -116,6 +119,21 @@ export function KeysSection() {
   const remove = async (id: string) => {
     await deleteKey.mutateAsync(id);
     await emitRefresh();
+  };
+
+  const confirmRemove = (key: SshKey) => {
+    setConfirmState({
+      title: t("keys.deleteConfirmTitle"),
+      description: t("keys.deleteConfirmDescription", { name: key.name }),
+      cancelLabel: t("common.cancel"),
+      actions: [
+        {
+          label: t("common.delete"),
+          variant: "destructive",
+          onSelect: () => void remove(key.id),
+        },
+      ],
+    });
   };
 
   return (
@@ -243,10 +261,11 @@ export function KeysSection() {
       ) : (
         <div className="flex flex-col gap-1">
           {keys.map((k) => (
-            <KeyRow key={k.id} sshKey={k} onDelete={() => remove(k.id)} />
+            <KeyRow key={k.id} sshKey={k} onDelete={() => confirmRemove(k)} />
           ))}
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </div>
   );
 }
