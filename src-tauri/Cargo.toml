@@ -5,6 +5,10 @@ description = "Sageport — an ops-focused SSH client with an AI assistant"
 authors = ["JoyGqz"]
 edition = "2021"
 
+[[bin]]
+name = "Sageport"
+path = "src/main.rs"
+
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
