@@ -2,7 +2,7 @@ import {
   getCurrentWebviewWindow,
   WebviewWindow,
 } from "@tauri-apps/api/webviewWindow";
-import type { TitleBarStyle } from "@tauri-apps/api/window";
+import { LogicalPosition, type TitleBarStyle } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 
 import { detectLocale } from "@/i18n/config";
@@ -20,6 +20,9 @@ export const ACTION_EVENT = "sageport://action";
 export const THEME_EVENT = "sageport://theme";
 export const THEME_ACCENT_EVENT = "sageport://theme-accent";
 export const LOCALE_EVENT = "sageport://locale";
+
+/** Matches the `h-9` custom title bar height used by overlay windows. */
+const TRAFFIC_LIGHT_POSITION = new LogicalPosition(20, 20);
 
 /** Translate an OS window title using the persisted locale (no React here). */
 function title(key: TKey): string {
@@ -65,6 +68,8 @@ async function openWindow(opts: OpenOptions) {
     shadow: opts.shadow ?? true,
     titleBarStyle: opts.titleBarStyle,
     hiddenTitle: opts.hiddenTitle,
+    trafficLightPosition:
+      opts.titleBarStyle === "overlay" ? TRAFFIC_LIGHT_POSITION : undefined,
     center: true,
     focus: true,
   });

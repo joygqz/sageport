@@ -4,6 +4,10 @@ import type { ResolvedTheme } from "@/theme/theme-context";
 /**
  * xterm requires concrete colors (it can't read our oklch CSS variables), so we
  * keep hand-tuned ANSI palettes that visually match the app's light/dark themes.
+ *
+ * `background`/`foreground` MUST byte-match --terminal-background /
+ * --terminal-foreground in styles/globals.css: the gutter around the canvas is
+ * painted with the CSS variable, and any drift shows up as a visible frame.
  */
 const dark: ITheme = {
   background: "#16181d",

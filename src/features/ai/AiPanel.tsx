@@ -13,7 +13,10 @@ import {
   User,
   X,
 } from "lucide-react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -49,25 +52,6 @@ const MAX_WIDTH = 640;
 const clampWidth = (w: number) => Math.max(MIN_WIDTH, Math.min(w, MAX_WIDTH));
 /** Stable reference so an inactive/unloaded session doesn't churn effect deps. */
 const EMPTY_LOG: AgentLogItem[] = [];
-
-/** Split assistant text into plain-text and fenced-code segments. */
-function parseSegments(text: string) {
-  const segments: { type: "text" | "code"; content: string }[] = [];
-  const regex = /```(?:[\w-]*)\n?([\s\S]*?)```/g;
-  let last = 0;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > last) {
-      segments.push({ type: "text", content: text.slice(last, match.index) });
-    }
-    segments.push({ type: "code", content: match[1].trimEnd() });
-    last = regex.lastIndex;
-  }
-  if (last < text.length) {
-    segments.push({ type: "text", content: text.slice(last) });
-  }
-  return segments;
-}
 
 export function AiPanel({
   onClose,
@@ -276,7 +260,7 @@ export function AiPanel({
             </div>
 
             <div className="p-2.5">
-              <div className="rounded-md border border-input bg-surface shadow-sm transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
+              <div className="rounded-md border border-input bg-surface transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
                 <Textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -287,7 +271,7 @@ export function AiPanel({
                     }
                   }}
                   placeholder={t("ai.inputPlaceholder")}
-                  className="max-h-40 min-h-16 resize-none border-0 shadow-none focus-visible:ring-0"
+                  className="max-h-40 min-h-16 resize-none border-0 focus-visible:ring-0"
                 />
                 <div className="flex items-center gap-1.5 px-1.5 pb-1.5">
                   <Select
@@ -433,23 +417,112 @@ function Bubble({
         {isUser ? (
           <p className="whitespace-pre-wrap break-words text-sm">{content}</p>
         ) : (
-          parseSegments(content).map((seg, i) =>
-            seg.type === "code" ? (
-              <CodeBlock key={i} code={seg.content} />
-            ) : (
-              <p
-                key={i}
-                className="whitespace-pre-wrap break-words text-sm text-foreground/90"
-              >
-                {seg.content.trim()}
-              </p>
-            ),
-          )
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={MARKDOWN_COMPONENTS}
+          >
+            {content}
+          </ReactMarkdown>
         )}
       </div>
     </div>
   );
 }
+
+/** Flattens a react-markdown/hast node subtree back into its source text. */
+function nodeText(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  if ("value" in node && typeof node.value === "string") return node.value;
+  if ("children" in node && Array.isArray(node.children)) {
+    return node.children.map(nodeText).join("");
+  }
+  return "";
+}
+
+const MARKDOWN_COMPONENTS: Components = {
+  p: ({ node: _node, ...props }) => (
+    <p
+      className="whitespace-pre-wrap break-words text-sm text-foreground/90"
+      {...props}
+    />
+  ),
+  a: ({ node: _node, href, ...props }) => (
+    <a
+      href={href}
+      className="text-primary underline underline-offset-2 hover:opacity-80"
+      onClick={(e) => {
+        e.preventDefault();
+        if (href) void openUrl(href);
+      }}
+      {...props}
+    />
+  ),
+  ul: ({ node: _node, ...props }) => (
+    <ul
+      className="list-disc space-y-1 pl-5 text-sm text-foreground/90"
+      {...props}
+    />
+  ),
+  ol: ({ node: _node, ...props }) => (
+    <ol
+      className="list-decimal space-y-1 pl-5 text-sm text-foreground/90"
+      {...props}
+    />
+  ),
+  li: ({ node: _node, ...props }) => (
+    <li className="leading-relaxed" {...props} />
+  ),
+  h1: ({ node: _node, ...props }) => (
+    <h1 className="mt-2 text-base font-semibold first:mt-0" {...props} />
+  ),
+  h2: ({ node: _node, ...props }) => (
+    <h2 className="mt-2 text-[0.95rem] font-semibold first:mt-0" {...props} />
+  ),
+  h3: ({ node: _node, ...props }) => (
+    <h3 className="mt-2 text-sm font-semibold first:mt-0" {...props} />
+  ),
+  h4: ({ node: _node, ...props }) => (
+    <h4 className="mt-2 text-sm font-semibold first:mt-0" {...props} />
+  ),
+  h5: ({ node: _node, ...props }) => (
+    <h5 className="mt-2 text-sm font-semibold first:mt-0" {...props} />
+  ),
+  h6: ({ node: _node, ...props }) => (
+    <h6 className="mt-2 text-sm font-semibold first:mt-0" {...props} />
+  ),
+  blockquote: ({ node: _node, ...props }) => (
+    <blockquote
+      className="border-l-2 border-border pl-3 text-sm italic text-muted-foreground"
+      {...props}
+    />
+  ),
+  hr: ({ node: _node, ...props }) => (
+    <hr className="my-2 border-border" {...props} />
+  ),
+  table: ({ node: _node, ...props }) => (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-xs" {...props} />
+    </div>
+  ),
+  th: ({ node: _node, ...props }) => (
+    <th
+      className="border border-border px-2 py-1 text-left font-medium"
+      {...props}
+    />
+  ),
+  td: ({ node: _node, ...props }) => (
+    <td className="border border-border px-2 py-1" {...props} />
+  ),
+  code: ({ node: _node, className: _className, ...props }) => (
+    <code
+      className="rounded bg-muted px-1 py-0.5 font-mono text-[0.8em] text-foreground/90"
+      {...props}
+    />
+  ),
+  pre: ({ node }) => (
+    <CodeBlock code={nodeText(node?.children?.[0]).replace(/\n$/, "")} />
+  ),
+};
 
 function CodeBlock({ code }: { code: string }) {
   const { t } = useI18n();

@@ -135,7 +135,7 @@ export function FilePane({ side }: { side: PaneSide }) {
             className={cn(
               "group flex h-6 cursor-default items-center gap-1.5 rounded px-2 text-xs",
               tab.id === pane.activeTabId
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-background text-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -317,7 +317,7 @@ function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
         setValue(tab.cwd);
         scrollToEnd();
       }}
-      className="ml-1 h-6 flex-1 rounded border-transparent bg-transparent px-2 text-xs text-muted-foreground shadow-none transition-colors hover:border-border focus-visible:bg-surface focus-visible:text-foreground"
+      className="ml-1 h-6 flex-1 rounded border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:border-border focus-visible:bg-surface focus-visible:text-foreground"
     />
   );
 }

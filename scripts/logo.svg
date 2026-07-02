@@ -2,8 +2,10 @@
   <!--
     Sageport — master app icon (single source of truth).
     Edit this file, then run `pnpm icon` to regenerate every platform icon.
-    Motif: the letter "S" drawn as a tunnel path between two endpoint ports
-    (local ↔ remote over SSH), teal→cyan stroke on deep graphite.
+    Motif (abstract): a glowing tunnel path threading through a port ring —
+    local ↔ remote over SSH. The path weaves behind the ring at the top-right
+    crossing and in front at the bottom-left one, giving the mark depth.
+    Teal→cyan stroke on deep graphite, round-cap terminals.
   -->
   <defs>
     <!-- deep graphite background -->
@@ -11,8 +13,13 @@
       <stop offset="0" stop-color="#252E3B"/>
       <stop offset="1" stop-color="#10141A"/>
     </linearGradient>
+    <!-- slate ring: quiet structure, must not compete with the tunnel path -->
+    <linearGradient id="ring" x1="512" y1="296" x2="512" y2="728" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#66788A"/>
+      <stop offset="1" stop-color="#3E4D5F"/>
+    </linearGradient>
     <!-- teal → cyan along the path (terminal / network) -->
-    <linearGradient id="path" x1="648" y1="390" x2="376" y2="634" gradientUnits="userSpaceOnUse">
+    <linearGradient id="tunnel" x1="736" y1="268" x2="288" y2="756" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#5EEAD4"/>
       <stop offset="0.5" stop-color="#2DD4BF"/>
       <stop offset="1" stop-color="#0EA5E9"/>
@@ -25,6 +32,11 @@
     <filter id="glyphShadow" x="-30%" y="-30%" width="160%" height="160%">
       <feDropShadow dx="0" dy="12" stdDeviation="22" flood-color="#000000" flood-opacity="0.35"/>
     </filter>
+    <!-- lower-left quadrant: where the path is re-drawn on top of the ring,
+         creating the over-under weave. Both crossings sit safely inside a
+         single quadrant, and the redraw is pixel-identical to the base path,
+         so the clip boundary never shows. -->
+    <clipPath id="frontHalf"><rect x="0" y="512" width="512" height="512"/></clipPath>
   </defs>
 
   <!-- rounded-squircle background (≈22% radius, iOS style) -->
@@ -33,15 +45,18 @@
   <!-- hairline inner highlight for definition on dark desktops -->
   <rect x="83" y="83" width="858" height="858" rx="193" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="3"/>
 
-  <!-- glyph: "S" as a tunnel path, twin elliptical arcs (rx 136 / ry 122 —
-       near-circular, so curvature stays even and the curve reads smooth).
-       Terminals stop at the ellipses' extreme x, flush with the opposite
-       bowl's outer edge; endpoints = ports -->
+  <!-- glyph: tunnel path through the port ring. The cubic is 180°-rotation
+       symmetric about (512,512) with ~-18° terminal tangents so the ends
+       taper along the travel direction instead of drooping flat. Ring is
+       thinner (60) than the path (72) to keep hierarchy: path = signal,
+       ring = structure. -->
   <g filter="url(#glyphShadow)">
-    <path d="M 648 390 A 136 122 0 1 0 512 512 A 136 122 0 1 1 376 634"
-          stroke="url(#path)" stroke-width="86" stroke-linecap="round"/>
-    <!-- endpoint ports -->
-    <circle cx="648" cy="390" r="30" fill="#FFFFFF"/>
-    <circle cx="376" cy="634" r="30" fill="#FFFFFF"/>
+    <path d="M 288 756 C 528 678, 496 346, 736 268"
+          stroke="url(#tunnel)" stroke-width="72" stroke-linecap="round"/>
+    <circle cx="512" cy="512" r="216" stroke="url(#ring)" stroke-width="60"/>
+    <g clip-path="url(#frontHalf)">
+      <path d="M 288 756 C 528 678, 496 346, 736 268"
+            stroke="url(#tunnel)" stroke-width="72" stroke-linecap="round"/>
+    </g>
   </g>
 </svg>

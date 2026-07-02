@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 
 import { THEME_ACCENT_EVENT, THEME_EVENT } from "@/lib/windows";
-import { applyAccent, type ThemeAccent } from "./accent";
+import type { ThemeAccent } from "./accent";
 import {
-  applyResolvedTheme,
+  applyTheme,
   getSystemTheme,
   readStoredAccent,
   readStoredMode,
@@ -33,18 +33,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const resolved: ResolvedTheme = mode === "system" ? systemTheme : mode;
 
-  // Reflect the resolved theme onto <html>. The inline bootstrap in index.html
-  // already painted the correct theme before load; this keeps it in sync and
-  // performs an instant, uniform swap whenever it changes.
+  // Reflect the resolved theme and accent onto <html> in one atomic swap.
+  // The inline bootstrap in index.html already painted the correct theme
+  // before load; this keeps it in sync whenever either input changes.
   useEffect(() => {
-    applyResolvedTheme(resolved);
-  }, [resolved]);
-
-  // Reflect the accent palette onto <html> whenever it — or the resolved
-  // light/dark theme it's blended with — changes.
-  useEffect(() => {
-    applyAccent(accent, resolved);
-  }, [accent, resolved]);
+    applyTheme(resolved, accent);
+  }, [resolved, accent]);
 
   // Keep every window's mode and accent in sync.
   useEffect(() => {

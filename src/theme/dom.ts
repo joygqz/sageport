@@ -1,4 +1,9 @@
-import { DEFAULT_ACCENT, isThemeAccent, type ThemeAccent } from "./accent";
+import {
+  applyAccent,
+  DEFAULT_ACCENT,
+  isThemeAccent,
+  type ThemeAccent,
+} from "./accent";
 import type { ResolvedTheme, ThemeMode } from "./theme-context";
 
 /**
@@ -7,7 +12,7 @@ import type { ResolvedTheme, ThemeMode } from "./theme-context";
  * load flash); this module keeps <html> in sync afterwards and guarantees the
  * light/dark swap is uniform.
  *
- * NOTE: STORAGE_KEY is duplicated literally in index.html's bootstrap script.
+ * STORAGE_KEY is duplicated literally in index.html's bootstrap script.
  */
 export const THEME_STORAGE_KEY = "sageport.theme";
 export const ACCENT_STORAGE_KEY = "sageport.accent";
@@ -39,32 +44,47 @@ export function getSystemTheme(): ResolvedTheme {
 }
 
 /**
- * Apply the resolved theme to <html>. Transitions are suppressed for the
- * duration of the swap so every surface — backgrounds, borders, text, and
- * components that happen to carry `transition-colors` — repaints together
- * instead of a jarring mix of instant and animated changes.
+ * Apply the resolved theme *and* accent to <html> as one atomic swap.
+ *
+ * Both are applied inside a single transition-suppression window so every
+ * surface — backgrounds, borders, text, and components that happen to carry
+ * `transition-colors` — repaints together instead of a jarring mix of
+ * instant and animated changes. (Applying them separately, or letting the
+ * accent change animate, is exactly what produced the "some elements fade,
+ * some snap" artifact when switching theme or accent.)
  */
-export function applyResolvedTheme(resolved: ResolvedTheme): void {
+export function applyTheme(resolved: ResolvedTheme, accent: ThemeAccent): void {
   const root = document.documentElement;
-  const restore = suppressTransitions();
+  suppressTransitionsForFrame();
   root.classList.toggle("dark", resolved === "dark");
   root.style.colorScheme = resolved;
-  restore();
+  applyAccent(accent, resolved);
 }
 
-function suppressTransitions(): () => void {
-  const style = document.createElement("style");
-  style.appendChild(
-    document.createTextNode(
-      "*,*::before,*::after{transition:none!important;animation:none!important}",
-    ),
-  );
-  document.head.appendChild(style);
+/**
+ * Disable all transitions/animations until the frame that contains the theme
+ * swap has actually been painted. A timeout is not reliable here: React may
+ * commit dependent re-renders (xterm palette sync, inline colors) slightly
+ * after the class toggle, and re-enabling transitions in between splits the
+ * swap into animated and non-animated halves. Double rAF guarantees at least
+ * one full painted frame with transitions off.
+ */
+let suppressor: HTMLStyleElement | null = null;
 
-  return () => {
-    // Force the browser to compute styles with transitions still disabled…
-    void window.getComputedStyle(document.body).opacity;
-    // …then re-enable them on the next tick for normal interactions.
-    setTimeout(() => style.remove(), 1);
-  };
+function suppressTransitionsForFrame(): void {
+  if (!suppressor) {
+    suppressor = document.createElement("style");
+    suppressor.appendChild(
+      document.createTextNode(
+        "*,*::before,*::after{transition:none!important;animation:none!important}",
+      ),
+    );
+    document.head.appendChild(suppressor);
+  }
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      suppressor?.remove();
+      suppressor = null;
+    });
+  });
 }

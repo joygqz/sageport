@@ -4,10 +4,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/theme/useTheme";
 import { SessionOverlay } from "./SessionOverlay";
 import { TerminalView } from "./Terminal";
-import { terminalTheme } from "./theme";
 import {
   useSessionStore,
   type SessionStatus,
@@ -24,7 +22,6 @@ const statusColor: Record<SessionStatus, string> = {
 
 export function Workspace({ onNewHost }: { onNewHost: () => void }) {
   const { t } = useI18n();
-  const { resolved } = useTheme();
   const { sessions, activeId, setActive, close, reconnect } = useSessionStore();
 
   if (sessions.length === 0) {
@@ -57,11 +54,13 @@ export function Workspace({ onNewHost }: { onNewHost: () => void }) {
         ))}
       </div>
 
-      <div className="relative min-h-0 flex-1">
+      {/* The pane and its uniform p-2 gutter share --terminal-background with
+          the xterm canvas, so the padding is invisible and the whole area
+          swaps color in the same paint as the rest of the theme. */}
+      <div className="relative min-h-0 flex-1 bg-terminal-background">
         {sessions.map((session) => (
           <div
             key={session.id}
-            style={{ background: terminalTheme(resolved).background }}
             className={cn(
               "absolute inset-0 p-2",
               session.id === activeId ? "block" : "hidden",
@@ -102,7 +101,7 @@ function TabItem({
       className={cn(
         "group flex h-7 cursor-default items-center gap-2 rounded-md px-2.5 text-xs font-medium transition-colors",
         active
-          ? "bg-background text-foreground shadow-sm"
+          ? "bg-background text-foreground"
           : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
       )}
     >
