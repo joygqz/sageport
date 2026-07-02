@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Bot,
   Info,
   KeyRound,
   Monitor,
@@ -8,6 +7,7 @@ import {
   Palette,
   RefreshCw,
   ScrollText,
+  Sparkles,
   Sun,
   UserCog,
 } from "lucide-react";
@@ -17,7 +17,6 @@ import { LOCALE_LABELS, LOCALES, useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/theme/useTheme";
-import { ACCENTS, ACCENT_SWATCH } from "@/theme/accent";
 import type { ThemeMode } from "@/theme/theme-context";
 import {
   AI_PROTOCOLS,
@@ -51,7 +50,7 @@ export function SettingsWindow() {
     icon: typeof Palette;
   }[] = [
     { id: "appearance", labelKey: "settings.tabs.appearance", icon: Palette },
-    { id: "ai", labelKey: "settings.tabs.ai", icon: Bot },
+    { id: "ai", labelKey: "settings.tabs.ai", icon: Sparkles },
     { id: "keys", labelKey: "settings.tabs.keys", icon: KeyRound },
     { id: "identities", labelKey: "settings.tabs.identities", icon: UserCog },
     { id: "snippets", labelKey: "settings.tabs.snippets", icon: ScrollText },
@@ -81,7 +80,7 @@ export function SettingsWindow() {
                   "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
                   active
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >
                 <Icon className="size-4 shrink-0" />
@@ -107,7 +106,7 @@ export function SettingsWindow() {
 
 function AppearanceSection() {
   const { t, locale, setLocale } = useI18n();
-  const { mode, setMode, accent, setAccent } = useTheme();
+  const { mode, setMode } = useTheme();
   const options: {
     value: ThemeMode;
     labelKey: Parameters<typeof t>[0];
@@ -139,29 +138,6 @@ function AppearanceSection() {
               </button>
             );
           })}
-        </div>
-      </Field>
-
-      <Field label={t("settings.appearance.accent")}>
-        <div className="grid grid-cols-5 gap-2">
-          {ACCENTS.map((value) => (
-            <button
-              key={value}
-              onClick={() => setAccent(value)}
-              className={cn(
-                "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-colors",
-                accent === value
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border text-muted-foreground hover:border-ring",
-              )}
-            >
-              <span
-                className="size-4 rounded-full border border-border/50"
-                style={{ backgroundColor: ACCENT_SWATCH[value] }}
-              />
-              {t(`settings.appearance.accent_${value}`)}
-            </button>
-          ))}
         </div>
       </Field>
 

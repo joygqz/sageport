@@ -1,16 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 
-import { THEME_ACCENT_EVENT, THEME_EVENT } from "@/lib/windows";
-import type { ThemeAccent } from "./accent";
-import {
-  applyTheme,
-  getSystemTheme,
-  readStoredAccent,
-  readStoredMode,
-  storeAccent,
-  storeMode,
-} from "./dom";
+import { THEME_EVENT } from "@/lib/windows";
+import { applyTheme, getSystemTheme, readStoredMode, storeMode } from "./dom";
 import {
   ThemeContext,
   type ResolvedTheme,
@@ -19,7 +11,6 @@ import {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(readStoredMode);
-  const [accent, setAccentState] = useState<ThemeAccent>(readStoredAccent);
   const [systemTheme, setSystemTheme] =
     useState<ResolvedTheme>(getSystemTheme);
 
@@ -33,26 +24,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const resolved: ResolvedTheme = mode === "system" ? systemTheme : mode;
 
-  // Reflect the resolved theme and accent onto <html> in one atomic swap.
-  // The inline bootstrap in index.html already painted the correct theme
-  // before load; this keeps it in sync whenever either input changes.
+  // Reflect the resolved theme onto <html>. The inline bootstrap in
+  // index.html already painted the correct theme before load; this keeps
+  // it in sync whenever the mode changes.
   useEffect(() => {
-    applyTheme(resolved, accent);
-  }, [resolved, accent]);
+    applyTheme(resolved);
+  }, [resolved]);
 
-  // Keep every window's mode and accent in sync.
+  // Keep every window's mode in sync.
   useEffect(() => {
     const unlistenMode = listen<ThemeMode>(THEME_EVENT, (e) => {
       setModeState(e.payload);
       storeMode(e.payload);
     });
-    const unlistenAccent = listen<ThemeAccent>(THEME_ACCENT_EVENT, (e) => {
-      setAccentState(e.payload);
-      storeAccent(e.payload);
-    });
     return () => {
       void unlistenMode.then((un) => un());
-      void unlistenAccent.then((un) => un());
     };
   }, []);
 
@@ -62,15 +48,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     void emit(THEME_EVENT, next);
   }, []);
 
-  const setAccent = useCallback((next: ThemeAccent) => {
-    setAccentState(next);
-    storeAccent(next);
-    void emit(THEME_ACCENT_EVENT, next);
-  }, []);
-
   const value = useMemo(
-    () => ({ mode, resolved, accent, setMode, setAccent }),
-    [mode, resolved, accent, setMode, setAccent],
+    () => ({ mode, resolved, setMode }),
+    [mode, resolved, setMode],
   );
 
   return (

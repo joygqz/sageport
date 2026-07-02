@@ -116,7 +116,7 @@ export function FileList({
               onDoubleClick={() =>
                 void navigate(side, tab.id, parentPath(tab.cwd))
               }
-              className="cursor-default select-none hover:bg-accent/60"
+              className="cursor-default select-none hover:bg-accent"
             >
               <td colSpan={3} className="px-2 py-1 text-muted-foreground">
                 <span className="inline-flex items-center gap-2">
@@ -152,7 +152,7 @@ export function FileList({
                       onDoubleClick={() => open(entry)}
                       className={cn(
                         "cursor-default select-none",
-                        selected ? "bg-primary/15" : "hover:bg-accent/60",
+                        selected ? "bg-primary/15" : "hover:bg-accent",
                       )}
                     >
                       <td className="truncate px-2 py-1">

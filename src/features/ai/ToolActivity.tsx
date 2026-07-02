@@ -52,7 +52,7 @@ export function ToolActivity({
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-accent/50"
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-accent"
       >
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-muted-foreground">

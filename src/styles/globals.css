@@ -13,112 +13,120 @@
   /* Flat, compact radius scale: sm 2px / md 4px / lg 6px / xl 10px. */
   --radius: 0.375rem;
 
-  /* Light theme.
+  /* Light theme — GitHub Primer light palette.
    * Two-tone layout: content surfaces (workspace/terminal) are white; the
-   * chrome ring (title bar, sidebar, tab strip, panels) is a distinctly
-   * darker grey, and every module boundary is drawn with a crisp border. */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.22 0.02 255);
+   * chrome ring (title bar, sidebar, tab strip, panels) is canvas.subtle
+   * (#f6f8fa), and every module boundary is drawn with a crisp border
+   * (#d0d7de, border.default).
+   *
+   * --primary is GitHub's accent blue (#0969da, accent.fg) — the single
+   * pervasive interactive color (links, focus rings, selection, the
+   * primary button). --accent is a neutral grey hover wash reserved for
+   * generic buttons/menus; --sidebar-accent is the blue-tinted wash GitHub
+   * uses for the current/hovered item in list-style navigation. Both are
+   * tuned to stay clearly distinguishable from every surface they render
+   * on (background/card/popover at #fff, surface/sidebar at #f6f8fa) —
+   * a flat, near-identical fill was the exact defect this palette fixes. */
+  --background: #ffffff;
+  --foreground: #1f2328;
 
-  --surface: oklch(0.955 0.005 250);
-  --surface-foreground: oklch(0.3 0.02 255);
+  --surface: #f6f8fa;
+  --surface-foreground: #1f2328;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.02 255);
+  --card: #ffffff;
+  --card-foreground: #1f2328;
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.02 255);
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
 
-  /* Primary/accent are neutral by default (professional monochrome); an
-   * accent palette applied via ThemeProvider overrides these as inline
-   * styles — see src/theme/accent.ts. */
-  --primary: oklch(0.2 0 0);
-  --primary-foreground: oklch(0.98 0 0);
+  --primary: #0969da;
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.935 0.01 250);
-  --secondary-foreground: oklch(0.3 0.02 255);
+  --secondary: #eaeef2;
+  --secondary-foreground: #1f2328;
 
-  --muted: oklch(0.95 0.005 250);
-  --muted-foreground: oklch(0.52 0.02 255);
+  --muted: #eef2f5;
+  --muted-foreground: #656d76;
 
-  --accent: oklch(0.94 0 0);
-  --accent-foreground: oklch(0.2 0 0);
+  --accent: #dde3ea;
+  --accent-foreground: #1f2328;
 
-  --destructive: oklch(0.58 0.21 25);
-  --destructive-foreground: oklch(0.99 0.01 25);
+  --destructive: #cf222e;
+  --destructive-foreground: #ffffff;
 
-  --success: oklch(0.65 0.16 150);
-  --warning: oklch(0.75 0.15 80);
-  --info: oklch(0.62 0.14 240);
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --info: #0969da;
 
-  --border: oklch(0.88 0.006 255);
-  --input: oklch(0.9 0.006 255);
-  --ring: oklch(0.2 0 0);
+  --border: #d0d7de;
+  --input: #d0d7de;
+  --ring: #0969da;
 
   /* Chrome surfaces — unified with --surface, separated structurally. */
-  --sidebar: oklch(0.955 0.005 250);
-  --sidebar-foreground: oklch(0.3 0.02 255);
-  --sidebar-border: oklch(0.88 0.006 255);
-  --sidebar-accent: oklch(0.88 0 0);
-  --sidebar-accent-foreground: oklch(0.15 0 0);
+  --sidebar: #f6f8fa;
+  --sidebar-foreground: #1f2328;
+  --sidebar-border: #d0d7de;
+  --sidebar-accent: #ddf4ff;
+  --sidebar-accent-foreground: #0969da;
 
   /* Terminal surface.
    * MUST byte-match the xterm palette in src/features/terminal/theme.ts so
    * the padding around the canvas is indistinguishable from the canvas
    * itself (xterm can't read CSS variables, so the values are duplicated). */
-  --terminal-background: #fbfcfe;
-  --terminal-foreground: #2b303b;
+  --terminal-background: #ffffff;
+  --terminal-foreground: #1f2328;
 }
 
 .dark {
-  /* Dark.
-   * Two-tone layout: content surfaces (workspace/terminal) are the deepest;
-   * the chrome ring (title bar, sidebar, tab strip, panels) sits clearly
-   * lighter, and every module boundary is drawn with a crisp border. */
-  --background: oklch(0.17 0.012 255);
-  --foreground: oklch(0.93 0.01 250);
+  /* Dark theme — GitHub Primer dark palette.
+   * Two-tone layout: content surfaces (workspace/terminal) are the deepest
+   * (#0d1117, canvas.default); the chrome ring sits one step lighter
+   * (#161b22, canvas.subtle); floating surfaces (card/popover) step
+   * lighter again for elevation, matching GitHub's own overlay tiers. */
+  --background: #0d1117;
+  --foreground: #e6edf3;
 
-  --surface: oklch(0.225 0.015 255);
-  --surface-foreground: oklch(0.93 0.01 250);
+  --surface: #161b22;
+  --surface-foreground: #e6edf3;
 
-  --card: oklch(0.255 0.017 255);
-  --card-foreground: oklch(0.93 0.01 250);
+  --card: #1c2128;
+  --card-foreground: #e6edf3;
 
-  --popover: oklch(0.265 0.018 255);
-  --popover-foreground: oklch(0.93 0.01 250);
+  --popover: #21262d;
+  --popover-foreground: #e6edf3;
 
-  --primary: oklch(0.95 0 0);
-  --primary-foreground: oklch(0.15 0 0);
+  --primary: #1f6feb;
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.29 0.018 255);
-  --secondary-foreground: oklch(0.9 0.01 250);
+  --secondary: #21262d;
+  --secondary-foreground: #e6edf3;
 
-  --muted: oklch(0.27 0.016 255);
-  --muted-foreground: oklch(0.66 0.015 255);
+  --muted: #21262d;
+  --muted-foreground: #8b949e;
 
-  --accent: oklch(0.32 0 0);
-  --accent-foreground: oklch(0.95 0 0);
+  --accent: #30363d;
+  --accent-foreground: #e6edf3;
 
-  --destructive: oklch(0.62 0.2 25);
-  --destructive-foreground: oklch(0.97 0.01 25);
+  --destructive: #da3633;
+  --destructive-foreground: #ffffff;
 
-  --success: oklch(0.72 0.16 150);
-  --warning: oklch(0.8 0.15 80);
-  --info: oklch(0.68 0.13 240);
+  --success: #3fb950;
+  --warning: #d29922;
+  --info: #58a6ff;
 
-  --border: oklch(0.33 0.015 255);
-  --input: oklch(0.34 0.016 255);
-  --ring: oklch(0.95 0 0);
+  --border: #30363d;
+  --input: #30363d;
+  --ring: #1f6feb;
 
-  --sidebar: oklch(0.225 0.015 255);
-  --sidebar-foreground: oklch(0.85 0.01 250);
-  --sidebar-border: oklch(0.33 0.015 255);
-  --sidebar-accent: oklch(0.36 0 0);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar: #161b22;
+  --sidebar-foreground: #e6edf3;
+  --sidebar-border: #30363d;
+  --sidebar-accent: #182636;
+  --sidebar-accent-foreground: #58a6ff;
 
   /* See the light-theme note: mirrors src/features/terminal/theme.ts. */
-  --terminal-background: #16181d;
-  --terminal-foreground: #dfe3ea;
+  --terminal-background: #0d1117;
+  --terminal-foreground: #e6edf3;
 }
 
 /* Map semantic tokens onto Tailwind's theme so utilities resolve at runtime */

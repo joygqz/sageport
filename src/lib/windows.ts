@@ -18,7 +18,6 @@ import { translate, type TKey } from "@/i18n/translate";
 export const REFRESH_EVENT = "sageport://refresh";
 export const ACTION_EVENT = "sageport://action";
 export const THEME_EVENT = "sageport://theme";
-export const THEME_ACCENT_EVENT = "sageport://theme-accent";
 export const LOCALE_EVENT = "sageport://locale";
 
 /** Matches the `h-9` custom title bar height used by overlay windows. */

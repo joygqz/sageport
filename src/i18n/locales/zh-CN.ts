@@ -118,12 +118,6 @@ export const zhCN: Dictionary = {
       light: "浅色",
       dark: "深色",
       system: "跟随系统",
-      accent: "主题色",
-      accent_mono: "黑白",
-      accent_indigo: "靛蓝",
-      accent_teal: "青色",
-      accent_forest: "墨绿",
-      accent_amber: "琥珀",
       language: "语言",
     },
     ai: {
@@ -314,7 +308,6 @@ export const zhCN: Dictionary = {
   },
 
   ai: {
-    assistant: "助手",
     connectTitle: "连接助手",
     connectDescription: "在设置中配置 OpenAI 或 Anthropic 兼容接口。",
     openSettings: "打开设置",

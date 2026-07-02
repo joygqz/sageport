@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
-  Bot,
   Check,
   Copy,
   History,
   KeyRound,
   Pencil,
+  Sparkles,
   SquarePen,
   Terminal as TerminalIcon,
   Trash2,
@@ -133,10 +133,10 @@ export function AiPanel({
         onResize={(w) => setWidth(clampWidth(w))}
       />
       <aside style={{ width }} className="flex shrink-0 flex-col bg-surface">
-        <div className="flex h-9 items-center gap-1 border-b border-border px-2">
-          <Bot className="size-4 shrink-0 text-primary" />
+        <div className="flex h-9 items-center gap-1 border-b border-border pl-2 pr-5">
+          <Sparkles className="size-4 shrink-0 text-primary" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {activeId ? activeTitle || t("ai.untitledChat") : t("ai.assistant")}
+            {activeTitle || t("ai.untitledChat")}
           </span>
           {configured && (
             <>
@@ -236,7 +236,7 @@ export function AiPanel({
                 {log.length === 0 ? (
                   <EmptyState
                     className="mt-10"
-                    icon={Bot}
+                    icon={Sparkles}
                     title={t("ai.askTitle")}
                     description={t("ai.askDescription")}
                   />
@@ -252,7 +252,7 @@ export function AiPanel({
                 )}
                 {pending && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Bot className="size-4 animate-pulse text-primary" />
+                    <Sparkles className="size-4 animate-pulse text-primary" />
                     {t("ai.thinking")}
                   </div>
                 )}
@@ -411,7 +411,11 @@ function Bubble({
           isUser ? "bg-secondary" : "bg-primary/15 text-primary",
         )}
       >
-        {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
+        {isUser ? (
+          <User className="size-3.5" />
+        ) : (
+          <Sparkles className="size-3.5" />
+        )}
       </div>
       <div className="min-w-0 flex-1 space-y-2 pt-0.5">
         {isUser ? (

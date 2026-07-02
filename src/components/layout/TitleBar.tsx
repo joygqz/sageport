@@ -1,4 +1,4 @@
-import { Bot, Folder, Moon, Settings, Sun } from "lucide-react";
+import { FolderSync, Moon, Settings, Sparkles, Sun } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -39,7 +39,7 @@ export function TitleBar({
             className="size-7"
             onClick={onToggleSftp}
           >
-            <Folder />
+            <FolderSync />
           </Button>
         </Tooltip>
         <Tooltip content={aiOpen ? t("titleBar.hideAi") : t("titleBar.showAi")}>
@@ -49,7 +49,7 @@ export function TitleBar({
             className="size-7"
             onClick={onToggleAi}
           >
-            <Bot />
+            <Sparkles />
           </Button>
         </Tooltip>
         <Tooltip content={t("titleBar.toggleTheme")}>

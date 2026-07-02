@@ -1,9 +1,3 @@
-import {
-  applyAccent,
-  DEFAULT_ACCENT,
-  isThemeAccent,
-  type ThemeAccent,
-} from "./accent";
 import type { ResolvedTheme, ThemeMode } from "./theme-context";
 
 /**
@@ -15,7 +9,6 @@ import type { ResolvedTheme, ThemeMode } from "./theme-context";
  * STORAGE_KEY is duplicated literally in index.html's bootstrap script.
  */
 export const THEME_STORAGE_KEY = "sageport.theme";
-export const ACCENT_STORAGE_KEY = "sageport.accent";
 
 export function readStoredMode(): ThemeMode {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -28,15 +21,6 @@ export function storeMode(mode: ThemeMode): void {
   localStorage.setItem(THEME_STORAGE_KEY, mode);
 }
 
-export function readStoredAccent(): ThemeAccent {
-  const stored = localStorage.getItem(ACCENT_STORAGE_KEY);
-  return isThemeAccent(stored) ? stored : DEFAULT_ACCENT;
-}
-
-export function storeAccent(accent: ThemeAccent): void {
-  localStorage.setItem(ACCENT_STORAGE_KEY, accent);
-}
-
 export function getSystemTheme(): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
@@ -44,21 +28,18 @@ export function getSystemTheme(): ResolvedTheme {
 }
 
 /**
- * Apply the resolved theme *and* accent to <html> as one atomic swap.
+ * Apply the resolved theme to <html>.
  *
- * Both are applied inside a single transition-suppression window so every
- * surface — backgrounds, borders, text, and components that happen to carry
+ * Applied inside a transition-suppression window so every surface —
+ * backgrounds, borders, text, and components that happen to carry
  * `transition-colors` — repaints together instead of a jarring mix of
- * instant and animated changes. (Applying them separately, or letting the
- * accent change animate, is exactly what produced the "some elements fade,
- * some snap" artifact when switching theme or accent.)
+ * instant and animated changes.
  */
-export function applyTheme(resolved: ResolvedTheme, accent: ThemeAccent): void {
+export function applyTheme(resolved: ResolvedTheme): void {
   const root = document.documentElement;
   suppressTransitionsForFrame();
   root.classList.toggle("dark", resolved === "dark");
   root.style.colorScheme = resolved;
-  applyAccent(accent, resolved);
 }
 
 /**
