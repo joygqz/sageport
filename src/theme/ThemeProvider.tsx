@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 
-import { THEME_EVENT } from "@/lib/windows";
+import { THEME_ACCENT_EVENT, THEME_EVENT } from "@/lib/windows";
+import { applyAccent, type ThemeAccent } from "./accent";
 import {
   applyResolvedTheme,
   getSystemTheme,
+  readStoredAccent,
   readStoredMode,
+  storeAccent,
   storeMode,
 } from "./dom";
 import {
@@ -16,6 +19,7 @@ import {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(readStoredMode);
+  const [accent, setAccentState] = useState<ThemeAccent>(readStoredAccent);
   const [systemTheme, setSystemTheme] =
     useState<ResolvedTheme>(getSystemTheme);
 
@@ -36,14 +40,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyResolvedTheme(resolved);
   }, [resolved]);
 
-  // Keep every window's theme in sync.
+  // Reflect the accent palette onto <html> whenever it — or the resolved
+  // light/dark theme it's blended with — changes.
   useEffect(() => {
-    const unlisten = listen<ThemeMode>(THEME_EVENT, (e) => {
+    applyAccent(accent, resolved);
+  }, [accent, resolved]);
+
+  // Keep every window's mode and accent in sync.
+  useEffect(() => {
+    const unlistenMode = listen<ThemeMode>(THEME_EVENT, (e) => {
       setModeState(e.payload);
       storeMode(e.payload);
     });
+    const unlistenAccent = listen<ThemeAccent>(THEME_ACCENT_EVENT, (e) => {
+      setAccentState(e.payload);
+      storeAccent(e.payload);
+    });
     return () => {
-      void unlisten.then((un) => un());
+      void unlistenMode.then((un) => un());
+      void unlistenAccent.then((un) => un());
     };
   }, []);
 
@@ -53,9 +68,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     void emit(THEME_EVENT, next);
   }, []);
 
+  const setAccent = useCallback((next: ThemeAccent) => {
+    setAccentState(next);
+    storeAccent(next);
+    void emit(THEME_ACCENT_EVENT, next);
+  }, []);
+
   const value = useMemo(
-    () => ({ mode, resolved, setMode }),
-    [mode, resolved, setMode],
+    () => ({ mode, resolved, accent, setMode, setAccent }),
+    [mode, resolved, accent, setMode, setAccent],
   );
 
   return (

@@ -17,6 +17,7 @@ import { LOCALE_LABELS, LOCALES, useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/theme/useTheme";
+import { ACCENTS, ACCENT_SWATCH } from "@/theme/accent";
 import type { ThemeMode } from "@/theme/theme-context";
 import {
   AI_PROTOCOLS,
@@ -106,7 +107,7 @@ export function SettingsWindow() {
 
 function AppearanceSection() {
   const { t, locale, setLocale } = useI18n();
-  const { mode, setMode } = useTheme();
+  const { mode, setMode, accent, setAccent } = useTheme();
   const options: {
     value: ThemeMode;
     labelKey: Parameters<typeof t>[0];
@@ -138,6 +139,29 @@ function AppearanceSection() {
               </button>
             );
           })}
+        </div>
+      </Field>
+
+      <Field label={t("settings.appearance.accent")}>
+        <div className="grid grid-cols-5 gap-2">
+          {ACCENTS.map((value) => (
+            <button
+              key={value}
+              onClick={() => setAccent(value)}
+              className={cn(
+                "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-colors",
+                accent === value
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border text-muted-foreground hover:border-ring",
+              )}
+            >
+              <span
+                className="size-4 rounded-full border border-border/50"
+                style={{ backgroundColor: ACCENT_SWATCH[value] }}
+              />
+              {t(`settings.appearance.accent_${value}`)}
+            </button>
+          ))}
         </div>
       </Field>
 

@@ -128,6 +128,12 @@ export const zhCN: Dictionary = {
       light: "浅色",
       dark: "深色",
       system: "跟随系统",
+      accent: "主题色",
+      accent_mono: "黑白",
+      accent_indigo: "靛蓝",
+      accent_teal: "青色",
+      accent_forest: "墨绿",
+      accent_amber: "琥珀",
       language: "语言",
     },
     ai: {

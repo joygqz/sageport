@@ -1,3 +1,4 @@
+import { DEFAULT_ACCENT, isThemeAccent, type ThemeAccent } from "./accent";
 import type { ResolvedTheme, ThemeMode } from "./theme-context";
 
 /**
@@ -9,6 +10,7 @@ import type { ResolvedTheme, ThemeMode } from "./theme-context";
  * NOTE: STORAGE_KEY is duplicated literally in index.html's bootstrap script.
  */
 export const THEME_STORAGE_KEY = "sageport.theme";
+export const ACCENT_STORAGE_KEY = "sageport.accent";
 
 export function readStoredMode(): ThemeMode {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -19,6 +21,15 @@ export function readStoredMode(): ThemeMode {
 
 export function storeMode(mode: ThemeMode): void {
   localStorage.setItem(THEME_STORAGE_KEY, mode);
+}
+
+export function readStoredAccent(): ThemeAccent {
+  const stored = localStorage.getItem(ACCENT_STORAGE_KEY);
+  return isThemeAccent(stored) ? stored : DEFAULT_ACCENT;
+}
+
+export function storeAccent(accent: ThemeAccent): void {
+  localStorage.setItem(ACCENT_STORAGE_KEY, accent);
 }
 
 export function getSystemTheme(): ResolvedTheme {

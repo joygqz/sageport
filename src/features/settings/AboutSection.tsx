@@ -82,48 +82,49 @@ export function AboutSection() {
       <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
         <UpdateStatus state={state} />
 
-        <div className="flex items-center gap-2">
-          {(state.status === "idle" ||
-            state.status === "up-to-date" ||
-            state.status === "error") && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void checkForUpdate()}
-            >
-              <RotateCw />
-              {t("settings.about.update.checkButton")}
-            </Button>
-          )}
+        {state.status !== "checking" && (
+          <div className="flex items-center gap-2">
+            {(state.status === "idle" ||
+              state.status === "up-to-date" ||
+              state.status === "error") && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void checkForUpdate()}
+              >
+                <RotateCw />
+                {t("settings.about.update.checkButton")}
+              </Button>
+            )}
 
-          {state.status === "checking" && (
-            <Button variant="secondary" size="sm" disabled loading>
-              {t("settings.about.update.checking")}
-            </Button>
-          )}
+            {state.status === "available" && (
+              <Button
+                size="sm"
+                onClick={() => void installUpdate(state.update)}
+              >
+                {t("settings.about.update.installButton")}
+              </Button>
+            )}
 
-          {state.status === "available" && (
-            <Button size="sm" onClick={() => void installUpdate(state.update)}>
-              {t("settings.about.update.installButton")}
-            </Button>
-          )}
+            {state.status === "downloading" && (
+              <Button variant="secondary" size="sm" disabled loading>
+                {state.total
+                  ? t("settings.about.update.downloadingProgress", {
+                      percent: Math.round(
+                        (state.downloaded / state.total) * 100,
+                      ),
+                    })
+                  : t("settings.about.update.downloading")}
+              </Button>
+            )}
 
-          {state.status === "downloading" && (
-            <Button variant="secondary" size="sm" disabled loading>
-              {state.total
-                ? t("settings.about.update.downloadingProgress", {
-                    percent: Math.round((state.downloaded / state.total) * 100),
-                  })
-                : t("settings.about.update.downloading")}
-            </Button>
-          )}
-
-          {state.status === "ready" && (
-            <Button size="sm" onClick={() => void relaunch()}>
-              {t("settings.about.update.restartButton")}
-            </Button>
-          )}
-        </div>
+            {state.status === "ready" && (
+              <Button size="sm" onClick={() => void relaunch()}>
+                {t("settings.about.update.restartButton")}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

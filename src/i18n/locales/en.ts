@@ -131,6 +131,12 @@ export const en = {
       light: "Light",
       dark: "Dark",
       system: "System",
+      accent: "Accent color",
+      accent_mono: "Monochrome",
+      accent_indigo: "Indigo",
+      accent_teal: "Teal",
+      accent_forest: "Forest",
+      accent_amber: "Amber",
       language: "Language",
     },
     ai: {

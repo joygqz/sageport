@@ -28,8 +28,11 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.22 0.02 255);
 
-  --primary: oklch(0.62 0.13 200);
-  --primary-foreground: oklch(0.99 0.01 200);
+  /* Primary/accent are neutral by default (professional monochrome); an
+   * accent palette applied via ThemeProvider overrides these as inline
+   * styles — see src/theme/accent.ts. */
+  --primary: oklch(0.2 0 0);
+  --primary-foreground: oklch(0.98 0 0);
 
   --secondary: oklch(0.935 0.01 250);
   --secondary-foreground: oklch(0.3 0.02 255);
@@ -37,8 +40,8 @@
   --muted: oklch(0.95 0.005 250);
   --muted-foreground: oklch(0.52 0.02 255);
 
-  --accent: oklch(0.95 0.02 200);
-  --accent-foreground: oklch(0.3 0.05 200);
+  --accent: oklch(0.94 0 0);
+  --accent-foreground: oklch(0.2 0 0);
 
   --destructive: oklch(0.58 0.21 25);
   --destructive-foreground: oklch(0.99 0.01 25);
@@ -49,14 +52,14 @@
 
   --border: oklch(0.88 0.006 255);
   --input: oklch(0.9 0.006 255);
-  --ring: oklch(0.62 0.13 200);
+  --ring: oklch(0.2 0 0);
 
   /* Chrome surfaces — unified with --surface, separated structurally. */
   --sidebar: oklch(0.955 0.005 250);
   --sidebar-foreground: oklch(0.3 0.02 255);
   --sidebar-border: oklch(0.88 0.006 255);
-  --sidebar-accent: oklch(0.91 0.025 200);
-  --sidebar-accent-foreground: oklch(0.28 0.05 200);
+  --sidebar-accent: oklch(0.88 0 0);
+  --sidebar-accent-foreground: oklch(0.15 0 0);
 
   /* Terminal surface */
   --terminal-background: oklch(0.995 0.002 250);
@@ -80,8 +83,8 @@
   --popover: oklch(0.265 0.018 255);
   --popover-foreground: oklch(0.93 0.01 250);
 
-  --primary: oklch(0.7 0.13 200);
-  --primary-foreground: oklch(0.18 0.03 200);
+  --primary: oklch(0.95 0 0);
+  --primary-foreground: oklch(0.15 0 0);
 
   --secondary: oklch(0.29 0.018 255);
   --secondary-foreground: oklch(0.9 0.01 250);
@@ -89,8 +92,8 @@
   --muted: oklch(0.27 0.016 255);
   --muted-foreground: oklch(0.66 0.015 255);
 
-  --accent: oklch(0.32 0.03 200);
-  --accent-foreground: oklch(0.9 0.04 200);
+  --accent: oklch(0.32 0 0);
+  --accent-foreground: oklch(0.95 0 0);
 
   --destructive: oklch(0.62 0.2 25);
   --destructive-foreground: oklch(0.97 0.01 25);
@@ -101,13 +104,13 @@
 
   --border: oklch(0.33 0.015 255);
   --input: oklch(0.34 0.016 255);
-  --ring: oklch(0.7 0.13 200);
+  --ring: oklch(0.95 0 0);
 
   --sidebar: oklch(0.225 0.015 255);
   --sidebar-foreground: oklch(0.85 0.01 250);
   --sidebar-border: oklch(0.33 0.015 255);
-  --sidebar-accent: oklch(0.32 0.03 200);
-  --sidebar-accent-foreground: oklch(0.9 0.04 200);
+  --sidebar-accent: oklch(0.36 0 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
 
   --terminal-background: oklch(0.165 0.012 255);
   --terminal-foreground: oklch(0.9 0.01 250);
