@@ -307,7 +307,7 @@ function HostRow({
       <ContextMenuTrigger asChild>
         <div
           onDoubleClick={() => onConnect(host)}
-          className="group flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="group flex cursor-default items-center gap-2 rounded-md py-1.5 pl-5 pr-2 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
           <span
             className={cn(
@@ -322,16 +322,6 @@ function HostRow({
               {host.address}
             </p>
           </div>
-          <Tooltip content={t("common.connect")}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6 opacity-0 group-hover:opacity-100"
-              onClick={() => onConnect(host)}
-            >
-              <Plug className="size-3.5" />
-            </Button>
-          </Tooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
