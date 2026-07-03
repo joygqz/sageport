@@ -221,6 +221,16 @@ export const ipc = {
       remove: (id: string) => invoke<void>("ai_session_delete", { id }),
     },
   },
+  window: {
+    /**
+     * macOS only (no-op elsewhere): re-center the native traffic lights in
+     * a title bar of `height` logical px, left edge at `x`. Re-invoked on
+     * zoom changes, window resizes and theme changes — AppKit re-lays the
+     * buttons out to their defaults on those.
+     */
+    setTrafficLightInset: (x: number, height: number) =>
+      invoke<void>("window_set_traffic_light_inset", { x, height }),
+  },
   update: {
     /** Current status, to sync a freshly (re)mounted window immediately. */
     status: () => invoke<UpdateStatus>("update_status"),

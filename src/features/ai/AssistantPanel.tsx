@@ -287,7 +287,7 @@ export function AssistantPanel({ width }: { width: number }) {
                 <Select
                   value={model}
                   onChange={(e) => changeModel(e.target.value)}
-                  className="h-7 max-w-[10.5rem] border-0 bg-transparent text-xs hover:bg-accent"
+                  className="h-7 max-w-[10.5rem] border-0 bg-transparent pl-2 pr-7 text-xs hover:bg-accent focus-visible:ring-0"
                   title={t("ai.modelLabel")}
                 >
                   {models.length === 0 ? (

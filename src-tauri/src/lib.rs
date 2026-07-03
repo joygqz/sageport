@@ -103,6 +103,8 @@ pub fn run() {
             commands::sync::sync_restore_gist_version,
             commands::sync::sync_file_export,
             commands::sync::sync_file_import,
+            // window chrome
+            commands::window::window_set_traffic_light_inset,
             // update
             commands::update::update_status,
             commands::update::update_check,

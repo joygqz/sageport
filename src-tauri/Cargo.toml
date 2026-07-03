@@ -67,6 +67,18 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # Concurrency helpers
 parking_lot = "0.12"
 
+# Re-center the macOS traffic lights in the custom title bar at runtime
+# (public AppKit API via the same bindings tauri/tao already compile).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSButton",
+  "NSControl",
+  "NSResponder",
+  "NSView",
+  "NSWindow",
+] }
+
 [features]
 # this feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]

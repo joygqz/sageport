@@ -24,14 +24,19 @@ export function TitleBar() {
   return (
     // ~34px, the height VSCode's title bar uses with the command center.
     // Sized in rem (h-9) so the whole bar scales with the UI zoom, exactly
-    // like VSCode. The native macOS traffic lights keep their default
-    // position (no private APIs), which at this height sits a couple of
-    // pixels above true center — the same tradeoff VSCode accepts.
+    // like VSCode. The native macOS traffic lights are re-centered to this
+    // bar's live height at runtime (public AppKit API — see
+    // syncTrafficLights in workbench/zoom.ts and the
+    // window_set_traffic_light_inset command), so they track zoom, window
+    // resizes and theme changes. If h-9 ever changes, update TITLE_BAR_REM
+    // in zoom.ts to match.
     <header
       data-tauri-drag-region
       className={cn(
         "grid h-9 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center border-b border-border bg-surface",
-        IS_MACOS ? "pl-[80px]" : "pl-2",
+        // rem-based so the reserved traffic-light space scales with zoom,
+        // in step with the lights' own scaled inset (see zoom.ts).
+        IS_MACOS ? "pl-[5.35rem]" : "pl-2",
       )}
     >
       <div data-tauri-drag-region className="h-full" />

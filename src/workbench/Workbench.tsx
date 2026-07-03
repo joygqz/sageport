@@ -1,6 +1,8 @@
 import { useEffect } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { ResizeHandle } from "@/components/ui";
+import { IS_MACOS } from "@/lib/platform";
 import { Toaster } from "@/components/ui/toaster";
 import { AssistantPanel } from "@/features/ai/AssistantPanel";
 import { GroupFormDialog } from "@/features/hosts/GroupFormDialog";
@@ -16,7 +18,7 @@ import { useOverlayStore } from "./overlays";
 import { SideBar } from "./SideBar";
 import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
-import { useZoomStore } from "./zoom";
+import { syncTrafficLights, useZoomStore } from "./zoom";
 
 /**
  * The workbench: a fixed chrome of title bar, activity bar, side bar,
@@ -45,6 +47,22 @@ export function Workbench() {
   // Re-apply the persisted UI zoom level to the document root on launch.
   useEffect(() => {
     useZoomStore.getState().init();
+  }, []);
+
+  // AppKit resets the traffic lights to their default position whenever the
+  // window re-lays out its chrome (resize, fullscreen transitions, theme
+  // change) — push them back to the title bar's center each time.
+  useEffect(() => {
+    if (!IS_MACOS) return;
+    const appWindow = getCurrentWindow();
+    const unlisteners: Array<() => void> = [];
+    void appWindow.onResized(() => syncTrafficLights()).then((un) => {
+      unlisteners.push(un);
+    });
+    void appWindow.onThemeChanged(() => syncTrafficLights()).then((un) => {
+      unlisteners.push(un);
+    });
+    return () => unlisteners.forEach((un) => un());
   }, []);
 
   const layout = useLayoutStore();

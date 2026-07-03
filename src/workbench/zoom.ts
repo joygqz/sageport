@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { applyTerminalFontSize } from "@/features/terminal/registry";
+import { ipc } from "@/lib/ipc";
+import { IS_MACOS } from "@/lib/platform";
 
 /**
  * Whole-UI zoom, VSCode-style (mod+= / mod+- / mod+0). Every Tailwind size
@@ -30,11 +32,40 @@ export function terminalFontSize(): number {
   return Math.round(TERMINAL_FONT_BASE * zoomFactor(useZoomStore.getState().level));
 }
 
+/** Title bar height in rem — must match TitleBar's `h-9`. */
+const TITLE_BAR_REM = 2.25;
+/** Left inset of the macOS traffic lights at 100% zoom (system default). */
+const TRAFFIC_LIGHT_X = 13;
+/** Root font-size at 100% zoom: 16px × 93.75%. */
+const BASE_ROOT_FONT_PX = 15;
+
+/**
+ * Keep the macOS traffic lights vertically centered in the title bar, which
+ * grows and shrinks with the UI zoom. Both the height and the left inset
+ * follow the live root font-size, so the lights track the zoom level like
+ * every other title-bar element (their padding reservation in TitleBar is
+ * rem-based too). Also re-invoked from the workbench on window resize /
+ * theme change, since AppKit resets the buttons to their default spot on
+ * those.
+ */
+export function syncTrafficLights() {
+  if (!IS_MACOS) return;
+  const rootFontPx = parseFloat(
+    getComputedStyle(document.documentElement).fontSize,
+  );
+  const scale = rootFontPx / BASE_ROOT_FONT_PX;
+  const height = TITLE_BAR_REM * rootFontPx;
+  void ipc.window
+    .setTrafficLightInset(TRAFFIC_LIGHT_X * scale, height)
+    .catch(() => {});
+}
+
 function applyZoom(level: number) {
   document.documentElement.style.fontSize = `${
     BASE_ROOT_FONT_PERCENT * zoomFactor(level)
   }%`;
   applyTerminalFontSize(Math.round(TERMINAL_FONT_BASE * zoomFactor(level)));
+  syncTrafficLights();
 }
 
 const clamp = (level: number) =>

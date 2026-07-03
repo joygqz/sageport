@@ -12,3 +12,4 @@ pub mod snippets;
 pub mod ssh;
 pub mod sync;
 pub mod update;
+pub mod window;
