@@ -2,7 +2,10 @@ import { useState } from "react";
 import { Play, Plus, ScrollText, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog, type ConfirmState } from "@/components/ui/confirm-dialog";
+import {
+  ConfirmDialog,
+  type ConfirmState,
+} from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -122,7 +125,11 @@ export function SnippetsSection() {
             <Button variant="ghost" size="sm" onClick={reset}>
               {t("common.cancel")}
             </Button>
-            <Button size="sm" onClick={submit} loading={createSnippet.isPending}>
+            <Button
+              size="sm"
+              onClick={submit}
+              loading={createSnippet.isPending}
+            >
               {t("snippets.saveSnippet")}
             </Button>
           </div>
@@ -130,10 +137,7 @@ export function SnippetsSection() {
       )}
 
       {snippets.length === 0 && !adding ? (
-        <EmptyState
-          icon={ScrollText}
-          title={t("snippets.emptyTitle")}
-        />
+        <EmptyState icon={ScrollText} title={t("snippets.emptyTitle")} />
       ) : (
         <div className="flex flex-col gap-1">
           {snippets.map((s) => (
@@ -169,7 +173,10 @@ export function SnippetsSection() {
           ))}
         </div>
       )}
-      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      <ConfirmDialog
+        state={confirmState}
+        onClose={() => setConfirmState(null)}
+      />
     </div>
   );
 }

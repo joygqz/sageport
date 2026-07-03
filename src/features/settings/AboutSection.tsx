@@ -45,9 +45,7 @@ export function AboutSection() {
           className="size-14 shrink-0 rounded-xl"
         />
         <div>
-          <h3 className="text-base font-semibold text-foreground">
-            Sageport
-          </h3>
+          <h3 className="text-base font-semibold text-foreground">Sageport</h3>
           <p className="text-sm text-muted-foreground">
             {version
               ? t("settings.about.version", { version })

@@ -102,7 +102,9 @@ export function openHostWindow(hostId?: string) {
     label: hostId ? `host-${hostId}` : "host-new",
     view: "host",
     id: hostId,
-    title: hostId ? title("windowTitles.editHost") : title("windowTitles.newHost"),
+    title: hostId
+      ? title("windowTitles.editHost")
+      : title("windowTitles.newHost"),
     width: 560,
     height: 620,
     titleBarStyle: "overlay",

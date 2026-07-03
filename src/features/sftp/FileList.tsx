@@ -13,12 +13,7 @@ import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { dragState } from "./dnd";
-import {
-  parentPath,
-  useSftpStore,
-  type PaneSide,
-  type SftpTab,
-} from "./store";
+import { parentPath, useSftpStore, type PaneSide, type SftpTab } from "./store";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -129,7 +124,11 @@ export function FileList({
           {tab.entries.length === 0 ? (
             <tr>
               <td colSpan={3}>
-                <EmptyState className="py-8" icon={Folder} title={t("sftp.emptyDir")} />
+                <EmptyState
+                  className="py-8"
+                  icon={Folder}
+                  title={t("sftp.emptyDir")}
+                />
               </td>
             </tr>
           ) : (
@@ -170,7 +169,9 @@ export function FileList({
                     </tr>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem onSelect={() => void transfer(side, [entry])}>
+                    <ContextMenuItem
+                      onSelect={() => void transfer(side, [entry])}
+                    >
                       {sendLabel}
                     </ContextMenuItem>
                     {entry.kind === "dir" && (
@@ -193,7 +194,10 @@ export function FileList({
                     <ContextMenuItem onSelect={() => onRename(entry)}>
                       {t("sftp.rename")}
                     </ContextMenuItem>
-                    <ContextMenuItem destructive onSelect={() => onDelete(entry)}>
+                    <ContextMenuItem
+                      destructive
+                      onSelect={() => onDelete(entry)}
+                    >
                       {t("common.delete")}
                     </ContextMenuItem>
                   </ContextMenuContent>

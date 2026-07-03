@@ -2,7 +2,10 @@ import { useState } from "react";
 import { Plus, Trash2, UserCog } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog, type ConfirmState } from "@/components/ui/confirm-dialog";
+import {
+  ConfirmDialog,
+  type ConfirmState,
+} from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -139,7 +142,9 @@ export function IdentitiesSection() {
           {authType === "key" && (
             <Field
               label={t("identities.sshKey")}
-              hint={keys.length === 0 ? t("identities.addKeyFirstHint") : undefined}
+              hint={
+                keys.length === 0 ? t("identities.addKeyFirstHint") : undefined
+              }
             >
               <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
                 <option value="">{t("common.selectKey")}</option>
@@ -167,10 +172,7 @@ export function IdentitiesSection() {
       )}
 
       {identities.length === 0 && !adding ? (
-        <EmptyState
-          icon={UserCog}
-          title={t("identities.emptyTitle")}
-        />
+        <EmptyState icon={UserCog} title={t("identities.emptyTitle")} />
       ) : (
         <div className="flex flex-col gap-1">
           {identities.map((id) => (
@@ -195,7 +197,10 @@ export function IdentitiesSection() {
           ))}
         </div>
       )}
-      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      <ConfirmDialog
+        state={confirmState}
+        onClose={() => setConfirmState(null)}
+      />
     </div>
   );
 }

@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Check, Copy, FileUp, KeyRound, Plus, Sparkles, Trash2 } from "lucide-react";
+import {
+  Check,
+  Copy,
+  FileUp,
+  KeyRound,
+  Plus,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 
 import {
   Badge,
@@ -219,7 +227,11 @@ export function KeysSection() {
               placeholder={t("keys.namePlaceholder")}
             />
           </Field>
-          <Field label={t("keys.privateKey")} required hint={t("keys.privateKeyHint")}>
+          <Field
+            label={t("keys.privateKey")}
+            required
+            hint={t("keys.privateKeyHint")}
+          >
             <div className="flex flex-col gap-2">
               <Textarea
                 rows={5}
@@ -250,7 +262,11 @@ export function KeysSection() {
             <Button variant="ghost" size="sm" onClick={reset}>
               {t("common.cancel")}
             </Button>
-            <Button size="sm" onClick={submitImport} loading={createKey.isPending}>
+            <Button
+              size="sm"
+              onClick={submitImport}
+              loading={createKey.isPending}
+            >
               {t("keys.saveKey")}
             </Button>
           </div>
@@ -258,10 +274,7 @@ export function KeysSection() {
       )}
 
       {keys.length === 0 && mode === "closed" ? (
-        <EmptyState
-          icon={KeyRound}
-          title={t("keys.emptyTitle")}
-        />
+        <EmptyState icon={KeyRound} title={t("keys.emptyTitle")} />
       ) : (
         <div className="flex flex-col gap-1">
           {keys.map((k) => (
@@ -269,7 +282,10 @@ export function KeysSection() {
           ))}
         </div>
       )}
-      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      <ConfirmDialog
+        state={confirmState}
+        onClose={() => setConfirmState(null)}
+      />
     </div>
   );
 }
@@ -303,9 +319,7 @@ function KeyRow({
     <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
       <KeyRound className="size-4 shrink-0 text-muted-foreground" />
       <span className="font-medium">{sshKey.name}</span>
-      {tag && (
-        <Badge className="font-mono text-[10px] uppercase">{tag}</Badge>
-      )}
+      {tag && <Badge className="font-mono text-[10px] uppercase">{tag}</Badge>}
       {sshKey.publicKey && (
         <Button
           size="icon"

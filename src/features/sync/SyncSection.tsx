@@ -275,10 +275,7 @@ function VersionsCard() {
       )}
 
       {!isLoading && !isError && (!versions || versions.length === 0) && (
-        <EmptyState
-          icon={History}
-          title={t("settings.sync.versions.empty")}
-        />
+        <EmptyState icon={History} title={t("settings.sync.versions.empty")} />
       )}
 
       {!!versions?.length && (
@@ -479,7 +476,9 @@ function FilePassphraseForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{t("settings.sync.file.passphraseDialogTitle")}</DialogTitle>
+        <DialogTitle>
+          {t("settings.sync.file.passphraseDialogTitle")}
+        </DialogTitle>
       </DialogHeader>
       <PasswordInput
         value={passphrase}

@@ -33,10 +33,7 @@ function DropdownMenuPortal(
   props: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>,
 ) {
   return (
-    <DropdownMenuPrimitive.Portal
-      data-slot="dropdown-menu-portal"
-      {...props}
-    />
+    <DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
   );
 }
 
@@ -221,9 +218,7 @@ function DropdownMenuSubTrigger({
   ref,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger> & {
-  ref?: React.Ref<
-    React.ComponentRef<typeof DropdownMenuPrimitive.SubTrigger>
-  >;
+  ref?: React.Ref<React.ComponentRef<typeof DropdownMenuPrimitive.SubTrigger>>;
 }) {
   return (
     <DropdownMenuPrimitive.SubTrigger
@@ -243,9 +238,7 @@ function DropdownMenuSubContent({
   ref,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent> & {
-  ref?: React.Ref<
-    React.ComponentRef<typeof DropdownMenuPrimitive.SubContent>
-  >;
+  ref?: React.Ref<React.ComponentRef<typeof DropdownMenuPrimitive.SubContent>>;
 }) {
   return (
     <DropdownMenuPrimitive.SubContent

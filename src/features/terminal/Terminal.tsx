@@ -58,7 +58,8 @@ export function TerminalView({
 
   // Keep colors in sync with the app theme without recreating the terminal.
   useEffect(() => {
-    if (termRef.current) termRef.current.options.theme = terminalTheme(resolved);
+    if (termRef.current)
+      termRef.current.options.theme = terminalTheme(resolved);
   }, [resolved]);
 
   useEffect(() => {

@@ -17,7 +17,10 @@ import remarkGfm from "remark-gfm";
 
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog, type ConfirmState } from "@/components/ui/confirm-dialog";
+import {
+  ConfirmDialog,
+  type ConfirmState,
+} from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -327,7 +330,10 @@ export function AiPanel({
         onClose={() => setRenameTarget(null)}
         onRename={renameSession}
       />
-      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      <ConfirmDialog
+        state={confirmState}
+        onClose={() => setConfirmState(null)}
+      />
     </>
   );
 }

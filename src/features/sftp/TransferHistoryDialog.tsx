@@ -124,10 +124,7 @@ export function TransferHistoryDialog({
         )}
 
         {!isLoading && !isError && entries?.length === 0 && (
-          <EmptyState
-            icon={History}
-            title={t("sftp.history.empty")}
-          />
+          <EmptyState icon={History} title={t("sftp.history.empty")} />
         )}
 
         {!isLoading && !!entries?.length && (
@@ -193,7 +190,10 @@ export function TransferHistoryDialog({
           </ScrollArea>
         )}
       </DialogContent>
-      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      <ConfirmDialog
+        state={confirmState}
+        onClose={() => setConfirmState(null)}
+      />
     </Dialog>
   );
 }

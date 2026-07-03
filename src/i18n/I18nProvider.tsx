@@ -37,8 +37,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
-      translate(locale, key, params),
+    (
+      key: Parameters<typeof translate>[1],
+      params?: Parameters<typeof translate>[2],
+    ) => translate(locale, key, params),
     [locale],
   );
 

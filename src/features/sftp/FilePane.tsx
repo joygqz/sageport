@@ -290,7 +290,10 @@ export function FilePane({ side }: { side: PaneSide }) {
       )}
 
       <PromptDialog state={prompt} onClose={() => setPrompt(null)} />
-      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      <ConfirmDialog
+        state={confirmState}
+        onClose={() => setConfirmState(null)}
+      />
     </div>
   );
 }

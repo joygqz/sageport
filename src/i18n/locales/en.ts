@@ -104,11 +104,11 @@ export const en = {
     deleteError: "Could not delete host",
     deleteGroupError: "Could not delete group",
     deleteHostTitle: "Delete host",
-    deleteHostConfirm: "Delete host \"{label}\"? This cannot be undone.",
+    deleteHostConfirm: 'Delete host "{label}"? This cannot be undone.',
     deleteGroupTitle: "Delete group",
-    deleteGroupConfirm: "Delete group \"{name}\"? This cannot be undone.",
+    deleteGroupConfirm: 'Delete group "{name}"? This cannot be undone.',
     deleteGroupWithHostsConfirm:
-      "Group \"{name}\" contains {count} host(s). Choose what to do with them.",
+      'Group "{name}" contains {count} host(s). Choose what to do with them.',
     deleteGroupKeepHosts: "Delete group only",
     deleteGroupAndHosts: "Delete group and hosts",
   },
@@ -274,7 +274,7 @@ export const en = {
     addError: "Could not add identity",
     deleteConfirmTitle: "Delete identity",
     deleteConfirmDescription:
-      "Delete identity \"{name}\"? This cannot be undone.",
+      'Delete identity "{name}"? This cannot be undone.',
     deleteError: "Could not delete identity",
   },
 
@@ -291,8 +291,7 @@ export const en = {
     nameCommandRequired: "Name and command are required",
     saveError: "Could not save snippet",
     deleteConfirmTitle: "Delete snippet",
-    deleteConfirmDescription:
-      "Delete snippet \"{name}\"? This cannot be undone.",
+    deleteConfirmDescription: 'Delete snippet "{name}"? This cannot be undone.',
   },
 
   keys: {
@@ -329,8 +328,7 @@ export const en = {
     nameKeyRequired: "Name and private key are required",
     addError: "Could not add key",
     deleteConfirmTitle: "Delete key",
-    deleteConfirmDescription:
-      "Delete key \"{name}\"? This cannot be undone.",
+    deleteConfirmDescription: 'Delete key "{name}"? This cannot be undone.',
     deleteError: "Could not delete key",
   },
 
@@ -354,8 +352,7 @@ export const en = {
     untitledChat: "New chat",
     renameSession: "Rename chat",
     deleteSessionConfirmTitle: "Delete chat",
-    deleteSessionConfirmDescription:
-      "Delete \"{title}\"? This cannot be undone.",
+    deleteSessionConfirmDescription: 'Delete "{title}"? This cannot be undone.',
     askTitle: "Ask the agent",
     askDescription: "It can inspect and act on your terminal sessions.",
     thinking: "Working…",

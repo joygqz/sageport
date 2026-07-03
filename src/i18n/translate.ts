@@ -15,9 +15,7 @@ const dictionaries: Record<Locale, Dictionary> = {
 export type TKey = LeafPaths<Dictionary>;
 
 type LeafPaths<T> = {
-  [K in keyof T & string]: T[K] extends string
-    ? K
-    : `${K}.${LeafPaths<T[K]>}`;
+  [K in keyof T & string]: T[K] extends string ? K : `${K}.${LeafPaths<T[K]>}`;
 }[keyof T & string];
 
 /** Interpolation values substituted into `{placeholder}` tokens. */

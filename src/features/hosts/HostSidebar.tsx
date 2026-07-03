@@ -132,7 +132,11 @@ export function HostSidebar({
     }
   };
 
-  const onDeleteGroup = (section: { id: string; name: string; hosts: Host[] }) => {
+  const onDeleteGroup = (section: {
+    id: string;
+    name: string;
+    hosts: Host[];
+  }) => {
     const hasHosts = section.hosts.length > 0;
     setConfirmState({
       title: t("sidebar.deleteGroupTitle"),
@@ -257,7 +261,10 @@ export function HostSidebar({
         size={width}
         onResize={(w) => setWidth(clampWidth(w))}
       />
-      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      <ConfirmDialog
+        state={confirmState}
+        onClose={() => setConfirmState(null)}
+      />
     </>
   );
 }
