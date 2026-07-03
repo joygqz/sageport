@@ -22,15 +22,15 @@ export function TitleBar() {
   const toggleAux = useLayoutStore((s) => s.toggleAux);
 
   return (
-    // 28px is macOS's standard title-bar height: the native traffic lights
-    // (12px tall, y-centered at 14px in their default position) land exactly
-    // in the middle, with no private-API repositioning. Sized in px, not rem,
-    // so UI font scaling never breaks the alignment. Everything inside is
-    // sized to leave breathing room within those 28px, VSCode-style.
+    // ~34px, the height VSCode's title bar uses with the command center.
+    // Sized in rem (h-9) so the whole bar scales with the UI zoom, exactly
+    // like VSCode. The native macOS traffic lights keep their default
+    // position (no private APIs), which at this height sits a couple of
+    // pixels above true center — the same tradeoff VSCode accepts.
     <header
       data-tauri-drag-region
       className={cn(
-        "grid h-[28px] shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center border-b border-border bg-surface",
+        "grid h-9 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center border-b border-border bg-surface",
         IS_MACOS ? "pl-[80px]" : "pl-2",
       )}
     >
@@ -38,7 +38,7 @@ export function TitleBar() {
 
       <button
         onClick={() => openPalette("quick")}
-        className="flex h-[22px] items-center justify-center gap-2 rounded-md border border-border bg-background/60 px-2 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+        className="flex h-6 items-center justify-center gap-2 rounded-md border border-border bg-background/60 px-2 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
       >
         <Search className="size-3.5 shrink-0" />
         <span className="truncate">{t("titleBar.commandCenter")}</span>
@@ -93,7 +93,7 @@ function LayoutToggle({
         onClick={onClick}
         aria-pressed={active}
         className={cn(
-          "flex size-5 items-center justify-center rounded transition-colors",
+          "flex size-6 items-center justify-center rounded transition-colors",
           active
             ? "bg-accent text-accent-foreground"
             : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",

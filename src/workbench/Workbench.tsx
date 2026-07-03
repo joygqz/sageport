@@ -16,6 +16,7 @@ import { useOverlayStore } from "./overlays";
 import { SideBar } from "./SideBar";
 import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
+import { useZoomStore } from "./zoom";
 
 /**
  * The workbench: a fixed chrome of title bar, activity bar, side bar,
@@ -39,6 +40,11 @@ export function Workbench() {
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Re-apply the persisted UI zoom level to the document root on launch.
+  useEffect(() => {
+    useZoomStore.getState().init();
   }, []);
 
   const layout = useLayoutStore();

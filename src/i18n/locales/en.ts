@@ -380,6 +380,12 @@ export const en = {
         "Choose how Sageport looks. Each theme styles the whole app including the terminal.",
       language: "Language",
       languageHint: "Sets the display language of the app.",
+      zoom: "Zoom",
+      zoomHint:
+        "Scales the whole interface, including the terminal. Shortcuts: {keys}.",
+      zoomIn: "Zoom in",
+      zoomOut: "Zoom out",
+      zoomReset: "Reset",
     },
     ai: {
       title: "AI provider",

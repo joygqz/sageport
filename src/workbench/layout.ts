@@ -22,7 +22,7 @@ export const AUX_MAX = 640;
 
 /** Fixed chrome that competes with the resizable parts for space. */
 const ACTIVITY_BAR_W = 48;
-const TITLE_BAR_H = 28;
+const TITLE_BAR_H = 34;
 const STATUS_BAR_H = 24;
 /** The editor area never gives up more than this. */
 const EDITOR_MIN_W = 300;

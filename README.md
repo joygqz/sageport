@@ -38,13 +38,13 @@ Sageport is organized like an editor, not a website.
 - **Status bar** shows the active session, transfer progress, sync state and available updates. Every item is clickable.
 - **Command palette** opens with <kbd>⌘P</kbd> to search and connect to hosts, and with <kbd>⌘⇧P</kbd> to run any command, exactly like VSCode quick open.
 
-Common shortcuts: <kbd>⌘N</kbd> new host, <kbd>⌘B</kbd> toggle side bar, <kbd>⌘J</kbd> toggle panel, <kbd>⌘L</kbd> toggle assistant, <kbd>⌘W</kbd> close tab, <kbd>⌘F</kbd> find in terminal, <kbd>⌘+</kbd>/<kbd>⌘−</kbd>/<kbd>⌘0</kbd> terminal zoom, <kbd>⌘,</kbd> settings. On Windows and Linux use <kbd>Ctrl</kbd>.
+Common shortcuts: <kbd>⌘N</kbd> new host, <kbd>⌘B</kbd> toggle side bar, <kbd>⌘J</kbd> toggle panel, <kbd>⌘L</kbd> toggle assistant, <kbd>⌘W</kbd> close tab, <kbd>⌘F</kbd> find in terminal, <kbd>⌘+</kbd>/<kbd>⌘−</kbd>/<kbd>⌘0</kbd> zoom the whole UI, <kbd>⌘,</kbd> settings. On Windows and Linux use <kbd>Ctrl</kbd>.
 
 ## Features
 
 ### Terminal
 
-Sessions render through xterm.js with GPU acceleration, so output stays smooth under heavy load. Multiple sessions run side by side as tabs, with clickable links, full Unicode support and 10000 lines of scrollback. A VSCode style find bar (<kbd>⌘F</kbd>) searches the scrollback with match highlighting, and the font size zooms across every session with <kbd>⌘+</kbd>/<kbd>⌘−</kbd>.
+Sessions render through xterm.js with GPU acceleration, so output stays smooth under heavy load. Multiple sessions run side by side as tabs, with clickable links, full Unicode support and 10000 lines of scrollback. A VSCode style find bar (<kbd>⌘F</kbd>) searches the scrollback with match highlighting, and <kbd>⌘+</kbd>/<kbd>⌘−</kbd> zooms the whole workbench — terminal glyphs re-render at the native pixel size, so text stays crisp at every zoom level.
 
 Connections are kept alive with protocol level keepalives, and a lost connection shows a clear overlay with a one click reconnect. Switching tabs never reflows the terminal — hidden sessions keep their exact size, so there is no flicker.
 

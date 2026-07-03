@@ -369,6 +369,11 @@ export const zhCN: Dictionary = {
       themeDescription: "选择 Sageport 的外观，每套主题都会同时应用到终端。",
       language: "语言",
       languageHint: "设置应用的显示语言。",
+      zoom: "缩放",
+      zoomHint: "整体缩放界面（包含终端）。快捷键：{keys}。",
+      zoomIn: "放大",
+      zoomOut: "缩小",
+      zoomReset: "重置",
     },
     ai: {
       title: "AI 服务",

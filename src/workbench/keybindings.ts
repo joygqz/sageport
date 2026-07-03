@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 
 import { useTerminalSearch } from "@/features/terminal/search";
-import { useTerminalSettings } from "@/features/terminal/settings";
 import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
+import { useZoomStore } from "./zoom";
 
 /**
  * Global workbench shortcuts. All bindings require the platform modifier
@@ -51,11 +51,12 @@ export function useKeybindings() {
           run(() => useTerminalSearch.getState().open(active.id));
         }
       } else if (key === "=" || key === "+") {
-        run(() => useTerminalSettings.getState().zoomIn());
-      } else if (key === "-") {
-        run(() => useTerminalSettings.getState().zoomOut());
+        // Whole-UI zoom, VSCode-style. "+" covers layouts/shift variants.
+        run(() => useZoomStore.getState().zoomIn());
+      } else if (key === "-" || key === "_") {
+        run(() => useZoomStore.getState().zoomOut());
       } else if (key === "0") {
-        run(() => useTerminalSettings.getState().resetZoom());
+        run(() => useZoomStore.getState().resetZoom());
       }
     };
 

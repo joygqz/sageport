@@ -1,12 +1,33 @@
 import { useState } from "react";
-import { Info, Palette, RefreshCw, Sparkles } from "lucide-react";
+import {
+  Info,
+  Minus,
+  Palette,
+  Plus,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 
-import { Button, Field, Input, ScrollArea, Select } from "@/components/ui";
+import {
+  Button,
+  Field,
+  Input,
+  ScrollArea,
+  Select,
+  Tooltip,
+} from "@/components/ui";
 import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
+import { IS_MACOS } from "@/lib/platform";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { THEMES, useTheme, type ThemeDefinition } from "@/themes";
 import { useTabsStore, type SettingsSection } from "@/workbench/tabs";
+import {
+  useZoomStore,
+  zoomFactor,
+  ZOOM_LEVEL_MAX,
+  ZOOM_LEVEL_MIN,
+} from "@/workbench/zoom";
 import type { AiConfig, AiProtocol } from "@/types/models";
 import {
   AI_PROTOCOLS,
@@ -112,7 +133,61 @@ function AppearanceSection() {
           ))}
         </Select>
       </Field>
+
+      <ZoomField />
     </div>
+  );
+}
+
+/** Whole-UI zoom stepper, mirroring the mod+= / mod+- / mod+0 shortcuts. */
+function ZoomField() {
+  const { t } = useI18n();
+  const level = useZoomStore((s) => s.level);
+  const zoomIn = useZoomStore((s) => s.zoomIn);
+  const zoomOut = useZoomStore((s) => s.zoomOut);
+  const resetZoom = useZoomStore((s) => s.resetZoom);
+
+  const percent = Math.round(zoomFactor(level) * 100);
+  const keys = IS_MACOS ? "⌘+ / ⌘− / ⌘0" : "Ctrl+ / Ctrl− / Ctrl0";
+
+  return (
+    <Field
+      label={t("settings.appearance.zoom")}
+      hint={t("settings.appearance.zoomHint", { keys })}
+    >
+      <div className="flex items-center gap-1.5">
+        <Tooltip content={t("settings.appearance.zoomOut")}>
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-7"
+            disabled={level <= ZOOM_LEVEL_MIN}
+            onClick={zoomOut}
+          >
+            <Minus className="size-3.5" />
+          </Button>
+        </Tooltip>
+        <span className="min-w-14 text-center text-sm tabular-nums text-foreground">
+          {percent}%
+        </span>
+        <Tooltip content={t("settings.appearance.zoomIn")}>
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-7"
+            disabled={level >= ZOOM_LEVEL_MAX}
+            onClick={zoomIn}
+          >
+            <Plus className="size-3.5" />
+          </Button>
+        </Tooltip>
+        {level !== 0 && (
+          <Button size="sm" variant="ghost" onClick={resetZoom}>
+            {t("settings.appearance.zoomReset")}
+          </Button>
+        )}
+      </div>
+    </Field>
   );
 }
 

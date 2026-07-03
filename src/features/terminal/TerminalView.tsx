@@ -12,8 +12,8 @@ import { ipc } from "@/lib/ipc";
 import { errorMessage } from "@/lib/toast";
 import { useTheme } from "@/themes/useTheme";
 import { useTabsStore } from "@/workbench/tabs";
+import { terminalFontSize } from "@/workbench/zoom";
 import { registerTerminal, unregisterTerminal } from "./registry";
-import { useTerminalSettings } from "./settings";
 import { xtermTheme } from "./xterm-theme";
 
 function decodeBase64(b64: string): Uint8Array {
@@ -67,7 +67,7 @@ export function TerminalView({
     const term = new XTerm({
       fontFamily:
         '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace',
-      fontSize: useTerminalSettings.getState().fontSize,
+      fontSize: terminalFontSize(),
       lineHeight: 1.25,
       cursorBlink: true,
       cursorStyle: "bar",
