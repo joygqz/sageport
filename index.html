@@ -3,58 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
     <title>Sageport</title>
 
     <!--
       Critical theme bootstrap. Runs before the app bundle (and before first
-      paint) so a window never flashes white while loading in dark mode.
-      The raw background colors mirror `--background` in styles/globals.css and
-      the storage key mirrors THEME_STORAGE_KEY in src/theme/dom.ts.
+      paint) so the window never flashes the wrong color while loading. The
+      storage keys mirror src/themes/apply.ts; the fallback background is the
+      default theme (Dark Modern).
     -->
-    <style>
-      html {
-        background-color: #ffffff;
-      }
-      html.dark {
-        background-color: #0d1117;
-      }
-      /*
-        Transparent OS windows (Spotlight-style launcher) must never paint an
-        opaque document background, or the window's rectangle reads as a frame
-        around the floating card. These rules are unlayered like the ones above
-        so they win over `html.dark`; the matching rules in globals.css live in
-        `@layer base` and would otherwise lose to this inline style.
-      */
-      html.transparent-window,
-      html.transparent-window.dark {
-        background-color: transparent;
-      }
-    </style>
     <script>
       (function () {
+        var bg = "#1f1f1f";
+        var scheme = "dark";
         try {
-          var stored = localStorage.getItem("sageport.theme");
-          var mode =
-            stored === "light" || stored === "dark" || stored === "system"
-              ? stored
-              : "dark";
-          var dark =
-            mode === "dark" ||
-            (mode === "system" &&
-              window.matchMedia("(prefers-color-scheme: dark)").matches);
-          var root = document.documentElement;
-          root.classList.toggle("dark", dark);
-          root.style.colorScheme = dark ? "dark" : "light";
-          // Flag transparent windows before first paint so the document stays
-          // transparent (mirrors the class set in main.tsx for the command view).
-          if (/^#\/?command(\?|$)/.test(window.location.hash)) {
-            root.classList.add("transparent-window");
-          }
+          bg = localStorage.getItem("sageport.theme.bg") || bg;
+          scheme = localStorage.getItem("sageport.theme.scheme") || scheme;
         } catch (e) {
-          /* localStorage/matchMedia unavailable — fall back to dark. */
-          document.documentElement.classList.add("dark");
+          /* localStorage unavailable, keep defaults */
         }
+        var root = document.documentElement;
+        root.style.backgroundColor = bg;
+        root.style.colorScheme = scheme;
+        if (scheme === "dark") root.classList.add("dark");
       })();
     </script>
   </head>

@@ -1,18 +1,18 @@
 import { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { WebLinksAddon } from "@xterm/addon-web-links";
-import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { WebglAddon } from "@xterm/addon-webgl";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
+import { FitAddon } from "@xterm/addon-fit";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 
 import { ipc } from "@/lib/ipc";
 import { errorMessage } from "@/lib/toast";
-import { useTheme } from "@/theme/useTheme";
+import { useTheme } from "@/themes/useTheme";
+import { useTabsStore } from "@/workbench/tabs";
 import { registerTerminal, unregisterTerminal } from "./registry";
-import { terminalTheme } from "./theme";
-import { useSessionStore } from "./sessionStore";
+import { xtermTheme } from "./xterm-theme";
 
 function decodeBase64(b64: string): Uint8Array {
   const binary = atob(b64);
@@ -22,9 +22,9 @@ function decodeBase64(b64: string): Uint8Array {
 }
 
 /**
- * Attach the GPU renderer. xterm transparently falls back to its DOM renderer
- * if WebGL is unavailable or the context is later lost (e.g. GPU reset), so we
- * dispose the addon on loss rather than trying to recreate it.
+ * Attach the GPU renderer. xterm transparently falls back to its DOM
+ * renderer if WebGL is unavailable or the context is later lost (e.g. GPU
+ * reset), so the addon is disposed on loss rather than recreated.
  */
 function attachWebgl(term: XTerm) {
   try {
@@ -32,15 +32,15 @@ function attachWebgl(term: XTerm) {
     webgl.onContextLoss(() => webgl.dispose());
     term.loadAddon(webgl);
   } catch {
-    /* no WebGL — DOM renderer remains active */
+    /* no WebGL, DOM renderer remains active */
   }
 }
 
 /**
- * A single SSH-backed terminal. Owns one xterm instance for the lifetime of the
- * session, streams output from `ssh://data`, and forwards keystrokes/resizes.
- * Bumping `attempt` (via the session store's `reconnect`) tears this down and
- * remounts a fresh connection.
+ * A single SSH-backed terminal. Owns one xterm instance for the lifetime of
+ * the session, streams output from `ssh://data`, and forwards keystrokes and
+ * resizes. Bumping `attempt` (via the tab store's `reconnectTerminal`) tears
+ * this down and remounts a fresh connection.
  */
 export function TerminalView({
   sessionId,
@@ -53,31 +53,29 @@ export function TerminalView({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
-  const { resolved } = useTheme();
-  const setStatus = useSessionStore((s) => s.setStatus);
+  const { theme } = useTheme();
+  const setStatus = useTabsStore((s) => s.setTerminalStatus);
 
   // Keep colors in sync with the app theme without recreating the terminal.
   useEffect(() => {
-    if (termRef.current)
-      termRef.current.options.theme = terminalTheme(resolved);
-  }, [resolved]);
+    if (termRef.current) termRef.current.options.theme = xtermTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     const term = new XTerm({
       fontFamily:
-        '"JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, monospace',
+        '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace',
       fontSize: 13,
       lineHeight: 1.25,
-      letterSpacing: 0,
       cursorBlink: true,
       cursorStyle: "bar",
       cursorInactiveStyle: "outline",
       allowProposedApi: true,
-      // Alt acts as Meta so shell word-motions (alt+←/→/backspace) work on mac.
+      // Alt acts as Meta so shell word motions (alt+arrows) work on macOS.
       macOptionIsMeta: true,
       // Keep faint colors legible against the themed background.
       minimumContrastRatio: 1.1,
-      theme: terminalTheme(resolved),
+      theme: xtermTheme(theme),
       scrollback: 10_000,
     });
     const fit = new FitAddon();
@@ -89,7 +87,7 @@ export function TerminalView({
     term.unicode.activeVersion = "11";
 
     term.open(containerRef.current!);
-    attachWebgl(term); // must run after open(), once the canvas exists.
+    attachWebgl(term); // must run after open(), once the canvas exists
     fit.fit();
     termRef.current = term;
     registerTerminal(sessionId, term);
@@ -102,8 +100,8 @@ export function TerminalView({
       void ipc.ssh.send(sessionId, data).catch(() => {});
     });
 
-    // Register event listeners *before* connecting so we never miss the
-    // backend's "connected"/"error" status or early output (the listen() call
+    // Register event listeners *before* connecting so the backend's
+    // "connected"/"error" status and early output are never missed (listen()
     // is async and Tauri does not buffer events for late subscribers).
     void (async () => {
       const [unData, unStatus] = await Promise.all([

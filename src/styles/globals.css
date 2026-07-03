@@ -3,142 +3,59 @@
 @import "@fontsource-variable/inter/wght.css";
 @import "@fontsource-variable/jetbrains-mono/wght.css";
 
-/* Enable class-based dark mode driven by ThemeProvider (.dark on <html>) */
+/* `.dark` is toggled by the theme system for dark-appearance themes. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Design tokens — semantic, theme-agnostic names.
- * Values are overridden per theme below; components only ever reference
- * the semantic Tailwind utilities (bg-background, text-muted-foreground, …).
+ * Design tokens. The authoritative values live in src/themes/themes.ts and
+ * are written onto :root by the theme provider at runtime; the values below
+ * are the Dark Modern defaults so the first paint (before the bundle runs)
+ * already matches the default theme.
  */
 :root {
-  /* Flat, compact radius scale: sm 2px / md 4px / lg 6px / xl 10px. */
+  --background: #1f1f1f;
+  --foreground: #cccccc;
+  --surface: #181818;
+  --surface-foreground: #cccccc;
+  --popover: #252526;
+  --popover-foreground: #cccccc;
+  --card: #232323;
+  --card-foreground: #cccccc;
+  --primary: #0078d4;
+  --primary-foreground: #ffffff;
+  --secondary: #2d2d2d;
+  --secondary-foreground: #cccccc;
+  --muted: #2a2a2a;
+  --muted-foreground: #9d9d9d;
+  --accent: #37373d;
+  --accent-foreground: #e4e4e4;
+  --destructive: #f85149;
+  --destructive-foreground: #ffffff;
+  --success: #2ea043;
+  --warning: #d29922;
+  --info: #4daafc;
+  --border: #2b2b2b;
+  --input: #3c3c3c;
+  --ring: #0078d4;
+  --list-hover: #2a2d2e;
+  --list-active: #04395e;
+  --list-active-foreground: #ffffff;
+  --terminal-background: #1f1f1f;
+  --terminal-foreground: #cccccc;
+
+  /* Compact radius scale for a dense desktop UI. */
   --radius: 0.375rem;
 
-  /* Elevation for floating surfaces (menus, tooltips, toasts, dialogs).
-   * Tuned as a soft, low-contrast lift rather than a skeuomorphic drop
-   * shadow — the app is otherwise a flat, border-driven design, so these
-   * exist only to separate overlays from whatever renders behind them. */
-  --elevation-sm: 0 1px 2px rgba(31, 35, 40, 0.06), 0 4px 10px rgba(31, 35, 40, 0.08);
-  --elevation-md: 0 2px 4px rgba(31, 35, 40, 0.06), 0 12px 28px rgba(31, 35, 40, 0.14);
-
-  /* Light theme — GitHub Primer light palette.
-   * Two-tone layout: content surfaces (workspace/terminal) are white; the
-   * chrome ring (title bar, sidebar, tab strip, panels) is canvas.subtle
-   * (#f6f8fa), and every module boundary is drawn with a crisp border
-   * (#d0d7de, border.default).
-   *
-   * --primary is GitHub's accent blue (#0969da, accent.fg) — the single
-   * pervasive interactive color (links, focus rings, selection, the
-   * primary button). --accent is a neutral grey hover wash reserved for
-   * generic buttons/menus; --sidebar-accent is the blue-tinted wash GitHub
-   * uses for the current/hovered item in list-style navigation. Both are
-   * tuned to stay clearly distinguishable from every surface they render
-   * on (background/card/popover at #fff, surface/sidebar at #f6f8fa) —
-   * a flat, near-identical fill was the exact defect this palette fixes. */
-  --background: #ffffff;
-  --foreground: #1f2328;
-
-  --surface: #f6f8fa;
-  --surface-foreground: #1f2328;
-
-  --card: #ffffff;
-  --card-foreground: #1f2328;
-
-  --popover: #ffffff;
-  --popover-foreground: #1f2328;
-
-  --primary: #0969da;
-  --primary-foreground: #ffffff;
-
-  --secondary: #eaeef2;
-  --secondary-foreground: #1f2328;
-
-  --muted: #eef2f5;
-  --muted-foreground: #656d76;
-
-  --accent: #dde3ea;
-  --accent-foreground: #1f2328;
-
-  --destructive: #cf222e;
-  --destructive-foreground: #ffffff;
-
-  --success: #1a7f37;
-  --warning: #9a6700;
-  --info: #0969da;
-
-  --border: #d0d7de;
-  --input: #d0d7de;
-  --ring: #0969da;
-
-  /* Chrome surfaces — unified with --surface, separated structurally. */
-  --sidebar: #f6f8fa;
-  --sidebar-foreground: #1f2328;
-  --sidebar-border: #d0d7de;
-  --sidebar-accent: #ddf4ff;
-  --sidebar-accent-foreground: #0969da;
-
-  /* Terminal surface.
-   * MUST byte-match the xterm palette in src/features/terminal/theme.ts so
-   * the padding around the canvas is indistinguishable from the canvas
-   * itself (xterm can't read CSS variables, so the values are duplicated). */
-  --terminal-background: #ffffff;
-  --terminal-foreground: #1f2328;
+  /* Elevation for floating surfaces. The app is a flat, border-driven
+   * design; these exist only to separate overlays from what is behind
+   * them. Dark themes get a stronger lift via the .dark override. */
+  --elevation-sm:
+    0 1px 2px rgba(31, 35, 40, 0.06), 0 4px 10px rgba(31, 35, 40, 0.08);
+  --elevation-md:
+    0 2px 4px rgba(31, 35, 40, 0.06), 0 12px 28px rgba(31, 35, 40, 0.14);
 }
 
 .dark {
-  /* Dark theme — GitHub Primer dark palette.
-   * Two-tone layout: content surfaces (workspace/terminal) are the deepest
-   * (#0d1117, canvas.default); the chrome ring sits one step lighter
-   * (#161b22, canvas.subtle); floating surfaces (card/popover) step
-   * lighter again for elevation, matching GitHub's own overlay tiers. */
-  --background: #0d1117;
-  --foreground: #e6edf3;
-
-  --surface: #161b22;
-  --surface-foreground: #e6edf3;
-
-  --card: #1c2128;
-  --card-foreground: #e6edf3;
-
-  --popover: #21262d;
-  --popover-foreground: #e6edf3;
-
-  --primary: #1f6feb;
-  --primary-foreground: #ffffff;
-
-  --secondary: #21262d;
-  --secondary-foreground: #e6edf3;
-
-  --muted: #21262d;
-  --muted-foreground: #8b949e;
-
-  --accent: #30363d;
-  --accent-foreground: #e6edf3;
-
-  --destructive: #da3633;
-  --destructive-foreground: #ffffff;
-
-  --success: #3fb950;
-  --warning: #d29922;
-  --info: #58a6ff;
-
-  --border: #30363d;
-  --input: #30363d;
-  --ring: #1f6feb;
-
-  --sidebar: #161b22;
-  --sidebar-foreground: #e6edf3;
-  --sidebar-border: #30363d;
-  --sidebar-accent: #182636;
-  --sidebar-accent-foreground: #58a6ff;
-
-  /* See the light-theme note: mirrors src/features/terminal/theme.ts. */
-  --terminal-background: #0d1117;
-  --terminal-foreground: #e6edf3;
-
-  /* Dark surfaces need a stronger, darker lift to read against near-black
-   * backgrounds — the light-theme shadow values would be invisible here. */
   --elevation-sm: 0 1px 2px rgba(1, 4, 9, 0.4), 0 4px 12px rgba(1, 4, 9, 0.45);
   --elevation-md: 0 2px 4px rgba(1, 4, 9, 0.4), 0 16px 36px rgba(1, 4, 9, 0.55);
 }
@@ -151,11 +68,11 @@
   --color-surface: var(--surface);
   --color-surface-foreground: var(--surface-foreground);
 
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
 
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
@@ -180,11 +97,9 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-list-hover: var(--list-hover);
+  --color-list-active: var(--list-active);
+  --color-list-active-foreground: var(--list-active-foreground);
 
   --color-terminal-background: var(--terminal-background);
   --color-terminal-foreground: var(--terminal-foreground);
@@ -194,8 +109,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Overrides Tailwind's built-in shadow-sm/shadow-md so every component
-   * using those utilities picks up the theme-aware elevation above. */
+  /* Route Tailwind's shadow-sm/shadow-md through the theme-aware elevation. */
   --shadow-sm: var(--elevation-sm);
   --shadow-md: var(--elevation-md);
 
@@ -206,9 +120,7 @@
     "JetBrains Mono Variable", "SFMono-Regular", ui-monospace, "Menlo",
     monospace;
 
-  /* A single deliberate micro-type step, replacing the ad hoc arbitrary
-   * values (0.65rem / 0.7rem / 10px) previously scattered across kbd,
-   * badges, and section labels. */
+  /* Single micro-type step for kbd, badges and section labels. */
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
 }
@@ -219,11 +131,9 @@
   }
 
   /*
-   * Every Tailwind size (type scale, spacing, radii, icon sizes) is
-   * rem-based, so scaling the root font-size scales the whole UI in
-   * lockstep rather than just body text. 93.75% (15px at a 16px OS
-   * default) brings text-sm to ~13.1px — in line with the terminal's
-   * fixed 13px canvas font instead of sitting a full size above it.
+   * Every Tailwind size is rem-based, so scaling the root font-size scales
+   * the whole UI in lockstep. 93.75% (15px at a 16px OS default) brings
+   * text-sm to ~13.1px, in line with the terminal's fixed 13px canvas font.
    */
   html {
     font-size: 93.75%;
@@ -246,19 +156,8 @@
   }
 
   /*
-   * Transparent OS windows (e.g. the Spotlight-style launcher) must not paint
-   * an opaque document background, otherwise the window's rounded corners read
-   * as an opaque frame around the floating card.
-   */
-  html.transparent-window,
-  html.transparent-window body,
-  html.transparent-window #root {
-    background: transparent;
-  }
-
-  /*
-   * Desktop-app text selection: like a native app, chrome (buttons, labels,
-   * menus, headings) is not selectable. Selection is re-enabled below only for
+   * Desktop-app text selection: chrome (buttons, labels, menus, headings)
+   * is not selectable, like a native app. Selection is re-enabled only for
    * editable fields and content explicitly opted in with `select-text`.
    */
   :root {

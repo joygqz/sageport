@@ -1,6 +1,3 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { CheckCircle2, RotateCw, Sparkles } from "lucide-react";
 
@@ -8,32 +5,11 @@ import { Badge, Button, Spinner } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import type { UpdateStatus } from "@/types/models";
+import { useUpdateStatus } from "@/features/updates/api";
 
 export function AboutSection() {
   const { t } = useI18n();
-  const { data: version } = useQuery({
-    queryKey: ["app", "version"],
-    queryFn: getVersion,
-  });
-  const [state, setState] = useState<UpdateStatus>({ status: "idle" });
-
-  // The update lifecycle lives in the Rust backend (see `update::UpdateManager`),
-  // not in this component: the Settings dialog unmounts on close, so any state
-  // kept here would be lost the moment the user closed it mid-download. Sync to
-  // the current status on mount, then follow live updates from the backend.
-  useEffect(() => {
-    let cancelled = false;
-    void ipc.update.status().then((s) => {
-      if (!cancelled) setState(s);
-    });
-    const unlisten = ipc.update.onStatus((s) => {
-      if (!cancelled) setState(s);
-    });
-    return () => {
-      cancelled = true;
-      void unlisten.then((un) => un());
-    };
-  }, []);
+  const state = useUpdateStatus();
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,9 +22,7 @@ export function AboutSection() {
         <div>
           <h3 className="text-base font-semibold text-foreground">Sageport</h3>
           <p className="text-sm text-muted-foreground">
-            {version
-              ? t("settings.about.version", { version })
-              : t("common.loading")}
+            {t("settings.about.version", { version: __APP_VERSION__ })}
           </p>
         </div>
       </div>
@@ -67,13 +41,13 @@ export function AboutSection() {
                 onClick={() => void ipc.update.check()}
               >
                 <RotateCw />
-                {t("settings.about.update.checkButton")}
+                {t("settings.about.update.check")}
               </Button>
             )}
 
             {state.status === "available" && (
               <Button size="sm" onClick={() => void ipc.update.install()}>
-                {t("settings.about.update.installButton")}
+                {t("settings.about.update.install")}
               </Button>
             )}
 
@@ -91,7 +65,7 @@ export function AboutSection() {
 
             {state.status === "ready" && (
               <Button size="sm" onClick={() => void relaunch()}>
-                {t("settings.about.update.restartButton")}
+                {t("settings.about.update.restart")}
               </Button>
             )}
           </div>

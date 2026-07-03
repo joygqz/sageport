@@ -34,18 +34,12 @@ interface PaneState {
 }
 
 interface SftpState {
-  visible: boolean;
-  /** Panel height in px. */
-  height: number;
-  /** Left pane width as a fraction of the panel (0–1). */
+  /** Left pane width as a fraction of the panel (0-1). */
   ratio: number;
   panes: Record<PaneSide, PaneState>;
   /** In-flight / recently finished transfers, keyed by id. */
   transfers: Record<string, TransferEvent>;
 
-  toggle: () => void;
-  setVisible: (v: boolean) => void;
-  setHeight: (h: number) => void;
   setRatio: (r: number) => void;
 
   addLocalTab: (side: PaneSide) => Promise<void>;
@@ -69,8 +63,8 @@ interface SftpState {
   cancelTransfer: (transferId: string) => void;
 
   /**
-   * Copy entries (or the tab's current selection) to the opposite pane. When
-   * `compress` is set, directories are shipped as a single tar.gz archive.
+   * Copy entries (or the tab's current selection) to the opposite pane.
+   * With `compress`, directories ship as a single tar.gz archive.
    */
   transfer: (
     fromSide: PaneSide,
@@ -91,12 +85,29 @@ export function parentPath(path: string): string {
 }
 
 /** Join a directory with a child name using the directory's separator. */
-function joinPath(dir: string, name: string): string {
+export function joinPath(dir: string, name: string): string {
   const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
   return dir.endsWith(sep) ? `${dir}${name}` : `${dir}${sep}${name}`;
 }
 
 const emptyPane = (): PaneState => ({ tabs: [], activeTabId: null });
+
+/**
+ * Subscribe the store to the backend's SFTP events for the whole app
+ * lifetime. Called once from the workbench root so status and transfer
+ * progress are never missed while the panel is hidden (the status bar shows
+ * transfer activity even then).
+ */
+let eventsBridged = false;
+export function bridgeSftpEvents(): void {
+  if (eventsBridged) return;
+  eventsBridged = true;
+  const { applyStatus, applyTransfer } = useSftpStore.getState();
+  void ipc.sftp.onStatus((e) =>
+    applyStatus(e.connectionId, e.status, e.message),
+  );
+  void ipc.sftp.onTransfer((e) => applyTransfer(e));
+}
 
 export const useSftpStore = create<SftpState>((set, get) => {
   // Mutate one tab in place and return the new panes object.
@@ -151,23 +162,10 @@ export const useSftpStore = create<SftpState>((set, get) => {
   };
 
   return {
-    visible: false,
-    height: 320,
     ratio: 0.5,
     panes: { left: emptyPane(), right: emptyPane() },
     transfers: {},
 
-    toggle: () => {
-      const opening = !get().visible;
-      set({ visible: opening });
-      // Seed the left pane with the local filesystem the first time the panel
-      // opens; the right pane stays empty until the user picks a destination.
-      if (opening && get().panes.left.tabs.length === 0) {
-        void get().addLocalTab("left");
-      }
-    },
-    setVisible: (v) => set({ visible: v }),
-    setHeight: (h) => set({ height: Math.max(300, h) }),
     setRatio: (r) => set({ ratio: Math.max(0.2, Math.min(r, 0.8)) }),
 
     addLocalTab: async (side) => {
@@ -331,5 +329,3 @@ export const useSftpStore = create<SftpState>((set, get) => {
     },
   };
 });
-
-export { joinPath };

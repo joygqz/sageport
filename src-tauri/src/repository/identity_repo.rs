@@ -20,11 +20,12 @@ fn normalize(mut input: IdentityInput) -> IdentityInput {
 }
 
 async fn hosts_using(pool: &SqlitePool, id: &str) -> AppResult<i64> {
-    let count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM hosts WHERE identity_id = ? AND deleted_at IS NULL")
-            .bind(id)
-            .fetch_one(pool)
-            .await?;
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM hosts WHERE identity_id = ? AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
     Ok(count)
 }
 

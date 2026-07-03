@@ -1,0 +1,164 @@
+import { ArrowUpCircle, Cloud, CloudOff, FolderSync } from "lucide-react";
+
+import { useI18n } from "@/i18n";
+import { cn } from "@/lib/utils";
+import { useSyncConfig } from "@/features/sync/api";
+import { useSftpStore } from "@/features/sftp/store";
+import { useUpdateStatus } from "@/features/updates/api";
+import { useLayoutStore } from "./layout";
+import {
+  targetTerminalId,
+  terminalTabs,
+  useTabsStore,
+  type TerminalStatus,
+} from "./tabs";
+
+const statusDot: Record<TerminalStatus, string> = {
+  idle: "bg-muted-foreground/40",
+  connecting: "bg-warning animate-pulse",
+  connected: "bg-success",
+  closed: "bg-muted-foreground/40",
+  error: "bg-destructive",
+};
+
+/**
+ * One-line status strip along the window's bottom edge. Every item is a
+ * click target: the session jumps to its tab, transfers open the panel,
+ * sync and updates open their settings section.
+ */
+export function StatusBar() {
+  const { t } = useI18n();
+
+  return (
+    <footer className="flex h-6 shrink-0 items-center justify-between border-t border-border bg-surface px-1 text-2xs text-muted-foreground">
+      <div className="flex h-full items-center">
+        <SessionItem />
+        <TransfersItem />
+      </div>
+      <div className="flex h-full items-center">
+        <UpdateItem />
+        <SyncItem />
+        <span className="px-2 tabular-nums">
+          {t("statusBar.version", { version: __APP_VERSION__ })}
+        </span>
+      </div>
+    </footer>
+  );
+}
+
+function StatusBarItem({
+  onClick,
+  title,
+  children,
+}: {
+  onClick?: () => void;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="flex h-full items-center gap-1.5 rounded-sm px-2 transition-colors hover:bg-accent hover:text-accent-foreground"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** The terminal session the workbench is currently targeting. */
+function SessionItem() {
+  const { t } = useI18n();
+  const tabs = useTabsStore((s) => s.tabs);
+  const activeId = useTabsStore((s) => s.activeId);
+  const lastTerminalId = useTabsStore((s) => s.lastTerminalId);
+  const setActive = useTabsStore((s) => s.setActive);
+
+  const id = targetTerminalId({ tabs, activeId, lastTerminalId });
+  const session = terminalTabs(tabs).find((x) => x.id === id);
+  if (!session) return null;
+
+  return (
+    <StatusBarItem onClick={() => setActive(session.id)}>
+      <span
+        className={cn("size-1.5 rounded-full", statusDot[session.status])}
+      />
+      <span className="max-w-48 truncate">{session.title}</span>
+      <span>{t(`terminal.status.${session.status}`)}</span>
+    </StatusBarItem>
+  );
+}
+
+function TransfersItem() {
+  const { t } = useI18n();
+  const togglePanel = useLayoutStore((s) => s.togglePanel);
+  const activeCount = useSftpStore(
+    (s) =>
+      Object.values(s.transfers).filter((x) => x.status === "active").length,
+  );
+  if (activeCount === 0) return null;
+
+  return (
+    <StatusBarItem onClick={togglePanel}>
+      <FolderSync className="size-3 animate-pulse" />
+      <span>{t("statusBar.transfers", { count: activeCount })}</span>
+    </StatusBarItem>
+  );
+}
+
+function SyncItem() {
+  const { t } = useI18n();
+  const { data: config } = useSyncConfig();
+  const openSettings = useTabsStore((s) => s.openSettings);
+
+  const connected = Boolean(config?.hasToken);
+  return (
+    <StatusBarItem
+      onClick={() => openSettings("sync")}
+      title={
+        connected && config?.lastSyncedAt
+          ? t("statusBar.lastSynced", {
+              time: new Date(config.lastSyncedAt).toLocaleString(),
+            })
+          : undefined
+      }
+    >
+      {connected ? (
+        <>
+          <Cloud className="size-3" />
+          <span>{t("statusBar.syncOn")}</span>
+        </>
+      ) : (
+        <>
+          <CloudOff className="size-3" />
+          <span>{t("statusBar.syncOff")}</span>
+        </>
+      )}
+    </StatusBarItem>
+  );
+}
+
+function UpdateItem() {
+  const { t } = useI18n();
+  const status = useUpdateStatus();
+  const openSettings = useTabsStore((s) => s.openSettings);
+
+  if (
+    status.status !== "available" &&
+    status.status !== "downloading" &&
+    status.status !== "ready"
+  ) {
+    return null;
+  }
+
+  return (
+    <StatusBarItem onClick={() => openSettings("about")}>
+      <ArrowUpCircle className="size-3 text-info" />
+      <span>
+        {status.status === "ready"
+          ? t("statusBar.updateReady")
+          : t("statusBar.updateAvailable")}
+      </span>
+    </StatusBarItem>
+  );
+}

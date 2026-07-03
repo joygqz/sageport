@@ -11,11 +11,7 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
-import {
-  useCreateGroup,
-  useGroups,
-  useUpdateGroup,
-} from "@/features/hosts/api";
+import { useCreateGroup, useGroups, useUpdateGroup } from "./api";
 
 interface FormValues {
   name: string;
@@ -82,24 +78,24 @@ function GroupFormBody({
       }
       onClose();
     } catch (err) {
-      toast.error(t("groups.saveError"), errorMessage(err));
+      toast.error(t("groupForm.saveError"), errorMessage(err));
     }
   });
 
   return (
     <>
       <DialogToolbar>
-        {groupId ? t("windowTitles.editGroup") : t("windowTitles.newGroup")}
+        {groupId ? t("groupForm.editTitle") : t("groupForm.newTitle")}
       </DialogToolbar>
       <form onSubmit={onSubmit} className="flex flex-col gap-4 p-5">
         <Field
-          label={t("groups.nameLabel")}
+          label={t("groupForm.name")}
           error={errors.name?.message}
           required
         >
           <Input
-            placeholder={t("groups.namePlaceholder")}
-            {...register("name", { required: t("groups.nameRequired") })}
+            placeholder={t("groupForm.namePlaceholder")}
+            {...register("name", { required: t("groupForm.nameRequired") })}
           />
         </Field>
 
@@ -111,7 +107,7 @@ function GroupFormBody({
             type="submit"
             loading={createGroup.isPending || updateGroup.isPending}
           >
-            {groupId ? t("common.save") : t("common.add")}
+            {groupId ? t("common.save") : t("common.create")}
           </Button>
         </div>
       </form>

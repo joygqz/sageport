@@ -11,15 +11,15 @@ import {
   Input,
   PasswordInput,
   Select,
+  Spinner,
   Textarea,
 } from "@/components/ui";
-import { Spinner } from "@/components/ui/spinner";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import type { AuthType, HostInput } from "@/types/models";
 import { useIdentities, useSshKeys } from "@/features/credentials/api";
-import { useCreateHost, useGroups, useUpdateHost } from "@/features/hosts/api";
+import { useCreateHost, useGroups, useUpdateHost } from "./api";
 
 interface FormValues {
   label: string;
@@ -100,10 +100,10 @@ function HostFormBody({
 
   useEffect(() => {
     if (!hostId) return;
-    // Wait for the identity/key lists to load too: the identityId/keyId
-    // <select> only renders their matching <option> once these arrive, and a
-    // native <select> silently falls back to the blank option if reset()
-    // assigns a value before that option exists.
+    // Wait for the identity/key lists too: the identityId/keyId <select>
+    // only renders their matching <option> once these arrive, and a native
+    // <select> silently falls back to the blank option if reset() assigns
+    // a value before that option exists.
     if (host && !identitiesLoading && !keysLoading) {
       reset({
         label: host.label,
@@ -165,7 +165,7 @@ function HostFormBody({
     }
   });
 
-  const title = hostId ? t("windowTitles.editHost") : t("windowTitles.newHost");
+  const title = hostId ? t("hostForm.editTitle") : t("hostForm.newTitle");
 
   if (hostId && isLoading) {
     return (
@@ -271,7 +271,10 @@ function HostFormBody({
         )}
 
         {!useIdentity && authType === "password" && (
-          <Field label={t("hostForm.password")}>
+          <Field
+            label={t("hostForm.password")}
+            hint={hostId ? t("hostForm.passwordKeepHint") : undefined}
+          >
             <PasswordInput
               placeholder="••••••••"
               autoComplete="off"
@@ -286,7 +289,7 @@ function HostFormBody({
             hint={keys.length === 0 ? t("hostForm.noKeysHint") : undefined}
           >
             <Select {...register("keyId")}>
-              <option value="">{t("common.selectKey")}</option>
+              <option value="">{t("hostForm.selectKey")}</option>
               {keys.map((k) => (
                 <option key={k.id} value={k.id}>
                   {k.name}
@@ -312,7 +315,7 @@ function HostFormBody({
             type="submit"
             loading={createHost.isPending || updateHost.isPending}
           >
-            {hostId ? t("hostForm.saveChanges") : t("hostForm.createHost")}
+            {hostId ? t("common.saveChanges") : t("hostForm.create")}
           </Button>
         </div>
       </form>

@@ -1,7 +1,7 @@
 import { ipc } from "@/lib/ipc";
 import type { AiToolSpec } from "@/types/models";
 import { readTerminalContext } from "@/features/terminal/registry";
-import { useSessionStore } from "@/features/terminal/sessionStore";
+import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 
 /**
  * Tools the agent can call. Read-only tools run automatically the moment the
@@ -85,11 +85,13 @@ export function normalizeArgs(raw: unknown): Record<string, unknown> {
 
 /** Resolve which session a tool call should target. */
 function resolveSessionId(requested?: string): string | null {
-  const { sessions, activeId } = useSessionStore.getState();
+  const state = useTabsStore.getState();
   if (requested) {
-    return sessions.some((s) => s.id === requested) ? requested : null;
+    return terminalTabs(state.tabs).some((s) => s.id === requested)
+      ? requested
+      : null;
   }
-  return activeId;
+  return targetTerminalId(state);
 }
 
 function sleep(ms: number) {
@@ -114,16 +116,18 @@ export async function executeTool(
 }
 
 function listSessions(): string {
-  const { sessions, activeId } = useSessionStore.getState();
+  const state = useTabsStore.getState();
+  const sessions = terminalTabs(state.tabs);
   if (sessions.length === 0) {
     return "No terminal sessions are open right now.";
   }
+  const focusedId = targetTerminalId(state);
   return JSON.stringify(
     sessions.map((s) => ({
       id: s.id,
       title: s.title,
       status: s.status,
-      active: s.id === activeId,
+      active: s.id === focusedId,
     })),
   );
 }

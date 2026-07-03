@@ -14,60 +14,53 @@ import {
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Button } from "@/components/ui/button";
+
 import {
+  Button,
   ConfirmDialog,
-  type ConfirmState,
-} from "@/components/ui/confirm-dialog";
-import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { ResizeHandle } from "@/components/ui/resize-handle";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip } from "@/components/ui/tooltip";
+  EmptyState,
+  Input,
+  Select,
+  Textarea,
+  Tooltip,
+  type ConfirmState,
+} from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { ipc } from "@/lib/ipc";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { useSessionStore } from "@/features/terminal/sessionStore";
 import type { AiSessionSummary } from "@/types/models";
+import { useLayoutStore } from "@/workbench/layout";
+import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
 import { useAiStore, type AgentLogItem } from "./store";
 import { ToolActivity } from "./ToolActivity";
 
-const MIN_WIDTH = 280;
-const MAX_WIDTH = 640;
-const clampWidth = (w: number) => Math.max(MIN_WIDTH, Math.min(w, MAX_WIDTH));
 /** Stable reference so an inactive/unloaded session doesn't churn effect deps. */
 const EMPTY_LOG: AgentLogItem[] = [];
 
-export function AiPanel({
-  onClose,
-  onOpenSettings,
-}: {
-  onClose: () => void;
-  onOpenSettings: () => void;
-}) {
+/**
+ * The AI assistant, docked as the right auxiliary bar. It chats over the
+ * configured provider and can inspect terminal sessions through tools;
+ * anything that executes on a server first asks for approval inline.
+ */
+export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
   const { data: config } = useAiConfig();
   const setModel = useSetAiModel();
-  const configured = !!config?.hasApiKey;
+  const configured = Boolean(config?.hasApiKey);
   const { data: fetchedModels } = useAiModels(configured);
+  const toggleAux = useLayoutStore((s) => s.toggleAux);
+  const openSettings = useTabsStore((s) => s.openSettings);
 
   const sessions = useAiStore((s) => s.sessions);
   const activeId = useAiStore((s) => s.activeId);
@@ -88,7 +81,6 @@ export function AiPanel({
 
   const [input, setInput] = useState("");
   const [modelOverride, setModelOverride] = useState<string | null>(null);
-  const [width, setWidth] = useState(384);
   const [renameTarget, setRenameTarget] = useState<AiSessionSummary | null>(
     null,
   );
@@ -103,8 +95,8 @@ export function AiPanel({
   const models = [
     ...new Set([config?.model, ...(fetchedModels ?? [])].filter(Boolean)),
   ] as string[];
-  // The user's in-session pick wins; otherwise fall back to the saved model,
-  // then the first one the provider reports.
+  // The in-session pick wins; otherwise the saved model, then the first
+  // one the provider reports.
   const model = modelOverride ?? config?.model ?? models[0] ?? "";
 
   const changeModel = (next: string) => {
@@ -130,8 +122,8 @@ export function AiPanel({
 
   const confirmDeleteSession = (session: AiSessionSummary) => {
     setConfirmState({
-      title: t("ai.deleteSessionConfirmTitle"),
-      description: t("ai.deleteSessionConfirmDescription", {
+      title: t("ai.deleteSession.title"),
+      description: t("ai.deleteSession.description", {
         title: session.title || t("ai.untitledChat"),
       }),
       cancelLabel: t("common.cancel"),
@@ -146,26 +138,22 @@ export function AiPanel({
   };
 
   return (
-    <>
-      <ResizeHandle
-        axis="x"
-        size={width}
-        reverse
-        onResize={(w) => setWidth(clampWidth(w))}
-      />
-      <aside style={{ width }} className="flex shrink-0 flex-col bg-surface">
-        <div className="flex h-9 items-center gap-1 border-b border-border pl-2 pr-5">
-          <Sparkles className="size-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {activeTitle || t("ai.untitledChat")}
-          </span>
+    <aside
+      style={{ width }}
+      className="flex shrink-0 flex-col overflow-hidden bg-surface"
+    >
+      <div className="flex h-9 shrink-0 items-center justify-between gap-1 pl-4 pr-2">
+        <h2 className="min-w-0 truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {activeTitle || t("ai.viewTitle")}
+        </h2>
+        <div className="flex items-center gap-0.5">
           {configured && (
             <>
               <Tooltip content={t("ai.newChat")}>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-7 shrink-0"
+                  className="size-6"
                   onClick={() => void newSession()}
                 >
                   <SquarePen className="size-4" />
@@ -174,11 +162,7 @@ export function AiPanel({
               <DropdownMenu>
                 <Tooltip content={t("ai.history")}>
                   <DropdownMenuTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 shrink-0"
-                    >
+                    <Button size="icon" variant="ghost" className="size-6">
                       <History className="size-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -228,103 +212,106 @@ export function AiPanel({
               </DropdownMenu>
             </>
           )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7 shrink-0"
-            onClick={onClose}
-          >
-            <X />
-          </Button>
+          <Tooltip content={t("ai.hidePanel")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              onClick={toggleAux}
+            >
+              <X className="size-4" />
+            </Button>
+          </Tooltip>
         </div>
+      </div>
 
-        {!configured ? (
-          <EmptyState
-            className="m-auto"
-            icon={KeyRound}
-            title={t("ai.connectTitle")}
-            description={t("ai.connectDescription")}
-            action={
-              <Button size="sm" onClick={onOpenSettings}>
-                {t("ai.openSettings")}
-              </Button>
-            }
-          />
-        ) : (
-          <>
-            <div ref={scrollRef} className="flex-1 overflow-y-auto">
-              <div className="flex flex-col gap-3 p-3">
-                {log.length === 0 ? (
-                  <EmptyState
-                    className="mt-10"
-                    icon={Sparkles}
-                    title={t("ai.askTitle")}
-                    description={t("ai.askDescription")}
-                  />
-                ) : (
-                  log.map((item) => (
-                    <LogEntry
-                      key={item.id}
-                      item={item}
-                      onApprove={approve}
-                      onDeny={deny}
-                    />
-                  ))
-                )}
-                {pending && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Sparkles className="size-4 animate-pulse text-primary" />
-                    {t("ai.thinking")}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="p-2.5">
-              <div className="rounded-md border border-input bg-surface transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      submit();
-                    }
-                  }}
-                  placeholder={t("ai.inputPlaceholder")}
-                  className="max-h-40 min-h-16 resize-none border-0 focus-visible:ring-0"
+      {!configured ? (
+        <EmptyState
+          className="m-auto"
+          icon={KeyRound}
+          title={t("ai.setup.title")}
+          description={t("ai.setup.description")}
+          action={
+            <Button size="sm" onClick={() => openSettings("ai")}>
+              {t("ai.setup.action")}
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <div ref={scrollRef} className="flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-3 p-3">
+              {log.length === 0 ? (
+                <EmptyState
+                  className="mt-10"
+                  icon={Sparkles}
+                  title={t("ai.empty.title")}
+                  description={t("ai.empty.description")}
                 />
-                <div className="flex items-center gap-1.5 px-1.5 pb-1.5">
-                  <Select
-                    value={model}
-                    onChange={(e) => changeModel(e.target.value)}
-                    className="h-7 max-w-[10.5rem] border-0 bg-transparent text-xs hover:bg-accent"
-                    title={t("ai.modelLabel")}
-                  >
-                    {models.length === 0 ? (
-                      <option value="">{t("ai.modelLoading")}</option>
-                    ) : (
-                      models.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))
-                    )}
-                  </Select>
-                  <Button
-                    size="icon"
-                    className="ml-auto size-7 shrink-0"
-                    disabled={!input.trim() || pending || !model}
-                    onClick={() => void submit()}
-                  >
-                    <ArrowUp className="size-4" />
-                  </Button>
+              ) : (
+                log.map((item) => (
+                  <LogEntry
+                    key={item.id}
+                    item={item}
+                    onApprove={approve}
+                    onDeny={deny}
+                  />
+                ))
+              )}
+              {pending && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Sparkles className="size-4 animate-pulse text-primary" />
+                  {t("ai.working")}
                 </div>
+              )}
+            </div>
+          </div>
+
+          <div className="p-2.5">
+            <div className="rounded-md border border-input bg-surface transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void submit();
+                  }
+                }}
+                placeholder={t("ai.inputPlaceholder")}
+                className="max-h-40 min-h-16 resize-none border-0 focus-visible:ring-0"
+              />
+              <div className="flex items-center gap-1.5 px-1.5 pb-1.5">
+                <Select
+                  value={model}
+                  onChange={(e) => changeModel(e.target.value)}
+                  className="h-7 max-w-[10.5rem] border-0 bg-transparent text-xs hover:bg-accent"
+                  title={t("ai.modelLabel")}
+                >
+                  {models.length === 0 ? (
+                    <option value="">{t("ai.modelLoading")}</option>
+                  ) : (
+                    models.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))
+                  )}
+                </Select>
+                <Button
+                  size="icon"
+                  className="ml-auto size-7 shrink-0"
+                  disabled={!input.trim() || pending || !model}
+                  onClick={() => void submit()}
+                >
+                  <ArrowUp className="size-4" />
+                </Button>
               </div>
             </div>
-          </>
-        )}
-      </aside>
+          </div>
+        </>
+      )}
+
       <RenameSessionDialog
         session={renameTarget}
         onClose={() => setRenameTarget(null)}
@@ -334,7 +321,7 @@ export function AiPanel({
         state={confirmState}
         onClose={() => setConfirmState(null)}
       />
-    </>
+    </aside>
   );
 }
 
@@ -544,7 +531,7 @@ const MARKDOWN_COMPONENTS: Components = {
 function CodeBlock({ code }: { code: string }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
-  const activeId = useSessionStore((s) => s.activeId);
+  const sendToTerminal = useTabsStore((s) => s.sendToTerminal);
 
   const copy = async () => {
     await navigator.clipboard.writeText(code);
@@ -553,11 +540,11 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   const run = () => {
-    if (!activeId) {
-      toast.error(t("common.noActiveTerminalTitle"));
-      return;
+    if (sendToTerminal(code)) {
+      toast.success(t("snippets.sent"));
+    } else {
+      toast.error(t("snippets.noTerminal"));
     }
-    void ipc.ssh.send(activeId, code + "\n").catch(() => {});
   };
 
   return (
@@ -567,7 +554,7 @@ function CodeBlock({ code }: { code: string }) {
           {t("ai.commandLabel")}
         </span>
         <div className="flex gap-1">
-          <Tooltip content={t("common.runInTerminal")}>
+          <Tooltip content={t("snippets.run")}>
             <Button
               size="icon"
               variant="ghost"

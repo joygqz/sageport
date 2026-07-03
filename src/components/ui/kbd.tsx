@@ -1,11 +1,24 @@
 import * as React from "react";
 
+import { IS_MACOS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
-export function Kbd({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLElement>) {
+/** Platform-aware display names for modifier tokens used in shortcuts. */
+const MODIFIER_LABELS: Record<string, string> = IS_MACOS
+  ? { mod: "⌘", shift: "⇧", alt: "⌥" }
+  : { mod: "Ctrl", shift: "Shift", alt: "Alt" };
+
+function formatShortcut(keys: string[]): string {
+  const parts = keys.map((k) => MODIFIER_LABELS[k] ?? k);
+  return IS_MACOS ? parts.join("") : parts.join("+");
+}
+
+interface KbdProps extends React.HTMLAttributes<HTMLElement> {
+  /** Shortcut tokens, e.g. ["mod", "P"]. Rendered platform-aware. */
+  keys?: string[];
+}
+
+export function Kbd({ className, keys, children, ...props }: KbdProps) {
   return (
     <kbd
       className={cn(
@@ -13,6 +26,8 @@ export function Kbd({
         className,
       )}
       {...props}
-    />
+    >
+      {keys ? formatShortcut(keys) : children}
+    </kbd>
   );
 }

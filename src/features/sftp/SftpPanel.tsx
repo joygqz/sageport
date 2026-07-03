@@ -1,66 +1,36 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Folder, History, X } from "lucide-react";
+import { History, X } from "lucide-react";
 
 import { Button, Tooltip } from "@/components/ui";
-import { ResizeHandle } from "@/components/ui/resize-handle";
 import { useI18n } from "@/i18n";
-import { ipc } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
+import { useLayoutStore } from "@/workbench/layout";
 import { FilePane } from "./FilePane";
 import { useSftpStore } from "./store";
 import { TransferHistoryDialog } from "./TransferHistoryDialog";
 
-export function SftpPanel() {
+/**
+ * The bottom panel: a dual-pane file browser (local or SFTP on either
+ * side) with drag-and-drop transfer between the panes and a live progress
+ * strip along the bottom edge.
+ */
+export function SftpPanel({ height }: { height: number }) {
   const { t } = useI18n();
-  const visible = useSftpStore((s) => s.visible);
-  const height = useSftpStore((s) => s.height);
   const ratio = useSftpStore((s) => s.ratio);
-  const setHeight = useSftpStore((s) => s.setHeight);
   const setRatio = useSftpStore((s) => s.setRatio);
-  const setVisible = useSftpStore((s) => s.setVisible);
-  const applyStatus = useSftpStore((s) => s.applyStatus);
-  const applyTransfer = useSftpStore((s) => s.applyTransfer);
-  const cancelTransfer = useSftpStore((s) => s.cancelTransfer);
-  const transfers = useSftpStore((s) => s.transfers);
+  const hasLeftTabs = useSftpStore((s) => s.panes.left.tabs.length > 0);
+  const addLocalTab = useSftpStore((s) => s.addLocalTab);
+  const setPanelVisible = useLayoutStore((s) => s.setPanelVisible);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const bodyRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
 
-  // Bridge backend events into the store for the panel's whole lifetime.
+  // Seed the left pane with the local filesystem the first time the panel
+  // opens; the right pane stays empty until the user picks a destination.
   useEffect(() => {
-    const unlisteners: Array<() => void> = [];
-    ipc.sftp
-      .onStatus((e) => applyStatus(e.connectionId, e.status, e.message))
-      .then((un) => unlisteners.push(un));
-    ipc.sftp
-      .onTransfer((e) => applyTransfer(e))
-      .then((un) => unlisteners.push(un));
-    return () => unlisteners.forEach((un) => un());
-  }, [applyStatus, applyTransfer]);
-
-  // Re-clamp if the window shrinks after a large drag, so the panel never
-  // overflows past the column's available space.
-  useEffect(() => {
-    const el = panelRef.current?.parentElement;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const max = el.clientHeight;
-      if (max && height > max) setHeight(max);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [visible, height, setHeight]);
-
-  if (!visible) return null;
-
-  // Cap the height at the column's full available space, so dragging the
-  // top border all the way up collapses the terminal above to nothing
-  // instead of overflowing the window.
-  const onResizeHeight = (h: number) => {
-    const max = panelRef.current?.parentElement?.clientHeight;
-    setHeight(max ? Math.min(h, max) : h);
-  };
+    if (!hasLeftTabs) void addLocalTab("left");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startSplitDrag = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -77,146 +47,143 @@ export function SftpPanel() {
     window.addEventListener("pointerup", onUp);
   };
 
-  const active = Object.values(transfers);
-
   return (
-    <>
-      <ResizeHandle axis="y" size={height} reverse onResize={onResizeHeight} />
-      <div
-        ref={panelRef}
-        className="flex shrink-0 flex-col bg-background"
-        style={{ height }}
-      >
-        {/* Header */}
-        <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-surface px-2 select-none">
-          <Folder className="size-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {t("sftp.title")}
-          </span>
+    <div
+      className="flex shrink-0 flex-col overflow-hidden bg-background"
+      style={{ height }}
+    >
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border bg-surface pl-4 pr-2">
+        <h2 className="truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {t("sftp.panelTitle")}
+        </h2>
+        <div className="flex items-center gap-0.5">
           <Tooltip content={t("sftp.history.title")}>
             <Button
               size="icon"
               variant="ghost"
-              className="size-7 shrink-0"
+              className="size-6"
               onClick={() => setHistoryOpen(true)}
             >
               <History className="size-4" />
             </Button>
           </Tooltip>
-          <Tooltip content={t("sftp.hide")}>
+          <Tooltip content={t("sftp.hidePanel")}>
             <Button
               size="icon"
               variant="ghost"
-              className="size-7 shrink-0"
-              onClick={() => setVisible(false)}
+              className="size-6"
+              onClick={() => setPanelVisible(false)}
             >
-              <ChevronDown className="size-4" />
+              <X className="size-4" />
             </Button>
           </Tooltip>
         </div>
-
-        {/* Two panes with a draggable divider */}
-        <div ref={bodyRef} className="flex min-h-0 flex-1">
-          <div style={{ width: `${ratio * 100}%` }} className="flex min-w-0">
-            <FilePane side="left" />
-          </div>
-          <div className="group relative z-10 w-0 shrink-0 select-none">
-            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-primary group-active:bg-primary" />
-            <div
-              onPointerDown={startSplitDrag}
-              className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize"
-            />
-          </div>
-          <div className="flex min-w-0 flex-1">
-            <FilePane side="right" />
-          </div>
-        </div>
-
-        {/* Transfer progress strip */}
-        {active.length > 0 && (
-          <div className="flex max-h-24 flex-col gap-1 overflow-y-auto border-t border-border bg-surface px-2 py-1.5">
-            {active.map((tx) => {
-              const pct =
-                tx.total > 0
-                  ? Math.round((tx.transferred / tx.total) * 100)
-                  : 0;
-              // While compressing/extracting we have no byte denominator, so show
-              // an indeterminate bar instead of a stuck 0%.
-              const indeterminate =
-                tx.status === "active" &&
-                tx.total === 0 &&
-                (tx.phase === "compressing" || tx.phase === "extracting");
-              return (
-                <div
-                  key={tx.transferId}
-                  className="flex items-center gap-2 text-xs"
-                >
-                  <span className="flex w-40 shrink-0 items-baseline gap-1.5 truncate">
-                    <span className="truncate" title={tx.file}>
-                      {tx.file}
-                    </span>
-                    {tx.phase && tx.status === "active" && (
-                      <span className="shrink-0 text-2xs text-muted-foreground">
-                        {t(`sftp.phase.${tx.phase}`)}
-                      </span>
-                    )}
-                  </span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-all",
-                        tx.status === "error"
-                          ? "bg-destructive"
-                          : tx.status === "cancelled"
-                            ? "bg-muted-foreground/50"
-                            : "bg-primary",
-                        indeterminate && "animate-pulse",
-                      )}
-                      style={{
-                        width: `${
-                          tx.status === "done" || tx.status === "cancelled"
-                            ? 100
-                            : indeterminate
-                              ? 100
-                              : pct
-                        }%`,
-                      }}
-                    />
-                  </div>
-                  <span className="w-10 shrink-0 text-right text-muted-foreground">
-                    {tx.status === "error"
-                      ? "!"
-                      : tx.status === "done"
-                        ? "✓"
-                        : tx.status === "cancelled"
-                          ? "×"
-                          : indeterminate
-                            ? "…"
-                            : `${pct}%`}
-                  </span>
-                  {tx.status === "active" && (
-                    <Tooltip content={t("sftp.cancel")}>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="size-5 shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => cancelTransfer(tx.transferId)}
-                      >
-                        <X className="size-3" />
-                      </Button>
-                    </Tooltip>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <TransferHistoryDialog
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-        />
       </div>
-    </>
+
+      {/* Two panes with a draggable divider */}
+      <div ref={bodyRef} className="flex min-h-0 flex-1">
+        <div style={{ width: `${ratio * 100}%` }} className="flex min-w-0">
+          <FilePane side="left" />
+        </div>
+        <div className="group relative z-10 w-0 shrink-0 select-none">
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-primary group-active:bg-primary" />
+          <div
+            onPointerDown={startSplitDrag}
+            className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize"
+          />
+        </div>
+        <div className="flex min-w-0 flex-1">
+          <FilePane side="right" />
+        </div>
+      </div>
+
+      <TransferStrip />
+
+      <TransferHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
+    </div>
+  );
+}
+
+/** Live progress for in-flight and just-finished transfers. */
+function TransferStrip() {
+  const { t } = useI18n();
+  const transfers = useSftpStore((s) => s.transfers);
+  const cancelTransfer = useSftpStore((s) => s.cancelTransfer);
+
+  const active = Object.values(transfers);
+  if (active.length === 0) return null;
+
+  return (
+    <div className="flex max-h-24 flex-col gap-1 overflow-y-auto border-t border-border bg-surface px-2 py-1.5">
+      {active.map((tx) => {
+        const pct =
+          tx.total > 0 ? Math.round((tx.transferred / tx.total) * 100) : 0;
+        // While compressing/extracting there is no byte denominator, so show
+        // an indeterminate bar instead of a stuck 0%.
+        const indeterminate =
+          tx.status === "active" &&
+          tx.total === 0 &&
+          (tx.phase === "compressing" || tx.phase === "extracting");
+        return (
+          <div key={tx.transferId} className="flex items-center gap-2 text-xs">
+            <span className="flex w-40 shrink-0 items-baseline gap-1.5 truncate">
+              <span className="truncate" title={tx.file}>
+                {tx.file}
+              </span>
+              {tx.phase && tx.status === "active" && (
+                <span className="shrink-0 text-2xs text-muted-foreground">
+                  {t(`sftp.phase.${tx.phase}`)}
+                </span>
+              )}
+            </span>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  tx.status === "error"
+                    ? "bg-destructive"
+                    : tx.status === "cancelled"
+                      ? "bg-muted-foreground/50"
+                      : "bg-primary",
+                  indeterminate && "animate-pulse",
+                )}
+                style={{
+                  width: `${
+                    tx.status === "done" || tx.status === "cancelled"
+                      ? 100
+                      : indeterminate
+                        ? 100
+                        : pct
+                  }%`,
+                }}
+              />
+            </div>
+            <span className="w-10 shrink-0 text-right text-muted-foreground">
+              {tx.status === "error"
+                ? "!"
+                : tx.status === "done"
+                  ? "✓"
+                  : tx.status === "cancelled"
+                    ? "×"
+                    : indeterminate
+                      ? "…"
+                      : `${pct}%`}
+            </span>
+            {tx.status === "active" && (
+              <Tooltip content={t("sftp.cancelTransfer")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-5 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => cancelTransfer(tx.transferId)}
+                >
+                  <X className="size-3" />
+                </Button>
+              </Tooltip>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
