@@ -60,6 +60,7 @@ export function FilePane({ side }: { side: PaneSide }) {
   const transfer = useSftpStore((s) => s.transfer);
   const { data: hosts = [] } = useHosts();
 
+  const tabStripRef = useRef<HTMLDivElement>(null);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const active = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
@@ -139,7 +140,17 @@ export function FilePane({ side }: { side: PaneSide }) {
       }}
     >
       {/* Tab bar */}
-      <div className="flex h-8 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface px-1.5">
+      <div
+        ref={tabStripRef}
+        // The strip scrolls with the wheel (any direction) instead of a
+        // scrollbar, which would eat into the fixed tab height.
+        onWheel={(e) => {
+          const el = tabStripRef.current;
+          if (!el || el.scrollWidth <= el.clientWidth) return;
+          el.scrollLeft += e.deltaX + e.deltaY;
+        }}
+        className="scrollbar-none flex h-8 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface px-1.5"
+      >
         {pane.tabs.map((tab) => (
           <div
             key={tab.id}
@@ -257,6 +268,7 @@ export function FilePane({ side }: { side: PaneSide }) {
       ) : (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
+            className="py-4"
             icon={HardDrive}
             title={t("sftp.noTabTitle")}
             action={
