@@ -46,7 +46,7 @@ export function EditorArea() {
         <Tooltip content={t("editor.newSession")}>
           <button
             onClick={() => openPalette("quick")}
-            className="mx-1 mb-1 flex size-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="mx-1 flex size-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             <Plus className="size-4" />
           </button>
