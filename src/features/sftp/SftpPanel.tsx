@@ -89,7 +89,7 @@ export function SftpPanel() {
       >
         {/* Header */}
         <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-surface px-2 select-none">
-          <Folder className="size-4 shrink-0 text-primary" />
+          <Folder className="size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {t("sftp.title")}
           </span>
@@ -156,7 +156,7 @@ export function SftpPanel() {
                       {tx.file}
                     </span>
                     {tx.phase && tx.status === "active" && (
-                      <span className="shrink-0 text-[0.65rem] text-muted-foreground">
+                      <span className="shrink-0 text-2xs text-muted-foreground">
                         {t(`sftp.phase.${tx.phase}`)}
                       </span>
                     )}

@@ -33,7 +33,7 @@ import {
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
-import { openGroupsWindow } from "@/lib/windows";
+import { useOverlayStore } from "@/app/overlay-store";
 import type { Host } from "@/types/models";
 import { useSessionStore } from "@/features/terminal/sessionStore";
 import { useDeleteGroup, useDeleteHost, useGroups, useHosts } from "./api";
@@ -59,6 +59,7 @@ export function HostSidebar({
   const { data: groups = [] } = useGroups();
   const deleteHost = useDeleteHost();
   const deleteGroup = useDeleteGroup();
+  const openGroupForm = useOverlayStore((s) => s.openGroupForm);
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [width, setWidth] = useState(288);
@@ -193,7 +194,7 @@ export function HostSidebar({
                 <Server />
                 {t("common.newHost")}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void openGroupsWindow()}>
+              <DropdownMenuItem onSelect={() => openGroupForm()}>
                 <FolderPlus />
                 {t("common.newGroup")}
               </DropdownMenuItem>
@@ -236,7 +237,7 @@ export function HostSidebar({
                           [section.id]: !c[section.id],
                         }))
                       }
-                      onEdit={() => void openGroupsWindow(section.id)}
+                      onEdit={() => openGroupForm(section.id)}
                       onDelete={() => onDeleteGroup(section)}
                     />
                     {!isCollapsed &&
@@ -288,7 +289,7 @@ function GroupSection({
   const isGroup = id !== UNGROUPED;
 
   const header = (
-    <div className="group flex items-center rounded text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
+    <div className="group flex items-center rounded text-2xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
       <button
         onClick={onToggle}
         className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1.5"

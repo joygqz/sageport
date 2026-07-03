@@ -18,10 +18,9 @@ export function AboutSection() {
   const [state, setState] = useState<UpdateStatus>({ status: "idle" });
 
   // The update lifecycle lives in the Rust backend (see `update::UpdateManager`),
-  // not in this component: Settings is a real OS window that gets destroyed on
-  // close, so any state kept here would be lost the moment the user closed the
-  // dialog mid-download. Sync to the current status on mount, then follow live
-  // updates broadcast to every window.
+  // not in this component: the Settings dialog unmounts on close, so any state
+  // kept here would be lost the moment the user closed it mid-download. Sync to
+  // the current status on mount, then follow live updates from the backend.
   useEffect(() => {
     let cancelled = false;
     void ipc.update.status().then((s) => {

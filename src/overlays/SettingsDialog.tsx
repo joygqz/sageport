@@ -12,8 +12,15 @@ import {
   UserCog,
 } from "lucide-react";
 
-import { Button, Field, Input, Select } from "@/components/ui";
-import { WindowHeader } from "@/components/layout/WindowHeader";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogToolbar,
+  Field,
+  Input,
+  Select,
+} from "@/components/ui";
 import { LOCALE_LABELS, LOCALES, useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -31,13 +38,38 @@ import { IdentitiesSection } from "@/features/credentials/IdentitiesSection";
 import { KeysSection } from "@/features/credentials/KeysSection";
 import { SnippetsSection } from "@/features/snippets/SnippetsSection";
 import { SyncSection } from "@/features/sync/SyncSection";
+import type { SettingsSection } from "@/app/overlay-store";
 
-type SettingsSection =
-  "appearance" | "ai" | "keys" | "identities" | "snippets" | "sync" | "about";
+export function SettingsDialog({
+  open,
+  section,
+  onClose,
+}: {
+  open: boolean;
+  section: SettingsSection;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        showClose={false}
+        className="flex h-[580px] w-[760px] max-w-[92vw] flex-col gap-0 p-0"
+      >
+        {/* Remount when the requested section changes so a deep link (e.g.
+            the AI panel jumping straight to "ai") always lands correctly. */}
+        <SettingsDialogBody key={section} initialSection={section} />
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-export function SettingsWindow() {
+function SettingsDialogBody({
+  initialSection,
+}: {
+  initialSection: SettingsSection;
+}) {
   const { t } = useI18n();
-  const [section, setSection] = useState<SettingsSection>("appearance");
+  const [section, setSection] = useState<SettingsSection>(initialSection);
 
   const items: {
     id: SettingsSection;
@@ -54,8 +86,8 @@ export function SettingsWindow() {
   ];
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <WindowHeader title={t("windowTitles.settings")} />
+    <>
+      <DialogToolbar>{t("windowTitles.settings")}</DialogToolbar>
 
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-sidebar-border bg-sidebar p-2">
@@ -90,7 +122,7 @@ export function SettingsWindow() {
           {section === "about" && <AboutSection />}
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

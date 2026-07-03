@@ -13,13 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
-import { emitAction, emitRefresh } from "@/lib/windows";
 import type { Snippet } from "@/types/models";
 import {
   useCreateSnippet,
   useDeleteSnippet,
   useSnippets,
 } from "@/features/credentials/api";
+import { useSessionStore } from "@/features/terminal/sessionStore";
 
 export function SnippetsSection() {
   const { t } = useI18n();
@@ -32,6 +32,7 @@ export function SnippetsSection() {
   const [command, setCommand] = useState("");
   const [description, setDescription] = useState("");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const sendCommand = useSessionStore((s) => s.sendCommand);
 
   const reset = () => {
     setName("");
@@ -50,7 +51,6 @@ export function SnippetsSection() {
         command: command.trim(),
         description: description.trim() || null,
       });
-      await emitRefresh();
       reset();
     } catch (err) {
       toast.error(t("snippets.saveError"), errorMessage(err));
@@ -59,7 +59,6 @@ export function SnippetsSection() {
 
   const remove = async (id: string) => {
     await deleteSnippet.mutateAsync(id);
-    await emitRefresh();
   };
 
   const confirmRemove = (snippet: Snippet) => {
@@ -79,10 +78,12 @@ export function SnippetsSection() {
     });
   };
 
-  // Snippets live in the Settings window; ask the main window to run it.
   const run = (cmd: string) => {
-    void emitAction({ type: "run-command", command: cmd });
-    toast.success(t("common.sentToTerminal"));
+    if (sendCommand(cmd)) {
+      toast.success(t("common.sentToTerminal"));
+    } else {
+      toast.error(t("common.noActiveTerminalTitle"));
+    }
   };
 
   return (

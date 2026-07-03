@@ -38,7 +38,7 @@
           var mode =
             stored === "light" || stored === "dark" || stored === "system"
               ? stored
-              : "system";
+              : "dark";
           var dark =
             mode === "dark" ||
             (mode === "system" &&
@@ -52,7 +52,8 @@
             root.classList.add("transparent-window");
           }
         } catch (e) {
-          /* localStorage/matchMedia unavailable — fall back to light. */
+          /* localStorage/matchMedia unavailable — fall back to dark. */
+          document.documentElement.classList.add("dark");
         }
       })();
     </script>

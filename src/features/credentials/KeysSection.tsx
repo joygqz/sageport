@@ -28,7 +28,6 @@ import {
 } from "@/components/ui";
 import { useI18n, type TKey } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
-import { emitRefresh } from "@/lib/windows";
 import type { SshKey, SshKeyAlgorithm } from "@/types/models";
 import {
   useCreateSshKey,
@@ -99,7 +98,6 @@ export function KeysSection() {
         algorithm,
         passphrase: passphrase || null,
       });
-      await emitRefresh();
       reset();
     } catch (err) {
       toast.error(t("keys.addError"), errorMessage(err));
@@ -117,7 +115,6 @@ export function KeysSection() {
         publicKey: publicKey || null,
         passphrase: passphrase || null,
       });
-      await emitRefresh();
       reset();
     } catch (err) {
       toast.error(t("keys.addError"), errorMessage(err));
@@ -127,7 +124,6 @@ export function KeysSection() {
   const remove = async (id: string) => {
     try {
       await deleteKey.mutateAsync(id);
-      await emitRefresh();
     } catch (err) {
       toast.error(t("keys.deleteError"), errorMessage(err));
     }
@@ -319,7 +315,7 @@ function KeyRow({
     <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
       <KeyRound className="size-4 shrink-0 text-muted-foreground" />
       <span className="font-medium">{sshKey.name}</span>
-      {tag && <Badge className="font-mono text-[10px] uppercase">{tag}</Badge>}
+      {tag && <Badge className="font-mono text-2xs uppercase">{tag}</Badge>}
       {sshKey.publicKey && (
         <Button
           size="icon"

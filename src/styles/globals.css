@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
 
 /* Enable class-based dark mode driven by ThemeProvider (.dark on <html>) */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -12,6 +14,13 @@
 :root {
   /* Flat, compact radius scale: sm 2px / md 4px / lg 6px / xl 10px. */
   --radius: 0.375rem;
+
+  /* Elevation for floating surfaces (menus, tooltips, toasts, dialogs).
+   * Tuned as a soft, low-contrast lift rather than a skeuomorphic drop
+   * shadow — the app is otherwise a flat, border-driven design, so these
+   * exist only to separate overlays from whatever renders behind them. */
+  --elevation-sm: 0 1px 2px rgba(31, 35, 40, 0.06), 0 4px 10px rgba(31, 35, 40, 0.08);
+  --elevation-md: 0 2px 4px rgba(31, 35, 40, 0.06), 0 12px 28px rgba(31, 35, 40, 0.14);
 
   /* Light theme — GitHub Primer light palette.
    * Two-tone layout: content surfaces (workspace/terminal) are white; the
@@ -127,6 +136,11 @@
   /* See the light-theme note: mirrors src/features/terminal/theme.ts. */
   --terminal-background: #0d1117;
   --terminal-foreground: #e6edf3;
+
+  /* Dark surfaces need a stronger, darker lift to read against near-black
+   * backgrounds — the light-theme shadow values would be invisible here. */
+  --elevation-sm: 0 1px 2px rgba(1, 4, 9, 0.4), 0 4px 12px rgba(1, 4, 9, 0.45);
+  --elevation-md: 0 2px 4px rgba(1, 4, 9, 0.4), 0 16px 36px rgba(1, 4, 9, 0.55);
 }
 
 /* Map semantic tokens onto Tailwind's theme so utilities resolve at runtime */
@@ -180,15 +194,39 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  /* Overrides Tailwind's built-in shadow-sm/shadow-md so every component
+   * using those utilities picks up the theme-aware elevation above. */
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+
   --font-sans:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
   --font-mono:
-    "JetBrains Mono", "SFMono-Regular", ui-monospace, "Menlo", monospace;
+    "JetBrains Mono Variable", "SFMono-Regular", ui-monospace, "Menlo",
+    monospace;
+
+  /* A single deliberate micro-type step, replacing the ad hoc arbitrary
+   * values (0.65rem / 0.7rem / 10px) previously scattered across kbd,
+   * badges, and section labels. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
 }
 
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+
+  /*
+   * Every Tailwind size (type scale, spacing, radii, icon sizes) is
+   * rem-based, so scaling the root font-size scales the whole UI in
+   * lockstep rather than just body text. 93.75% (15px at a 16px OS
+   * default) brings text-sm to ~13.1px — in line with the terminal's
+   * fixed 13px canvas font instead of sitting a full size above it.
+   */
+  html {
+    font-size: 93.75%;
   }
 
   html,

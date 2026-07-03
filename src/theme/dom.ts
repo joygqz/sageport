@@ -14,7 +14,7 @@ export function readStoredMode(): ThemeMode {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
   return stored === "light" || stored === "dark" || stored === "system"
     ? stored
-    : "system";
+    : "dark";
 }
 
 export function storeMode(mode: ThemeMode): void {

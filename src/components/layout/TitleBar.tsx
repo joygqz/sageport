@@ -3,6 +3,7 @@ import { FolderSync, Moon, Settings, Sparkles, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
+import { cn } from "@/lib/utils";
 import { useTheme } from "@/theme/useTheme";
 import { WindowHeader } from "./WindowHeader";
 
@@ -23,14 +24,14 @@ export function TitleBar({
   const { resolved, setMode } = useTheme();
 
   return (
-    <WindowHeader title="Sageport">
+    <WindowHeader>
       <Tooltip
         content={sftpOpen ? t("titleBar.hideSftp") : t("titleBar.showSftp")}
       >
         <Button
-          variant={sftpOpen ? "secondary" : "ghost"}
+          variant="ghost"
           size="icon"
-          className="size-7"
+          className={cn("size-7", sftpOpen && "bg-accent text-accent-foreground")}
           onClick={onToggleSftp}
         >
           <FolderSync />
@@ -38,9 +39,9 @@ export function TitleBar({
       </Tooltip>
       <Tooltip content={aiOpen ? t("titleBar.hideAi") : t("titleBar.showAi")}>
         <Button
-          variant={aiOpen ? "secondary" : "ghost"}
+          variant="ghost"
           size="icon"
-          className="size-7"
+          className={cn("size-7", aiOpen && "bg-accent text-accent-foreground")}
           onClick={onToggleAi}
         >
           <Sparkles />

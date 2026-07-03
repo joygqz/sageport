@@ -1,8 +1,8 @@
 /**
  * Locale registry. Adding a language means: append its tag here, add a
  * `LOCALE_LABELS` entry, and create a `locales/<tag>.ts` dictionary that
- * satisfies the `Dictionary` type. Everything else (typing, switching,
- * cross-window sync) flows from these declarations.
+ * satisfies the `Dictionary` type. Everything else (typing, switching)
+ * flows from these declarations.
  */
 
 export const LOCALES = ["en", "zh-CN"] as const;

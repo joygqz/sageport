@@ -30,9 +30,11 @@ interface SessionState {
   setStatus: (id: string, status: SessionStatus, error?: string) => void;
   /** Retry a failed/closed session in place, reusing its tab and id. */
   reconnect: (id: string) => void;
+  /** Send a command to the active terminal. Returns false if none is active. */
+  sendCommand: (command: string) => boolean;
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
+export const useSessionStore = create<SessionState>((set, get) => ({
   sessions: [],
   activeId: null,
 
@@ -83,4 +85,11 @@ export const useSessionStore = create<SessionState>((set) => ({
           : x,
       ),
     })),
+
+  sendCommand: (command) => {
+    const { activeId } = get();
+    if (!activeId) return false;
+    void ipc.ssh.send(activeId, command + "\n").catch(() => {});
+    return true;
+  },
 }));

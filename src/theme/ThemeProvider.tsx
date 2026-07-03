@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { emit, listen } from "@tauri-apps/api/event";
 
-import { THEME_EVENT } from "@/lib/windows";
 import { applyTheme, getSystemTheme, readStoredMode, storeMode } from "./dom";
 import {
   ThemeContext,
@@ -30,21 +28,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyTheme(resolved);
   }, [resolved]);
 
-  // Keep every window's mode in sync.
-  useEffect(() => {
-    const unlistenMode = listen<ThemeMode>(THEME_EVENT, (e) => {
-      setModeState(e.payload);
-      storeMode(e.payload);
-    });
-    return () => {
-      void unlistenMode.then((un) => un());
-    };
-  }, []);
-
   const setMode = useCallback((next: ThemeMode) => {
     setModeState(next);
     storeMode(next);
-    void emit(THEME_EVENT, next);
   }, []);
 
   const value = useMemo(

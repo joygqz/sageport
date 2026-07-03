@@ -312,9 +312,8 @@ export interface TransferHistoryEntry {
 }
 
 /**
- * Lives in the Rust backend (`update::UpdateManager`), not per-window state —
- * every window reads/writes the same status, so it survives Settings being
- * closed and reopened mid-download.
+ * Lives in the Rust backend (`update::UpdateManager`), not component state —
+ * so it survives the Settings dialog being closed and reopened mid-download.
  */
 export type UpdateStatus =
   | { status: "idle" }

@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
-import { emitRefresh } from "@/lib/windows";
 import type { SyncConnectOutcome } from "@/types/models";
 
 const syncKey = ["sync", "config"] as const;
@@ -25,10 +24,8 @@ export function useSyncConnect() {
     }) => ipc.sync.connect(token, passphrase, force),
     onSuccess: (outcome: SyncConnectOutcome) => {
       if (outcome.status !== "connected") return;
-      // A successful connect may have merged in an existing remote backup —
-      // every other open window needs to refetch, not just this one.
+      // A successful connect may have merged in an existing remote backup.
       qc.invalidateQueries();
-      void emitRefresh();
     },
   });
 }
@@ -45,12 +42,10 @@ export function useSyncPush() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => ipc.sync.push(),
-    // A push may create the gist and/or merge in remote rows — every other
-    // open window needs to refetch, not just this one.
+    // A push may create the gist and/or merge in remote rows.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: syncKey });
       qc.invalidateQueries({ queryKey: versionsKey });
-      void emitRefresh();
     },
   });
 }
@@ -68,12 +63,10 @@ export function useSyncRestoreVersion() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (sha: string) => ipc.sync.restoreVersion(sha),
-    // A restore replaces every entity table wholesale — every other open
-    // window (host list, groups, ...) must refetch too, or it keeps showing
-    // data that no longer exists in the DB.
+    // A restore replaces every entity table wholesale, so every cached
+    // query (host list, groups, ...) must refetch.
     onSuccess: () => {
       qc.invalidateQueries();
-      void emitRefresh();
     },
   });
 }
@@ -92,7 +85,6 @@ export function useSyncFileImport() {
       ipc.sync.fileImport(path, passphrase),
     onSuccess: () => {
       qc.invalidateQueries();
-      void emitRefresh();
     },
   });
 }

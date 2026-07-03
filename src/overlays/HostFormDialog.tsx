@@ -4,6 +4,9 @@ import { useForm } from "react-hook-form";
 
 import {
   Button,
+  Dialog,
+  DialogContent,
+  DialogToolbar,
   Field,
   Input,
   PasswordInput,
@@ -11,11 +14,9 @@ import {
   Textarea,
 } from "@/components/ui";
 import { Spinner } from "@/components/ui/spinner";
-import { WindowHeader } from "@/components/layout/WindowHeader";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
-import { closeSelf, emitRefresh } from "@/lib/windows";
 import type { AuthType, HostInput } from "@/types/models";
 import { useIdentities, useSshKeys } from "@/features/credentials/api";
 import { useCreateHost, useGroups, useUpdateHost } from "@/features/hosts/api";
@@ -46,7 +47,34 @@ const emptyValues: FormValues = {
   notes: "",
 };
 
-export function HostFormWindow({ hostId }: { hostId: string | null }) {
+export function HostFormDialog({
+  open,
+  hostId,
+  onClose,
+}: {
+  open: boolean;
+  hostId: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        showClose={false}
+        className="flex h-[640px] w-[560px] max-w-[92vw] flex-col gap-0 p-0"
+      >
+        <HostFormBody hostId={hostId} onClose={onClose} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HostFormBody({
+  hostId,
+  onClose,
+}: {
+  hostId: string | null;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
   const { data: groups = [] } = useGroups();
   const { data: keys = [] } = useSshKeys();
@@ -125,8 +153,7 @@ export function HostFormWindow({ hostId }: { hostId: string | null }) {
       } else {
         await createHost.mutateAsync(input);
       }
-      await emitRefresh();
-      await closeSelf();
+      onClose();
     } catch (err) {
       toast.error(t("hostForm.saveError"), errorMessage(err));
     }
@@ -136,18 +163,18 @@ export function HostFormWindow({ hostId }: { hostId: string | null }) {
 
   if (hostId && isLoading) {
     return (
-      <div className="flex h-full flex-col bg-background">
-        <WindowHeader title={title} />
+      <>
+        <DialogToolbar>{title}</DialogToolbar>
         <div className="flex flex-1 items-center justify-center">
           <Spinner />
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <WindowHeader title={title} />
+    <>
+      <DialogToolbar>{title}</DialogToolbar>
       <form
         onSubmit={onSubmit}
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5"
@@ -262,7 +289,7 @@ export function HostFormWindow({ hostId }: { hostId: string | null }) {
         </Field>
 
         <div className="mt-auto flex justify-end gap-2 pt-2">
-          <Button type="button" variant="ghost" onClick={() => closeSelf()}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             {t("common.cancel")}
           </Button>
           <Button
@@ -273,6 +300,6 @@ export function HostFormWindow({ hostId }: { hostId: string | null }) {
           </Button>
         </div>
       </form>
-    </div>
+    </>
   );
 }

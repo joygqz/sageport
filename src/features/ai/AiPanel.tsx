@@ -155,7 +155,7 @@ export function AiPanel({
       />
       <aside style={{ width }} className="flex shrink-0 flex-col bg-surface">
         <div className="flex h-9 items-center gap-1 border-b border-border pl-2 pr-5">
-          <Sparkles className="size-4 shrink-0 text-primary" />
+          <Sparkles className="size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {activeTitle || t("ai.untitledChat")}
           </span>
@@ -298,7 +298,7 @@ export function AiPanel({
                   <Select
                     value={model}
                     onChange={(e) => changeModel(e.target.value)}
-                    className="h-7 max-w-[10.5rem] border-0 bg-transparent text-xs shadow-none hover:bg-accent"
+                    className="h-7 max-w-[10.5rem] border-0 bg-transparent text-xs hover:bg-accent"
                     title={t("ai.modelLabel")}
                   >
                     {models.length === 0 ? (
@@ -563,7 +563,7 @@ function CodeBlock({ code }: { code: string }) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-terminal-background">
       <div className="flex items-center justify-between border-b border-border px-2 py-1">
-        <span className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
           {t("ai.commandLabel")}
         </span>
         <div className="flex gap-1">

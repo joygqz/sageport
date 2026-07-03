@@ -13,7 +13,6 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
-import { emitRefresh } from "@/lib/windows";
 import type { AuthType, Identity } from "@/types/models";
 import {
   useCreateIdentity,
@@ -58,7 +57,6 @@ export function IdentitiesSection() {
         keyId: authType === "key" ? keyId || null : null,
         password: authType === "password" && password ? password : null,
       });
-      await emitRefresh();
       reset();
     } catch (err) {
       toast.error(t("identities.addError"), errorMessage(err));
@@ -68,7 +66,6 @@ export function IdentitiesSection() {
   const remove = async (id: string) => {
     try {
       await deleteIdentity.mutateAsync(id);
-      await emitRefresh();
     } catch (err) {
       toast.error(t("identities.deleteError"), errorMessage(err));
     }
