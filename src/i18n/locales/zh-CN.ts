@@ -102,6 +102,13 @@ export const zhCN: Dictionary = {
       closed: "已断开",
       error: "错误",
     },
+    search: {
+      placeholder: "查找",
+      noResults: "无结果",
+      previous: "上一个匹配",
+      next: "下一个匹配",
+      close: "关闭查找",
+    },
   },
 
   hosts: {
@@ -210,6 +217,7 @@ export const zhCN: Dictionary = {
         title: "删除密钥",
         description: "将永久删除 {name}，此操作无法撤销。",
         error: "删除密钥失败",
+        inUse: "该密钥仍被主机或身份使用，请先在相关配置中解除引用后再删除。",
       },
     },
     identities: {
@@ -232,6 +240,7 @@ export const zhCN: Dictionary = {
         title: "删除身份",
         description: "将永久删除 {name}，此操作无法撤销。",
         error: "删除身份失败",
+        inUse: "该身份仍被主机使用，请先在主机配置中解除引用后再删除。",
       },
     },
   },
@@ -330,6 +339,7 @@ export const zhCN: Dictionary = {
       description: "将永久删除 {title}，此操作无法撤销。",
     },
     working: "处理中",
+    stop: "停止生成",
     stepLimitReached: "已达到步骤上限，请换个说法或拆分请求后重试。",
     inputPlaceholder: "询问服务器相关问题",
     commandLabel: "命令",

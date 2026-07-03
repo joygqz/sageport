@@ -117,32 +117,68 @@ pub async fn ai_list_models(state: State<'_, AppState>) -> AppResult<Vec<String>
 /// Ask the assistant for its next turn. `model` is chosen in the chat window;
 /// `messages` is the canonical conversation so far (never including a
 /// `system` entry — the backend always supplies its own); `tools` describes
-/// whatever the frontend can execute on the model's behalf. The frontend
-/// drives the agent loop: it runs any returned `toolCalls`, appends the
-/// results as `tool` messages, and calls this again until a final reply with
-/// no tool calls comes back.
+/// whatever the frontend can execute on the model's behalf; `context` is a
+/// snapshot of the user's workspace appended to the system prompt. The reply
+/// streams: text deltas flow over `on_delta` as they arrive and the complete
+/// turn is returned at the end. The frontend drives the agent loop: it runs
+/// any returned `toolCalls`, appends the results as `tool` messages, and
+/// calls this again until a final reply with no tool calls comes back.
+///
+/// When `request_id` is set the turn can be aborted mid-stream with
+/// [`ai_chat_cancel`], failing with the `cancelled` error code.
 #[tauri::command]
 pub async fn ai_chat(
     state: State<'_, AppState>,
     model: String,
     messages: Vec<ai::ChatMessage>,
     tools: Vec<ai::ToolSpec>,
+    context: Option<String>,
+    request_id: Option<String>,
+    on_delta: tauri::ipc::Channel<ai::StreamEvent>,
 ) -> AppResult<ai::ChatResult> {
     if model.trim().is_empty() {
         return Err(AppError::Invalid("no model selected".into()));
     }
     let (base_url, api_key, protocol) = endpoint(&state).await?;
-    ai::chat(
-        &Endpoint {
-            base_url: &base_url,
-            api_key: &api_key,
-            protocol,
-        },
+    let ep = Endpoint {
+        base_url: &base_url,
+        api_key: &api_key,
+        protocol,
+    };
+    let chat = ai::chat(
+        &ep,
         &model,
         &messages,
         &tools,
-    )
-    .await
+        context.as_deref(),
+        |text| {
+            let _ = on_delta.send(ai::StreamEvent::Text {
+                text: text.to_string(),
+            });
+        },
+    );
+
+    let Some(request_id) = request_id else {
+        return chat.await;
+    };
+
+    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    state.ai_cancels.lock().insert(request_id.clone(), cancel_tx);
+    let result = tokio::select! {
+        r = chat => r,
+        _ = cancel_rx => Err(AppError::Cancelled),
+    };
+    state.ai_cancels.lock().remove(&request_id);
+    result
+}
+
+/// Abort an in-flight [`ai_chat`] turn. A no-op if the turn already finished.
+#[tauri::command]
+pub async fn ai_chat_cancel(state: State<'_, AppState>, request_id: String) -> AppResult<()> {
+    if let Some(tx) = state.ai_cancels.lock().remove(&request_id) {
+        let _ = tx.send(());
+    }
+    Ok(())
 }
 
 // --- Persisted chat sessions (history + multi-session support) ---

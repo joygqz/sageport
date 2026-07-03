@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Plus, Settings, TerminalSquare, X } from "lucide-react";
 
 import { Kbd, Tooltip } from "@/components/ui";
@@ -5,6 +6,7 @@ import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { TerminalEditor } from "@/features/terminal/TerminalEditor";
+import { focusTerminal } from "@/features/terminal/registry";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore, type EditorTab, type TerminalStatus } from "./tabs";
 
@@ -28,12 +30,33 @@ export function EditorArea() {
   const setActive = useTabsStore((s) => s.setActive);
   const close = useTabsStore((s) => s.close);
   const openPalette = useOverlayStore((s) => s.openPalette);
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  // Keep the active tab in view and hand focus to its terminal, so switching
+  // tabs (mouse or shortcut) lands keystrokes in the shell immediately.
+  useEffect(() => {
+    if (!activeId) return;
+    stripRef.current
+      ?.querySelector(`[data-tab-id="${CSS.escape(activeId)}"]`)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    focusTerminal(activeId);
+  }, [activeId]);
 
   if (tabs.length === 0) return <Watermark />;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-      <div className="flex h-9 shrink-0 items-end overflow-x-auto border-b border-border bg-surface">
+      <div
+        ref={stripRef}
+        // The strip scrolls with the wheel (any direction) instead of a
+        // scrollbar, which would eat into the fixed tab height.
+        onWheel={(e) => {
+          const el = stripRef.current;
+          if (!el || el.scrollWidth <= el.clientWidth) return;
+          el.scrollLeft += e.deltaX + e.deltaY;
+        }}
+        className="scrollbar-none flex h-9 shrink-0 items-end overflow-x-auto border-b border-border bg-surface"
+      >
         {tabs.map((tab) => (
           <TabItem
             key={tab.id}
@@ -57,13 +80,16 @@ export function EditorArea() {
         {tabs.map((tab) => (
           <div
             key={tab.id}
+            // Inactive panes keep their layout (visibility, not display):
+            // hidden terminals stay fitted to their real size, so activating
+            // a tab never triggers a visible refit/flicker.
             className={cn(
               "absolute inset-0",
-              tab.id === activeId ? "block" : "hidden",
+              tab.id === activeId ? "visible" : "invisible",
             )}
           >
             {tab.kind === "terminal" ? (
-              <TerminalEditor tab={tab} />
+              <TerminalEditor tab={tab} active={tab.id === activeId} />
             ) : (
               <SettingsPage section={tab.section} />
             )}
@@ -92,6 +118,7 @@ function TabItem({
 
   return (
     <div
+      data-tab-id={tab.id}
       onClick={onSelect}
       onDoubleClick={
         tab.kind === "terminal"
@@ -103,7 +130,7 @@ function TabItem({
         if (e.button === 1) onClose();
       }}
       className={cn(
-        "group relative flex h-full min-w-32 max-w-52 cursor-default items-center gap-2 border-r border-border px-3 text-xs",
+        "group relative flex h-full min-w-32 max-w-52 cursor-pointer items-center gap-2 border-r border-border px-3 text-xs",
         active
           ? "bg-background text-foreground"
           : "bg-surface text-muted-foreground hover:text-foreground",

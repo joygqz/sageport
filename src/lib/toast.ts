@@ -45,3 +45,15 @@ export function errorMessage(err: unknown): string {
   }
   return typeof err === "string" ? err : "Unexpected error";
 }
+
+/**
+ * Machine-readable error code set by the backend (`AppError::code`), e.g.
+ * "in_use" | "not_found" | "invalid". Lets callers show a localized,
+ * human-friendly description instead of the raw English message.
+ */
+export function errorCode(err: unknown): string | null {
+  if (err && typeof err === "object" && "code" in err) {
+    return String((err as { code: unknown }).code);
+  }
+  return null;
+}

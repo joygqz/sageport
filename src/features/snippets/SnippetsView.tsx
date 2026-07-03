@@ -100,7 +100,7 @@ export function SnippetsView() {
               <ContextMenuTrigger asChild>
                 <div
                   onDoubleClick={() => run(snippet)}
-                  className="group flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 hover:bg-list-hover"
+                  className="group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-list-hover"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{snippet.name}</p>

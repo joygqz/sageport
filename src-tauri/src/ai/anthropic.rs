@@ -112,53 +112,148 @@ fn is_tool_result_message(v: &Value) -> bool {
             })
 }
 
-/// Extract the assistant's next turn (text and/or tool calls) from a
-/// Messages response.
-pub(super) fn parse_chat(bytes: &[u8]) -> AppResult<ChatResult> {
-    let parsed: MessageResponse = serde_json::from_slice(bytes)?;
-    let mut content = String::new();
-    let mut tool_calls = Vec::new();
-    for block in parsed.content {
-        match block.kind.as_str() {
-            "text" => {
-                let text = block.text.trim();
-                if !text.is_empty() {
-                    if !content.is_empty() {
-                        content.push('\n');
+/// Accumulates a streamed Messages turn. Anthropic streams content as
+/// indexed blocks: `content_block_start` opens a text or tool_use block,
+/// `content_block_delta` grows it (`text_delta` / `input_json_delta`), and
+/// the final result is assembled once the stream ends.
+#[derive(Default)]
+pub(super) struct StreamAccumulator {
+    blocks: Vec<Block>,
+}
+
+enum Block {
+    Text(String),
+    ToolUse {
+        id: String,
+        name: String,
+        input_json: String,
+    },
+}
+
+impl StreamAccumulator {
+    /// Consume one SSE `data:` payload, forwarding text deltas. A payload of
+    /// type `error` aborts the turn with the provider's message.
+    pub(super) fn feed(&mut self, data: &str, on_text: &mut dyn FnMut(&str)) -> AppResult<()> {
+        let Ok(event) = serde_json::from_str::<StreamPayload>(data) else {
+            return Ok(());
+        };
+        match event.kind.as_str() {
+            "content_block_start" => {
+                let index = event.index as usize;
+                while self.blocks.len() <= index {
+                    self.blocks.push(Block::Text(String::new()));
+                }
+                if let Some(block) = event.content_block {
+                    self.blocks[index] = match block.kind.as_str() {
+                        "tool_use" => Block::ToolUse {
+                            id: block.id.unwrap_or_default(),
+                            name: block.name.unwrap_or_default(),
+                            input_json: String::new(),
+                        },
+                        _ => Block::Text(block.text),
+                    };
+                    if let Block::Text(text) = &self.blocks[index] {
+                        if !text.is_empty() {
+                            on_text(text);
+                        }
                     }
-                    content.push_str(text);
                 }
             }
-            "tool_use" => tool_calls.push(ToolCall {
-                id: block.id.unwrap_or_default(),
-                name: block.name.unwrap_or_default(),
-                arguments: block.input.unwrap_or_else(|| json!({})),
-            }),
+            "content_block_delta" => {
+                let index = event.index as usize;
+                let Some(block) = self.blocks.get_mut(index) else {
+                    return Ok(());
+                };
+                let Some(delta) = event.delta else {
+                    return Ok(());
+                };
+                match (block, delta.kind.as_str()) {
+                    (Block::Text(text), "text_delta") => {
+                        text.push_str(&delta.text);
+                        if !delta.text.is_empty() {
+                            on_text(&delta.text);
+                        }
+                    }
+                    (Block::ToolUse { input_json, .. }, "input_json_delta") => {
+                        input_json.push_str(&delta.partial_json);
+                    }
+                    _ => {}
+                }
+            }
+            "error" => {
+                let message = event
+                    .error
+                    .map(|e| e.message)
+                    .unwrap_or_else(|| "the provider reported a stream error".into());
+                return Err(AppError::Other(message));
+            }
             _ => {}
         }
+        Ok(())
     }
 
-    if content.is_empty() && tool_calls.is_empty() {
-        return Err(AppError::Other("the assistant returned no content".into()));
+    pub(super) fn finish(self) -> AppResult<ChatResult> {
+        let mut content = String::new();
+        let mut tool_calls = Vec::new();
+        for block in self.blocks {
+            match block {
+                Block::Text(text) => {
+                    let text = text.trim();
+                    if !text.is_empty() {
+                        if !content.is_empty() {
+                            content.push('\n');
+                        }
+                        content.push_str(text);
+                    }
+                }
+                Block::ToolUse {
+                    id,
+                    name,
+                    input_json,
+                } => {
+                    if name.is_empty() {
+                        continue;
+                    }
+                    tool_calls.push(ToolCall {
+                        id,
+                        name,
+                        arguments: serde_json::from_str(&input_json)
+                            .unwrap_or_else(|_| json!({})),
+                    });
+                }
+            }
+        }
+
+        if content.is_empty() && tool_calls.is_empty() {
+            return Err(AppError::Other("the assistant returned no content".into()));
+        }
+        Ok(ChatResult {
+            content: if content.is_empty() {
+                None
+            } else {
+                Some(content)
+            },
+            tool_calls,
+        })
     }
-    Ok(ChatResult {
-        content: if content.is_empty() {
-            None
-        } else {
-            Some(content)
-        },
-        tool_calls,
-    })
 }
 
 #[derive(Deserialize)]
-struct MessageResponse {
+struct StreamPayload {
+    #[serde(rename = "type")]
+    kind: String,
     #[serde(default)]
-    content: Vec<ContentBlock>,
+    index: u32,
+    #[serde(default)]
+    content_block: Option<RawBlock>,
+    #[serde(default)]
+    delta: Option<RawDelta>,
+    #[serde(default)]
+    error: Option<RawError>,
 }
 
 #[derive(Deserialize)]
-struct ContentBlock {
+struct RawBlock {
     #[serde(rename = "type")]
     kind: String,
     #[serde(default)]
@@ -167,6 +262,19 @@ struct ContentBlock {
     id: Option<String>,
     #[serde(default)]
     name: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawDelta {
+    #[serde(rename = "type")]
+    kind: String,
     #[serde(default)]
-    input: Option<Value>,
+    text: String,
+    #[serde(default)]
+    partial_json: String,
+}
+
+#[derive(Deserialize)]
+struct RawError {
+    message: String,
 }

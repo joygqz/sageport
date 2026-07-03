@@ -7,6 +7,7 @@ import {
   KeyRound,
   Pencil,
   Sparkles,
+  Square,
   SquarePen,
   Terminal as TerminalIcon,
   Trash2,
@@ -73,6 +74,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const renameSession = useAiStore((s) => s.renameSession);
   const deleteSession = useAiStore((s) => s.deleteSession);
   const send = useAiStore((s) => s.send);
+  const stop = useAiStore((s) => s.stop);
   const approve = useAiStore((s) => s.approve);
   const deny = useAiStore((s) => s.deny);
 
@@ -298,14 +300,27 @@ export function AssistantPanel({ width }: { width: number }) {
                     ))
                   )}
                 </Select>
-                <Button
-                  size="icon"
-                  className="ml-auto size-7 shrink-0"
-                  disabled={!input.trim() || pending || !model}
-                  onClick={() => void submit()}
-                >
-                  <ArrowUp className="size-4" />
-                </Button>
+                {pending ? (
+                  <Tooltip content={t("ai.stop")}>
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="ml-auto size-7 shrink-0"
+                      onClick={() => activeId && stop(activeId)}
+                    >
+                      <Square className="size-3.5 fill-current" />
+                    </Button>
+                  </Tooltip>
+                ) : (
+                  <Button
+                    size="icon"
+                    className="ml-auto size-7 shrink-0"
+                    disabled={!input.trim() || !model}
+                    onClick={() => void submit()}
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -417,12 +432,14 @@ function Bubble({
   if (role === "user") {
     return (
       <div className="rounded-lg bg-accent/60 px-3 py-2">
-        <p className="whitespace-pre-wrap break-words text-sm">{content}</p>
+        <p className="select-text whitespace-pre-wrap break-words text-sm">
+          {content}
+        </p>
       </div>
     );
   }
   return (
-    <div className="min-w-0 space-y-2">
+    <div className="min-w-0 select-text space-y-2">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={MARKDOWN_COMPONENTS}

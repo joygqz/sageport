@@ -176,6 +176,25 @@
     cursor: auto;
   }
 
+  /*
+   * Every interactive control shows a pointer, like the web (and VSCode's
+   * webview UI). The `:root` rule above resets the browser default to
+   * `default`, so this opt-in list is what makes clickability visible.
+   * Disabled controls fall back to the arrow.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([data-disabled]),
+  [role="option"]:not([data-disabled]),
+  [role="tab"],
+  [role="switch"]:not(:disabled),
+  a[href],
+  label[for],
+  select:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
   ::selection {
     background-color: color-mix(
       in oklch,
@@ -205,5 +224,14 @@
       var(--color-muted-foreground) 55%,
       transparent
     );
+  }
+}
+
+/* Scroll container whose scrollbar never takes up layout space (used by the
+ * editor tab strip, which scrolls with the wheel instead). */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }

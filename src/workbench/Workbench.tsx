@@ -32,6 +32,15 @@ export function Workbench() {
     bridgeSftpEvents();
   }, []);
 
+  // Panels keep their share of a shrinking window in check (VSCode-style):
+  // resizing the window re-clamps every part so the editor never collapses.
+  useEffect(() => {
+    const onResize = () => useLayoutStore.getState().clampToViewport();
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const layout = useLayoutStore();
   const overlay = useOverlayStore((s) => s.overlay);
   const closeOverlay = useOverlayStore((s) => s.close);

@@ -69,7 +69,7 @@ export function ToolActivity({
       {expanded && (
         <div className="space-y-1.5 border-t border-border px-2.5 py-1.5">
           {command && (
-            <pre className="overflow-x-auto rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
+            <pre className="select-text overflow-x-auto rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
               {command}
             </pre>
           )}
@@ -92,7 +92,7 @@ export function ToolActivity({
             </div>
           )}
           {item.result && (
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[0.7rem] text-muted-foreground">
+            <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap font-mono text-[0.7rem] text-muted-foreground">
               {item.result}
             </pre>
           )}

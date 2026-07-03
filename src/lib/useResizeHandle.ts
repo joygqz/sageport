@@ -25,17 +25,25 @@ export function useResizeHandle({
       e.preventDefault();
       const start = axis === "x" ? e.clientX : e.clientY;
       const startSize = size;
+      // Pin the resize cursor for the whole drag, even when the pointer
+      // leaves the thin handle or crosses an iframe/canvas.
+      const cursor = axis === "x" ? "col-resize" : "row-resize";
+      const prevCursor = document.body.style.cursor;
+      document.body.style.cursor = cursor;
       const onMove = (ev: PointerEvent) => {
         const pos = axis === "x" ? ev.clientX : ev.clientY;
         const delta = pos - start;
         onResize(startSize + (reverse ? -delta : delta));
       };
       const onUp = () => {
+        document.body.style.cursor = prevCursor;
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
       };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
     },
     [axis, size, reverse, onResize],
   );

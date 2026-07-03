@@ -104,6 +104,13 @@ export const en = {
       closed: "Disconnected",
       error: "Error",
     },
+    search: {
+      placeholder: "Find",
+      noResults: "No results",
+      previous: "Previous match",
+      next: "Next match",
+      close: "Close find",
+    },
   },
 
   hosts: {
@@ -214,6 +221,8 @@ export const en = {
         title: "Delete key",
         description: "This permanently deletes {name} and cannot be undone.",
         error: "Failed to delete key",
+        inUse:
+          "This key is still used by hosts or identities. Reassign them before deleting it.",
       },
     },
     identities: {
@@ -237,6 +246,8 @@ export const en = {
         title: "Delete identity",
         description: "This permanently deletes {name} and cannot be undone.",
         error: "Failed to delete identity",
+        inUse:
+          "This identity is still used by hosts. Reassign them before deleting it.",
       },
     },
   },
@@ -337,6 +348,7 @@ export const en = {
       description: "This permanently deletes {title} and cannot be undone.",
     },
     working: "Working",
+    stop: "Stop generating",
     stepLimitReached:
       "Step limit reached. Rephrase or split the request and try again.",
     inputPlaceholder: "Ask about your servers",

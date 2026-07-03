@@ -127,8 +127,19 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let hosts = hosts_using(pool, id).await?;
     let identities = identities_using(pool, id).await?;
     if hosts > 0 || identities > 0 {
+        let mut used_by = Vec::new();
+        if hosts > 0 {
+            used_by.push(format!("{hosts} host{}", if hosts == 1 { "" } else { "s" }));
+        }
+        if identities > 0 {
+            used_by.push(format!(
+                "{identities} identit{}",
+                if identities == 1 { "y" } else { "ies" }
+            ));
+        }
         return Err(AppError::InUse(format!(
-            "key is used by {hosts} host(s) and {identities} identity(ies); reassign them before deleting"
+            "this key is still used by {}; reassign them before deleting it",
+            used_by.join(" and ")
         )));
     }
 

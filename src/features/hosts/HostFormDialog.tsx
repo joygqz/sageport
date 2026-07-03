@@ -60,7 +60,7 @@ export function HostFormDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         showClose={false}
-        className="flex h-[640px] w-[560px] max-w-[92vw] flex-col gap-0 p-0"
+        className="flex w-[560px] max-w-[92vw] flex-col gap-0 p-0"
       >
         <HostFormBody hostId={hostId} onClose={onClose} />
       </DialogContent>
@@ -171,7 +171,7 @@ function HostFormBody({
     return (
       <>
         <DialogToolbar>{title}</DialogToolbar>
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex min-h-48 flex-1 items-center justify-center">
           <Spinner />
         </div>
       </>

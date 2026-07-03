@@ -43,17 +43,17 @@ export function ActivityBar() {
                   "relative flex size-10 items-center justify-center rounded-md transition-colors",
                   active
                     ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+                    : "text-muted-foreground/75 hover:text-foreground",
                 )}
               >
-                {/* VSCode-style active indicator: a 2px bar on the rail edge. */}
+                {/* VSCode-style active indicator: a bar on the rail edge. */}
                 <span
                   className={cn(
-                    "absolute inset-y-2 -left-1 w-0.5 rounded-full bg-primary transition-opacity",
+                    "absolute inset-y-1.5 -left-1 w-[3px] bg-primary transition-opacity",
                     active ? "opacity-100" : "opacity-0",
                   )}
                 />
-                <Icon className="size-5" strokeWidth={1.75} />
+                <Icon className="size-6" strokeWidth={1.5} />
               </button>
             </Tooltip>
           );
@@ -67,10 +67,10 @@ export function ActivityBar() {
             "flex size-10 items-center justify-center rounded-md transition-colors",
             settingsActive
               ? "text-foreground"
-              : "text-muted-foreground hover:text-foreground",
+              : "text-muted-foreground/75 hover:text-foreground",
           )}
         >
-          <Settings className="size-5" strokeWidth={1.75} />
+          <Settings className="size-6" strokeWidth={1.5} />
         </button>
       </Tooltip>
     </nav>

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
@@ -176,9 +176,36 @@ export const ipc = {
     /** Fetch the provider's available model ids for the chat-window picker. */
     listModels: () => invoke<string[]>("ai_list_models"),
     setModel: (model: string) => invoke<void>("ai_set_model", { model }),
-    /** One agent turn: send the conversation so far, get the next one back. */
-    chat: (model: string, messages: AiChatMessage[], tools: AiToolSpec[]) =>
-      invoke<AiChatResult>("ai_chat", { model, messages, tools }),
+    /**
+     * One agent turn: send the conversation so far, get the next one back.
+     * Assistant text streams through `onDelta` as it is generated; the
+     * complete turn (text + tool calls) resolves at the end. Pass a
+     * `requestId` to make the turn abortable via `cancel`.
+     */
+    chat: (
+      model: string,
+      messages: AiChatMessage[],
+      tools: AiToolSpec[],
+      opts?: {
+        context?: string;
+        requestId?: string;
+        onDelta?: (text: string) => void;
+      },
+    ) => {
+      const onDelta = new Channel<{ type: "text"; text: string }>();
+      onDelta.onmessage = (e) => opts?.onDelta?.(e.text);
+      return invoke<AiChatResult>("ai_chat", {
+        model,
+        messages,
+        tools,
+        context: opts?.context ?? null,
+        requestId: opts?.requestId ?? null,
+        onDelta,
+      });
+    },
+    /** Abort an in-flight chat turn; it rejects with the `cancelled` code. */
+    cancel: (requestId: string) =>
+      invoke<void>("ai_chat_cancel", { requestId }),
     session: {
       /** Newest-first list of saved chat sessions, for the history menu. */
       list: () => invoke<AiSessionSummary[]>("ai_session_list"),

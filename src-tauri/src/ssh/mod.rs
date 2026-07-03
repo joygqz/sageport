@@ -27,6 +27,14 @@ pub const EVENT_STATUS: &str = "ssh://status";
 /// How often to send an SSH keepalive probe on an otherwise idle session.
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
 
+/// Upper bound for the blocking connect/handshake/auth phase, so a dead
+/// network fails fast instead of hanging the session thread forever.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// How many 32 KiB reads to drain per loop tick before yielding, so a burst
+/// of output (e.g. `cat` on a large file) still keeps the UI responsive.
+const MAX_READS_PER_TICK: usize = 16;
+
 #[derive(Debug, Clone)]
 pub enum AuthMethod {
     Password(String),
@@ -177,6 +185,13 @@ fn run_session(app: AppHandle, params: ConnectParams, rx: Receiver<SessionComman
     }
 }
 
+/// A broken link mid-session (reset, NAT drop, server kill) surfaces as an
+/// opaque libssh2 transport error ("transport read"); translate it into a
+/// message a user can act on.
+fn connection_lost(e: std::io::Error) -> AppError {
+    AppError::Other(format!("connection lost: {e}"))
+}
+
 fn run_session_inner(
     app: &AppHandle,
     params: &ConnectParams,
@@ -185,8 +200,12 @@ fn run_session_inner(
     let id = &params.session_id;
 
     let tcp = TcpStream::connect((params.host.as_str(), params.port))?;
+    // Interactive keystrokes should not sit in Nagle's buffer.
+    let _ = tcp.set_nodelay(true);
     let mut session = ssh2::Session::new()?;
     session.set_tcp_stream(tcp);
+    // Bound the blocking connect phase (handshake + auth); 0 = no timeout.
+    session.set_timeout(CONNECT_TIMEOUT.as_millis() as u32);
     session.handshake()?;
 
     authenticate(&session, &params.username, &params.auth)?;
@@ -201,13 +220,18 @@ fn run_session_inner(
 
     emit_status(app, id, "connected", None);
 
-    // Ask libssh2 to keep the connection alive so idle sessions are not dropped
-    // by the server or an intervening NAT/firewall. `want_reply = true` makes
-    // the peer acknowledge each probe, so a dead link surfaces as a read error.
-    session.set_keepalive(true, KEEPALIVE_INTERVAL.as_secs() as u32);
+    // Ask libssh2 to keep the connection alive so idle sessions are not
+    // dropped by the server or an intervening NAT/firewall. `want_reply =
+    // false`: a probe the peer must answer adds traffic and, more
+    // importantly, interleaving its reply with pending channel writes has
+    // historically confused libssh2's non-blocking transport. The probe
+    // itself is enough to keep NAT/firewall state alive, and a dead TCP link
+    // still surfaces as a read/write error.
+    session.set_keepalive(false, KEEPALIVE_INTERVAL.as_secs() as u32);
 
     // Non-blocking I/O so the single event loop can interleave reads, writes,
     // and control commands without ever blocking on any one of them.
+    session.set_timeout(0);
     session.set_blocking(false);
 
     let mut buf = [0u8; 32 * 1024];
@@ -220,10 +244,15 @@ fn run_session_inner(
     let mut needs_flush = false;
     let mut next_keepalive = Instant::now() + KEEPALIVE_INTERVAL;
     loop {
+        let mut made_progress = false;
+
         // Drain pending control commands first.
         loop {
             match rx.try_recv() {
-                Ok(SessionCommand::Input(data)) => outbuf.extend_from_slice(&data),
+                Ok(SessionCommand::Input(data)) => {
+                    outbuf.extend_from_slice(&data);
+                    made_progress = true;
+                }
                 Ok(SessionCommand::Resize(cols, rows)) => {
                     let _ = channel.request_pty_size(cols, rows, None, None);
                 }
@@ -245,9 +274,10 @@ fn run_session_inner(
                 Ok(n) => {
                     sent += n;
                     needs_flush = true;
+                    made_progress = true;
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
-                Err(e) => return Err(AppError::Io(e)),
+                Err(e) => return Err(connection_lost(e)),
             }
         }
         if sent > 0 && sent == outbuf.len() {
@@ -258,41 +288,53 @@ fn run_session_inner(
             match channel.flush() {
                 Ok(()) => needs_flush = false,
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-                Err(e) => return Err(AppError::Io(e)),
+                Err(e) => return Err(connection_lost(e)),
             }
         }
 
-        match channel.read(&mut buf) {
-            Ok(0) => {
-                if channel.eof() {
-                    return Ok(());
+        // Drain what the remote has ready, bounded per tick so a firehose of
+        // output cannot starve input handling.
+        for _ in 0..MAX_READS_PER_TICK {
+            match channel.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    made_progress = true;
+                    let _ = app.emit(
+                        EVENT_DATA,
+                        DataEvent {
+                            id: id.clone(),
+                            data: STANDARD.encode(&buf[..n]),
+                        },
+                    );
                 }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(e) => return Err(connection_lost(e)),
             }
-            Ok(n) => {
-                let _ = app.emit(
-                    EVENT_DATA,
-                    DataEvent {
-                        id: id.clone(),
-                        data: STANDARD.encode(&buf[..n]),
-                    },
-                );
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-            Err(e) => return Err(AppError::Io(e)),
         }
 
         if channel.eof() {
             return Ok(());
         }
 
-        // Send a keepalive probe when due. libssh2 only emits probes while we
-        // poke it, so we drive it from the event loop.
-        if Instant::now() >= next_keepalive {
-            let _ = session.keepalive_send();
-            next_keepalive = Instant::now() + KEEPALIVE_INTERVAL;
+        // Send a keepalive probe when due — but only while our own outbound
+        // side is idle. libssh2 must never start a new packet while another
+        // one is partially written (EAGAIN mid-packet), or the transport
+        // stream corrupts and the server drops the connection — the classic
+        // cause of sudden "transport read" failures on busy sessions.
+        if outbuf.is_empty() && !needs_flush && Instant::now() >= next_keepalive {
+            match session.keepalive_send() {
+                // Probe sent (or nothing to do): schedule the next one.
+                Ok(_) => next_keepalive = Instant::now() + KEEPALIVE_INTERVAL,
+                // EAGAIN: socket buffer full right now, retry next tick.
+                Err(ref e) if e.code() == ssh2::ErrorCode::Session(-37) => {}
+                // Keepalive failing outright means the link is gone.
+                Err(e) => return Err(connection_lost(std::io::Error::other(e))),
+            }
         }
 
-        std::thread::sleep(Duration::from_millis(5));
+        if !made_progress {
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
 }
 

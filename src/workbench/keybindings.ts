@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+import { useTerminalSearch } from "@/features/terminal/search";
+import { useTerminalSettings } from "@/features/terminal/settings";
 import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
@@ -42,6 +44,18 @@ export function useKeybindings() {
         });
       } else if (e.shiftKey && (key === "[" || key === "]")) {
         run(() => tabs.activateNext(key === "]" ? 1 : -1));
+      } else if (key === "f" && !e.shiftKey) {
+        // Find in the active terminal, VSCode-style.
+        const active = tabs.tabs.find((t) => t.id === tabs.activeId);
+        if (active?.kind === "terminal") {
+          run(() => useTerminalSearch.getState().open(active.id));
+        }
+      } else if (key === "=" || key === "+") {
+        run(() => useTerminalSettings.getState().zoomIn());
+      } else if (key === "-") {
+        run(() => useTerminalSettings.getState().zoomOut());
+      } else if (key === "0") {
+        run(() => useTerminalSettings.getState().resetZoom());
       }
     };
 

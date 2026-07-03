@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
+import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -12,6 +13,7 @@ import { errorMessage } from "@/lib/toast";
 import { useTheme } from "@/themes/useTheme";
 import { useTabsStore } from "@/workbench/tabs";
 import { registerTerminal, unregisterTerminal } from "./registry";
+import { useTerminalSettings } from "./settings";
 import { xtermTheme } from "./xterm-theme";
 
 function decodeBase64(b64: string): Uint8Array {
@@ -65,7 +67,7 @@ export function TerminalView({
     const term = new XTerm({
       fontFamily:
         '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace',
-      fontSize: 13,
+      fontSize: useTerminalSettings.getState().fontSize,
       lineHeight: 1.25,
       cursorBlink: true,
       cursorStyle: "bar",
@@ -79,7 +81,9 @@ export function TerminalView({
       scrollback: 10_000,
     });
     const fit = new FitAddon();
+    const search = new SearchAddon();
     term.loadAddon(fit);
+    term.loadAddon(search);
     term.loadAddon(new WebLinksAddon());
     term.loadAddon(new ClipboardAddon());
     const unicode = new Unicode11Addon();
@@ -90,7 +94,7 @@ export function TerminalView({
     attachWebgl(term); // must run after open(), once the canvas exists
     fit.fit();
     termRef.current = term;
-    registerTerminal(sessionId, term);
+    registerTerminal(sessionId, { term, fit, search });
 
     let disposed = false;
     const unlisteners: Array<() => void> = [];
@@ -135,14 +139,26 @@ export function TerminalView({
       }
     })();
 
-    // Refit on container resize and inform the remote PTY.
+    // Refit on container resize and inform the remote PTY. Coalesced to one
+    // fit per frame so drag-resizing a panel doesn't thrash the renderer.
+    let fitQueued = false;
     const observer = new ResizeObserver(() => {
-      try {
-        fit.fit();
-        void ipc.ssh.resize(sessionId, term.cols, term.rows).catch(() => {});
-      } catch {
-        /* element not visible */
-      }
+      if (fitQueued) return;
+      fitQueued = true;
+      requestAnimationFrame(() => {
+        fitQueued = false;
+        if (disposed) return;
+        const el = containerRef.current;
+        // Skip zero-size passes (e.g. mid-layout) — fitting to them would
+        // clamp the PTY to a bogus size and repaint visibly.
+        if (!el || el.clientWidth === 0 || el.clientHeight === 0) return;
+        try {
+          fit.fit();
+          void ipc.ssh.resize(sessionId, term.cols, term.rows).catch(() => {});
+        } catch {
+          /* element not measurable */
+        }
+      });
     });
     observer.observe(containerRef.current!);
 

@@ -107,7 +107,8 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let in_use = hosts_using(pool, id).await?;
     if in_use > 0 {
         return Err(AppError::InUse(format!(
-            "identity is used by {in_use} host(s); reassign them before deleting"
+            "this identity is still used by {in_use} host{}; reassign them before deleting it",
+            if in_use == 1 { "" } else { "s" }
         )));
     }
 

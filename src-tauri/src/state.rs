@@ -1,6 +1,9 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
+use parking_lot::Mutex;
 use sqlx::SqlitePool;
+use tokio::sync::oneshot;
 
 use crate::sftp::SftpManager;
 use crate::ssh::SessionManager;
@@ -16,6 +19,9 @@ pub struct AppState {
     /// Lives for the whole app process, so update state survives any single
     /// window (Settings) closing and reopening.
     pub update: UpdateManager,
+    /// In-flight `ai_chat` requests by request id; sending on the stored
+    /// channel (via `ai_chat_cancel`) aborts the request mid-stream.
+    pub ai_cancels: Mutex<HashMap<String, oneshot::Sender<()>>>,
 }
 
 impl AppState {
@@ -25,6 +31,7 @@ impl AppState {
             ssh: SessionManager::new(),
             sftp: Arc::new(SftpManager::new()),
             update: UpdateManager::new(),
+            ai_cancels: Mutex::new(HashMap::new()),
         }
     }
 }

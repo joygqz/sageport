@@ -24,7 +24,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type { Identity, SshKey } from "@/types/models";
 import { SideBarView } from "@/workbench/SideBarView";
 import {
@@ -157,7 +157,9 @@ function KeyList({
             void deleteKey.mutateAsync(key.id).catch((err) => {
               toast.error(
                 t("credentials.keys.delete.error"),
-                errorMessage(err),
+                errorCode(err) === "in_use"
+                  ? t("credentials.keys.delete.inUse")
+                  : errorMessage(err),
               );
             }),
         },
@@ -199,7 +201,7 @@ function KeyRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group flex cursor-default items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover">
+        <div className="group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover">
           <KeyRound className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate text-sm">{sshKey.name}</span>
           {tag && <Badge className="font-mono text-2xs uppercase">{tag}</Badge>}
@@ -268,7 +270,9 @@ function IdentityList({
             void deleteIdentity.mutateAsync(identity.id).catch((err) => {
               toast.error(
                 t("credentials.identities.delete.error"),
-                errorMessage(err),
+                errorCode(err) === "in_use"
+                  ? t("credentials.identities.delete.inUse")
+                  : errorMessage(err),
               );
             }),
         },
@@ -287,7 +291,7 @@ function IdentityList({
           <ContextMenuTrigger asChild>
             <div
               onDoubleClick={() => onEdit(identity)}
-              className="group flex cursor-default items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover"
+              className="group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover"
             >
               <User className="size-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate text-sm">{identity.name}</span>

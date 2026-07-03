@@ -31,7 +31,7 @@ export function Toaster() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-foreground">{t.title}</p>
               {t.description && (
-                <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                <p className="mt-0.5 select-text break-words text-xs text-muted-foreground">
                   {t.description}
                 </p>
               )}

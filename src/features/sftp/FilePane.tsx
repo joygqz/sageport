@@ -153,7 +153,7 @@ export function FilePane({ side }: { side: PaneSide }) {
               if (host) addRemoteTab(side, host);
             }}
             className={cn(
-              "group flex h-6 cursor-default items-center gap-1.5 rounded px-2 text-xs",
+              "group flex h-6 cursor-pointer items-center gap-1.5 rounded px-2 text-xs",
               tab.id === pane.activeTabId
                 ? "bg-background text-foreground"
                 : "text-muted-foreground hover:text-foreground",

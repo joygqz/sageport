@@ -3,12 +3,13 @@ import { create } from "zustand";
 import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type {
   AiChatMessage,
   AiSessionSummary,
   AiToolCall,
 } from "@/types/models";
+import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 import {
   AI_TOOL_SPECS,
   executeTool,
@@ -49,6 +50,10 @@ interface RuntimeSession {
   /** Rendered log (richer than `history`: tool status, args, bubbles). */
   log: AgentLogItem[];
   pending: boolean;
+  /** Backend id of the in-flight chat turn, for mid-stream cancellation. */
+  requestId: string | null;
+  /** Set by `stop`; the agent loop winds down at the next safe point. */
+  stopRequested: boolean;
 }
 
 interface AiStoreState {
@@ -69,8 +74,36 @@ interface AiStoreState {
   deleteSession: (id: string) => Promise<void>;
 
   send: (sessionId: string, prompt: string, model: string) => Promise<void>;
+  /** Abort the running turn: cancels the request and stops the agent loop. */
+  stop: (sessionId: string) => void;
   approve: (toolLogId: string) => void;
   deny: (toolLogId: string) => void;
+}
+
+/**
+ * Workspace snapshot appended to the system prompt on every turn, so the
+ * model knows what it is working with before calling any tool: which
+ * sessions are open, which one the user is looking at, and the UI language.
+ */
+function buildContext(): string {
+  const state = useTabsStore.getState();
+  const sessions = terminalTabs(state.tabs);
+  const focusedId = targetTerminalId(state);
+  const lines = [
+    `App: Sageport v${__APP_VERSION__}, a desktop SSH client.`,
+    `UI language: ${detectLocale()}.`,
+    sessions.length === 0
+      ? "No terminal sessions are open."
+      : `Open terminal sessions: ${JSON.stringify(
+          sessions.map((s) => ({
+            id: s.id,
+            host: s.title,
+            status: s.status,
+            focused: s.id === focusedId,
+          })),
+        )}`,
+  ];
+  return lines.join("\n");
 }
 
 /** Reconstruct a renderable log from a persisted canonical history. */
@@ -208,15 +241,74 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     }));
   };
 
+  /** Append `text` to the streaming assistant bubble, creating it lazily. */
+  const appendDelta = (sessionId: string, itemId: string, text: string) => {
+    patch(sessionId, (r) => {
+      const existing = r.log.find((i) => i.id === itemId);
+      if (!existing) {
+        return {
+          ...r,
+          log: [...r.log, { id: itemId, kind: "assistant", content: text }],
+        };
+      }
+      return {
+        ...r,
+        log: r.log.map((i) =>
+          i.id === itemId && i.kind === "assistant"
+            ? { ...i, content: i.content + text }
+            : i,
+        ),
+      };
+    });
+  };
+
+  const stopped = (sessionId: string) =>
+    get().runtime[sessionId]?.stopRequested ?? false;
+
   const runLoop = async (sessionId: string, model: string) => {
     for (let step = 0; step < MAX_STEPS; step++) {
       const runtime = get().runtime[sessionId];
       // Session was deleted out from under a still-running loop — stop
       // quietly rather than throwing on the missing runtime slice.
       if (!runtime) return;
-      const result = await ipc.ai.chat(model, runtime.history, AI_TOOL_SPECS);
-      const toolCalls = result.toolCalls ?? [];
 
+      const requestId = crypto.randomUUID();
+      const streamItemId = crypto.randomUUID();
+      patch(sessionId, (r) => ({ ...r, requestId }));
+
+      // Ignore any delta that straggles in after the turn has resolved —
+      // the returned result is authoritative and already rendered by then.
+      let turnDone = false;
+      let result;
+      try {
+        result = await ipc.ai.chat(model, runtime.history, AI_TOOL_SPECS, {
+          context: buildContext(),
+          requestId,
+          onDelta: (text) => {
+            if (!turnDone) appendDelta(sessionId, streamItemId, text);
+          },
+        });
+      } catch (err) {
+        turnDone = true;
+        if (errorCode(err) !== "cancelled") throw err;
+        // Stopped mid-stream: keep whatever text already streamed, both on
+        // screen and in the canonical history, then wind down quietly.
+        const partial = get()
+          .runtime[sessionId]?.log.find((i) => i.id === streamItemId);
+        if (partial?.kind === "assistant" && partial.content) {
+          patch(sessionId, (r) => ({
+            ...r,
+            history: [
+              ...r.history,
+              { role: "assistant", content: partial.content },
+            ],
+          }));
+        }
+        return;
+      }
+
+      turnDone = true;
+      const toolCalls = result.toolCalls ?? [];
       patch(sessionId, (r) => ({
         ...r,
         history: [
@@ -227,22 +319,49 @@ export const useAiStore = create<AiStoreState>((set, get) => {
             toolCalls: toolCalls.length ? toolCalls : undefined,
           },
         ],
+        // The final content is authoritative: replace the streamed bubble's
+        // text with it (they only differ in whitespace normalization), or
+        // add the bubble now if nothing streamed (e.g. tool-calls-only turn
+        // from a provider that still sent text at once).
         log: result.content
-          ? [
-              ...r.log,
-              {
-                id: crypto.randomUUID(),
-                kind: "assistant",
-                content: result.content,
-              },
-            ]
-          : r.log,
+          ? r.log.some((i) => i.id === streamItemId)
+            ? r.log.map((i) =>
+                i.id === streamItemId && i.kind === "assistant"
+                  ? { ...i, content: result.content! }
+                  : i,
+              )
+            : [
+                ...r.log,
+                {
+                  id: streamItemId,
+                  kind: "assistant",
+                  content: result.content,
+                },
+              ]
+          : r.log.filter((i) => i.id !== streamItemId),
       }));
 
       if (toolCalls.length === 0) return;
       for (const call of toolCalls) {
+        if (stopped(sessionId)) {
+          // Keep the conversation protocol-valid: every requested call gets
+          // a result, even when the user aborted the run.
+          patch(sessionId, (r) => ({
+            ...r,
+            history: [
+              ...r.history,
+              {
+                role: "tool",
+                toolCallId: call.id,
+                content: "The user stopped this run before the call executed.",
+              },
+            ],
+          }));
+          continue;
+        }
         await runToolCall(sessionId, call);
       }
+      if (stopped(sessionId)) return;
     }
     patch(sessionId, (r) => ({
       ...r,
@@ -284,6 +403,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
             history: session.messages,
             log: buildLogFromHistory(session.messages),
             pending: false,
+            requestId: null,
+            stopRequested: false,
           },
         },
       }));
@@ -303,7 +424,13 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         ],
         runtime: {
           ...s.runtime,
-          [session.id]: { history: [], log: [], pending: false },
+          [session.id]: {
+            history: [],
+            log: [],
+            pending: false,
+            requestId: null,
+            stopRequested: false,
+          },
         },
         activeId: session.id,
       }));
@@ -350,6 +477,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       patch(sessionId, (r) => ({
         ...r,
         pending: true,
+        stopRequested: false,
         log: [
           ...r.log,
           { id: crypto.randomUUID(), kind: "user", content: trimmed },
@@ -374,9 +502,26 @@ export const useAiStore = create<AiStoreState>((set, get) => {
           ],
         }));
       } finally {
-        patch(sessionId, (r) => ({ ...r, pending: false }));
+        patch(sessionId, (r) => ({
+          ...r,
+          pending: false,
+          requestId: null,
+          stopRequested: false,
+        }));
         void persist(sessionId, title);
       }
+    },
+
+    stop: (sessionId) => {
+      const runtime = get().runtime[sessionId];
+      if (!runtime?.pending) return;
+      patch(sessionId, (r) => ({ ...r, stopRequested: true }));
+      // Abort the in-flight request (it rejects with `cancelled`) …
+      if (runtime.requestId) void ipc.ai.cancel(runtime.requestId);
+      // … and resolve any approval the loop is currently blocked on.
+      const approvals = get().approvals;
+      for (const resolve of approvals.values()) resolve(false);
+      approvals.clear();
     },
 
     approve: (toolLogId) => {

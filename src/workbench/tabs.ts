@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { useTerminalSearch } from "@/features/terminal/search";
 import { ipc } from "@/lib/ipc";
 import type { Host, SshStatusKind } from "@/types/models";
 
@@ -139,6 +140,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const tab = get().tabs.find((t) => t.id === id);
     if (tab && isTerminal(tab)) {
       void ipc.ssh.disconnect(id).catch(() => {});
+      const search = useTerminalSearch.getState();
+      if (search.openFor === id) search.close();
     }
     set((s) => {
       const index = s.tabs.findIndex((t) => t.id === id);

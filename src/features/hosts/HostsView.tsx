@@ -326,7 +326,7 @@ function HostRow({
       <ContextMenuTrigger asChild>
         <div
           onDoubleClick={() => openTerminal(host)}
-          className="group flex cursor-default items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover"
+          className="group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover"
         >
           <span
             className={cn(

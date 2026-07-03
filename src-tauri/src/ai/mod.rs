@@ -7,7 +7,9 @@
 //! selector, so any service implementing one of those two formats works.
 //!
 //! Both protocols expose a models-list endpoint (`/models`), which the UI calls
-//! to populate the chat-window model picker. Requests are non-streaming.
+//! to populate the chat-window model picker. Chat requests stream (SSE): text
+//! deltas are surfaced through a callback as they arrive, while the complete
+//! turn — including any tool calls — is accumulated and returned at the end.
 //!
 //! This module only speaks a *canonical*, provider-agnostic conversation
 //! format ([`ChatMessage`], [`ToolSpec`], [`ChatResult`]) and translates it to
@@ -43,7 +45,8 @@ Use tools proactively and iteratively — read before acting, act, then read aga
 instead of guessing. When you give a command you are NOT running yourself, still put it in a \
 fenced code block so the user can run or copy it. Prefer safe, portable, widely-available \
 commands, and call out anything destructive or risky before doing it. Do not invent \
-server-specific details you weren't given or shown by a tool. Keep replies concise.";
+server-specific details you weren't given or shown by a tool. Keep replies concise. \
+Always reply in the user's own language.";
 
 /// One role in a canonical conversation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,6 +104,15 @@ pub struct ChatResult {
     pub content: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<ToolCall>,
+}
+
+/// Incremental event pushed to the frontend while a chat turn streams.
+/// Only assistant text streams; tool calls are delivered whole via the
+/// final [`ChatResult`] once their JSON arguments are complete.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum StreamEvent {
+    Text { text: String },
 }
 
 /// Wire format spoken by the configured endpoint.
@@ -172,37 +184,96 @@ pub async fn list_models(ep: &Endpoint<'_>) -> AppResult<Vec<String>> {
 }
 
 /// Send a canonical conversation (plus the tools the model may call) and
-/// return its next turn. [`SYSTEM_PROMPT`] is always prepended, so `messages`
-/// should only ever contain `user`/`assistant`/`tool` entries.
+/// stream its next turn: `on_text` fires for each assistant text delta as it
+/// arrives, and the accumulated turn (text + tool calls) is returned whole.
+///
+/// [`SYSTEM_PROMPT`] is always prepended (with `context` — a snapshot of the
+/// user's workspace: open sessions, UI language, app version — appended to
+/// it), so `messages` should only ever contain `user`/`assistant`/`tool`
+/// entries.
 pub async fn chat(
     ep: &Endpoint<'_>,
     model: &str,
     messages: &[ChatMessage],
     tools: &[ToolSpec],
+    context: Option<&str>,
+    mut on_text: impl FnMut(&str),
 ) -> AppResult<ChatResult> {
+    let mut system = SYSTEM_PROMPT.to_string();
+    if let Some(ctx) = context.filter(|c| !c.trim().is_empty()) {
+        system.push_str("\n\n# Current workspace context\n");
+        system.push_str(ctx);
+    }
+
     let mut full = Vec::with_capacity(messages.len() + 1);
     full.push(ChatMessage {
         role: Role::System,
-        content: Some(SYSTEM_PROMPT.to_string()),
+        content: Some(system),
         tool_calls: Vec::new(),
         tool_call_id: None,
     });
     full.extend_from_slice(messages);
 
-    let (path, body) = match ep.protocol {
+    let (path, mut body) = match ep.protocol {
         Protocol::Openai => (
             "/chat/completions",
             openai::request_body(model, &full, tools),
         ),
         Protocol::Anthropic => ("/v1/messages", anthropic::request_body(model, &full, tools)),
     };
+    body["stream"] = serde_json::json!(true);
 
     let req = ep.authorize(reqwest::Client::new().post(ep.url(path)).json(&body));
-    let bytes = send(req).await?;
+    let mut response = req
+        .send()
+        .await
+        .map_err(|e| AppError::Other(format!("request failed: {e}")))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| AppError::Other(format!("failed to read response: {e}")))?;
+        let message = serde_json::from_slice::<ApiError>(&bytes)
+            .map(|e| e.error.message)
+            .unwrap_or_else(|_| format!("AI request failed with status {status}"));
+        return Err(AppError::Other(message));
+    }
+
+    // Both wire formats stream as server-sent events: newline-separated
+    // `data: <json>` lines (Anthropic adds `event:` lines we can ignore —
+    // each data payload restates its own `type`). Chunks can split a line
+    // anywhere, so buffer bytes and only process complete lines.
+    let mut openai_acc = openai::StreamAccumulator::default();
+    let mut anthropic_acc = anthropic::StreamAccumulator::default();
+    let mut buf: Vec<u8> = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|e| AppError::Other(format!("stream interrupted: {e}")))?
+    {
+        buf.extend_from_slice(&chunk);
+        while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+            let line: Vec<u8> = buf.drain(..=pos).collect();
+            let line = String::from_utf8_lossy(&line);
+            let Some(data) = line.trim().strip_prefix("data:") else {
+                continue;
+            };
+            let data = data.trim();
+            if data.is_empty() || data == "[DONE]" {
+                continue;
+            }
+            match ep.protocol {
+                Protocol::Openai => openai_acc.feed(data, &mut on_text),
+                Protocol::Anthropic => anthropic_acc.feed(data, &mut on_text)?,
+            }
+        }
+    }
 
     match ep.protocol {
-        Protocol::Openai => openai::parse_chat(&bytes),
-        Protocol::Anthropic => anthropic::parse_chat(&bytes),
+        Protocol::Openai => openai_acc.finish(),
+        Protocol::Anthropic => anthropic_acc.finish(),
     }
 }
 

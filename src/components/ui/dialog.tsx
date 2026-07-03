@@ -1,4 +1,4 @@
-import type * as React from "react";
+import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
@@ -46,6 +46,9 @@ function DialogOverlay({
   );
 }
 
+/** Viewport margin a dragged dialog can never cross. */
+const DRAG_MARGIN = 8;
+
 function DialogContent({
   className,
   children,
@@ -56,14 +59,80 @@ function DialogContent({
   showClose?: boolean;
   ref?: React.Ref<React.ComponentRef<typeof DialogPrimitive.Content>>;
 }) {
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  // Offset from the centered position, applied via transform. State lives in
+  // the content (which unmounts on close), so every open starts centered.
+  const [offset, setOffset] = React.useState({ x: 0, y: 0 });
+
+  const setRefs = (node: HTMLDivElement | null) => {
+    contentRef.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  };
+
+  /**
+   * Dragging the header/toolbar moves the dialog (native-window style),
+   * clamped so it always stays fully inside the viewport. Interactive
+   * elements inside the header keep their normal behavior.
+   */
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (
+      !target.closest('[data-slot="dialog-header"], [data-slot="dialog-toolbar"]') ||
+      target.closest("button, input, textarea, select, a, [role='combobox']")
+    ) {
+      return;
+    }
+    const el = contentRef.current;
+    if (!el) return;
+    e.preventDefault();
+
+    const rect = el.getBoundingClientRect();
+    // The handler is re-created each render, so `offset` is current here.
+    const base = offset;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const clampMove = (value: number, lo: number, hi: number) =>
+      Math.min(Math.max(value, lo), Math.max(lo, hi));
+
+    const onMove = (ev: PointerEvent) => {
+      const mx = clampMove(
+        ev.clientX - startX,
+        DRAG_MARGIN - rect.left,
+        window.innerWidth - DRAG_MARGIN - rect.right,
+      );
+      const my = clampMove(
+        ev.clientY - startY,
+        DRAG_MARGIN - rect.top,
+        window.innerHeight - DRAG_MARGIN - rect.bottom,
+      );
+      setOffset({ x: base.x + mx, y: base.y + my });
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        ref={ref}
+        ref={setRefs}
         data-slot="dialog-content"
+        onPointerDown={onPointerDown}
+        style={{
+          transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
+        }}
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4",
+          // Height follows content; the viewport is the hard ceiling, with
+          // the overflow scrolling inside the dialog (VSCode-style).
+          "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100vh-4rem)] w-full max-w-lg gap-4 overflow-y-auto",
           "rounded-lg border border-border bg-popover p-6 text-popover-foreground shadow-md",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           className,

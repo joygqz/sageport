@@ -191,7 +191,7 @@ function PaletteRow({
       onPointerMove={onHover}
       onClick={onSelect}
       className={cn(
-        "flex cursor-default items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
+        "flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
         highlighted
           ? "bg-list-active text-list-active-foreground"
           : "text-foreground",
