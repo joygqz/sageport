@@ -1,7 +1,7 @@
 import type { Dictionary } from "./en";
 
 /**
- * 简体中文词典。文案风格与英文一致，参考 GitHub 中文文案，
+ * 简体中文词典。文案风格与英文一致，参考 GitHub 中文文案。
  */
 export const zhCN: Dictionary = {
   common: {
@@ -45,7 +45,7 @@ export const zhCN: Dictionary = {
   watermark: {
     quickConnect: "连接主机",
     commands: "显示所有命令",
-    newHost: "添加主机",
+    newHost: "新建主机",
     settings: "打开设置",
   },
 
@@ -63,8 +63,8 @@ export const zhCN: Dictionary = {
       preferences: "偏好设置",
       theme: "主题",
     },
-    host: { new: "添加主机" },
-    group: { new: "添加分组" },
+    host: { new: "新建主机" },
+    group: { new: "新建分组" },
     view: {
       toggleSidebar: "显示或隐藏侧边栏",
       togglePanel: "显示或隐藏文件传输面板",
@@ -104,8 +104,8 @@ export const zhCN: Dictionary = {
     search: {
       placeholder: "查找",
       noResults: "无结果",
-      previous: "上一个匹配",
-      next: "下一个匹配",
+      previous: "上一个匹配项",
+      next: "下一个匹配项",
       close: "关闭查找",
     },
   },
@@ -115,7 +115,7 @@ export const zhCN: Dictionary = {
     filterPlaceholder: "筛选主机",
     newHost: "新建主机",
     newGroup: "新建分组",
-    noMatches: "没有符合条件的主机",
+    noMatches: "没有匹配的主机",
     empty: {
       title: "暂无主机",
       description: "添加主机后即可开始终端会话。",
@@ -189,7 +189,7 @@ export const zhCN: Dictionary = {
       nameRequired: "名称为必填项",
       algorithmLabel: "算法",
       algorithm: {
-        ed25519: "Ed25519，推荐",
+        ed25519: "Ed25519（推荐）",
         rsa2048: "RSA 2048",
         rsa4096: "RSA 4096",
         ecdsaP256: "ECDSA P-256",
@@ -210,13 +210,13 @@ export const zhCN: Dictionary = {
       generateAction: "生成密钥",
       importAction: "保存密钥",
       copyPublicKey: "复制公钥",
-      empty: "暂无密钥，生成或导入一个即可使用。",
+      empty: "暂无密钥，可生成新密钥或导入已有密钥。",
       addError: "保存密钥失败",
       delete: {
         title: "删除密钥",
         description: "将永久删除 {name}，此操作无法撤销。",
         error: "删除密钥失败",
-        inUse: "该密钥仍被主机或身份使用，请先在相关配置中解除引用后再删除。",
+        inUse: "该密钥仍被主机或身份使用，请先为它们改用其他凭据再删除。",
       },
     },
     identities: {
@@ -232,14 +232,14 @@ export const zhCN: Dictionary = {
       passwordKeepHint: "留空则保留当前密码。",
       sshKey: "SSH 密钥",
       noKeysHint: "使用密钥认证前请先添加 SSH 密钥。",
-      empty: "暂无身份。身份将用户名与认证方式打包，可在多台主机间复用。",
+      empty: "暂无身份。身份将用户名与认证方式组合，可供多台主机共用同一登录。",
       nameUsernameRequired: "名称和用户名为必填项",
       saveError: "保存身份失败",
       delete: {
         title: "删除身份",
         description: "将永久删除 {name}，此操作无法撤销。",
         error: "删除身份失败",
-        inUse: "该身份仍被主机使用，请先在主机配置中解除引用后再删除。",
+        inUse: "该身份仍被主机使用，请先为这些主机改用其他凭据再删除。",
       },
     },
   },
@@ -276,16 +276,16 @@ export const zhCN: Dictionary = {
     hidePanel: "隐藏面板",
     local: "本地",
     newTab: "新建标签页",
-    up: "上级目录",
+    up: "上级文件夹",
     refresh: "刷新",
-    pathPlaceholder: "输入路径后按回车跳转",
+    pathPlaceholder: "输入路径后按回车",
     newFolder: "新建文件夹",
     rename: "重命名",
     open: "打开",
-    sendLeft: "复制到左侧",
-    sendRight: "复制到右侧",
-    sendLeftCompressed: "压缩后复制到左侧",
-    sendRightCompressed: "压缩后复制到右侧",
+    sendLeft: "复制到左侧窗格",
+    sendRight: "复制到右侧窗格",
+    sendLeftCompressed: "压缩后复制到左侧窗格",
+    sendRightCompressed: "压缩后复制到右侧窗格",
     phase: {
       compressing: "压缩中",
       transferring: "传输中",
@@ -365,17 +365,18 @@ export const zhCN: Dictionary = {
     },
     appearance: {
       themeTitle: "主题",
-      themeDescription: "选择 Sageport 的外观，每套主题都会同时应用到终端。",
+      themeDescription:
+        "选择 Sageport 的外观。每套主题都会应用到整个界面，包括终端。",
       language: "语言",
       languageHint: "设置应用的显示语言。",
       zoom: "缩放",
-      zoomHint: "整体缩放界面（包含终端）。快捷键：{keys}。",
+      zoomHint: "缩放整个界面，包括终端。快捷键：{keys}。",
       zoomIn: "放大",
       zoomOut: "缩小",
       zoomReset: "重置",
     },
     ai: {
-      title: "AI 服务",
+      title: "AI 服务商",
       description:
         "使用你自己的 API 密钥，支持 Anthropic 和任意 OpenAI 兼容接口。",
       protocolLabel: "接口格式",
@@ -405,7 +406,7 @@ export const zhCN: Dictionary = {
         description:
           "将数据备份到私密 GitHub Gist，使用你的口令进行端到端加密。",
         tokenLabel: "GitHub 访问令牌",
-        tokenHint: "仅需要 gist 权限。",
+        tokenHint: "仅需 gist 权限。",
         passphraseLabel: "保险库口令",
         passphraseHint: "所有设备需使用相同口令，口令不会离开本设备。",
         connectButton: "连接",
@@ -448,7 +449,8 @@ export const zhCN: Dictionary = {
       },
       file: {
         title: "文件备份",
-        description: "导出加密备份文件或从文件恢复，口令每次输入且不会被保存。",
+        description:
+          "导出加密备份文件或从文件恢复。每次操作都需输入口令，口令不会被保存。",
         passphraseDialogTitle: "输入备份口令",
         passphraseDialogConfirm: "继续",
       },
@@ -463,7 +465,7 @@ export const zhCN: Dictionary = {
         install: "下载并安装",
         downloading: "下载中",
         downloadingProgress: "下载中 {percent}%",
-        ready: "新版本 {version} 已准备就绪。",
+        ready: "新版本 {version} 已就绪。",
         readyBadge: "就绪",
         restart: "重启以更新",
         error: "检查更新失败。{message}",

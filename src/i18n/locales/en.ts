@@ -3,7 +3,7 @@
  * Its shape defines the `Dictionary` type, so every other locale is checked
  * against it and missing or extra keys surface as type errors.
  *
- * Copy style follows GitHub: sentence case, plain complete sentences,
+ * Copy style follows GitHub: sentence case, plain complete sentences.
  */
 export const en = {
   common: {
@@ -47,12 +47,12 @@ export const en = {
   watermark: {
     quickConnect: "Connect to a host",
     commands: "Show all commands",
-    newHost: "Add a host",
+    newHost: "New host",
     settings: "Open settings",
   },
 
   palette: {
-    quickPlaceholder: "Search hosts by name, address or user",
+    quickPlaceholder: "Search hosts by name, address, or username",
     commandsPlaceholder: "Search commands",
     noHosts: "No matching hosts",
     noCommands: "No matching commands",
@@ -65,8 +65,8 @@ export const en = {
       preferences: "Preferences",
       theme: "Theme",
     },
-    host: { new: "Add host" },
-    group: { new: "Add group" },
+    host: { new: "New host" },
+    group: { new: "New group" },
     view: {
       toggleSidebar: "Toggle side bar",
       togglePanel: "Toggle file transfer panel",
@@ -117,7 +117,7 @@ export const en = {
     filterPlaceholder: "Filter hosts",
     newHost: "New host",
     newGroup: "New group",
-    noMatches: "No hosts match your filter",
+    noMatches: "No matching hosts",
     empty: {
       title: "No hosts yet",
       description: "Add a host to start a terminal session.",
@@ -193,7 +193,7 @@ export const en = {
       nameRequired: "Name is required",
       algorithmLabel: "Algorithm",
       algorithm: {
-        ed25519: "Ed25519, recommended",
+        ed25519: "Ed25519 (recommended)",
         rsa2048: "RSA 2048",
         rsa4096: "RSA 4096",
         ecdsaP256: "ECDSA P-256",
@@ -286,14 +286,14 @@ export const en = {
     newTab: "New tab",
     up: "Parent folder",
     refresh: "Refresh",
-    pathPlaceholder: "Enter a path and press Enter",
+    pathPlaceholder: "Type a path and press Enter",
     newFolder: "New folder",
     rename: "Rename",
     open: "Open",
     sendLeft: "Copy to left pane",
     sendRight: "Copy to right pane",
-    sendLeftCompressed: "Copy to left pane compressed",
-    sendRightCompressed: "Copy to right pane compressed",
+    sendLeftCompressed: "Compress and copy to left pane",
+    sendRightCompressed: "Compress and copy to right pane",
     phase: {
       compressing: "compressing",
       transferring: "transferring",
@@ -376,7 +376,7 @@ export const en = {
     appearance: {
       themeTitle: "Theme",
       themeDescription:
-        "Choose how Sageport looks. Each theme styles the whole app including the terminal.",
+        "Choose how Sageport looks. Each theme styles the whole interface, including the terminal.",
       language: "Language",
       languageHint: "Sets the display language of the app.",
       zoom: "Zoom",
