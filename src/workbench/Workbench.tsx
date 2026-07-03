@@ -36,12 +36,17 @@ export function Workbench() {
   }, []);
 
   // Panels keep their share of a shrinking window in check (VSCode-style):
-  // resizing the window re-clamps every part so the editor never collapses.
+  // resizing the window or zooming the UI re-clamps every part so the editor
+  // never collapses (layout constraints scale with the zoom factor).
   useEffect(() => {
-    const onResize = () => useLayoutStore.getState().clampToViewport();
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    const reclamp = () => useLayoutStore.getState().clampToViewport();
+    reclamp();
+    window.addEventListener("resize", reclamp);
+    const unsubZoom = useZoomStore.subscribe(reclamp);
+    return () => {
+      window.removeEventListener("resize", reclamp);
+      unsubZoom();
+    };
   }, []);
 
   // Re-apply the persisted UI zoom level to the document root on launch.

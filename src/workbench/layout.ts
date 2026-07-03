@@ -1,32 +1,40 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { useZoomStore, zoomFactor } from "./zoom";
+
 /**
  * Workbench layout state: which activity view the side bar shows, and the
  * visibility/size of each dockable region. Persisted so the window comes
  * back exactly as the user left it.
  *
  * Sizing follows VSCode's model: every part has a hard minimum (so its
- * content never deforms), and maximums are computed against the live window
- * size so the editor always keeps a usable minimum area. Sizes re-clamp on
- * window resize instead of overflowing.
+ * content never deforms) and no fixed maximum — a part may grow until the
+ * editor and the other parts are squeezed down to their own minimums. Sizes
+ * re-clamp on window resize and zoom change instead of overflowing.
+ *
+ * All constants are CSS px at zoom level 0. The UI zooms by scaling the root
+ * font-size, so every constraint is multiplied by the same zoom factor
+ * before use — a minimum then always guarantees the same amount of content,
+ * not the same amount of screen.
  */
 
 export type Activity = "hosts" | "credentials" | "snippets";
 
-export const SIDEBAR_MIN = 180;
-export const SIDEBAR_MAX = 480;
-export const PANEL_MIN = 160;
-export const AUX_MIN = 300;
-export const AUX_MAX = 640;
+export const SIDEBAR_MIN = 170;
+export const PANEL_MIN = 100;
+export const AUX_MIN = 240;
 
 /** Fixed chrome that competes with the resizable parts for space. */
-const ACTIVITY_BAR_W = 48;
-const TITLE_BAR_H = 34;
-const STATUS_BAR_H = 24;
+const ACTIVITY_BAR_W = 45; // w-12 = 3rem
+const TITLE_BAR_H = 33.75; // h-9 = 2.25rem
+const STATUS_BAR_H = 22.5; // h-6 = 1.5rem
 /** The editor area never gives up more than this. */
-const EDITOR_MIN_W = 300;
-const EDITOR_MIN_H = 140;
+const EDITOR_MIN_W = 220;
+const EDITOR_MIN_H = 70;
+
+/** Live zoom factor scaling every rem-based size in the app. */
+const uiScale = () => zoomFactor(useZoomStore.getState().level);
 
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(value, max));
@@ -57,22 +65,30 @@ interface LayoutState {
 
 /** Horizontal space the editor + the *other* horizontal part leave over. */
 function maxWidthFor(other: number): number {
-  return Math.max(0, window.innerWidth - ACTIVITY_BAR_W - EDITOR_MIN_W - other);
+  return Math.max(
+    0,
+    window.innerWidth - (ACTIVITY_BAR_W + EDITOR_MIN_W) * uiScale() - other,
+  );
 }
 
 function clampSidebar(width: number, s: { auxVisible: boolean; auxWidth: number }) {
+  const min = SIDEBAR_MIN * uiScale();
   const roomMax = maxWidthFor(s.auxVisible ? s.auxWidth : 0);
-  return clamp(width, SIDEBAR_MIN, Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, roomMax)));
+  return clamp(width, min, Math.max(min, roomMax));
 }
 
 function clampAux(width: number, s: { sidebarVisible: boolean; sidebarWidth: number }) {
+  const min = AUX_MIN * uiScale();
   const roomMax = maxWidthFor(s.sidebarVisible ? s.sidebarWidth : 0);
-  return clamp(width, AUX_MIN, Math.max(AUX_MIN, Math.min(AUX_MAX, roomMax)));
+  return clamp(width, min, Math.max(min, roomMax));
 }
 
 function clampPanel(height: number) {
-  const roomMax = window.innerHeight - TITLE_BAR_H - STATUS_BAR_H - EDITOR_MIN_H;
-  return clamp(height, PANEL_MIN, Math.max(PANEL_MIN, roomMax));
+  const min = PANEL_MIN * uiScale();
+  const roomMax =
+    window.innerHeight -
+    (TITLE_BAR_H + STATUS_BAR_H + EDITOR_MIN_H) * uiScale();
+  return clamp(height, min, Math.max(min, roomMax));
 }
 
 export const useLayoutStore = create<LayoutState>()(

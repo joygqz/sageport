@@ -211,8 +211,13 @@ function StatusOverlay({
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/85 backdrop-blur-sm">
-      {children}
+    // `m-auto` instead of justify/items-center: when the pane is smaller
+    // than the status content, auto margins collapse to zero and the content
+    // clips at one edge instead of spilling out or squashing the icon.
+    <div className="absolute inset-0 z-10 flex overflow-hidden bg-background/85 backdrop-blur-sm">
+      <div className="m-auto flex flex-col items-center gap-3 p-3">
+        {children}
+      </div>
     </div>
   );
 }

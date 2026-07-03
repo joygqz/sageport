@@ -166,7 +166,9 @@ export const useSftpStore = create<SftpState>((set, get) => {
     panes: { left: emptyPane(), right: emptyPane() },
     transfers: {},
 
-    setRatio: (r) => set({ ratio: Math.max(0.2, Math.min(r, 0.8)) }),
+    // The px-based pane minimum is enforced at the drag site (SftpPanel),
+    // where the container width is known; this only guards the invariant.
+    setRatio: (r) => set({ ratio: Math.max(0, Math.min(r, 1)) }),
 
     addLocalTab: async (side) => {
       const id = crypto.randomUUID();

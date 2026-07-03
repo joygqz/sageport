@@ -76,7 +76,7 @@ export function EditorArea() {
         </Tooltip>
       </div>
 
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         {tabs.map((tab) => (
           <div
             key={tab.id}
@@ -186,8 +186,11 @@ function Watermark() {
   ];
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center bg-background">
-      <div className="flex flex-col gap-2.5">
+    // `m-auto` instead of justify/items-center: when the area is smaller
+    // than the hints, auto margins collapse to zero and the content clips at
+    // one edge instead of spilling out past both.
+    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
+      <div className="m-auto flex flex-col gap-2.5 p-3">
         {hints.map((hint) => (
           <div
             key={hint.label}

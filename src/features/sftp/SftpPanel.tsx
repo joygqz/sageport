@@ -5,9 +5,13 @@ import { Button, Tooltip } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/workbench/layout";
+import { useZoomStore, zoomFactor } from "@/workbench/zoom";
 import { FilePane } from "./FilePane";
 import { useSftpStore } from "./store";
 import { TransferHistoryDialog } from "./TransferHistoryDialog";
+
+/** Minimum width of one file pane, in CSS px at zoom level 0. */
+const PANE_MIN_W = 200;
 
 /**
  * The bottom panel: a dual-pane file browser (local or SFTP on either
@@ -36,8 +40,16 @@ export function SftpPanel({ height }: { height: number }) {
     e.preventDefault();
     const onMove = (ev: PointerEvent) => {
       const rect = bodyRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setRatio((ev.clientX - rect.left) / rect.width);
+      if (!rect || rect.width === 0) return;
+      // Each pane keeps a usable minimum width (in px, so it holds at any
+      // panel size, and zoom-scaled like every layout constraint). When the
+      // panel is too narrow for two minimums the divider stays centered.
+      const min = Math.min(
+        (PANE_MIN_W * zoomFactor(useZoomStore.getState().level)) / rect.width,
+        0.5,
+      );
+      const ratio = (ev.clientX - rect.left) / rect.width;
+      setRatio(Math.max(min, Math.min(ratio, 1 - min)));
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
