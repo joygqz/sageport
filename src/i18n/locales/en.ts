@@ -4,7 +4,6 @@
  * against it and missing or extra keys surface as type errors.
  *
  * Copy style follows GitHub: sentence case, plain complete sentences,
- * commas and periods only.
  */
 export const en = {
   common: {

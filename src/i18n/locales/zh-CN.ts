@@ -2,7 +2,6 @@ import type { Dictionary } from "./en";
 
 /**
  * 简体中文词典。文案风格与英文一致，参考 GitHub 中文文案，
- * 句子完整简洁，只使用逗号和句号。
  */
 export const zhCN: Dictionary = {
   common: {
