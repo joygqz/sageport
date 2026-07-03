@@ -38,7 +38,8 @@ function DialogOverlay({
       ref={ref}
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 backdrop-blur-sm",
+        "fixed inset-0 z-50 bg-black/50",
+        "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         className,
       )}
       {...props}
@@ -126,15 +127,23 @@ function DialogContent({
         ref={setRefs}
         data-slot="dialog-content"
         onPointerDown={onPointerDown}
+        // Centering + drag offset live on the CSS `translate` property, NOT
+        // `transform`: the enter/exit animations animate `transform`, and a
+        // keyframe would override an inline transform for their duration —
+        // the dialog would lose its centering while animating (appearing to
+        // shrink toward the bottom-right). `translate` composes with the
+        // animated transform instead, so the dialog stays put and the zoom
+        // scales around its own center.
         style={{
-          transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
+          translate: `calc(-50% + ${offset.x}px) calc(-50% + ${offset.y}px)`,
         }}
         className={cn(
           // Height follows content; the viewport is the hard ceiling, with
           // the overflow scrolling inside the dialog (VSCode-style).
           "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100vh-4rem)] w-full max-w-lg gap-4 overflow-y-auto",
           "rounded-lg border border-border bg-popover p-6 text-popover-foreground shadow-md",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           className,
         )}
         {...props}
