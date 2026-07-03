@@ -1,14 +1,30 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 
 import { AppProviders } from "@/app/providers";
-import App from "@/App";
-import { GroupsWindow } from "@/windows/GroupsWindow";
-import { HostFormWindow } from "@/windows/HostFormWindow";
-import { SettingsWindow } from "@/windows/SettingsWindow";
 import "@/styles/globals.css";
 
-/** Each window loads this same bundle with a `#/<view>?id=…` hash. */
+/* eslint-disable react-refresh/only-export-components -- entry point, never itself hot-reloaded */
+const App = lazy(() => import("@/App"));
+const GroupsWindow = lazy(() =>
+  import("@/windows/GroupsWindow").then((m) => ({ default: m.GroupsWindow })),
+);
+const HostFormWindow = lazy(() =>
+  import("@/windows/HostFormWindow").then((m) => ({
+    default: m.HostFormWindow,
+  })),
+);
+const SettingsWindow = lazy(() =>
+  import("@/windows/SettingsWindow").then((m) => ({
+    default: m.SettingsWindow,
+  })),
+);
+
+/**
+ * Each Tauri window loads this same bundle with a `#/<view>?id=…` hash. The
+ * views are lazy-imported so a popup window (e.g. settings) doesn't have to
+ * download the main window's terminal/markdown dependencies.
+ */
 function resolveView() {
   const raw = window.location.hash.replace(/^#\/?/, "");
   const [view, qs] = raw.split("?");
@@ -28,6 +44,8 @@ function resolveView() {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <AppProviders>{resolveView()}</AppProviders>
+    <AppProviders>
+      <Suspense fallback={null}>{resolveView()}</Suspense>
+    </AppProviders>
   </React.StrictMode>,
 );
