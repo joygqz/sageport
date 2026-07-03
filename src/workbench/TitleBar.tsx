@@ -49,10 +49,13 @@ export function TitleBar() {
         data-tauri-drag-region
         className="flex h-full items-center justify-end"
       >
+        {/* Same metrics as the panel-header action rows below (size-6
+            buttons, gap-0.5, right padding pr-2), so this column of icons
+            lines up with the AI panel's actions on the same right edge. */}
         <div
           className={cn(
-            "flex items-center gap-1 pl-1.5",
-            IS_MACOS ? "pr-3" : "pr-1.5",
+            "flex items-center gap-0.5 pl-1.5",
+            IS_MACOS ? "pr-2" : "pr-1",
           )}
         >
           <LayoutToggle
@@ -93,7 +96,7 @@ function LayoutToggle({
         onClick={onClick}
         aria-pressed={active}
         className={cn(
-          "flex size-6 items-center justify-center rounded transition-colors",
+          "flex size-6 items-center justify-center rounded-md transition-colors",
           active
             ? "bg-accent text-accent-foreground"
             : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
