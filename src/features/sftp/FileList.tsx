@@ -105,6 +105,11 @@ export function FileList({
   return (
     <ScrollArea className="min-h-0 flex-1">
       <table className="w-full table-fixed border-collapse text-xs">
+        <colgroup>
+          <col />
+          <col className="w-14" />
+          <col className="w-30" />
+        </colgroup>
         <tbody>
           {canGoUp && (
             <tr
@@ -154,16 +159,16 @@ export function FileList({
                         selected ? "bg-primary/15" : "hover:bg-accent",
                       )}
                     >
-                      <td className="truncate px-2 py-1">
-                        <span className="inline-flex items-center gap-2">
+                      <td className="truncate py-1 pl-2 pr-1">
+                        <span className="inline-flex max-w-full items-center gap-2">
                           <EntryIcon entry={entry} />
                           <span className="truncate">{entry.name}</span>
                         </span>
                       </td>
-                      <td className="w-24 px-2 py-1 text-right text-muted-foreground">
+                      <td className="truncate px-1 py-1 text-right text-muted-foreground">
                         {entry.kind === "dir" ? "" : formatSize(entry.size)}
                       </td>
-                      <td className="w-36 px-2 py-1 text-right text-muted-foreground">
+                      <td className="truncate py-1 pl-1 pr-2 text-right text-muted-foreground">
                         {formatTime(entry.modified)}
                       </td>
                     </tr>
