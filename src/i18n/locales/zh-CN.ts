@@ -42,6 +42,13 @@ export const zhCN: Dictionary = {
     settings: "设置",
   },
 
+  windowControls: {
+    minimize: "最小化",
+    maximize: "最大化",
+    restore: "还原",
+    close: "关闭",
+  },
+
   sftp: {
     title: "文件传输",
     hide: "隐藏面板",

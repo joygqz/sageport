@@ -44,6 +44,13 @@ export const en = {
     settings: "Settings",
   },
 
+  windowControls: {
+    minimize: "Minimize",
+    maximize: "Maximize",
+    restore: "Restore",
+    close: "Close",
+  },
+
   sftp: {
     title: "File transfer",
     hide: "Hide panel",

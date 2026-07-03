@@ -2,10 +2,15 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button, Field, Input } from "@/components/ui";
+import { WindowHeader } from "@/components/layout/WindowHeader";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { closeSelf, emitRefresh } from "@/lib/windows";
-import { useCreateGroup, useGroups, useUpdateGroup } from "@/features/hosts/api";
+import {
+  useCreateGroup,
+  useGroups,
+  useUpdateGroup,
+} from "@/features/hosts/api";
 
 interface FormValues {
   name: string;
@@ -51,28 +56,40 @@ export function GroupsWindow({ groupId }: { groupId: string | null }) {
   });
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="flex h-full flex-col gap-4 bg-background p-5"
-    >
-      <Field label={t("groups.nameLabel")} error={errors.name?.message} required>
-        <Input
-          placeholder={t("groups.namePlaceholder")}
-          {...register("name", { required: t("groups.nameRequired") })}
-        />
-      </Field>
-
-      <div className="mt-auto flex justify-end gap-2 pt-2">
-        <Button type="button" variant="ghost" onClick={() => closeSelf()}>
-          {t("common.cancel")}
-        </Button>
-        <Button
-          type="submit"
-          loading={createGroup.isPending || updateGroup.isPending}
+    <div className="flex h-full flex-col bg-background">
+      <WindowHeader
+        title={
+          groupId ? t("windowTitles.editGroup") : t("windowTitles.newGroup")
+        }
+        resizable={false}
+      />
+      <form
+        onSubmit={onSubmit}
+        className="flex min-h-0 flex-1 flex-col gap-4 p-5"
+      >
+        <Field
+          label={t("groups.nameLabel")}
+          error={errors.name?.message}
+          required
         >
-          {groupId ? t("common.save") : t("common.add")}
-        </Button>
-      </div>
-    </form>
+          <Input
+            placeholder={t("groups.namePlaceholder")}
+            {...register("name", { required: t("groups.nameRequired") })}
+          />
+        </Field>
+
+        <div className="mt-auto flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={() => closeSelf()}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            loading={createGroup.isPending || updateGroup.isPending}
+          >
+            {groupId ? t("common.save") : t("common.add")}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }

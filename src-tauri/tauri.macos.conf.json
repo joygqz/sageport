@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "title": "Sageport",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 880,
+        "minHeight": 560,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 20, "y": 20 }
+      }
+    ]
+  }
+}

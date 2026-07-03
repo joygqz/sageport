@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Button, Field, Input, Select } from "@/components/ui";
+import { WindowHeader } from "@/components/layout/WindowHeader";
 import { LOCALE_LABELS, LOCALES, useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -32,13 +33,7 @@ import { SnippetsSection } from "@/features/snippets/SnippetsSection";
 import { SyncSection } from "@/features/sync/SyncSection";
 
 type SettingsSection =
-  | "appearance"
-  | "ai"
-  | "keys"
-  | "identities"
-  | "snippets"
-  | "sync"
-  | "about";
+  "appearance" | "ai" | "keys" | "identities" | "snippets" | "sync" | "about";
 
 export function SettingsWindow() {
   const { t } = useI18n();
@@ -60,12 +55,7 @@ export function SettingsWindow() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <header
-        data-tauri-drag-region
-        className="flex h-9 shrink-0 items-center border-b border-border bg-surface pl-24 text-sm font-medium text-surface-foreground"
-      >
-        {t("windowTitles.settings")}
-      </header>
+      <WindowHeader title={t("windowTitles.settings")} />
 
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-sidebar-border bg-sidebar p-2">

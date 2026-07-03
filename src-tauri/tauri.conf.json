@@ -10,7 +10,6 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Sageport",
@@ -18,9 +17,7 @@
         "height": 800,
         "minWidth": 880,
         "minHeight": 560,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "trafficLightPosition": { "x": 20, "y": 20 }
+        "decorations": false
       }
     ],
     "security": {

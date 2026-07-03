@@ -11,6 +11,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { Spinner } from "@/components/ui/spinner";
+import { WindowHeader } from "@/components/layout/WindowHeader";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
@@ -114,7 +115,8 @@ export function HostFormWindow({ hostId }: { hostId: string | null }) {
           keyId: values.authType === "key" ? values.keyId || null : null,
           // Always send the field value for password auth so clearing it
           // removes the stored secret; an empty string clears the column.
-          password: values.authType === "password" ? values.password : undefined,
+          password:
+            values.authType === "password" ? values.password : undefined,
         };
 
     try {
@@ -130,126 +132,147 @@ export function HostFormWindow({ hostId }: { hostId: string | null }) {
     }
   });
 
+  const title = hostId ? t("windowTitles.editHost") : t("windowTitles.newHost");
+
   if (hostId && isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-background">
-        <Spinner />
+      <div className="flex h-full flex-col bg-background">
+        <WindowHeader title={title} />
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner />
+        </div>
       </div>
     );
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="flex h-full flex-col gap-4 overflow-y-auto bg-background p-5"
-    >
-      <div className="grid grid-cols-2 gap-3">
-        <Field label={t("hostForm.label")} error={errors.label?.message} required>
-          <Input
-            placeholder={t("hostForm.labelPlaceholder")}
-            {...register("label", { required: t("hostForm.labelRequired") })}
-          />
-        </Field>
-        <Field label={t("hostForm.group")}>
-          <Select {...register("groupId")}>
-            <option value="">{t("hostForm.noGroup")}</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </div>
-
-      <div className="grid grid-cols-[1fr_7rem] gap-3">
-        <Field label={t("hostForm.address")} error={errors.address?.message} required>
-          <Input
-            placeholder={t("hostForm.addressPlaceholder")}
-            {...register("address", { required: t("hostForm.addressRequired") })}
-          />
-        </Field>
-        <Field label={t("hostForm.port")}>
-          <Input type="number" {...register("port")} />
-        </Field>
-      </div>
-
-      {identities.length > 0 && (
-        <Field
-          label={t("hostForm.credentials")}
-          hint={useIdentity ? t("hostForm.usingIdentityHint") : undefined}
-        >
-          <Select {...register("identityId")}>
-            <option value="">{t("hostForm.customCredentials")}</option>
-            {identities.map((id) => (
-              <option key={id.id} value={id.id}>
-                {id.name} ({id.username})
-              </option>
-            ))}
-          </Select>
-        </Field>
-      )}
-
-      {!useIdentity && (
+    <div className="flex h-full flex-col bg-background">
+      <WindowHeader title={title} />
+      <form
+        onSubmit={onSubmit}
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5"
+      >
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t("hostForm.username")}>
-            <Input placeholder={t("hostForm.usernamePlaceholder")} {...register("username")} />
+          <Field
+            label={t("hostForm.label")}
+            error={errors.label?.message}
+            required
+          >
+            <Input
+              placeholder={t("hostForm.labelPlaceholder")}
+              {...register("label", { required: t("hostForm.labelRequired") })}
+            />
           </Field>
-          <Field label={t("hostForm.authentication")}>
-            <Select {...register("authType")}>
-              <option value="password">{t("common.auth.password")}</option>
-              <option value="key">{t("common.auth.key")}</option>
-              <option value="agent">{t("common.auth.agent")}</option>
+          <Field label={t("hostForm.group")}>
+            <Select {...register("groupId")}>
+              <option value="">{t("hostForm.noGroup")}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
             </Select>
           </Field>
         </div>
-      )}
 
-      {!useIdentity && authType === "password" && (
-        <Field label={t("hostForm.password")}>
-          <PasswordInput
-            placeholder="••••••••"
-            autoComplete="off"
-            {...register("password")}
+        <div className="grid grid-cols-[1fr_7rem] gap-3">
+          <Field
+            label={t("hostForm.address")}
+            error={errors.address?.message}
+            required
+          >
+            <Input
+              placeholder={t("hostForm.addressPlaceholder")}
+              {...register("address", {
+                required: t("hostForm.addressRequired"),
+              })}
+            />
+          </Field>
+          <Field label={t("hostForm.port")}>
+            <Input type="number" {...register("port")} />
+          </Field>
+        </div>
+
+        {identities.length > 0 && (
+          <Field
+            label={t("hostForm.credentials")}
+            hint={useIdentity ? t("hostForm.usingIdentityHint") : undefined}
+          >
+            <Select {...register("identityId")}>
+              <option value="">{t("hostForm.customCredentials")}</option>
+              {identities.map((id) => (
+                <option key={id.id} value={id.id}>
+                  {id.name} ({id.username})
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
+        {!useIdentity && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t("hostForm.username")}>
+              <Input
+                placeholder={t("hostForm.usernamePlaceholder")}
+                {...register("username")}
+              />
+            </Field>
+            <Field label={t("hostForm.authentication")}>
+              <Select {...register("authType")}>
+                <option value="password">{t("common.auth.password")}</option>
+                <option value="key">{t("common.auth.key")}</option>
+                <option value="agent">{t("common.auth.agent")}</option>
+              </Select>
+            </Field>
+          </div>
+        )}
+
+        {!useIdentity && authType === "password" && (
+          <Field label={t("hostForm.password")}>
+            <PasswordInput
+              placeholder="••••••••"
+              autoComplete="off"
+              {...register("password")}
+            />
+          </Field>
+        )}
+
+        {!useIdentity && authType === "key" && (
+          <Field
+            label={t("hostForm.sshKey")}
+            hint={keys.length === 0 ? t("hostForm.noKeysHint") : undefined}
+          >
+            <Select {...register("keyId")}>
+              <option value="">{t("common.selectKey")}</option>
+              {keys.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
+        <Field label={t("hostForm.notes")}>
+          <Textarea
+            rows={2}
+            placeholder={t("hostForm.notesPlaceholder")}
+            {...register("notes")}
           />
         </Field>
-      )}
 
-      {!useIdentity && authType === "key" && (
-        <Field
-          label={t("hostForm.sshKey")}
-          hint={keys.length === 0 ? t("hostForm.noKeysHint") : undefined}
-        >
-          <Select {...register("keyId")}>
-            <option value="">{t("common.selectKey")}</option>
-            {keys.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      )}
-
-      <Field label={t("hostForm.notes")}>
-        <Textarea
-          rows={2}
-          placeholder={t("hostForm.notesPlaceholder")}
-          {...register("notes")}
-        />
-      </Field>
-
-      <div className="mt-auto flex justify-end gap-2 pt-2">
-        <Button type="button" variant="ghost" onClick={() => closeSelf()}>
-          {t("common.cancel")}
-        </Button>
-        <Button
-          type="submit"
-          loading={createHost.isPending || updateHost.isPending}
-        >
-          {hostId ? t("hostForm.saveChanges") : t("hostForm.createHost")}
-        </Button>
-      </div>
-    </form>
+        <div className="mt-auto flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={() => closeSelf()}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            loading={createHost.isPending || updateHost.isPending}
+          >
+            {hostId ? t("hostForm.saveChanges") : t("hostForm.createHost")}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }

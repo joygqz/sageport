@@ -7,6 +7,7 @@ import { emit } from "@tauri-apps/api/event";
 
 import { detectLocale } from "@/i18n/config";
 import { translate, type TKey } from "@/i18n/translate";
+import { IS_MACOS } from "@/lib/platform";
 
 /**
  * Multi-window helpers. Every "dialog" in the app is a real OS window that
@@ -65,14 +66,19 @@ async function openWindow(opts: OpenOptions) {
     minWidth: 360,
     minHeight: opts.height < 320 ? opts.height : 320,
     resizable: opts.resizable ?? true,
-    decorations: opts.decorations ?? true,
+    // macOS keeps its native inset traffic lights (titleBarStyle "overlay");
+    // every other platform draws its own via `WindowControls`, which needs
+    // `decorations: false` since those options are macOS-only.
+    decorations: opts.decorations ?? IS_MACOS,
     alwaysOnTop: opts.alwaysOnTop ?? false,
     transparent: opts.transparent ?? false,
     shadow: opts.shadow ?? true,
-    titleBarStyle: opts.titleBarStyle,
-    hiddenTitle: opts.hiddenTitle,
+    titleBarStyle: IS_MACOS ? opts.titleBarStyle : undefined,
+    hiddenTitle: IS_MACOS ? opts.hiddenTitle : undefined,
     trafficLightPosition:
-      opts.titleBarStyle === "overlay" ? TRAFFIC_LIGHT_POSITION : undefined,
+      IS_MACOS && opts.titleBarStyle === "overlay"
+        ? TRAFFIC_LIGHT_POSITION
+        : undefined,
     center: true,
     focus: true,
   });
@@ -99,6 +105,8 @@ export function openHostWindow(hostId?: string) {
     title: hostId ? title("windowTitles.editHost") : title("windowTitles.newHost"),
     width: 560,
     height: 620,
+    titleBarStyle: "overlay",
+    hiddenTitle: true,
   });
 }
 
@@ -113,6 +121,8 @@ export function openGroupsWindow(groupId?: string) {
     width: 420,
     height: 220,
     resizable: false,
+    titleBarStyle: "overlay",
+    hiddenTitle: true,
   });
 }
 
