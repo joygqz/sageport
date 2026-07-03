@@ -13,6 +13,12 @@ import { useZoomStore, zoomFactor } from "./zoom";
  * editor and the other parts are squeezed down to their own minimums. Sizes
  * re-clamp on window resize and zoom change instead of overflowing.
  *
+ * The side bar, bottom panel and auxiliary bar also snap closed like VSCode's:
+ * dragging their sash past the minimum pins the part at its minimum until
+ * the pointer crosses half the minimum, at which point the part hides;
+ * dragging back re-opens it (the drag listeners live on `window`, so the
+ * gesture survives the sash unmounting).
+ *
  * All constants are CSS px at zoom level 0. The UI zooms by scaling the root
  * font-size, so every constraint is multiplied by the same zoom factor
  * before use — a minimum then always guarantees the same amount of content,
@@ -110,12 +116,23 @@ export const useLayoutStore = create<LayoutState>()(
         ),
       toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
       setSidebarWidth: (width) =>
-        set((s) => ({ sidebarWidth: clampSidebar(width, s) })),
+        set((s) => ({
+          sidebarWidth: clampSidebar(width, s),
+          sidebarVisible: width >= (SIDEBAR_MIN * uiScale()) / 2,
+        })),
       togglePanel: () => set((s) => ({ panelVisible: !s.panelVisible })),
       setPanelVisible: (visible) => set({ panelVisible: visible }),
-      setPanelHeight: (height) => set({ panelHeight: clampPanel(height) }),
+      setPanelHeight: (height) =>
+        set({
+          panelHeight: clampPanel(height),
+          panelVisible: height >= (PANEL_MIN * uiScale()) / 2,
+        }),
       toggleAux: () => set((s) => ({ auxVisible: !s.auxVisible })),
-      setAuxWidth: (width) => set((s) => ({ auxWidth: clampAux(width, s) })),
+      setAuxWidth: (width) =>
+        set((s) => ({
+          auxWidth: clampAux(width, s),
+          auxVisible: width >= (AUX_MIN * uiScale()) / 2,
+        })),
 
       clampToViewport: () => {
         const s = get();

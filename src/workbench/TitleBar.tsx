@@ -68,14 +68,18 @@ export function TitleBar() {
             active={panelVisible}
             onClick={togglePanel}
           >
-            <PanelBottom className="size-4" />
+            {panelVisible
+              ? <PanelBottomFilled className="size-4" />
+              : <PanelBottom className="size-4" />}
           </LayoutToggle>
           <LayoutToggle
             label={t("titleBar.toggleAssistant")}
             active={auxVisible}
             onClick={toggleAux}
           >
-            <PanelRight className="size-4" />
+            {auxVisible
+              ? <PanelRightFilled className="size-4" />
+              : <PanelRight className="size-4" />}
           </LayoutToggle>
         </div>
         {!IS_MACOS && <WindowControls />}
@@ -100,15 +104,57 @@ function LayoutToggle({
       <button
         onClick={onClick}
         aria-pressed={active}
-        className={cn(
-          "flex size-6 items-center justify-center rounded-md transition-colors",
-          active
-            ? "bg-accent text-accent-foreground"
-            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-        )}
+        className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         {children}
       </button>
     </Tooltip>
+  );
+}
+
+// Filled counterparts of lucide's PanelBottom / PanelRight (same 24px
+// grid and stroke metrics). Visibility is conveyed VSCode-style: filled
+// section = open, outline = closed.
+function PanelBottomFilled({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path
+        d="M3 15h18v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  );
+}
+
+function PanelRightFilled({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path
+        d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
   );
 }

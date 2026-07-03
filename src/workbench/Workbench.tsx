@@ -81,16 +81,16 @@ export function Workbench() {
       <div className="flex min-h-0 flex-1">
         <ActivityBar />
 
-        {layout.sidebarVisible && (
-          <>
-            <SideBar width={layout.sidebarWidth} />
-            <ResizeHandle
-              axis="x"
-              size={layout.sidebarWidth}
-              onResize={layout.setSidebarWidth}
-            />
-          </>
-        )}
+        {layout.sidebarVisible && <SideBar width={layout.sidebarWidth} />}
+        {/* Kept mounted while the side bar is hidden (VSCode-style): the
+            sash rests on the activity bar's edge and dragging it from
+            width 0 pulls the side bar back open. */}
+        <ResizeHandle
+          axis="x"
+          size={layout.sidebarVisible ? layout.sidebarWidth : 0}
+          onResize={layout.setSidebarWidth}
+        />
+
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <EditorArea />
