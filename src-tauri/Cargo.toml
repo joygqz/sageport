@@ -70,3 +70,10 @@ parking_lot = "0.12"
 [features]
 # this feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+# rustc's built-in debuginfo stripping leaves the Mach-O LINKEDIT string
+# table 4-byte aligned instead of 8-byte, which current macOS dyld rejects
+# as "mis-aligned LINKEDIT string pool" (hits the sqlx-macros proc-macro
+# dylib). Disabling strip avoids the buggy codepath; DO NOT REMOVE.
+strip = "none"

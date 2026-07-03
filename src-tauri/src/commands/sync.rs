@@ -23,7 +23,11 @@
 //! If decryption fails — the passphrase doesn't match what encrypted the
 //! remote data — `sync_connect` returns [`ConnectOutcome::PassphraseMismatch`]
 //! instead of an error, so the frontend can offer to either re-enter the
-//! passphrase or force-overwrite the remote backup with `force: true`.
+//! passphrase or force-overwrite the remote backup with `force: true`. The
+//! force path deletes the old gist and creates a brand new one rather than
+//! patching the existing gist in place — GitHub has no way to remove a
+//! single revision, so patching would leave the old, undecryptable
+//! revisions sitting in the version history forever.
 //!
 //! Push safety: pushing first pulls and merges whatever is already on the
 //! gist (last-write-wins, keyed on `updated_at`) so a push from a device that
@@ -166,7 +170,7 @@ pub async fn sync_connect(
     }
 
     let client = GistClient::new(&token);
-    let gist_id = client.find_vault_gist().await?;
+    let mut gist_id = client.find_vault_gist().await?;
 
     if let Some(id) = &gist_id {
         if !force {
@@ -188,16 +192,22 @@ pub async fn sync_connect(
 
     settings_repo::set(&state.db, TOKEN_KEY, &token).await?;
     settings_repo::set(&state.db, PASSPHRASE_KEY, &passphrase).await?;
-    if let Some(id) = &gist_id {
-        settings_repo::set(&state.db, GIST_ID_KEY, id).await?;
-    }
 
     if force {
         if let Some(id) = &gist_id {
+            // Delete rather than patch: patching would keep the old,
+            // undecryptable revisions in the gist's history, where the
+            // version list would keep surfacing them forever.
+            client.delete(id).await?;
             let envelope = sync::export_encrypted(&state.db, &passphrase).await?;
-            client.push(Some(id), &envelope).await?;
+            let new_id = client.push(None, &envelope).await?;
+            settings_repo::set(&state.db, GIST_ID_KEY, &new_id).await?;
+            gist_id = Some(new_id);
         }
+    } else if let Some(id) = &gist_id {
+        settings_repo::set(&state.db, GIST_ID_KEY, id).await?;
     }
+
     if gist_id.is_some() {
         mark_synced(&state).await?;
     }

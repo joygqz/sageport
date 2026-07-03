@@ -168,6 +168,38 @@ impl GistClient {
             .await
     }
 
+    /// Permanently delete the vault gist, including its entire revision
+    /// history. GitHub has no way to remove a single revision, so this is the
+    /// only way to purge stale history (e.g. revisions encrypted with an
+    /// abandoned passphrase) rather than leaving it to accumulate underneath
+    /// a patch. A gist that's already gone (404) is treated as success.
+    pub async fn delete(&self, gist_id: &str) -> AppResult<()> {
+        let url = format!("{API}/gists/{gist_id}");
+        let resp = self
+            .request(Method::DELETE, &url)
+            .send()
+            .await
+            .map_err(|e| AppError::Other(format!("gist request failed: {e}")))?;
+
+        let status = resp.status();
+        if status.is_success() || status.as_u16() == 404 {
+            return Ok(());
+        }
+
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| AppError::Other(format!("failed to read gist response: {e}")))?;
+        let detail = serde_json::from_slice::<GistErr>(&bytes)
+            .map(|e| e.message)
+            .unwrap_or_else(|_| format!("GitHub API error (status {status})"));
+        Err(match status.as_u16() {
+            401 => AppError::Invalid("GitHub token is invalid or expired".into()),
+            403 | 429 => AppError::Invalid(format!("GitHub denied the request: {detail}")),
+            _ => AppError::Other(detail),
+        })
+    }
+
     /// List the vault gist's revision history, newest first. GitHub keeps at
     /// most the last ~100 revisions per gist, which is what a single page
     /// covers, so no further pagination is needed.
