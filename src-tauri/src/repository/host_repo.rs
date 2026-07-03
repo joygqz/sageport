@@ -1,8 +1,30 @@
 use sqlx::SqlitePool;
 
-use crate::domain::{new_id, now, Host, HostInput};
+use crate::domain::{auth, new_id, now, Host, HostInput};
 use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
+
+/// Inline credential fields (`username`/`auth_type`/`key_id`/`password`) are
+/// redundant once `identity_id` is set, and `key_id`/`password` are mutually
+/// exclusive depending on `auth_type`. Clear whatever doesn't apply so
+/// switching to an identity — or between auth types — can't leave a stale
+/// secret behind, regardless of what the caller sent.
+fn normalize(mut input: HostInput) -> HostInput {
+    if input.identity_id.is_some() {
+        input.username = None;
+        input.auth_type = None;
+        input.key_id = None;
+        input.password = Some(String::new());
+    } else {
+        if input.auth_type.as_deref() != Some(auth::KEY) {
+            input.key_id = None;
+        }
+        if input.auth_type.as_deref() != Some(auth::PASSWORD) {
+            input.password = Some(String::new());
+        }
+    }
+    input
+}
 
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Host>> {
     let rows = sqlx::query_as::<_, Host>(
@@ -22,6 +44,7 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Host> {
 }
 
 pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
+    let input = normalize(input);
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -52,6 +75,7 @@ pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<Host> {
+    let input = normalize(input);
     let ts = now();
     let affected = sqlx::query(
         "UPDATE hosts SET

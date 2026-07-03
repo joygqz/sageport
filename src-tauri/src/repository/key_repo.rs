@@ -104,7 +104,34 @@ pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResul
     get(pool, id).await
 }
 
+async fn hosts_using(pool: &SqlitePool, id: &str) -> AppResult<i64> {
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM hosts WHERE key_id = ? AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+    Ok(count)
+}
+
+async fn identities_using(pool: &SqlitePool, id: &str) -> AppResult<i64> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM identities WHERE key_id = ? AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
+    let hosts = hosts_using(pool, id).await?;
+    let identities = identities_using(pool, id).await?;
+    if hosts > 0 || identities > 0 {
+        return Err(AppError::InUse(format!(
+            "key is used by {hosts} host(s) and {identities} identity(ies); reassign them before deleting"
+        )));
+    }
+
     let ts = now();
     sqlx::query(
         "UPDATE keys SET deleted_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",

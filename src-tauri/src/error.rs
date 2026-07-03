@@ -28,6 +28,9 @@ pub enum AppError {
     #[error("invalid input: {0}")]
     Invalid(String),
 
+    #[error("in use: {0}")]
+    InUse(String),
+
     #[error("cancelled")]
     Cancelled,
 
@@ -46,6 +49,7 @@ impl AppError {
             AppError::Crypto(_) => "crypto",
             AppError::NotFound(_) => "not_found",
             AppError::Invalid(_) => "invalid",
+            AppError::InUse(_) => "in_use",
             AppError::Cancelled => "cancelled",
             AppError::Other(_) => "other",
         }

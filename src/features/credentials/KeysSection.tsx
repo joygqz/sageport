@@ -117,8 +117,12 @@ export function KeysSection() {
   };
 
   const remove = async (id: string) => {
-    await deleteKey.mutateAsync(id);
-    await emitRefresh();
+    try {
+      await deleteKey.mutateAsync(id);
+      await emitRefresh();
+    } catch (err) {
+      toast.error(t("keys.deleteError"), errorMessage(err));
+    }
   };
 
   const confirmRemove = (key: SshKey) => {

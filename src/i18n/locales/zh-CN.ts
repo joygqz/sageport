@@ -270,8 +270,8 @@ export const zhCN: Dictionary = {
     nameUsernameRequired: "名称和用户名为必填项",
     addError: "无法添加身份",
     deleteConfirmTitle: "删除身份",
-    deleteConfirmDescription:
-      "确定删除身份「{name}」吗？使用该身份的主机在重新指定凭据前可能无法连接。此操作无法撤销。",
+    deleteConfirmDescription: "确定删除身份「{name}」吗？此操作无法撤销。",
+    deleteError: "无法删除身份",
   },
 
   snippets: {
@@ -324,8 +324,8 @@ export const zhCN: Dictionary = {
     nameKeyRequired: "名称和私钥为必填项",
     addError: "无法添加密钥",
     deleteConfirmTitle: "删除密钥",
-    deleteConfirmDescription:
-      "确定删除密钥「{name}」吗？使用该密钥的主机或身份在重新指定密钥前可能无法连接。此操作无法撤销。",
+    deleteConfirmDescription: "确定删除密钥「{name}」吗？此操作无法撤销。",
+    deleteError: "无法删除密钥",
   },
 
   groups: {

@@ -63,8 +63,12 @@ export function IdentitiesSection() {
   };
 
   const remove = async (id: string) => {
-    await deleteIdentity.mutateAsync(id);
-    await emitRefresh();
+    try {
+      await deleteIdentity.mutateAsync(id);
+      await emitRefresh();
+    } catch (err) {
+      toast.error(t("identities.deleteError"), errorMessage(err));
+    }
   };
 
   const confirmRemove = (identity: Identity) => {

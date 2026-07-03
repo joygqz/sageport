@@ -275,7 +275,8 @@ export const en = {
     addError: "Could not add identity",
     deleteConfirmTitle: "Delete identity",
     deleteConfirmDescription:
-      "Delete identity \"{name}\"? Hosts using it may fail to connect until you assign new credentials. This cannot be undone.",
+      "Delete identity \"{name}\"? This cannot be undone.",
+    deleteError: "Could not delete identity",
   },
 
   snippets: {
@@ -330,7 +331,8 @@ export const en = {
     addError: "Could not add key",
     deleteConfirmTitle: "Delete key",
     deleteConfirmDescription:
-      "Delete key \"{name}\"? Hosts or identities using it may fail to connect until you assign a new one. This cannot be undone.",
+      "Delete key \"{name}\"? This cannot be undone.",
+    deleteError: "Could not delete key",
   },
 
   groups: {
