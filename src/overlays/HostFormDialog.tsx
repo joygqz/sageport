@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ChangeEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 
@@ -77,8 +77,9 @@ function HostFormBody({
 }) {
   const { t } = useI18n();
   const { data: groups = [] } = useGroups();
-  const { data: keys = [] } = useSshKeys();
-  const { data: identities = [] } = useIdentities();
+  const { data: keys = [], isLoading: keysLoading } = useSshKeys();
+  const { data: identities = [], isLoading: identitiesLoading } =
+    useIdentities();
   const createHost = useCreateHost();
   const updateHost = useUpdateHost();
 
@@ -92,13 +93,18 @@ function HostFormBody({
     register,
     handleSubmit,
     reset,
+    resetField,
     watch,
     formState: { errors },
   } = useForm<FormValues>({ defaultValues: emptyValues });
 
   useEffect(() => {
     if (!hostId) return;
-    if (host) {
+    // Wait for the identity/key lists to load too: the identityId/keyId
+    // <select> only renders their matching <option> once these arrive, and a
+    // native <select> silently falls back to the blank option if reset()
+    // assigns a value before that option exists.
+    if (host && !identitiesLoading && !keysLoading) {
       reset({
         label: host.label,
         address: host.address,
@@ -112,7 +118,7 @@ function HostFormBody({
         notes: host.notes ?? "",
       });
     }
-  }, [host, hostId, reset]);
+  }, [host, hostId, identitiesLoading, keysLoading, reset]);
 
   const authType = watch("authType");
   const identityId = watch("identityId");
@@ -225,7 +231,17 @@ function HostFormBody({
             label={t("hostForm.credentials")}
             hint={useIdentity ? t("hostForm.usingIdentityHint") : undefined}
           >
-            <Select {...register("identityId")}>
+            <Select
+              {...register("identityId", {
+                onChange: (e: ChangeEvent<HTMLSelectElement>) => {
+                  if (!e.target.value) return;
+                  resetField("username");
+                  resetField("authType");
+                  resetField("password");
+                  resetField("keyId");
+                },
+              })}
+            >
               <option value="">{t("hostForm.customCredentials")}</option>
               {identities.map((id) => (
                 <option key={id.id} value={id.id}>

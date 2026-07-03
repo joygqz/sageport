@@ -29,7 +29,10 @@ export function useUpdateHost() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: HostInput }) =>
       ipc.hosts.update(id, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: hostKeys.hosts }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: hostKeys.hosts });
+      qc.invalidateQueries({ queryKey: ["host", id] });
+    },
   });
 }
 
