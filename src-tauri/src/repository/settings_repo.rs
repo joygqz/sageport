@@ -33,22 +33,26 @@ pub async fn all(pool: &SqlitePool) -> AppResult<Vec<(String, String)>> {
     Ok(rows)
 }
 
-/// Every setting row with its `updated_at`, excluding keys under `prefix`
-/// (dot-separated, e.g. `"sync."`). Used by the vault backup/restore path to
-/// carry every app setting *except* the sync connection itself (token, gist
-/// id, passphrase, last-synced marker) — those are per-device and must never
-/// round-trip through a backup.
-pub async fn all_excluding_prefix(
+/// Every setting row with its `updated_at`, excluding keys under any of
+/// `prefixes` (dot-separated, e.g. `"sync."`). Used by the vault
+/// backup/restore path to carry every app setting *except* per-device state
+/// (the sync connection itself, cached update-check results) — those must
+/// never round-trip through a backup.
+pub async fn all_excluding_prefixes(
     pool: &SqlitePool,
-    prefix: &str,
+    prefixes: &[&str],
 ) -> AppResult<Vec<(String, String, String)>> {
-    let like_pattern = format!("{prefix}%");
-    let rows: Vec<(String, String, String)> = sqlx::query_as(
-        "SELECT key, value, updated_at FROM settings WHERE key NOT LIKE ? ORDER BY key",
-    )
-    .bind(like_pattern)
-    .fetch_all(pool)
-    .await?;
+    let clause = prefixes
+        .iter()
+        .map(|_| "key NOT LIKE ?")
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let sql = format!("SELECT key, value, updated_at FROM settings WHERE {clause} ORDER BY key");
+    let mut query = sqlx::query_as(&sql);
+    for prefix in prefixes {
+        query = query.bind(format!("{prefix}%"));
+    }
+    let rows: Vec<(String, String, String)> = query.fetch_all(pool).await?;
     Ok(rows)
 }
 
@@ -68,14 +72,20 @@ pub async fn merge(pool: &SqlitePool, key: &str, value: &str, updated_at: &str) 
     Ok(())
 }
 
-/// Delete every setting except those under `prefix` (dot-separated). Used
-/// before a destructive vault restore so a rollback can't be used to wipe out
-/// the local sync connection it was fetched through.
-pub async fn delete_all_excluding_prefix(pool: &SqlitePool, prefix: &str) -> AppResult<()> {
-    let like_pattern = format!("{prefix}%");
-    sqlx::query("DELETE FROM settings WHERE key NOT LIKE ?")
-        .bind(like_pattern)
-        .execute(pool)
-        .await?;
+/// Delete every setting except those under `prefixes` (dot-separated). Used
+/// before a destructive vault restore so a rollback can't wipe out per-device
+/// state (the local sync connection, cached update-check results).
+pub async fn delete_all_excluding_prefixes(pool: &SqlitePool, prefixes: &[&str]) -> AppResult<()> {
+    let clause = prefixes
+        .iter()
+        .map(|_| "key NOT LIKE ?")
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let sql = format!("DELETE FROM settings WHERE {clause}");
+    let mut query = sqlx::query(&sql);
+    for prefix in prefixes {
+        query = query.bind(format!("{prefix}%"));
+    }
+    query.execute(pool).await?;
     Ok(())
 }

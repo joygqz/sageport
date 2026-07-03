@@ -28,11 +28,15 @@ use crate::repository::settings_repo;
 
 const SNAPSHOT_VERSION: u32 = 2;
 
-/// Setting keys under this prefix (the sync connection itself — token, gist
-/// id, passphrase, last-synced marker) never travel in a vault snapshot: they
-/// are per-device, and backing them up would let a restore on one device
-/// silently repoint another device's sync connection.
-const EXCLUDED_SETTINGS_PREFIX: &str = "sync.";
+/// Setting keys under these prefixes never travel in a vault snapshot — they
+/// are per-device, not user data:
+/// * `sync.` — the sync connection itself (token, gist id, passphrase,
+///   last-synced marker). Backing it up would let a restore on one device
+///   silently repoint another device's sync connection.
+/// * `update.` — cached update-check results (last checked time, last known
+///   version). Restoring these on another device would show that device
+///   stale or wrong update info for its own binary.
+const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["sync.", "update."];
 
 /// One row of the app's key/value settings (AI config, and anything else
 /// added later) carried by a vault snapshot, LWW-merged just like the entity
@@ -48,8 +52,8 @@ pub struct SettingEntry {
 /// Full, device-independent snapshot of the user's data. Secrets travel inline
 /// on their rows (passwords, private keys, passphrases), so a snapshot is
 /// everything another device needs to make the hosts usable. Also carries
-/// every app setting except the sync connection itself (see
-/// [`EXCLUDED_SETTINGS_PREFIX`]).
+/// every app setting except per-device state (see
+/// [`EXCLUDED_SETTINGS_PREFIXES`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultSnapshot {
@@ -71,7 +75,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     let identities = fetch_all::<Identity>(pool, "identities").await?;
     let keys = fetch_all::<SshKey>(pool, "keys").await?;
     let snippets = fetch_all::<Snippet>(pool, "snippets").await?;
-    let settings = settings_repo::all_excluding_prefix(pool, EXCLUDED_SETTINGS_PREFIX)
+    let settings = settings_repo::all_excluding_prefixes(pool, EXCLUDED_SETTINGS_PREFIXES)
         .await?
         .into_iter()
         .map(|(key, value, updated_at)| SettingEntry {
@@ -146,10 +150,10 @@ pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> Ap
     sqlx::query("DELETE FROM keys").execute(pool).await?;
     sqlx::query("DELETE FROM groups").execute(pool).await?;
     sqlx::query("DELETE FROM snippets").execute(pool).await?;
-    // Never touch the sync connection itself (token/gist id/passphrase) —
-    // rolling back to an old backup must not repoint or disconnect sync on
-    // this device.
-    settings_repo::delete_all_excluding_prefix(pool, EXCLUDED_SETTINGS_PREFIX).await?;
+    // Never touch per-device state (sync connection, cached update info) —
+    // rolling back to an old backup must not repoint or disconnect sync, or
+    // clobber this device's own update-check cache.
+    settings_repo::delete_all_excluding_prefixes(pool, EXCLUDED_SETTINGS_PREFIXES).await?;
 
     // The tables above are now empty, so every insert below always takes the
     // plain-insert branch of the upsert (no row can conflict).
@@ -298,10 +302,13 @@ async fn merge_snippet(pool: &SqlitePool, s: &Snippet) -> AppResult<()> {
 }
 
 async fn merge_setting(pool: &SqlitePool, entry: &SettingEntry) -> AppResult<()> {
-    // Defense in depth: even if a snapshot somehow carried a `sync.*` key
-    // (old export, hand-edited file, ...) never let it overwrite this
-    // device's own sync connection.
-    if entry.key.starts_with(EXCLUDED_SETTINGS_PREFIX) {
+    // Defense in depth: even if a snapshot somehow carried a `sync.*` or
+    // `update.*` key (old export, hand-edited file, ...) never let it
+    // overwrite this device's own sync connection or update-check cache.
+    if EXCLUDED_SETTINGS_PREFIXES
+        .iter()
+        .any(|prefix| entry.key.starts_with(prefix))
+    {
         return Ok(());
     }
     settings_repo::merge(pool, &entry.key, &entry.value, &entry.updated_at).await

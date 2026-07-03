@@ -310,3 +310,22 @@ export interface TransferHistoryEntry {
   startedAt: string;
   finishedAt: string | null;
 }
+
+/**
+ * Lives in the Rust backend (`update::UpdateManager`), not per-window state —
+ * every window reads/writes the same status, so it survives Settings being
+ * closed and reopened mid-download.
+ */
+export type UpdateStatus =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "up-to-date" }
+  | { status: "available"; version: string; body: string | null }
+  | {
+      status: "downloading";
+      version: string;
+      downloaded: number;
+      total: number | null;
+    }
+  | { status: "ready"; version: string }
+  | { status: "error"; message: string };

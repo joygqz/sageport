@@ -32,6 +32,7 @@ import type {
   SyncConnectOutcome,
   TransferEvent,
   TransferHistoryEntry,
+  UpdateStatus,
 } from "@/types/models";
 
 /**
@@ -192,5 +193,15 @@ export const ipc = {
         invoke<AiSessionSummary>("ai_session_rename", { id, title }),
       remove: (id: string) => invoke<void>("ai_session_delete", { id }),
     },
+  },
+  update: {
+    /** Current status, to sync a freshly (re)mounted window immediately. */
+    status: () => invoke<UpdateStatus>("update_status"),
+    check: () => invoke<UpdateStatus>("update_check"),
+    install: () => invoke<UpdateStatus>("update_install"),
+    onStatus: (handler: (e: UpdateStatus) => void): Promise<UnlistenFn> =>
+      listen<UpdateStatus>("sageport://update-status", (event) =>
+        handler(event.payload),
+      ),
   },
 };

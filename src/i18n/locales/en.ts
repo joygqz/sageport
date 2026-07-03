@@ -222,7 +222,6 @@ export const en = {
         installButton: "Download and install",
         downloading: "Downloading…",
         downloadingProgress: "Downloading… {percent}%",
-        installError: "Update failed",
         ready: "Version {version} is ready to install.",
         readyBadge: "Ready",
         restartButton: "Restart to update",

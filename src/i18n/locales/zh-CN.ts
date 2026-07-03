@@ -219,7 +219,6 @@ export const zhCN: Dictionary = {
         installButton: "下载并安装",
         downloading: "正在下载…",
         downloadingProgress: "正在下载… {percent}%",
-        installError: "更新失败",
         ready: "版本 {version} 已下载，可以安装。",
         readyBadge: "已就绪",
         restartButton: "重启以完成更新",

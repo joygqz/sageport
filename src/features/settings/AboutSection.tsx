@@ -1,22 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { check, type Update } from "@tauri-apps/plugin-updater";
 import { CheckCircle2, RotateCw, Sparkles } from "lucide-react";
 
 import { Badge, Button, Spinner } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { errorMessage, toast } from "@/lib/toast";
-
-type UpdateState =
-  | { status: "idle" }
-  | { status: "checking" }
-  | { status: "up-to-date" }
-  | { status: "available"; update: Update }
-  | { status: "downloading"; update: Update; downloaded: number; total: number | null }
-  | { status: "ready"; update: Update }
-  | { status: "error"; message: string };
+import { ipc } from "@/lib/ipc";
+import type { UpdateStatus } from "@/types/models";
 
 export function AboutSection() {
   const { t } = useI18n();
@@ -24,40 +15,26 @@ export function AboutSection() {
     queryKey: ["app", "version"],
     queryFn: getVersion,
   });
-  const [state, setState] = useState<UpdateState>({ status: "idle" });
+  const [state, setState] = useState<UpdateStatus>({ status: "idle" });
 
-  const checkForUpdate = async () => {
-    setState({ status: "checking" });
-    try {
-      const update = await check();
-      setState(
-        update ? { status: "available", update } : { status: "up-to-date" },
-      );
-    } catch (err) {
-      setState({ status: "error", message: errorMessage(err) });
-    }
-  };
-
-  const installUpdate = async (update: Update) => {
-    setState({ status: "downloading", update, downloaded: 0, total: null });
-    try {
-      let downloaded = 0;
-      let total: number | null = null;
-      await update.downloadAndInstall((event) => {
-        if (event.event === "Started") {
-          total = event.data.contentLength ?? null;
-          setState({ status: "downloading", update, downloaded, total });
-        } else if (event.event === "Progress") {
-          downloaded += event.data.chunkLength;
-          setState({ status: "downloading", update, downloaded, total });
-        }
-      });
-      setState({ status: "ready", update });
-    } catch (err) {
-      setState({ status: "error", message: errorMessage(err) });
-      toast.error(t("settings.about.update.installError"), errorMessage(err));
-    }
-  };
+  // The update lifecycle lives in the Rust backend (see `update::UpdateManager`),
+  // not in this component: Settings is a real OS window that gets destroyed on
+  // close, so any state kept here would be lost the moment the user closed the
+  // dialog mid-download. Sync to the current status on mount, then follow live
+  // updates broadcast to every window.
+  useEffect(() => {
+    let cancelled = false;
+    void ipc.update.status().then((s) => {
+      if (!cancelled) setState(s);
+    });
+    const unlisten = ipc.update.onStatus((s) => {
+      if (!cancelled) setState(s);
+    });
+    return () => {
+      cancelled = true;
+      void unlisten.then((un) => un());
+    };
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,7 +57,7 @@ export function AboutSection() {
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
-        <UpdateStatus state={state} />
+        <UpdateStatusView state={state} />
 
         {state.status !== "checking" && (
           <div className="flex items-center gap-2">
@@ -90,7 +67,7 @@ export function AboutSection() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => void checkForUpdate()}
+                onClick={() => void ipc.update.check()}
               >
                 <RotateCw />
                 {t("settings.about.update.checkButton")}
@@ -98,10 +75,7 @@ export function AboutSection() {
             )}
 
             {state.status === "available" && (
-              <Button
-                size="sm"
-                onClick={() => void installUpdate(state.update)}
-              >
+              <Button size="sm" onClick={() => void ipc.update.install()}>
                 {t("settings.about.update.installButton")}
               </Button>
             )}
@@ -130,7 +104,7 @@ export function AboutSection() {
   );
 }
 
-function UpdateStatus({ state }: { state: UpdateState }) {
+function UpdateStatusView({ state }: { state: UpdateStatus }) {
   const { t } = useI18n();
 
   if (state.status === "idle") {
@@ -157,13 +131,11 @@ function UpdateStatus({ state }: { state: UpdateState }) {
       <div className="flex flex-col gap-1.5">
         <p className="flex items-center gap-2 text-sm text-foreground">
           <Sparkles className="size-4 text-primary" />
-          {t("settings.about.update.available", {
-            version: state.update.version,
-          })}
+          {t("settings.about.update.available", { version: state.version })}
         </p>
-        {state.update.body && (
+        {state.body && (
           <p className="whitespace-pre-line text-xs text-muted-foreground">
-            {state.update.body}
+            {state.body}
           </p>
         )}
       </div>
@@ -173,9 +145,7 @@ function UpdateStatus({ state }: { state: UpdateState }) {
     return (
       <div className="flex flex-col gap-1.5">
         <p className="text-sm text-foreground">
-          {t("settings.about.update.available", {
-            version: state.update.version,
-          })}
+          {t("settings.about.update.available", { version: state.version })}
         </p>
         {state.total && (
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
@@ -194,7 +164,7 @@ function UpdateStatus({ state }: { state: UpdateState }) {
     return (
       <p className="flex items-center gap-2 text-sm text-foreground">
         <Badge variant="success">{t("settings.about.update.readyBadge")}</Badge>
-        {t("settings.about.update.ready", { version: state.update.version })}
+        {t("settings.about.update.ready", { version: state.version })}
       </p>
     );
   }

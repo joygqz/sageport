@@ -10,6 +10,7 @@ mod ssh;
 mod sshkey;
 mod state;
 mod sync;
+mod update;
 
 use tauri::Manager;
 
@@ -32,6 +33,14 @@ pub fn run() {
             let db_path = data_dir.join("sageport.db");
             let pool = tauri::async_runtime::block_on(db::init(&db_path))?;
             app.manage(AppState::new(pool));
+
+            // Check for an update on every launch; status flows to every
+            // window (present or future) over `update::EVENT`.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                update::check(&handle).await;
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -94,6 +103,10 @@ pub fn run() {
             commands::sync::sync_restore_gist_version,
             commands::sync::sync_file_export,
             commands::sync::sync_file_import,
+            // update
+            commands::update::update_status,
+            commands::update::update_check,
+            commands::update::update_install,
             // ai
             commands::ai::ai_get_config,
             commands::ai::ai_set_config,
