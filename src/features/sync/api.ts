@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
 import type {
-  SyncConnectOutcome,
   SyncOAuthEvent,
   SyncProviderKind,
   SyncProviderSettings,
@@ -37,11 +36,12 @@ export function useSyncConnect() {
       passphrase: string;
       force: boolean;
     }) => ipc.sync.connect(input),
-    onSuccess: (outcome: SyncConnectOutcome) => {
-      if (outcome.status !== "connected") return;
-      // A successful connect may have merged in an existing remote backup,
-      // so every cached entity query must refetch.
-      qc.invalidateQueries();
+    // A connect may have merged in an existing remote backup (even when a
+    // later step failed), so every cached entity query must refetch. Fire
+    // and forget: returning the promise would keep `isPending` true until
+    // every refetch lands.
+    onSettled: () => {
+      void qc.invalidateQueries();
     },
   });
 }
@@ -58,8 +58,11 @@ export function useSyncPush() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => ipc.sync.push(),
-    // A push merges remote rows in before uploading.
-    onSuccess: () => qc.invalidateQueries(),
+    // A push merges remote rows in before uploading — refetch even on
+    // failure, since the merge may have landed before the upload broke.
+    onSettled: () => {
+      void qc.invalidateQueries();
+    },
   });
 }
 
@@ -77,8 +80,11 @@ export function useSyncRestoreVersion() {
   return useMutation({
     mutationFn: (id: string) => ipc.sync.restoreVersion(id),
     // A restore replaces every entity table wholesale, so every cached
-    // query (host list, groups, ...) must refetch.
-    onSuccess: () => qc.invalidateQueries(),
+    // query (host list, groups, ...) must refetch — even on failure, since
+    // the local restore may have landed before a later step broke.
+    onSettled: () => {
+      void qc.invalidateQueries();
+    },
   });
 }
 
@@ -94,6 +100,8 @@ export function useSyncFileImport() {
   return useMutation({
     mutationFn: ({ path, passphrase }: { path: string; passphrase: string }) =>
       ipc.sync.fileImport(path, passphrase),
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: () => {
+      void qc.invalidateQueries();
+    },
   });
 }

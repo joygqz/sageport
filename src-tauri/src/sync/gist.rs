@@ -220,15 +220,13 @@ impl SyncProvider for GistProvider {
             .await
     }
 
-    async fn reset(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
+    async fn clear(&mut self) -> AppResult<()> {
         // Delete rather than patch: GitHub can't drop individual revisions,
-        // so patching would leave the old, undecryptable history visible in
-        // the version list forever.
+        // so clearing is the only way to remove old, undecryptable history.
         if let Some(id) = self.resolve_gist_id().await? {
             self.delete_gist(&id).await?;
         }
-        let new_id = self.upload(None, envelope).await?;
-        self.gist_id = Some(new_id);
+        self.gist_id = None;
         Ok(())
     }
 

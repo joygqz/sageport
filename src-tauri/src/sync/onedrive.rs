@@ -1,24 +1,20 @@
-//! Microsoft OneDrive provider.
+//! Microsoft OneDrive object store.
 //!
 //! Backups live in the app's own folder (`special/approot`, i.e.
-//! `Apps/<app name>` in the user's OneDrive), one timestamped object per
-//! push. Versions are addressed by file name — Graph supports path
-//! addressing, so no id bookkeeping is needed. Access tokens refresh
-//! transparently; Microsoft rotates refresh tokens, so the updated set is
-//! persisted via [`SyncProvider::config`] after every operation.
+//! `Apps/<app name>` in the user's OneDrive). Objects are addressed by file
+//! name — Graph supports path addressing, so no id bookkeeping is needed.
+//! Access tokens refresh transparently; Microsoft rotates refresh tokens, so
+//! the updated set is persisted via [`ObjectStore::config`] after every
+//! operation.
 
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::crypto::EncryptedEnvelope;
 use crate::error::{AppError, AppResult};
 
 use super::oauth::{self, OAuthTokens};
-use super::provider::{
-    is_vault_filename, version_filename, version_time_from_name, ProviderConfig, SyncProvider,
-    SyncVersion, KEEP_VERSIONS,
-};
+use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
 
 const APPROOT: &str = "https://graph.microsoft.com/v1.0/me/drive/special/approot";
 
@@ -26,7 +22,7 @@ const APPROOT: &str = "https://graph.microsoft.com/v1.0/me/drive/special/approot
 /// get anywhere near it, so exceeding it is reported instead of chunked.
 const SIMPLE_UPLOAD_LIMIT: usize = 4 * 1024 * 1024;
 
-pub struct OnedriveProvider {
+pub struct OnedriveStore {
     http: reqwest::Client,
     tokens: OAuthTokens,
 }
@@ -46,7 +42,7 @@ struct DriveItem {
     size: Option<u64>,
 }
 
-impl OnedriveProvider {
+impl OnedriveStore {
     pub fn new(tokens: OAuthTokens) -> Self {
         Self {
             http: reqwest::Client::new(),
@@ -60,11 +56,13 @@ impl OnedriveProvider {
         }
         Ok(self.tokens.access_token.clone())
     }
+}
 
-    /// Vault file names in the app folder, newest first.
-    async fn list_names(&mut self) -> AppResult<Vec<(String, Option<u64>)>> {
+#[async_trait]
+impl ObjectStore for OnedriveStore {
+    async fn list(&mut self) -> AppResult<Vec<RemoteObject>> {
         let token = self.token().await?;
-        let mut names: Vec<(String, Option<u64>)> = Vec::new();
+        let mut objects = Vec::new();
         let mut url = format!("{APPROOT}/children?$select=name,size&$top=200");
         loop {
             let resp = self
@@ -84,28 +82,26 @@ impl OnedriveProvider {
                 return Err(api_err("OneDrive list", status, &bytes));
             }
             let page: Children = serde_json::from_slice(&bytes)?;
-            names.extend(
-                page.value
-                    .into_iter()
-                    .filter(|item| is_vault_filename(&item.name))
-                    .map(|item| (item.name, item.size)),
-            );
+            objects.extend(page.value.into_iter().map(|item| RemoteObject {
+                id: item.name.clone(),
+                name: item.name,
+                size: item.size,
+            }));
             match page.next_link {
                 Some(next) => url = next,
                 None => break,
             }
         }
-        names.sort_by(|a, b| b.0.cmp(&a.0));
-        Ok(names)
+        Ok(objects)
     }
 
-    async fn download(&mut self, name: &str) -> AppResult<EncryptedEnvelope> {
+    async fn get(&mut self, id: &str) -> AppResult<Vec<u8>> {
         let token = self.token().await?;
         // Graph answers with a 302 to a pre-authenticated download URL;
         // reqwest follows it (and drops the auth header cross-origin).
         let resp = self
             .http
-            .get(format!("{APPROOT}:/{name}:/content"))
+            .get(format!("{APPROOT}:/{id}:/content"))
             .bearer_auth(&token)
             .send()
             .await
@@ -115,14 +111,12 @@ impl OnedriveProvider {
         if !status.is_success() {
             return Err(api_err("OneDrive download", status, &bytes));
         }
-        Ok(serde_json::from_slice(&bytes)?)
+        Ok(bytes.to_vec())
     }
 
-    async fn upload(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
+    async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
         let token = self.token().await?;
-        let name = version_filename();
-        let content = serde_json::to_string_pretty(envelope)?;
-        if content.len() > SIMPLE_UPLOAD_LIMIT {
+        if body.len() > SIMPLE_UPLOAD_LIMIT {
             return Err(AppError::Invalid(
                 "the vault exceeds OneDrive's 4 MB simple-upload limit".into(),
             ));
@@ -132,7 +126,7 @@ impl OnedriveProvider {
             .put(format!("{APPROOT}:/{name}:/content"))
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
-            .body(content)
+            .body(body)
             .send()
             .await
             .map_err(net_err)?;
@@ -144,11 +138,11 @@ impl OnedriveProvider {
         Ok(())
     }
 
-    async fn delete(&mut self, name: &str) -> AppResult<()> {
+    async fn delete(&mut self, id: &str) -> AppResult<()> {
         let token = self.token().await?;
         let resp = self
             .http
-            .delete(format!("{APPROOT}:/{name}:"))
+            .delete(format!("{APPROOT}:/{id}:"))
             .bearer_auth(&token)
             .send()
             .await
@@ -159,55 +153,6 @@ impl OnedriveProvider {
         }
         let bytes = resp.bytes().await.unwrap_or_default();
         Err(api_err("OneDrive delete", status, &bytes))
-    }
-
-    async fn prune(&mut self) -> AppResult<()> {
-        let names = self.list_names().await?;
-        for (name, _) in names.into_iter().skip(KEEP_VERSIONS) {
-            self.delete(&name).await?;
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl SyncProvider for OnedriveProvider {
-    async fn pull_latest(&mut self) -> AppResult<Option<EncryptedEnvelope>> {
-        match self.list_names().await?.first() {
-            Some((name, _)) => Ok(Some(self.download(&name.clone()).await?)),
-            None => Ok(None),
-        }
-    }
-
-    async fn push(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        self.upload(envelope).await?;
-        self.prune().await
-    }
-
-    async fn list_versions(&mut self) -> AppResult<Vec<SyncVersion>> {
-        Ok(self
-            .list_names()
-            .await?
-            .into_iter()
-            .filter_map(|(name, size)| {
-                Some(SyncVersion {
-                    created_at: version_time_from_name(&name)?,
-                    id: name,
-                    size_bytes: size,
-                })
-            })
-            .collect())
-    }
-
-    async fn pull_version(&mut self, id: &str) -> AppResult<EncryptedEnvelope> {
-        self.download(id).await
-    }
-
-    async fn reset(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        for (name, _) in self.list_names().await? {
-            self.delete(&name).await?;
-        }
-        self.upload(envelope).await
     }
 
     fn config(&self) -> ProviderConfig {

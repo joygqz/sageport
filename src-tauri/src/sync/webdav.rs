@@ -1,7 +1,7 @@
-//! WebDAV provider (Nextcloud, Synology, rclone serve, ...).
+//! WebDAV object store (Nextcloud, Synology, rclone serve, ...).
 //!
-//! The user points the config at a collection URL; backups are timestamped
-//! objects directly inside it. Listing is a depth-1 PROPFIND parsed
+//! The user points the config at a collection URL; backups are objects
+//! directly inside it. Listing is a depth-1 PROPFIND parsed
 //! namespace-agnostically (servers disagree wildly on prefixes), and the
 //! collection is created with MKCOL on demand.
 
@@ -11,15 +11,11 @@ use quick_xml::Reader;
 use reqwest::{Method, StatusCode};
 use url::Url;
 
-use crate::crypto::EncryptedEnvelope;
 use crate::error::{AppError, AppResult};
 
-use super::provider::{
-    is_vault_filename, version_filename, version_time_from_name, ProviderConfig, SyncProvider,
-    SyncVersion, KEEP_VERSIONS,
-};
+use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
 
-pub struct WebdavProvider {
+pub struct WebdavStore {
     http: reqwest::Client,
     /// Collection URL, normalized to end with `/` so joins stay inside it.
     base: Url,
@@ -29,7 +25,7 @@ pub struct WebdavProvider {
     password: String,
 }
 
-impl WebdavProvider {
+impl WebdavStore {
     pub fn new(url: String, username: String, password: String) -> AppResult<Self> {
         let normalized = if url.ends_with('/') {
             url.clone()
@@ -80,16 +76,15 @@ impl WebdavProvider {
                 "WebDAV parent folder does not exist — create it on the server first".into(),
             )),
             401 => Err(unauthorized()),
-            s if resp.status().is_success() => {
-                let _ = s;
-                Ok(())
-            }
+            _ if resp.status().is_success() => Ok(()),
             s => Err(AppError::Other(format!("WebDAV MKCOL failed (status {s})"))),
         }
     }
+}
 
-    /// Vault file names inside the collection, newest first.
-    async fn list_names(&self) -> AppResult<Vec<String>> {
+#[async_trait]
+impl ObjectStore for WebdavStore {
+    async fn list(&mut self) -> AppResult<Vec<RemoteObject>> {
         let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>"#;
         let resp = self
@@ -114,25 +109,29 @@ impl WebdavProvider {
             _ => {}
         }
         let text = resp.text().await.map_err(net_err)?;
-        let mut names = parse_hrefs(&text)?
-            .into_iter()
-            .filter(|n| is_vault_filename(n))
-            .collect::<Vec<_>>();
-        names.sort_by(|a, b| b.cmp(a));
+        let mut names = parse_hrefs(&text)?;
+        names.sort_unstable();
         names.dedup();
-        Ok(names)
+        Ok(names
+            .into_iter()
+            .map(|name| RemoteObject {
+                id: name.clone(),
+                name,
+                size: None,
+            })
+            .collect())
     }
 
-    async fn download(&self, name: &str) -> AppResult<EncryptedEnvelope> {
+    async fn get(&mut self, id: &str) -> AppResult<Vec<u8>> {
         let resp = self
-            .request(Method::GET, self.file_url(name)?)
+            .request(Method::GET, self.file_url(id)?)
             .send()
             .await
             .map_err(net_err)?;
         match resp.status() {
             StatusCode::UNAUTHORIZED => return Err(unauthorized()),
             StatusCode::NOT_FOUND => {
-                return Err(AppError::NotFound(format!("backup {name} not found")))
+                return Err(AppError::NotFound(format!("backup {id} not found")))
             }
             s if !s.is_success() => {
                 return Err(AppError::Other(format!(
@@ -141,17 +140,15 @@ impl WebdavProvider {
             }
             _ => {}
         }
-        let bytes = resp.bytes().await.map_err(net_err)?;
-        Ok(serde_json::from_slice(&bytes)?)
+        Ok(resp.bytes().await.map_err(net_err)?.to_vec())
     }
 
-    async fn upload(&self, envelope: &EncryptedEnvelope) -> AppResult<()> {
+    async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
         self.ensure_collection().await?;
-        let name = version_filename();
         let resp = self
-            .request(Method::PUT, self.file_url(&name)?)
+            .request(Method::PUT, self.file_url(name)?)
             .header("Content-Type", "application/json")
-            .body(serde_json::to_string_pretty(envelope)?)
+            .body(body)
             .send()
             .await
             .map_err(net_err)?;
@@ -164,9 +161,9 @@ impl WebdavProvider {
         }
     }
 
-    async fn delete(&self, name: &str) -> AppResult<()> {
+    async fn delete(&mut self, id: &str) -> AppResult<()> {
         let resp = self
-            .request(Method::DELETE, self.file_url(name)?)
+            .request(Method::DELETE, self.file_url(id)?)
             .send()
             .await
             .map_err(net_err)?;
@@ -178,54 +175,6 @@ impl WebdavProvider {
             ))),
             _ => Ok(()),
         }
-    }
-
-    async fn prune(&self) -> AppResult<()> {
-        for name in self.list_names().await?.into_iter().skip(KEEP_VERSIONS) {
-            self.delete(&name).await?;
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl SyncProvider for WebdavProvider {
-    async fn pull_latest(&mut self) -> AppResult<Option<EncryptedEnvelope>> {
-        match self.list_names().await?.first() {
-            Some(name) => Ok(Some(self.download(name).await?)),
-            None => Ok(None),
-        }
-    }
-
-    async fn push(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        self.upload(envelope).await?;
-        self.prune().await
-    }
-
-    async fn list_versions(&mut self) -> AppResult<Vec<SyncVersion>> {
-        Ok(self
-            .list_names()
-            .await?
-            .into_iter()
-            .filter_map(|name| {
-                Some(SyncVersion {
-                    created_at: version_time_from_name(&name)?,
-                    id: name,
-                    size_bytes: None,
-                })
-            })
-            .collect())
-    }
-
-    async fn pull_version(&mut self, id: &str) -> AppResult<EncryptedEnvelope> {
-        self.download(id).await
-    }
-
-    async fn reset(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        for name in self.list_names().await? {
-            self.delete(&name).await?;
-        }
-        self.upload(envelope).await
     }
 
     fn config(&self) -> ProviderConfig {

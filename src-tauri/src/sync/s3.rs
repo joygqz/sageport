@@ -1,9 +1,9 @@
-//! S3-compatible object storage provider (AWS S3, MinIO, Cloudflare R2,
-//! Backblaze B2, ...).
+//! S3-compatible object store (AWS S3, MinIO, Cloudflare R2, Backblaze B2,
+//! ...).
 //!
 //! Requests are presigned with SigV4 via `rusty-s3` and executed with the
 //! app's shared reqwest stack, so no AWS SDK is pulled in. Backups are
-//! timestamped objects under an optional key prefix.
+//! objects under an optional key prefix.
 
 use std::time::Duration;
 
@@ -12,18 +12,14 @@ use rusty_s3::actions::ListObjectsV2;
 use rusty_s3::{Bucket, Credentials, S3Action, UrlStyle};
 use url::Url;
 
-use crate::crypto::EncryptedEnvelope;
 use crate::error::{AppError, AppResult};
 
-use super::provider::{
-    is_vault_filename, version_filename, version_time_from_name, ProviderConfig, SyncProvider,
-    SyncVersion, KEEP_VERSIONS,
-};
+use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
 
 /// Presigned URLs only need to outlive the single request they authorize.
 const SIGN_TTL: Duration = Duration::from_secs(300);
 
-pub struct S3Provider {
+pub struct S3Store {
     http: reqwest::Client,
     bucket: Bucket,
     credentials: Credentials,
@@ -36,7 +32,7 @@ pub struct S3Provider {
     path_style: bool,
 }
 
-impl S3Provider {
+impl S3Store {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         endpoint: String,
@@ -78,9 +74,11 @@ impl S3Provider {
     fn key(&self, name: &str) -> String {
         format!("{}{name}", self.prefix)
     }
+}
 
-    /// Vault object names (basenames, prefix stripped), newest first.
-    async fn list_names(&self) -> AppResult<Vec<(String, Option<u64>)>> {
+#[async_trait]
+impl ObjectStore for S3Store {
+    async fn list(&mut self) -> AppResult<Vec<RemoteObject>> {
         let mut action = self.bucket.list_objects_v2(Some(&self.credentials));
         action.query_mut().insert("prefix", self.prefix.clone());
         let url = action.sign(SIGN_TTL);
@@ -92,26 +90,28 @@ impl S3Provider {
         }
         let parsed = ListObjectsV2::parse_response(&text)
             .map_err(|e| AppError::Other(format!("could not parse the S3 list response: {e}")))?;
-        let mut names: Vec<(String, Option<u64>)> = parsed
+        Ok(parsed
             .contents
             .into_iter()
             .filter_map(|obj| {
                 let name = obj.key.strip_prefix(&self.prefix)?.to_string();
-                is_vault_filename(&name).then_some((name, Some(obj.size)))
+                Some(RemoteObject {
+                    id: name.clone(),
+                    name,
+                    size: Some(obj.size),
+                })
             })
-            .collect();
-        names.sort_by(|a, b| b.0.cmp(&a.0));
-        Ok(names)
+            .collect())
     }
 
-    async fn download(&self, name: &str) -> AppResult<EncryptedEnvelope> {
-        let key = self.key(name);
+    async fn get(&mut self, id: &str) -> AppResult<Vec<u8>> {
+        let key = self.key(id);
         let action = self.bucket.get_object(Some(&self.credentials), &key);
         let url = action.sign(SIGN_TTL);
         let resp = self.http.get(url).send().await.map_err(net_err)?;
         let status = resp.status();
         if status.as_u16() == 404 {
-            return Err(AppError::NotFound(format!("backup {name} not found")));
+            return Err(AppError::NotFound(format!("backup {id} not found")));
         }
         let bytes = resp.bytes().await.map_err(net_err)?;
         if !status.is_success() {
@@ -121,18 +121,18 @@ impl S3Provider {
                 &String::from_utf8_lossy(&bytes),
             ));
         }
-        Ok(serde_json::from_slice(&bytes)?)
+        Ok(bytes.to_vec())
     }
 
-    async fn upload(&self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        let key = self.key(&version_filename());
+    async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
+        let key = self.key(name);
         let action = self.bucket.put_object(Some(&self.credentials), &key);
         let url = action.sign(SIGN_TTL);
         let resp = self
             .http
             .put(url)
             .header("Content-Type", "application/json")
-            .body(serde_json::to_string_pretty(envelope)?)
+            .body(body)
             .send()
             .await
             .map_err(net_err)?;
@@ -144,8 +144,8 @@ impl S3Provider {
         Ok(())
     }
 
-    async fn delete(&self, name: &str) -> AppResult<()> {
-        let key = self.key(name);
+    async fn delete(&mut self, id: &str) -> AppResult<()> {
+        let key = self.key(id);
         let action = self.bucket.delete_object(Some(&self.credentials), &key);
         let url = action.sign(SIGN_TTL);
         let resp = self.http.delete(url).send().await.map_err(net_err)?;
@@ -155,54 +155,6 @@ impl S3Provider {
         }
         let text = resp.text().await.unwrap_or_default();
         Err(api_err("delete", status, &text))
-    }
-
-    async fn prune(&self) -> AppResult<()> {
-        for (name, _) in self.list_names().await?.into_iter().skip(KEEP_VERSIONS) {
-            self.delete(&name).await?;
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl SyncProvider for S3Provider {
-    async fn pull_latest(&mut self) -> AppResult<Option<EncryptedEnvelope>> {
-        match self.list_names().await?.first() {
-            Some((name, _)) => Ok(Some(self.download(name).await?)),
-            None => Ok(None),
-        }
-    }
-
-    async fn push(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        self.upload(envelope).await?;
-        self.prune().await
-    }
-
-    async fn list_versions(&mut self) -> AppResult<Vec<SyncVersion>> {
-        Ok(self
-            .list_names()
-            .await?
-            .into_iter()
-            .filter_map(|(name, size)| {
-                Some(SyncVersion {
-                    created_at: version_time_from_name(&name)?,
-                    id: name,
-                    size_bytes: size,
-                })
-            })
-            .collect())
-    }
-
-    async fn pull_version(&mut self, id: &str) -> AppResult<EncryptedEnvelope> {
-        self.download(id).await
-    }
-
-    async fn reset(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        for (name, _) in self.list_names().await? {
-            self.delete(&name).await?;
-        }
-        self.upload(envelope).await
     }
 
     fn config(&self) -> ProviderConfig {

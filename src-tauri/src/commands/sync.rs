@@ -10,46 +10,84 @@
 //!   with PKCE). A completed flow parks its credential in [`AppState`] so
 //!   the token never crosses into the webview; `sync_connect` claims it.
 //! * `sync_connect` — link a provider. If the target already holds a backup
-//!   it is pulled and decrypted first: success merges it in
-//!   (last-write-wins), a decrypt failure returns
+//!   it is pulled and decrypted first: success merges it in (last-write-wins),
+//!   but connecting never creates a new backup. A decrypt failure returns
 //!   [`ConnectOutcome::PassphraseMismatch`] so the UI can re-prompt or
-//!   force-overwrite (`force: true` wipes the remote history and starts
-//!   over — old revisions sealed with an abandoned passphrase would
-//!   otherwise linger in the version list).
-//! * `sync_push` — pull-merge-push so a device that hasn't seen another
-//!   device's edits can't clobber them. The final push is skipped when the
-//!   merge left the vault content-identical to what the remote already
-//!   holds (see [`sync::VaultSnapshot::content_fingerprint`]), so reconnects
-//!   and no-op syncs don't spend a slot in the provider's version history.
+//!   clear the remote history (`force: true`) without uploading local data.
+//! * `sync_push` — the only connected-provider command that writes a backup.
+//!   In the normal case it pull-merges first so a device that hasn't seen
+//!   another device's edits can't clobber them. After a restore, it preserves
+//!   the user's chosen local state and skips the pre-push merge.
 //! * `sync_list_versions` / `sync_restore_version` — browse backup history
 //!   and roll back. Restoring replaces local data outright (not a merge);
-//!   the frontend confirms before calling.
+//!   it never uploads a backup. The next explicit `sync_push` publishes the
+//!   restored state if the user wants to keep it.
+//!
+//! The whole connection (provider config, account label, passphrase, sync
+//! bookkeeping) lives in one JSON blob under the `sync.connection` settings
+//! key — per-device state that never travels in a vault snapshot.
 //!
 //! Local file backup (`sync_file_export` / `sync_file_import`) is a separate
 //! one-shot feature, independent of the connected provider: the passphrase
 //! is supplied per call and never persisted.
+//!
+//! Commands that merge or restore remote data can fail *after* the local
+//! database changed (e.g. the upload step). The frontend therefore refetches
+//! its caches on settled, not just on success.
 
 use std::path::PathBuf;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 use tokio::sync::oneshot;
 
-use crate::crypto;
 use crate::domain::now;
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 use crate::state::AppState;
 use crate::sync::{self, oauth, ProviderConfig, ProviderKind, SyncVersion};
 
-const PROVIDER_KEY: &str = "sync.provider";
-const CONFIG_KEY: &str = "sync.provider_config";
-const ACCOUNT_KEY: &str = "sync.account";
-const PASSPHRASE_KEY: &str = "sync.passphrase";
-const LAST_SYNCED_KEY: &str = "sync.last_synced_at";
+const CONNECTION_KEY: &str = "sync.connection";
+
+/// Everything the active sync connection consists of, persisted as one JSON
+/// blob (it is per-device state, excluded from vault snapshots by the
+/// `sync.` prefix rule in [`crate::sync`]).
+#[derive(Serialize, Deserialize)]
+struct Connection {
+    config: ProviderConfig,
+    /// Human-readable account label (GitHub login, e-mail, username, ...).
+    account: String,
+    /// Vault passphrase; every backup this connection touches is sealed with it.
+    passphrase: String,
+    last_synced_at: Option<String>,
+    /// Set when the user rolled back to an older backup that is not the
+    /// remote head: the next push publishes local state without pre-merging
+    /// the (newer) remote head back in first.
+    pending_restore: bool,
+}
+
+async fn load_connection(state: &AppState) -> AppResult<Option<Connection>> {
+    let Some(raw) = settings_repo::get(&state.db, CONNECTION_KEY)
+        .await?
+        .filter(|v| !v.is_empty())
+    else {
+        return Ok(None);
+    };
+    Ok(Some(serde_json::from_str(&raw)?))
+}
+
+async fn require_connection(state: &AppState) -> AppResult<Connection> {
+    load_connection(state)
+        .await?
+        .ok_or_else(|| AppError::Invalid("sync is not connected".into()))
+}
+
+async fn save_connection(state: &AppState, conn: &Connection) -> AppResult<()> {
+    settings_repo::set(&state.db, CONNECTION_KEY, &serde_json::to_string(conn)?).await
+}
 
 /// Non-secret view of the sync state handed to the UI.
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStatus {
     /// Connected provider, `None` when sync is not set up.
@@ -64,7 +102,7 @@ pub struct SyncStatus {
     pub oauth_ready: OAuthReady,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthReady {
     pub gist: bool,
@@ -74,18 +112,36 @@ pub struct OAuthReady {
 
 /// Outcome of `sync_connect`, tagged so the frontend can branch without
 /// treating a passphrase mismatch as a hard error.
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 #[serde(tag = "status", rename_all = "camelCase")]
 pub enum ConnectOutcome {
     Connected,
     /// A backup exists but the passphrase can't decrypt it. Nothing was
     /// persisted — retry with another passphrase, or `force: true` to
-    /// overwrite the remote.
+    /// clear the remote history without uploading a replacement backup.
     PassphraseMismatch,
 }
 
+/// Outcome of `sync_push`, so the UI can tell a real new backup from a
+/// no-op where the latest backup already contains the same data.
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum PushOutcome {
+    Pushed,
+    Unchanged,
+}
+
+/// Outcome of `sync_restore_version`. `remote_synced` is true when the
+/// restored revision is also the provider's latest backup; otherwise the next
+/// explicit push publishes the rollback.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreOutcome {
+    pub remote_synced: bool,
+}
+
 /// Resolved account label returned by a completed OAuth flow.
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthAccount {
     pub account: String,
@@ -114,53 +170,14 @@ struct S3Settings {
     path_style: bool,
 }
 
-async fn stored_config(state: &AppState) -> AppResult<Option<ProviderConfig>> {
-    let Some(raw) = settings_repo::get(&state.db, CONFIG_KEY)
-        .await?
-        .filter(|v| !v.is_empty())
-    else {
-        return Ok(None);
-    };
-    Ok(Some(serde_json::from_str(&raw)?))
-}
-
-async fn require_config(state: &AppState) -> AppResult<ProviderConfig> {
-    stored_config(state)
-        .await?
-        .ok_or_else(|| AppError::Invalid("sync is not connected".into()))
-}
-
-async fn require_passphrase(state: &AppState) -> AppResult<String> {
-    settings_repo::get(&state.db, PASSPHRASE_KEY)
-        .await?
-        .filter(|p| !p.is_empty())
-        .ok_or_else(|| AppError::Invalid("no vault passphrase configured for sync".into()))
-}
-
-/// Persist the provider's (possibly mutated) config — refreshed OAuth
-/// tokens, discovered gist ids — after any provider operation.
-async fn persist_config(state: &AppState, config: &ProviderConfig) -> AppResult<()> {
-    settings_repo::set(&state.db, CONFIG_KEY, &serde_json::to_string(config)?).await
-}
-
-async fn mark_synced(state: &AppState) -> AppResult<()> {
-    settings_repo::set(&state.db, LAST_SYNCED_KEY, &now()).await
-}
-
 #[tauri::command]
 pub async fn sync_get_status(state: State<'_, AppState>) -> AppResult<SyncStatus> {
-    let config = stored_config(&state).await?;
-    let account = settings_repo::get(&state.db, ACCOUNT_KEY)
-        .await?
-        .filter(|v| !v.is_empty());
-    let last_synced_at = settings_repo::get(&state.db, LAST_SYNCED_KEY)
-        .await?
-        .filter(|v| !v.is_empty());
+    let conn = load_connection(&state).await?;
     Ok(SyncStatus {
-        provider: config.as_ref().map(|c| c.kind()),
-        detail: config.as_ref().and_then(|c| c.detail()),
-        account,
-        last_synced_at,
+        provider: conn.as_ref().map(|c| c.config.kind()),
+        detail: conn.as_ref().and_then(|c| c.config.detail()),
+        account: conn.as_ref().map(|c| c.account.clone()),
+        last_synced_at: conn.and_then(|c| c.last_synced_at),
         oauth_ready: OAuthReady {
             gist: oauth::GITHUB_CLIENT_ID.is_some_and(|v| !v.is_empty()),
             gdrive: oauth::GOOGLE_CLIENT_ID.is_some_and(|v| !v.is_empty())
@@ -342,7 +359,7 @@ pub async fn sync_connect(
     if passphrase.is_empty() {
         return Err(AppError::Invalid("passphrase is required".into()));
     }
-    if stored_config(&state).await?.is_some() {
+    if load_connection(&state).await?.is_some() {
         return Err(AppError::Invalid(
             "sync is already connected — disconnect first to switch providers".into(),
         ));
@@ -351,44 +368,34 @@ pub async fn sync_connect(
     let (config, account) = build_config(&state, kind, settings)?;
     let mut backend = sync::make_provider(config)?;
 
-    // Probe the target before persisting anything: an existing backup is
-    // merged in (or reported as a mismatch); only then does the connection
-    // become real.
-    let remote = backend.pull_latest().await?;
-    let mut remote_fingerprint = None;
-    match remote {
-        Some(envelope) if !force => match crypto::decrypt(&envelope, &passphrase) {
-            Ok(bytes) => {
-                let snapshot: sync::VaultSnapshot = serde_json::from_slice(&bytes)?;
-                remote_fingerprint = Some(snapshot.content_fingerprint());
+    // Probe the target before persisting anything. A regular connect merges
+    // the existing latest backup into local data; force-connect clears
+    // undecryptable remote history but never uploads a replacement backup.
+    let mut last_synced_at = None;
+    match backend.pull_latest().await? {
+        Some(_) if force => backend.clear().await?,
+        Some(envelope) => match sync::decrypt_snapshot(&envelope, &passphrase) {
+            Ok(snapshot) => {
                 sync::import_snapshot(&state.db, &snapshot).await?;
+                last_synced_at = Some(now());
             }
             Err(AppError::Crypto(_)) => return Ok(ConnectOutcome::PassphraseMismatch),
             Err(err) => return Err(err),
         },
-        _ => {}
+        None => {}
     }
 
-    // Seal the (merged) local vault and make it the newest backup — but only
-    // when connecting actually changes what the remote holds. A bare
-    // reconnect to a target that already matches local data would otherwise
-    // stamp out a new, content-identical backup revision every time,
-    // needlessly burning through the provider's version history.
-    let snapshot = sync::export_snapshot(&state.db).await?;
-    if force || remote_fingerprint.as_ref() != Some(&snapshot.content_fingerprint()) {
-        let sealed = crypto::encrypt(&serde_json::to_vec(&snapshot)?, &passphrase)?;
-        if force {
-            backend.reset(&sealed).await?;
-        } else {
-            backend.push(&sealed).await?;
-        }
-    }
-
-    settings_repo::set(&state.db, PROVIDER_KEY, &provider).await?;
-    persist_config(&state, &backend.config()).await?;
-    settings_repo::set(&state.db, ACCOUNT_KEY, &account).await?;
-    settings_repo::set(&state.db, PASSPHRASE_KEY, &passphrase).await?;
-    mark_synced(&state).await?;
+    save_connection(
+        &state,
+        &Connection {
+            config: backend.config(),
+            account,
+            passphrase,
+            last_synced_at,
+            pending_restore: false,
+        },
+    )
+    .await?;
     state.sync_oauth.lock().pending = None;
 
     Ok(ConnectOutcome::Connected)
@@ -398,73 +405,94 @@ pub async fn sync_connect(
 /// untouched.
 #[tauri::command]
 pub async fn sync_disconnect(state: State<'_, AppState>) -> AppResult<()> {
-    for key in [
-        PROVIDER_KEY,
-        CONFIG_KEY,
-        ACCOUNT_KEY,
-        PASSPHRASE_KEY,
-        LAST_SYNCED_KEY,
-    ] {
-        settings_repo::set(&state.db, key, "").await?;
-    }
+    settings_repo::set(&state.db, CONNECTION_KEY, "").await?;
     state.sync_oauth.lock().pending = None;
     Ok(())
 }
 
 /// Merge the remote backup into the local vault (so edits from other devices
-/// survive), then push the result as a new backup revision.
+/// survive), then push the result as a new backup revision when content
+/// changed. Skipping content-identical pushes keeps the provider's limited
+/// version history from filling up with redundant revisions.
 #[tauri::command]
-pub async fn sync_push(state: State<'_, AppState>) -> AppResult<()> {
-    let config = require_config(&state).await?;
-    let passphrase = require_passphrase(&state).await?;
-    let mut backend = sync::make_provider(config)?;
+pub async fn sync_push(state: State<'_, AppState>) -> AppResult<PushOutcome> {
+    let mut conn = require_connection(&state).await?;
+    let mut backend = sync::make_provider(conn.config.clone())?;
 
-    let mut remote_fingerprint = None;
-    if let Some(envelope) = backend.pull_latest().await? {
-        // Left as `AppError::Crypto` (code "crypto") rather than rewrapped with
-        // an English explanation here — the frontend maps the code to a
-        // localized, context-appropriate message instead.
-        let snapshot = sync::import_encrypted(&state.db, &envelope, &passphrase).await?;
-        remote_fingerprint = Some(snapshot.content_fingerprint());
+    let remote = match backend.pull_latest().await? {
+        Some(envelope) => Some(sync::decrypt_snapshot(&envelope, &conn.passphrase)?),
+        None => None,
+    };
+
+    // Pre-merge the remote head — unless the user just rolled back to an
+    // older backup, whose whole point is to override newer remote rows.
+    if !conn.pending_restore {
+        if let Some(snapshot) = &remote {
+            sync::import_snapshot(&state.db, snapshot).await?;
+        }
     }
 
-    // Skip pushing when the merged local vault already matches the remote —
-    // an unconditional push here would otherwise add a content-identical
-    // backup revision every time the user hits "sync now" with nothing new
-    // to contribute, crowding out the provider's limited version history.
-    let snapshot = sync::export_snapshot(&state.db).await?;
-    if remote_fingerprint.as_ref() != Some(&snapshot.content_fingerprint()) {
-        let sealed = crypto::encrypt(&serde_json::to_vec(&snapshot)?, &passphrase)?;
+    let local = sync::export_snapshot(&state.db).await?;
+    let unchanged = remote
+        .as_ref()
+        .is_some_and(|r| r.content_fingerprint() == local.content_fingerprint());
+    if !unchanged {
+        let sealed = crate::crypto::encrypt(&serde_json::to_vec(&local)?, &conn.passphrase)?;
         backend.push(&sealed).await?;
     }
 
-    persist_config(&state, &backend.config()).await?;
-    mark_synced(&state).await
+    conn.config = backend.config();
+    conn.pending_restore = false;
+    conn.last_synced_at = Some(now());
+    save_connection(&state, &conn).await?;
+
+    Ok(if unchanged {
+        PushOutcome::Unchanged
+    } else {
+        PushOutcome::Pushed
+    })
 }
 
 /// Backup history of the connected provider, newest first.
 #[tauri::command]
 pub async fn sync_list_versions(state: State<'_, AppState>) -> AppResult<Vec<SyncVersion>> {
-    let config = require_config(&state).await?;
-    let mut backend = sync::make_provider(config)?;
+    let mut conn = require_connection(&state).await?;
+    let mut backend = sync::make_provider(conn.config.clone())?;
     let versions = backend.list_versions().await?;
-    persist_config(&state, &backend.config()).await?;
+    conn.config = backend.config();
+    save_connection(&state, &conn).await?;
     Ok(versions)
 }
 
 /// Roll the local vault back to one specific backup revision. This replaces
-/// local data outright (see [`sync::restore_snapshot`]) — it is not a merge.
+/// local data outright (see [`sync::restore_snapshot`]) — it is not a merge,
+/// and it never uploads anything: the user may be trying several backups, so
+/// only the next explicit push publishes the chosen state.
 #[tauri::command]
-pub async fn sync_restore_version(state: State<'_, AppState>, id: String) -> AppResult<()> {
-    let config = require_config(&state).await?;
-    let passphrase = require_passphrase(&state).await?;
-    let mut backend = sync::make_provider(config)?;
+pub async fn sync_restore_version(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<RestoreOutcome> {
+    let mut conn = require_connection(&state).await?;
+    let mut backend = sync::make_provider(conn.config.clone())?;
+
+    let target_is_latest = backend
+        .list_versions()
+        .await?
+        .first()
+        .is_some_and(|version| version.id == id);
 
     let envelope = backend.pull_version(&id).await?;
-    sync::restore_encrypted(&state.db, &envelope, &passphrase).await?;
+    sync::restore_encrypted(&state.db, &envelope, &conn.passphrase).await?;
 
-    persist_config(&state, &backend.config()).await?;
-    mark_synced(&state).await
+    conn.config = backend.config();
+    conn.pending_restore = !target_is_latest;
+    conn.last_synced_at = Some(now());
+    save_connection(&state, &conn).await?;
+
+    Ok(RestoreOutcome {
+        remote_synced: target_is_latest,
+    })
 }
 
 /// Encrypt the full data set with a caller-supplied passphrase and write it

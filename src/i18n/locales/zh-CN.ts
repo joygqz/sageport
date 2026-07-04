@@ -464,9 +464,9 @@ export const zhCN: Dictionary = {
         connectError: "连接失败",
         mismatchTitle: "口令不匹配",
         mismatchDescription:
-          "此口令无法解密已有备份。请输入原口令，或清空远端备份历史、用本设备的数据重新开始。",
+          "此口令无法解密已有备份。请输入原口令，或清空远端备份历史，准备好后再手动点击立即备份。",
         mismatchCancelButton: "重新输入",
-        mismatchForceButton: "覆盖远端备份",
+        mismatchForceButton: "清空远端历史",
       },
       connected: {
         badge: "已连接",
@@ -475,6 +475,8 @@ export const zhCN: Dictionary = {
         neverSynced: "从未同步",
         pushButton: "立即备份",
         pushedTitle: "备份完成",
+        unchangedTitle: "已是最新备份",
+        unchangedDescription: "当前数据与最新备份一致，未新增备份记录。",
         pushFailed: "备份失败",
         pushWrongPassphrase:
           "已连接的备份无法再用本设备的口令解密，可能已在其他设备上被重新加密。请断开连接后使用正确的口令重新连接。",
@@ -499,6 +501,8 @@ export const zhCN: Dictionary = {
           "全部本地数据将被所选备份替换，此后产生的更改会丢失且无法找回。",
         restoreConfirmButton: "恢复并覆盖",
         restoredTitle: "备份已恢复",
+        restoredPendingDescription:
+          "尚未上传新备份。确认这是要保留的版本后，再点击“立即备份”。",
         restoreFailed: "恢复失败",
         restoreWrongPassphrase:
           "该备份使用的口令与当前同步配置的口令不同。请断开连接后使用正确的口令重新连接，再重新尝试恢复。",

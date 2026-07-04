@@ -1,27 +1,23 @@
-//! Google Drive provider.
+//! Google Drive object store.
 //!
 //! Backups live in the app-scoped `appDataFolder` (hidden from the user's
-//! normal Drive view, only reachable with the `drive.appdata` scope), one
-//! timestamped object per push. Access tokens are refreshed transparently;
-//! the updated token set surfaces through [`SyncProvider::config`].
+//! normal Drive view, only reachable with the `drive.appdata` scope). Access
+//! tokens are refreshed transparently; the updated token set surfaces through
+//! [`ObjectStore::config`].
 
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::crypto::EncryptedEnvelope;
 use crate::error::{AppError, AppResult};
 
 use super::oauth::{self, OAuthTokens};
-use super::provider::{
-    is_vault_filename, version_filename, version_time_from_name, ProviderConfig, SyncProvider,
-    SyncVersion, KEEP_VERSIONS,
-};
+use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
 
 const FILES_API: &str = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_API: &str = "https://www.googleapis.com/upload/drive/v3/files";
 
-pub struct GdriveProvider {
+pub struct GdriveStore {
     http: reqwest::Client,
     tokens: OAuthTokens,
 }
@@ -34,7 +30,7 @@ struct FileList {
     next_page_token: Option<String>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 struct DriveFile {
     id: String,
     name: String,
@@ -42,7 +38,7 @@ struct DriveFile {
     size: Option<String>,
 }
 
-impl GdriveProvider {
+impl GdriveStore {
     pub fn new(tokens: OAuthTokens) -> Self {
         Self {
             http: reqwest::Client::new(),
@@ -56,12 +52,13 @@ impl GdriveProvider {
         }
         Ok(self.tokens.access_token.clone())
     }
+}
 
-    /// All vault objects in `appDataFolder`, newest first (by embedded
-    /// timestamp — Drive file ids are opaque, so names carry the ordering).
-    async fn list_files(&mut self) -> AppResult<Vec<DriveFile>> {
+#[async_trait]
+impl ObjectStore for GdriveStore {
+    async fn list(&mut self) -> AppResult<Vec<RemoteObject>> {
         let token = self.token().await?;
-        let mut files: Vec<DriveFile> = Vec::new();
+        let mut objects = Vec::new();
         let mut page_token: Option<String> = None;
         loop {
             let mut req = self.http.get(FILES_API).bearer_auth(&token).query(&[
@@ -74,25 +71,24 @@ impl GdriveProvider {
             }
             let body = send_json(req).await?;
             let page: FileList = serde_json::from_value(body)?;
-            files.extend(
-                page.files
-                    .into_iter()
-                    .filter(|f| is_vault_filename(&f.name)),
-            );
+            objects.extend(page.files.into_iter().map(|f| RemoteObject {
+                id: f.id,
+                name: f.name,
+                size: f.size.and_then(|s| s.parse().ok()),
+            }));
             match page.next_page_token {
                 Some(t) => page_token = Some(t),
                 None => break,
             }
         }
-        files.sort_by(|a, b| b.name.cmp(&a.name));
-        Ok(files)
+        Ok(objects)
     }
 
-    async fn download(&mut self, file_id: &str) -> AppResult<EncryptedEnvelope> {
+    async fn get(&mut self, id: &str) -> AppResult<Vec<u8>> {
         let token = self.token().await?;
         let resp = self
             .http
-            .get(format!("{FILES_API}/{file_id}"))
+            .get(format!("{FILES_API}/{id}"))
             .bearer_auth(&token)
             .query(&[("alt", "media")])
             .send()
@@ -103,12 +99,11 @@ impl GdriveProvider {
         if !status.is_success() {
             return Err(api_err("Google Drive download", status, &bytes));
         }
-        Ok(serde_json::from_slice(&bytes)?)
+        Ok(bytes.to_vec())
     }
 
-    async fn upload(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
+    async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
         let token = self.token().await?;
-        let name = version_filename();
         // Drive's multipart upload is `multipart/related` (metadata part +
         // content part), which reqwest's form-data helper can't produce —
         // build the body by hand.
@@ -116,10 +111,9 @@ impl GdriveProvider {
         let metadata = serde_json::to_string(
             &serde_json::json!({ "name": name, "parents": ["appDataFolder"] }),
         )?;
-        let content = serde_json::to_string_pretty(envelope)?;
-        let body = format!(
+        let payload = format!(
             "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n\
-             --{boundary}\r\nContent-Type: application/json\r\n\r\n{content}\r\n--{boundary}--"
+             --{boundary}\r\nContent-Type: application/json\r\n\r\n{body}\r\n--{boundary}--"
         );
         let req = self
             .http
@@ -130,16 +124,16 @@ impl GdriveProvider {
                 "Content-Type",
                 format!("multipart/related; boundary={boundary}"),
             )
-            .body(body);
+            .body(payload);
         send_json(req).await?;
         Ok(())
     }
 
-    async fn delete(&mut self, file_id: &str) -> AppResult<()> {
+    async fn delete(&mut self, id: &str) -> AppResult<()> {
         let token = self.token().await?;
         let resp = self
             .http
-            .delete(format!("{FILES_API}/{file_id}"))
+            .delete(format!("{FILES_API}/{id}"))
             .bearer_auth(&token)
             .send()
             .await
@@ -150,55 +144,6 @@ impl GdriveProvider {
         }
         let bytes = resp.bytes().await.unwrap_or_default();
         Err(api_err("Google Drive delete", status, &bytes))
-    }
-
-    async fn prune(&mut self) -> AppResult<()> {
-        let files = self.list_files().await?;
-        for file in files.into_iter().skip(KEEP_VERSIONS) {
-            self.delete(&file.id).await?;
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl SyncProvider for GdriveProvider {
-    async fn pull_latest(&mut self) -> AppResult<Option<EncryptedEnvelope>> {
-        match self.list_files().await?.first() {
-            Some(latest) => Ok(Some(self.download(&latest.id.clone()).await?)),
-            None => Ok(None),
-        }
-    }
-
-    async fn push(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        self.upload(envelope).await?;
-        self.prune().await
-    }
-
-    async fn list_versions(&mut self) -> AppResult<Vec<SyncVersion>> {
-        Ok(self
-            .list_files()
-            .await?
-            .into_iter()
-            .filter_map(|f| {
-                Some(SyncVersion {
-                    created_at: version_time_from_name(&f.name)?,
-                    id: f.id,
-                    size_bytes: f.size.and_then(|s| s.parse().ok()),
-                })
-            })
-            .collect())
-    }
-
-    async fn pull_version(&mut self, id: &str) -> AppResult<EncryptedEnvelope> {
-        self.download(id).await
-    }
-
-    async fn reset(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        for file in self.list_files().await? {
-            self.delete(&file.id).await?;
-        }
-        self.upload(envelope).await
     }
 
     fn config(&self) -> ProviderConfig {

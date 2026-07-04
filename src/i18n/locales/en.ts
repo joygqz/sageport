@@ -477,9 +477,9 @@ export const en = {
         connectError: "Failed to connect",
         mismatchTitle: "Passphrase does not match",
         mismatchDescription:
-          "This passphrase cannot decrypt the existing backup. Enter the original passphrase, or wipe the remote backup history and start over with the data on this device.",
+          "This passphrase cannot decrypt the existing backup. Enter the original passphrase, or clear the remote backup history and back up manually when ready.",
         mismatchCancelButton: "Try again",
-        mismatchForceButton: "Overwrite remote backup",
+        mismatchForceButton: "Clear remote history",
       },
       connected: {
         badge: "Connected",
@@ -488,6 +488,9 @@ export const en = {
         neverSynced: "never",
         pushButton: "Back up now",
         pushedTitle: "Backup complete",
+        unchangedTitle: "Already backed up",
+        unchangedDescription:
+          "Current data matches the latest backup, so no new backup was added.",
         pushFailed: "Backup failed",
         pushWrongPassphrase:
           "The connected backup can no longer be decrypted with this device's passphrase — it may have been re-encrypted from another device. Disconnect and reconnect with the correct passphrase to resolve.",
@@ -513,6 +516,8 @@ export const en = {
           "All local data will be replaced by the selected backup. Changes made since then are lost and cannot be recovered.",
         restoreConfirmButton: "Restore and overwrite",
         restoredTitle: "Backup restored",
+        restoredPendingDescription:
+          "No backup was uploaded. When this is the version you want to keep, click Back up now.",
         restoreFailed: "Restore failed",
         restoreWrongPassphrase:
           "This backup was sealed with a different passphrase than the one currently configured for sync. Disconnect and reconnect with the correct passphrase, then try restoring again.",

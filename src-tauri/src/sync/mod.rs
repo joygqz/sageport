@@ -33,7 +33,7 @@ use crate::domain::{now, Group, Host, Identity, Snippet, SshKey};
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 
-const SNAPSHOT_VERSION: u32 = 2;
+const SNAPSHOT_VERSION: u32 = 4;
 
 /// Setting keys under these prefixes never travel in a vault snapshot — they
 /// are per-device, not user data:
@@ -191,6 +191,18 @@ pub async fn export_encrypted(pool: &SqlitePool, passphrase: &str) -> AppResult<
     crypto::encrypt(&bytes, passphrase)
 }
 
+/// Decrypt an encrypted vault without importing it, so the caller can compare
+/// content fingerprints before deciding whether to merge or push.
+pub fn decrypt_snapshot(
+    envelope: &EncryptedEnvelope,
+    passphrase: &str,
+) -> AppResult<VaultSnapshot> {
+    let bytes = crypto::decrypt(envelope, passphrase)?;
+    let snapshot: VaultSnapshot = serde_json::from_slice(&bytes)?;
+    validate_snapshot(&snapshot)?;
+    Ok(snapshot)
+}
+
 /// Decrypt, merge, and hand back the remote snapshot so the caller can
 /// compare its [`VaultSnapshot::content_fingerprint`] against a fresh local
 /// export before deciding whether pushing again would be redundant.
@@ -199,8 +211,7 @@ pub async fn import_encrypted(
     envelope: &EncryptedEnvelope,
     passphrase: &str,
 ) -> AppResult<VaultSnapshot> {
-    let bytes = crypto::decrypt(envelope, passphrase)?;
-    let snapshot: VaultSnapshot = serde_json::from_slice(&bytes)?;
+    let snapshot = decrypt_snapshot(envelope, passphrase)?;
     import_snapshot(pool, &snapshot).await?;
     Ok(snapshot)
 }
@@ -264,8 +275,7 @@ pub async fn restore_encrypted(
     envelope: &EncryptedEnvelope,
     passphrase: &str,
 ) -> AppResult<()> {
-    let bytes = crypto::decrypt(envelope, passphrase)?;
-    let snapshot: VaultSnapshot = serde_json::from_slice(&bytes)?;
+    let snapshot = decrypt_snapshot(envelope, passphrase)?;
     restore_snapshot(pool, &snapshot).await
 }
 
@@ -286,7 +296,7 @@ pub fn read_envelope_file(path: &Path) -> AppResult<EncryptedEnvelope> {
 }
 
 fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
-    if snapshot.version == 0 || snapshot.version > SNAPSHOT_VERSION {
+    if snapshot.version != SNAPSHOT_VERSION {
         return Err(AppError::Invalid(format!(
             "unsupported vault version {}",
             snapshot.version

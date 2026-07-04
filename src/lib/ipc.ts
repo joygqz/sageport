@@ -32,6 +32,8 @@ import type {
   SyncOAuthEvent,
   SyncProviderKind,
   SyncProviderSettings,
+  SyncPushOutcome,
+  SyncRestoreOutcome,
   SyncStatus,
   SyncVersion,
   TransferEvent,
@@ -192,12 +194,13 @@ export const ipc = {
       force: boolean;
     }) => invoke<SyncConnectOutcome>("sync_connect", input),
     disconnect: () => invoke<void>("sync_disconnect"),
-    /** Merge the remote backup into local data, then push a new revision. */
-    push: () => invoke<void>("sync_push"),
+    /** Merge the remote backup into local data, pushing only when content changed. */
+    push: () => invoke<SyncPushOutcome>("sync_push"),
     /** Newest-first backup history of the connected provider. */
     listVersions: () => invoke<SyncVersion[]>("sync_list_versions"),
     /** Destructive: replaces local data with the chosen revision. */
-    restoreVersion: (id: string) => invoke<void>("sync_restore_version", { id }),
+    restoreVersion: (id: string) =>
+      invoke<SyncRestoreOutcome>("sync_restore_version", { id }),
     /** `passphrase` is entered manually each call and never persisted. */
     fileExport: (path: string, passphrase: string) =>
       invoke<void>("sync_file_export", { path, passphrase }),

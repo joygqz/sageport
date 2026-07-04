@@ -1,4 +1,4 @@
-import { CheckCircle2, Info, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useToastStore, type ToastKind } from "@/lib/toast";
@@ -6,12 +6,14 @@ import { useToastStore, type ToastKind } from "@/lib/toast";
 const iconFor: Record<ToastKind, typeof Info> = {
   info: Info,
   success: CheckCircle2,
+  warning: AlertTriangle,
   error: XCircle,
 };
 
 const accentFor: Record<ToastKind, string> = {
   info: "text-info",
   success: "text-success",
+  warning: "text-warning",
   error: "text-destructive",
 };
 

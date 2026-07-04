@@ -66,8 +66,15 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
 
   const doPush = async () => {
     try {
-      await push.mutateAsync();
-      toast.success(t("settings.sync.connected.pushedTitle"));
+      const outcome = await push.mutateAsync();
+      if (outcome.status === "unchanged") {
+        toast.info(
+          t("settings.sync.connected.unchangedTitle"),
+          t("settings.sync.connected.unchangedDescription"),
+        );
+      } else {
+        toast.success(t("settings.sync.connected.pushedTitle"));
+      }
     } catch (err) {
       const code = errorCode(err);
       toast.error(
@@ -291,8 +298,13 @@ function RestoreConfirmDialog({
 
   const confirm = async (id: string) => {
     try {
-      await restore.mutateAsync(id);
-      toast.success(t("settings.sync.versions.restoredTitle"));
+      const outcome = await restore.mutateAsync(id);
+      toast.success(
+        t("settings.sync.versions.restoredTitle"),
+        outcome.remoteSynced
+          ? undefined
+          : t("settings.sync.versions.restoredPendingDescription"),
+      );
     } catch (err) {
       const code = errorCode(err);
       toast.error(
@@ -315,7 +327,8 @@ function RestoreConfirmDialog({
           {
             label: t("settings.sync.versions.restoreConfirmButton"),
             variant: "destructive",
-            onSelect: () => void confirm(target.id),
+            loading: restore.isPending,
+            onSelect: () => confirm(target.id),
           },
         ],
       }

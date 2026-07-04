@@ -244,6 +244,17 @@ export type SyncConnectOutcome =
   | { status: "connected" }
   | { status: "passphraseMismatch" };
 
+/** Result of `sync.push`: either a new backup was written, or local data
+ * already matches the latest backup. */
+export type SyncPushOutcome = { status: "pushed" } | { status: "unchanged" };
+
+/** Result of restoring a backup revision. `remoteSynced` is true when the
+ * restored revision is also the provider's latest backup; otherwise the next
+ * explicit push publishes the rollback. */
+export interface SyncRestoreOutcome {
+  remoteSynced: boolean;
+}
+
 /** Progress of an in-flight OAuth flow (streamed from `sync.oauthStart`). */
 export type SyncOAuthEvent =
   | { type: "deviceCode"; userCode: string; verificationUri: string }

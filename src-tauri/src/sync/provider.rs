@@ -5,9 +5,10 @@
 //! disconnecting and connecting the new one from scratch.
 //!
 //! Except for GitHub Gist (which rides the gist's native revision history),
-//! every provider uses the same layout: each push writes a new timestamped
-//! object named [`version_filename`], listing enumerates those objects, and
-//! pushes prune history down to [`KEEP_VERSIONS`].
+//! every backend is a plain object store: it only implements [`ObjectStore`]
+//! (list/get/put/delete), and the shared [`Versioned`] wrapper turns that
+//! into the full [`SyncProvider`] contract — timestamped object names,
+//! newest-first ordering, and pruning down to [`KEEP_VERSIONS`].
 
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
@@ -16,15 +17,15 @@ use serde::{Deserialize, Serialize};
 use crate::crypto::EncryptedEnvelope;
 use crate::error::{AppError, AppResult};
 
-use super::gdrive::GdriveProvider;
+use super::gdrive::GdriveStore;
 use super::gist::GistProvider;
 use super::oauth::OAuthTokens;
-use super::onedrive::OnedriveProvider;
-use super::s3::S3Provider;
-use super::webdav::WebdavProvider;
+use super::onedrive::OnedriveStore;
+use super::s3::S3Store;
+use super::webdav::WebdavStore;
 
-/// How many backup revisions the timestamped-object providers keep before
-/// pruning the oldest on push. Gist history is capped by GitHub itself.
+/// How many backup revisions the object-store providers keep before pruning
+/// the oldest on push. Gist history is capped by GitHub itself.
 pub const KEEP_VERSIONS: usize = 10;
 
 const FILE_PREFIX: &str = "sageport-vault-";
@@ -144,27 +145,126 @@ pub trait SyncProvider: Send {
     /// Fetch one specific revision from `list_versions`.
     async fn pull_version(&mut self, id: &str) -> AppResult<EncryptedEnvelope>;
 
-    /// Destroy the entire remote history and start over with `envelope`.
-    /// Used by force-connect so revisions sealed with an abandoned
-    /// passphrase don't linger in the version list.
-    async fn reset(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()>;
+    /// Destroy the entire remote history without creating a new backup. Used
+    /// by force-connect so only a later explicit `sync_push` writes data.
+    async fn clear(&mut self) -> AppResult<()>;
 
     /// Current config snapshot for persistence (may differ from the config
     /// the provider was built with — refreshed tokens, discovered ids).
     fn config(&self) -> ProviderConfig;
 }
 
+/// One backup object as an [`ObjectStore`] backend reports it.
+pub struct RemoteObject {
+    /// Store-scoped handle for get/delete (Drive file id, object key name...).
+    pub id: String,
+    /// The [`version_filename`] the object was stored under.
+    pub name: String,
+    pub size: Option<u64>,
+}
+
+/// Minimal contract for object-store backends (Drive, OneDrive, WebDAV, S3).
+/// Implementations only move bytes; all versioning semantics live in
+/// [`Versioned`].
+#[async_trait]
+pub trait ObjectStore: Send {
+    /// Every object in the backup location, in any order; [`Versioned`]
+    /// filters foreign names and sorts.
+    async fn list(&mut self) -> AppResult<Vec<RemoteObject>>;
+    async fn get(&mut self, id: &str) -> AppResult<Vec<u8>>;
+    async fn put(&mut self, name: &str, body: String) -> AppResult<()>;
+    /// Deleting an object that is already gone must succeed.
+    async fn delete(&mut self, id: &str) -> AppResult<()>;
+    fn config(&self) -> ProviderConfig;
+}
+
+/// Adapter turning any [`ObjectStore`] into a [`SyncProvider`]: one
+/// timestamped object per push, newest-first listing by embedded timestamp,
+/// history pruned to [`KEEP_VERSIONS`].
+pub struct Versioned<S>(pub S);
+
+impl<S: ObjectStore> Versioned<S> {
+    /// Vault objects, newest first (names embed the creation time and sort
+    /// lexicographically in chronological order).
+    async fn objects(&mut self) -> AppResult<Vec<RemoteObject>> {
+        let mut objects: Vec<RemoteObject> = self
+            .0
+            .list()
+            .await?
+            .into_iter()
+            .filter(|o| is_vault_filename(&o.name))
+            .collect();
+        objects.sort_by(|a, b| b.name.cmp(&a.name));
+        Ok(objects)
+    }
+
+    async fn fetch(&mut self, id: &str) -> AppResult<EncryptedEnvelope> {
+        let bytes = self.0.get(id).await?;
+        Ok(serde_json::from_slice(&bytes)?)
+    }
+}
+
+#[async_trait]
+impl<S: ObjectStore> SyncProvider for Versioned<S> {
+    async fn pull_latest(&mut self) -> AppResult<Option<EncryptedEnvelope>> {
+        match self.objects().await?.first() {
+            Some(latest) => Ok(Some(self.fetch(&latest.id.clone()).await?)),
+            None => Ok(None),
+        }
+    }
+
+    async fn push(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
+        // Pretty JSON so a backup stays inspectable on the remote.
+        let body = serde_json::to_string_pretty(envelope)?;
+        self.0.put(&version_filename(), body).await?;
+        for stale in self.objects().await?.into_iter().skip(KEEP_VERSIONS) {
+            self.0.delete(&stale.id).await?;
+        }
+        Ok(())
+    }
+
+    async fn list_versions(&mut self) -> AppResult<Vec<SyncVersion>> {
+        Ok(self
+            .objects()
+            .await?
+            .into_iter()
+            .filter_map(|o| {
+                Some(SyncVersion {
+                    created_at: version_time_from_name(&o.name)?,
+                    id: o.id,
+                    size_bytes: o.size,
+                })
+            })
+            .collect())
+    }
+
+    async fn pull_version(&mut self, id: &str) -> AppResult<EncryptedEnvelope> {
+        self.fetch(id).await
+    }
+
+    async fn clear(&mut self) -> AppResult<()> {
+        for object in self.objects().await? {
+            self.0.delete(&object.id).await?;
+        }
+        Ok(())
+    }
+
+    fn config(&self) -> ProviderConfig {
+        self.0.config()
+    }
+}
+
 /// Instantiate the provider for a stored config.
 pub fn make_provider(config: ProviderConfig) -> AppResult<Box<dyn SyncProvider>> {
     Ok(match config {
         ProviderConfig::Gist { token, gist_id } => Box::new(GistProvider::new(token, gist_id)),
-        ProviderConfig::Gdrive { tokens } => Box::new(GdriveProvider::new(tokens)),
-        ProviderConfig::Onedrive { tokens } => Box::new(OnedriveProvider::new(tokens)),
+        ProviderConfig::Gdrive { tokens } => Box::new(Versioned(GdriveStore::new(tokens))),
+        ProviderConfig::Onedrive { tokens } => Box::new(Versioned(OnedriveStore::new(tokens))),
         ProviderConfig::Webdav {
             url,
             username,
             password,
-        } => Box::new(WebdavProvider::new(url, username, password)?),
+        } => Box::new(Versioned(WebdavStore::new(url, username, password)?)),
         ProviderConfig::S3 {
             endpoint,
             region,
@@ -173,9 +273,9 @@ pub fn make_provider(config: ProviderConfig) -> AppResult<Box<dyn SyncProvider>>
             access_key,
             secret_key,
             path_style,
-        } => Box::new(S3Provider::new(
+        } => Box::new(Versioned(S3Store::new(
             endpoint, region, bucket, prefix, access_key, secret_key, path_style,
-        )?),
+        )?)),
     })
 }
 

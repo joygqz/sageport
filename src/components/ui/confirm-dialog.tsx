@@ -12,7 +12,9 @@ import {
 export interface ConfirmAction {
   label: string;
   variant?: ButtonProps["variant"];
-  onSelect: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  onSelect: () => void | Promise<void>;
 }
 
 export interface ConfirmState {
@@ -31,8 +33,10 @@ export function ConfirmDialog({
   state: ConfirmState | null;
   onClose: () => void;
 }) {
+  const busy = state?.actions.some((action) => action.loading) ?? false;
+
   return (
-    <Dialog open={!!state} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={!!state} onOpenChange={(open) => !open && !busy && onClose()}>
       <DialogContent className="max-w-sm">
         {state && (
           <>
@@ -43,16 +47,18 @@ export function ConfirmDialog({
               )}
             </DialogHeader>
             <DialogFooter>
-              <Button variant="ghost" onClick={onClose}>
+              <Button variant="ghost" onClick={onClose} disabled={busy}>
                 {state.cancelLabel}
               </Button>
               {state.actions.map((action) => (
                 <Button
                   key={action.label}
                   variant={action.variant ?? "primary"}
-                  onClick={() => {
+                  loading={action.loading}
+                  disabled={action.disabled || busy}
+                  onClick={async () => {
+                    await action.onSelect();
                     onClose();
-                    action.onSelect();
                   }}
                 >
                   {action.label}
