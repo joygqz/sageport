@@ -83,6 +83,10 @@ struct StatusEvent {
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
+    /// Machine-readable [`AppError::code`], set only for "error" — lets the
+    /// frontend show a localized message instead of the raw `message` above.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
 }
 
 type SessionMap = Arc<Mutex<HashMap<String, SessionHandle>>>;
@@ -162,13 +166,26 @@ impl SessionManager {
     }
 }
 
-fn emit_status(app: &AppHandle, id: &str, status: &str, message: Option<String>) {
+fn emit_status(app: &AppHandle, id: &str, status: &str) {
     let _ = app.emit(
         EVENT_STATUS,
         StatusEvent {
             id: id.to_string(),
             status: status.to_string(),
-            message,
+            message: None,
+            code: None,
+        },
+    );
+}
+
+fn emit_error_status(app: &AppHandle, id: &str, err: &AppError) {
+    let _ = app.emit(
+        EVENT_STATUS,
+        StatusEvent {
+            id: id.to_string(),
+            status: "error".to_string(),
+            message: Some(err.to_string()),
+            code: Some(err.code().to_string()),
         },
     );
 }
@@ -176,12 +193,12 @@ fn emit_status(app: &AppHandle, id: &str, status: &str, message: Option<String>)
 /// Blocking session lifecycle, run on a dedicated thread.
 fn run_session(app: AppHandle, params: ConnectParams, rx: Receiver<SessionCommand>) {
     let id = params.session_id.clone();
-    emit_status(&app, &id, "connecting", None);
+    emit_status(&app, &id, "connecting");
 
     if let Err(e) = run_session_inner(&app, &params, rx) {
-        emit_status(&app, &id, "error", Some(e.to_string()));
+        emit_error_status(&app, &id, &e);
     } else {
-        emit_status(&app, &id, "closed", None);
+        emit_status(&app, &id, "closed");
     }
 }
 
@@ -218,7 +235,7 @@ fn run_session_inner(
     )?;
     channel.shell()?;
 
-    emit_status(app, id, "connected", None);
+    emit_status(app, id, "connected");
 
     // Ask libssh2 to keep the connection alive so idle sessions are not
     // dropped by the server or an intervening NAT/firewall. `want_reply =
@@ -338,34 +355,49 @@ fn run_session_inner(
     }
 }
 
+/// libssh2 codes meaning "the server understood the request and rejected
+/// these credentials", as opposed to a network/protocol-level failure —
+/// distinguished so a wrong password/key surfaces as [`AppError::Auth`]
+/// rather than a raw libssh2 error string.
+const AUTH_REJECTED_CODES: [i32; 4] = [
+    -15, // LIBSSH2_ERROR_PASSWORD_EXPIRED
+    -18, // LIBSSH2_ERROR_AUTHENTICATION_FAILED (also PUBLICKEY_UNRECOGNIZED)
+    -19, // LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED
+    -48, // LIBSSH2_ERROR_KEYFILE_AUTH_FAILED
+];
+
+fn map_auth_error(e: ssh2::Error) -> AppError {
+    match e.code() {
+        ssh2::ErrorCode::Session(code) if AUTH_REJECTED_CODES.contains(&code) => {
+            AppError::Auth("the server rejected these credentials".into())
+        }
+        _ => AppError::Ssh(e),
+    }
+}
+
 pub(crate) fn authenticate(
     session: &ssh2::Session,
     username: &str,
     auth: &AuthMethod,
 ) -> AppResult<()> {
     match auth {
-        AuthMethod::Password(password) => {
-            session.userauth_password(username, password)?;
-        }
+        AuthMethod::Password(password) => session.userauth_password(username, password),
         AuthMethod::Key {
             private_key,
             public_key,
             passphrase,
-        } => {
-            session.userauth_pubkey_memory(
-                username,
-                public_key.as_deref(),
-                private_key,
-                passphrase.as_deref(),
-            )?;
-        }
-        AuthMethod::Agent => {
-            session.userauth_agent(username)?;
-        }
+        } => session.userauth_pubkey_memory(
+            username,
+            public_key.as_deref(),
+            private_key,
+            passphrase.as_deref(),
+        ),
+        AuthMethod::Agent => session.userauth_agent(username),
     }
+    .map_err(map_auth_error)?;
 
     if !session.authenticated() {
-        return Err(AppError::Other("authentication failed".into()));
+        return Err(AppError::Auth("the server rejected these credentials".into()));
     }
     Ok(())
 }

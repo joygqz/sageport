@@ -92,6 +92,9 @@ export const zhCN: Dictionary = {
   terminal: {
     connecting: "正在连接 {host}",
     connectFailed: "连接失败",
+    credentialsMissing:
+      "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
+    authFailed: "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
     closed: "会话已结束",
     reconnect: "重新连接",
     status: {
@@ -297,6 +300,9 @@ export const zhCN: Dictionary = {
     mkdirError: "创建文件夹失败",
     renameError: "重命名失败",
     deleteError: "删除失败",
+    credentialsMissing:
+      "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
+    authFailed: "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
     cancelTransfer: "取消传输",
     history: {
       title: "传输历史",
@@ -395,6 +401,7 @@ export const zhCN: Dictionary = {
       title: "同步",
       description:
         "将主机、密钥、代码片段和设置备份到你选择的存储。数据在离开本设备前先用口令进行端到端加密。切换存储需先断开连接。",
+      corruptRemoteBackup: "从已连接存储获取的备份数据似乎已损坏，或来自不兼容的应用版本。",
       provider: {
         gistTagline: "你 GitHub 账户下的私密 Gist",
         gdriveTagline: "Google Drive 中的隐藏应用文件夹",
@@ -447,6 +454,8 @@ export const zhCN: Dictionary = {
         pushButton: "立即备份",
         pushedTitle: "备份完成",
         pushFailed: "备份失败",
+        pushWrongPassphrase:
+          "已连接的备份无法再用本设备的口令解密，可能已在其他设备上被重新加密。请断开连接后使用正确的口令重新连接。",
         disconnectButton: "断开连接",
         disconnectError: "断开连接失败",
         disconnectConfirmTitle: "断开同步",
@@ -467,6 +476,8 @@ export const zhCN: Dictionary = {
         restoreConfirmButton: "恢复并覆盖",
         restoredTitle: "备份已恢复",
         restoreFailed: "恢复失败",
+        restoreWrongPassphrase:
+          "该备份使用的口令与当前同步配置的口令不同。请断开连接后使用正确的口令重新连接，再重新尝试恢复。",
       },
       file: {
         title: "文件备份",
@@ -481,6 +492,8 @@ export const zhCN: Dictionary = {
         exportFailed: "导出失败",
         importedTitle: "备份已恢复",
         importFailed: "恢复失败",
+        importWrongPassphrase: "口令与加密此文件时使用的口令不一致，请检查后重试。",
+        importInvalidFile: "所选文件不是有效的 Sageport 备份文件，请确认选择了正确的文件。",
         passphraseDialogTitle: "输入备份口令",
         passphraseDialogConfirm: "继续",
       },

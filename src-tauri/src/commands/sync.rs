@@ -412,16 +412,10 @@ pub async fn sync_push(state: State<'_, AppState>) -> AppResult<()> {
 
     let mut remote_fingerprint = None;
     if let Some(envelope) = backend.pull_latest().await? {
-        let snapshot = sync::import_encrypted(&state.db, &envelope, &passphrase)
-            .await
-            .map_err(|err| match err {
-                AppError::Crypto(_) => AppError::Invalid(
-                    "could not decrypt the remote backup with the stored passphrase — \
-                     it was re-encrypted elsewhere; disconnect and reconnect to resolve"
-                        .into(),
-                ),
-                other => other,
-            })?;
+        // Left as `AppError::Crypto` (code "crypto") rather than rewrapped with
+        // an English explanation here — the frontend maps the code to a
+        // localized, context-appropriate message instead.
+        let snapshot = sync::import_encrypted(&state.db, &envelope, &passphrase).await?;
         remote_fingerprint = Some(snapshot.content_fingerprint());
     }
 

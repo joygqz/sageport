@@ -13,6 +13,13 @@ pub enum AppError {
     #[error("ssh error: {0}")]
     Ssh(#[from] ssh2::Error),
 
+    /// The server reached out fine but rejected the credentials (wrong
+    /// password, unrecognized key, expired password, ...) — distinct from
+    /// [`AppError::Ssh`] so the frontend can show a friendly message instead
+    /// of a raw libssh2 error string.
+    #[error("authentication failed: {0}")]
+    Auth(String),
+
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -44,6 +51,7 @@ impl AppError {
         match self {
             AppError::Database(_) | AppError::Migration(_) => "database",
             AppError::Ssh(_) => "ssh",
+            AppError::Auth(_) => "auth",
             AppError::Io(_) => "io",
             AppError::Serde(_) => "serde",
             AppError::Crypto(_) => "crypto",

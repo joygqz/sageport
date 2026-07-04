@@ -22,7 +22,6 @@ export function SftpPanel({ height }: { height: number }) {
   const { t } = useI18n();
   const ratio = useSftpStore((s) => s.ratio);
   const setRatio = useSftpStore((s) => s.setRatio);
-  const hasLeftTabs = useSftpStore((s) => s.panes.left.tabs.length > 0);
   const addLocalTab = useSftpStore((s) => s.addLocalTab);
   const setPanelVisible = useLayoutStore((s) => s.setPanelVisible);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -31,10 +30,14 @@ export function SftpPanel({ height }: { height: number }) {
 
   // Seed the left pane with the local filesystem the first time the panel
   // opens; the right pane stays empty until the user picks a destination.
+  // Reads live store state instead of a render-captured flag, since React's
+  // StrictMode double-invokes this effect on mount with the same stale
+  // closure and would otherwise seed two local tabs.
   useEffect(() => {
-    if (!hasLeftTabs) void addLocalTab("left");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (useSftpStore.getState().panes.left.tabs.length === 0) {
+      void addLocalTab("left");
+    }
+  }, [addLocalTab]);
 
   const startSplitDrag = (e: React.PointerEvent) => {
     e.preventDefault();

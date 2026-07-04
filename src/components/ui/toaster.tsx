@@ -16,7 +16,7 @@ const accentFor: Record<ToastKind, string> = {
 };
 
 export function Toaster() {
-  const { toasts, dismiss } = useToastStore();
+  const { toasts, dismiss, pause, resume } = useToastStore();
 
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-80 flex-col gap-2">
@@ -25,6 +25,8 @@ export function Toaster() {
         return (
           <div
             key={t.id}
+            onMouseEnter={() => pause(t.id)}
+            onMouseLeave={() => resume(t.id)}
             className="pointer-events-auto flex items-start gap-3 rounded-md border border-border bg-popover p-3 shadow-md animate-in fade-in"
           >
             <Icon className={cn("mt-0.5 size-4 shrink-0", accentFor[t.kind])} />

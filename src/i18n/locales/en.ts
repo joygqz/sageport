@@ -94,6 +94,10 @@ export const en = {
   terminal: {
     connecting: "Connecting to {host}",
     connectFailed: "Connection failed",
+    credentialsMissing:
+      "This host is missing sign-in credentials. Add a username and password, or link a saved identity, in host settings.",
+    authFailed:
+      "The server rejected these credentials. Check the username, password, or key for this host.",
     closed: "Session ended",
     reconnect: "Reconnect",
     status: {
@@ -305,6 +309,10 @@ export const en = {
     mkdirError: "Failed to create folder",
     renameError: "Failed to rename",
     deleteError: "Failed to delete",
+    credentialsMissing:
+      "This host is missing sign-in credentials. Add a username and password, or link a saved identity, in host settings.",
+    authFailed:
+      "The server rejected these credentials. Check the username, password, or key for this host.",
     cancelTransfer: "Cancel transfer",
     history: {
       title: "Transfer history",
@@ -406,6 +414,8 @@ export const en = {
       title: "Sync",
       description:
         "Back up hosts, keys, snippets and settings to one storage of your choice, encrypted end to end with your passphrase before anything leaves this device. Disconnect first to switch storage.",
+      corruptRemoteBackup:
+        "The backup retrieved from the connected storage looks corrupted or from an incompatible app version.",
       provider: {
         gistTagline: "A secret gist on your GitHub account",
         gdriveTagline: "A hidden app folder in your Google Drive",
@@ -460,6 +470,8 @@ export const en = {
         pushButton: "Back up now",
         pushedTitle: "Backup complete",
         pushFailed: "Backup failed",
+        pushWrongPassphrase:
+          "The connected backup can no longer be decrypted with this device's passphrase — it may have been re-encrypted from another device. Disconnect and reconnect with the correct passphrase to resolve.",
         disconnectButton: "Disconnect",
         disconnectError: "Failed to disconnect",
         disconnectConfirmTitle: "Disconnect sync",
@@ -481,6 +493,8 @@ export const en = {
         restoreConfirmButton: "Restore and overwrite",
         restoredTitle: "Backup restored",
         restoreFailed: "Restore failed",
+        restoreWrongPassphrase:
+          "This backup was sealed with a different passphrase than the one currently configured for sync. Disconnect and reconnect with the correct passphrase, then try restoring again.",
       },
       file: {
         title: "File backup",
@@ -495,6 +509,10 @@ export const en = {
         exportFailed: "Export failed",
         importedTitle: "Backup restored",
         importFailed: "Restore failed",
+        importWrongPassphrase:
+          "This passphrase doesn't match the one used to encrypt this file. Check for typos and try again.",
+        importInvalidFile:
+          "This file doesn't look like a Sageport backup. Check that you selected the right file.",
         passphraseDialogTitle: "Enter backup passphrase",
         passphraseDialogConfirm: "Continue",
       },

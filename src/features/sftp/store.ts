@@ -1,13 +1,30 @@
 import { create } from "zustand";
 
+import { detectLocale } from "@/i18n/config";
+import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
-import { errorMessage } from "@/lib/toast";
+import { errorCode, errorMessage } from "@/lib/toast";
 import type {
   FileEntry,
   Host,
   SftpStatusKind,
   TransferEvent,
 } from "@/types/models";
+
+/** Imperative translation helper — this store lives outside React. */
+function t(key: Parameters<typeof translate>[1]): string {
+  return translate(detectLocale(), key);
+}
+
+// Both the initial connect (rejected synchronously, e.g. a misconfigured
+// host) and the background connection thread (reported via "error" status
+// events, e.g. a rejected password) can fail with the same error codes — map
+// both through one place so they read the same way.
+function describeConnectError(code?: string | null, message?: string) {
+  if (code === "invalid") return t("sftp.credentialsMissing");
+  if (code === "auth") return t("sftp.authFailed");
+  return message;
+}
 
 export type PaneSide = "left" | "right";
 export type TabKind = "local" | "remote";
@@ -56,6 +73,7 @@ interface SftpState {
     connectionId: string,
     status: SftpStatusKind,
     message?: string,
+    code?: string,
   ) => void;
   /** Apply an `sftp://transfer` progress event. */
   applyTransfer: (e: TransferEvent) => void;
@@ -104,7 +122,7 @@ export function bridgeSftpEvents(): void {
   eventsBridged = true;
   const { applyStatus, applyTransfer } = useSftpStore.getState();
   void ipc.sftp.onStatus((e) =>
-    applyStatus(e.connectionId, e.status, e.message),
+    applyStatus(e.connectionId, e.status, e.message, e.code),
   );
   void ipc.sftp.onTransfer((e) => applyTransfer(e));
 }
@@ -222,7 +240,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
         patchTab(side, id, {
           status: "error",
           loading: false,
-          error: errorMessage(err),
+          error: describeConnectError(errorCode(err), errorMessage(err)),
         });
       });
     },
@@ -257,11 +275,18 @@ export const useSftpStore = create<SftpState>((set, get) => {
 
     setSelected: (side, tabId, selected) => patchTab(side, tabId, { selected }),
 
-    applyStatus: (connectionId, status, message) => {
+    applyStatus: (connectionId, status, message, code) => {
       const found = findByConnection(connectionId);
       if (!found) return;
       const { side, tab } = found;
-      patchTab(side, tab.id, { status, error: message });
+      patchTab(side, tab.id, {
+        status,
+        // The initial connect leaves `loading: true` (set by addRemoteTab)
+        // until entries load; "error" is terminal here and never reaches
+        // that point, so nothing else would clear the spinner.
+        ...(status === "error" ? { loading: false } : null),
+        error: status === "error" ? describeConnectError(code, message) : message,
+      });
       // On first connect, resolve the remote home directory and list it.
       if (status === "connected" && !tab.cwd) {
         void (async () => {

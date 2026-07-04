@@ -260,6 +260,8 @@ export interface SshStatusEvent {
   id: string;
   status: SshStatusKind;
   message?: string;
+  /** Machine-readable `AppError::code`, set only when `status` is "error". */
+  code?: string;
 }
 
 export interface SshDataEvent {
@@ -295,6 +297,8 @@ export interface SftpStatusEvent {
   connectionId: string;
   status: SftpStatusKind;
   message?: string;
+  /** Machine-readable `AppError::code`, set only when `status` is "error". */
+  code?: string;
 }
 
 export type TransferStatus = "active" | "done" | "error" | "cancelled";

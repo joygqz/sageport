@@ -75,7 +75,12 @@ export function SetupView({ status }: { status: SyncStatus }) {
       toast.success(t("settings.sync.setup.connectedTitle"));
     } catch (err) {
       setMismatch(null);
-      toast.error(t("settings.sync.setup.connectError"), errorMessage(err));
+      toast.error(
+        t("settings.sync.setup.connectError"),
+        errorCode(err) === "serde"
+          ? t("settings.sync.corruptRemoteBackup")
+          : errorMessage(err),
+      );
     }
   };
 

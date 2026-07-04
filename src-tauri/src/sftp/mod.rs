@@ -64,6 +64,10 @@ struct StatusEvent {
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
+    /// Machine-readable [`AppError::code`], set only for "error" — lets the
+    /// frontend show a localized message instead of the raw `message` above.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
 }
 
 /// Progress for an in-flight transfer. `total`/`transferred` are byte counts;
@@ -290,13 +294,26 @@ impl SftpManager {
     }
 }
 
-fn emit_status(app: &AppHandle, id: &str, status: &str, message: Option<String>) {
+fn emit_status(app: &AppHandle, id: &str, status: &str) {
     let _ = app.emit(
         EVENT_STATUS,
         StatusEvent {
             connection_id: id.to_string(),
             status: status.to_string(),
-            message,
+            message: None,
+            code: None,
+        },
+    );
+}
+
+fn emit_error_status(app: &AppHandle, id: &str, err: &AppError) {
+    let _ = app.emit(
+        EVENT_STATUS,
+        StatusEvent {
+            connection_id: id.to_string(),
+            status: "error".to_string(),
+            message: Some(err.to_string()),
+            code: Some(err.code().to_string()),
         },
     );
 }
@@ -305,17 +322,17 @@ fn emit_status(app: &AppHandle, id: &str, status: &str, message: Option<String>)
 /// closed or the channel disconnects.
 fn run_connection(app: AppHandle, params: SftpConnectParams, rx: Receiver<SftpRequest>) {
     let id = params.connection_id.clone();
-    emit_status(&app, &id, "connecting", None);
+    emit_status(&app, &id, "connecting");
 
     let (session, sftp) = match open_sftp(&params) {
         Ok(pair) => pair,
         Err(e) => {
-            emit_status(&app, &id, "error", Some(e.to_string()));
+            emit_error_status(&app, &id, &e);
             return;
         }
     };
 
-    emit_status(&app, &id, "connected", None);
+    emit_status(&app, &id, "connected");
 
     while let Ok(req) = rx.recv() {
         match req {
@@ -368,7 +385,7 @@ fn run_connection(app: AppHandle, params: SftpConnectParams, rx: Receiver<SftpRe
         }
     }
 
-    emit_status(&app, &id, "closed", None);
+    emit_status(&app, &id, "closed");
 }
 
 fn open_sftp(params: &SftpConnectParams) -> AppResult<(ssh2::Session, ssh2::Sftp)> {

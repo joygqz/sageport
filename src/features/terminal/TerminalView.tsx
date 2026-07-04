@@ -8,8 +8,9 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 
+import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
-import { errorMessage } from "@/lib/toast";
+import { errorCode, errorMessage } from "@/lib/toast";
 import { useTheme } from "@/themes/useTheme";
 import { useTabsStore } from "@/workbench/tabs";
 import { terminalFontSize } from "@/workbench/zoom";
@@ -56,7 +57,18 @@ export function TerminalView({
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const { theme } = useTheme();
+  const { t } = useI18n();
   const setStatus = useTabsStore((s) => s.setTerminalStatus);
+
+  // Both the initial connect (rejected synchronously, e.g. a misconfigured
+  // host) and the background session thread (reported via "error" status
+  // events, e.g. a rejected password) can fail with the same error codes —
+  // map both through one place so they read the same way.
+  const describeConnectError = (code?: string | null, message?: string) => {
+    if (code === "invalid") return t("terminal.credentialsMissing");
+    if (code === "auth") return t("terminal.authFailed");
+    return message;
+  };
 
   // Keep colors in sync with the app theme without recreating the terminal.
   useEffect(() => {
@@ -114,7 +126,13 @@ export function TerminalView({
         }),
         ipc.ssh.onStatus((e) => {
           if (e.id === sessionId && !disposed) {
-            setStatus(sessionId, e.status, e.message);
+            setStatus(
+              sessionId,
+              e.status,
+              e.status === "error"
+                ? describeConnectError(e.code, e.message)
+                : e.message,
+            );
           }
         }),
       ]);
@@ -135,7 +153,13 @@ export function TerminalView({
           rows: term.rows,
         });
       } catch (err) {
-        if (!disposed) setStatus(sessionId, "error", errorMessage(err));
+        if (!disposed) {
+          setStatus(
+            sessionId,
+            "error",
+            describeConnectError(errorCode(err), errorMessage(err)),
+          );
+        }
       }
     })();
 

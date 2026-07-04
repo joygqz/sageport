@@ -18,7 +18,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type { SyncStatus, SyncVersion } from "@/types/models";
 import {
   useSyncDisconnect,
@@ -68,7 +68,15 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
       await push.mutateAsync();
       toast.success(t("settings.sync.connected.pushedTitle"));
     } catch (err) {
-      toast.error(t("settings.sync.connected.pushFailed"), errorMessage(err));
+      const code = errorCode(err);
+      toast.error(
+        t("settings.sync.connected.pushFailed"),
+        code === "crypto"
+          ? t("settings.sync.connected.pushWrongPassphrase")
+          : code === "serde"
+            ? t("settings.sync.corruptRemoteBackup")
+            : errorMessage(err),
+      );
     }
   };
 
@@ -247,7 +255,15 @@ function RestoreConfirmDialog({
       await restore.mutateAsync(id);
       toast.success(t("settings.sync.versions.restoredTitle"));
     } catch (err) {
-      toast.error(t("settings.sync.versions.restoreFailed"), errorMessage(err));
+      const code = errorCode(err);
+      toast.error(
+        t("settings.sync.versions.restoreFailed"),
+        code === "crypto"
+          ? t("settings.sync.versions.restoreWrongPassphrase")
+          : code === "serde"
+            ? t("settings.sync.corruptRemoteBackup")
+            : errorMessage(err),
+      );
     }
   };
 
@@ -310,7 +326,15 @@ function FileBackupCard() {
       await fileImport.mutateAsync({ path, passphrase });
       toast.success(t("settings.sync.file.importedTitle"));
     } catch (err) {
-      toast.error(t("settings.sync.file.importFailed"), errorMessage(err));
+      const code = errorCode(err);
+      toast.error(
+        t("settings.sync.file.importFailed"),
+        code === "crypto"
+          ? t("settings.sync.file.importWrongPassphrase")
+          : code === "serde"
+            ? t("settings.sync.file.importInvalidFile")
+            : errorMessage(err),
+      );
     }
   };
 
