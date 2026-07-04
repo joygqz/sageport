@@ -69,24 +69,29 @@ export function ToolActivity({
       {expanded && (
         <div className="space-y-1.5 border-t border-border px-2.5 py-1.5">
           {command && (
-            <pre className="select-text overflow-x-auto rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
+            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
               {command}
             </pre>
           )}
           {item.status === "awaiting-approval" && (
-            <div className="flex items-center gap-2 pt-0.5">
-              <span className="mr-auto flex items-center gap-1 text-warning">
-                <ShieldAlert className="size-3.5" />
-                {t("ai.confirmRun")}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="mr-auto flex min-w-0 items-center gap-1 text-warning">
+                <ShieldAlert className="size-3.5 shrink-0" />
+                <span className="truncate">{t("ai.confirmRun")}</span>
               </span>
               <Button
                 size="sm"
                 variant="outline"
+                className="h-6 shrink-0 px-2"
                 onClick={() => onDeny(item.id)}
               >
                 {t("ai.deny")}
               </Button>
-              <Button size="sm" onClick={() => onApprove(item.id)}>
+              <Button
+                size="sm"
+                className="h-6 shrink-0 px-2"
+                onClick={() => onApprove(item.id)}
+              >
                 {t("ai.approve")}
               </Button>
             </div>

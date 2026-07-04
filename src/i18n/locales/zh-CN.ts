@@ -353,7 +353,7 @@ export const zhCN: Dictionary = {
     inputPlaceholder: "询问服务器相关问题",
     commandLabel: "命令",
     error: "助手出错",
-    confirmRun: "请求在你的终端中运行此命令",
+    confirmRun: "请求在终端中运行此命令",
     approve: "允许",
     deny: "拒绝",
     modelLabel: "模型",
