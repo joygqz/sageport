@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sageport</title>
+<meta name="description" content="SSH workbench with integrated SFTP, credential management, and an AI assistant." />
+<link rel="icon" href="app-icon.png" />
+<link rel="stylesheet" href="style.css" />
+<style>
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 64px 24px 48px;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  header img {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+  }
+  h1 {
+    font-size: 32px;
+    margin: 16px 0 8px;
+  }
+  .tagline {
+    color: var(--muted);
+    font-size: 16px;
+    margin: 0 0 24px;
+  }
+  .actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .screenshot {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    margin: 40px 0;
+  }
+  section {
+    margin: 40px 0;
+  }
+  h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 0 0 16px;
+  }
+  ul.features {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+  ul.features li {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  ul.features b {
+    display: block;
+    margin-bottom: 2px;
+  }
+  ul.features span {
+    color: var(--muted);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="app-icon.png" alt="Sageport" />
+    <h1>Sageport</h1>
+    <p class="tagline">SSH workbench with integrated SFTP, credential management, and an AI assistant.</p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/joygqz/sageport/releases/latest">Download</a>
+      <a class="btn secondary" href="https://github.com/joygqz/sageport">GitHub</a>
+    </div>
+  </header>
+
+  <img class="screenshot" src="screenshot.png" alt="Sageport workbench" />
+
+  <section>
+    <h2>Features</h2>
+    <ul class="features">
+      <li><b>Terminal</b><span>GPU-accelerated, tabbed, with scrollback search and keepalives</span></li>
+      <li><b>Hosts &amp; credentials</b><span>Grouped hosts, reusable identities, built-in key manager</span></li>
+      <li><b>File transfer</b><span>Dual-pane SFTP browser with drag-and-drop</span></li>
+      <li><b>AI assistant</b><span>Bring your own API key; every command needs your confirmation</span></li>
+      <li><b>Sync &amp; backup</b><span>End-to-end encrypted across five providers</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    <a href="privacy-policy.html">Privacy Policy</a>
+    ·
+    <a href="terms-of-service.html">Terms of Service</a>
+    ·
+    <a href="https://github.com/joygqz/sageport/blob/main/LICENSE">GPL-3.0</a>
+  </footer>
+</main>
+</body>
+</html>
