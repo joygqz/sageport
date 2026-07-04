@@ -32,7 +32,7 @@ Sageport consolidates the tools of routine server operations — terminal, file 
 
 **AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model. The assistant can list open sessions, read terminal output, and propose commands — every remote command requires explicit confirmation before it runs. Conversations are stored locally.
 
-**Sync & backup** — Cross-device sync through a secret GitHub Gist, encrypted end to end with a passphrase-derived key. No account, no server that sees plaintext. Automatic last-write-wins conflict resolution, revision history with restore, and encrypted export/import for offline backups.
+**Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials — encrypted end to end with a passphrase-derived key. Only ciphertext ever leaves the device. Syncs hosts, credentials, snippets, and interface preferences (locale, theme, zoom). Automatic last-write-wins conflict resolution, revision history with restore, and encrypted export/import for offline backups.
 
 **Interface** — Six full themes (terminal palette included), English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘ P</kbd> / <kbd>⌘ ⇧ P</kbd>), and automatic updates.
 
@@ -54,7 +54,7 @@ The application updates itself; the status bar indicates when a new version is a
 2. **Connect** — <kbd>⌘ P</kbd>, type the host name, press Enter.
 3. **Transfer files** — <kbd>⌘ J</kbd> opens the dual-pane file panel.
 4. **AI assistant** (optional) — set an API key under *Settings → AI*, then <kbd>⌘ L</kbd> to chat.
-5. **Sync** (optional) — under *Settings → Sync*, provide a GitHub token with the `gist` scope and a passphrase; enter the same passphrase on another device to restore.
+5. **Sync** (optional) — under *Settings → Sync*, pick a provider (GitHub, Google Drive, OneDrive, WebDAV, or S3), authorize or enter credentials, then set a passphrase; enter the same passphrase on another device to restore.
 
 On Windows and Linux, substitute <kbd>Ctrl</kbd> for <kbd>⌘</kbd>.
 
@@ -94,7 +94,8 @@ src-tauri/src/
   commands/     Thin Tauri command handlers
   repository/   SQLite persistence per entity
   ssh/ sftp/    Session and transfer engines
-  sync/ crypto/ Vault snapshot, Gist client, Argon2id + AES-256-GCM
+  sync/ crypto/ Vault snapshot, provider clients (Gist, Drive, OneDrive,
+                WebDAV, S3), OAuth, Argon2id + AES-256-GCM
   ai/           Anthropic and OpenAI-compatible chat clients
 ```
 
