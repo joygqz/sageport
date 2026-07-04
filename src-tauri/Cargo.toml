@@ -34,8 +34,8 @@ serde_json = "1"
 thiserror = "2"
 anyhow = "1"
 
-# Async runtime
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util"] }
+# Async runtime ("net" backs the OAuth loopback redirect listener)
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "net"] }
 
 # Persistence (ids/timestamps stored as TEXT -> Rust String, so no
 # compile-time DATABASE_URL coupling and no chrono/uuid row mapping).
@@ -66,6 +66,13 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 
 # Concurrency helpers
 parking_lot = "0.12"
+
+# Sync providers
+async-trait = "0.1"   # object-safe SyncProvider trait
+sha2 = "0.10"         # PKCE S256 code challenge
+url = "2"             # OAuth/WebDAV URL building
+quick-xml = "0.37"    # WebDAV PROPFIND response parsing
+rusty-s3 = "0.7"      # SigV4 presigning for S3-compatible storage
 
 # Re-center the macOS traffic lights in the custom title bar at runtime
 # (public AppKit API via the same bindings tauri/tao already compile).

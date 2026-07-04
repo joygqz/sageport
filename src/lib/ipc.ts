@@ -12,7 +12,6 @@ import type {
   FileEntry,
   FsEndpoint,
   GeneratedSshKey,
-  GistVersion,
   Group,
   GroupInput,
   Host,
@@ -28,8 +27,12 @@ import type {
   SshKeyGenerateInput,
   SshKeyInput,
   SshStatusEvent,
-  SyncConfig,
   SyncConnectOutcome,
+  SyncOAuthEvent,
+  SyncProviderKind,
+  SyncProviderSettings,
+  SyncStatus,
+  SyncVersion,
   TransferEvent,
   TransferHistoryEntry,
   UpdateStatus,
@@ -148,18 +151,41 @@ export const ipc = {
       ),
   },
   sync: {
-    getConfig: () => invoke<SyncConfig>("sync_get_config"),
-    /** Link a device to a GitHub account; see `SyncConnectOutcome`. */
-    connect: (token: string, passphrase: string, force: boolean) =>
-      invoke<SyncConnectOutcome>("sync_connect", { token, passphrase, force }),
+    status: () => invoke<SyncStatus>("sync_get_status"),
+    /**
+     * Run the OAuth flow for a provider. Progress (device code, browser
+     * opened) streams through `onEvent`; resolves with the account label
+     * once authorized. The credential itself stays in the backend — call
+     * `connect` afterwards to link the provider.
+     */
+    oauthStart: (
+      provider: SyncProviderKind,
+      onEvent: (e: SyncOAuthEvent) => void,
+    ) => {
+      const channel = new Channel<SyncOAuthEvent>();
+      channel.onmessage = onEvent;
+      return invoke<{ account: string }>("sync_oauth_start", {
+        provider,
+        onEvent: channel,
+      });
+    },
+    /** Abort an in-flight OAuth flow; it rejects with the `cancelled` code. */
+    oauthCancel: () => invoke<void>("sync_oauth_cancel"),
+    /** Link a provider; see `SyncConnectOutcome`. `settings` only applies to
+     * the credential-based providers (WebDAV, S3). */
+    connect: (input: {
+      provider: SyncProviderKind;
+      settings?: SyncProviderSettings;
+      passphrase: string;
+      force: boolean;
+    }) => invoke<SyncConnectOutcome>("sync_connect", input),
     disconnect: () => invoke<void>("sync_disconnect"),
-    /** Merge remote + local, then push; resolves to the gist id. */
-    push: () => invoke<string>("sync_push"),
-    /** Newest-first backup history for the linked gist. */
-    listVersions: () => invoke<GistVersion[]>("sync_list_gist_versions"),
+    /** Merge the remote backup into local data, then push a new revision. */
+    push: () => invoke<void>("sync_push"),
+    /** Newest-first backup history of the connected provider. */
+    listVersions: () => invoke<SyncVersion[]>("sync_list_versions"),
     /** Destructive: replaces local data with the chosen revision. */
-    restoreVersion: (sha: string) =>
-      invoke<void>("sync_restore_gist_version", { sha }),
+    restoreVersion: (id: string) => invoke<void>("sync_restore_version", { id }),
     /** `passphrase` is entered manually each call and never persisted. */
     fileExport: (path: string, passphrase: string) =>
       invoke<void>("sync_file_export", { path, passphrase }),

@@ -1,105 +1,143 @@
 //! Sync commands.
 //!
-//! Two manual paths, both built on the same encrypted snapshot:
-//!   * GitHub Gist — `sync_connect` links the token+passphrase pair and pulls
-//!     in whatever backup already exists; `sync_push` backs up (merge + push)
-//!     afterwards; `sync_list_gist_versions` / `sync_restore_gist_version`
-//!     browse and roll back to any prior backup. Once connected, the token,
-//!     gist id and passphrase are immutable from the UI — the only way to
-//!     change them is `sync_disconnect` followed by a fresh `sync_connect`.
-//!   * Local file — `sync_file_export` / `sync_file_import` for offline backup
-//!     and manual restore. These take a passphrase supplied by the caller on
-//!     each call instead of the stored gist passphrase, so a local file can be
-//!     sealed with a secret independent of (and usable without) a configured
-//!     sync account.
+//! Exactly one remote provider (GitHub Gist, Google Drive, OneDrive, WebDAV
+//! or S3-compatible storage) is connected at a time; switching providers
+//! means `sync_disconnect` followed by a fresh `sync_connect`. All providers
+//! store the same passphrase-sealed vault and share one command surface:
 //!
-//! Gist discovery: the gist id is cached locally once known, but a device
-//! that only has the token (e.g. a fresh install) auto-discovers the vault
-//! gist created by another device on its first connect, so multi-device sync
-//! doesn't require copying a gist id around by hand.
+//! * `sync_oauth_start` / `sync_oauth_cancel` — browser-based authorization
+//!   for the OAuth providers (GitHub device flow; Google/Microsoft loopback
+//!   with PKCE). A completed flow parks its credential in [`AppState`] so
+//!   the token never crosses into the webview; `sync_connect` claims it.
+//! * `sync_connect` — link a provider. If the target already holds a backup
+//!   it is pulled and decrypted first: success merges it in
+//!   (last-write-wins), a decrypt failure returns
+//!   [`ConnectOutcome::PassphraseMismatch`] so the UI can re-prompt or
+//!   force-overwrite (`force: true` wipes the remote history and starts
+//!   over — old revisions sealed with an abandoned passphrase would
+//!   otherwise linger in the version list).
+//! * `sync_push` — pull-merge-push so a device that hasn't seen another
+//!   device's edits can't clobber them.
+//! * `sync_list_versions` / `sync_restore_version` — browse backup history
+//!   and roll back. Restoring replaces local data outright (not a merge);
+//!   the frontend confirms before calling.
 //!
-//! Connect safety: connecting to an account that already has a backup pulls
-//! and decrypts it with the given passphrase before anything is persisted.
-//! If decryption fails — the passphrase doesn't match what encrypted the
-//! remote data — `sync_connect` returns [`ConnectOutcome::PassphraseMismatch`]
-//! instead of an error, so the frontend can offer to either re-enter the
-//! passphrase or force-overwrite the remote backup with `force: true`. The
-//! force path deletes the old gist and creates a brand new one rather than
-//! patching the existing gist in place — GitHub has no way to remove a
-//! single revision, so patching would leave the old, undecryptable
-//! revisions sitting in the version history forever.
-//!
-//! Push safety: pushing first pulls and merges whatever is already on the
-//! gist (last-write-wins, keyed on `updated_at`) so a push from a device that
-//! hasn't seen a teammate's edits can't silently clobber them. If the merge
-//! can't be completed — the gist was deleted, or the remote data was
-//! re-encrypted with a different passphrase after this device connected —
-//! the push is aborted with a clear error instead of overwriting the remote
-//! vault.
-//!
-//! Restoring a specific version is a deliberate, destructive action: it
-//! replaces the local vault outright (see [`sync::restore_snapshot`]) instead
-//! of merging, since the whole point is to roll back rows that look newer
-//! locally. The frontend is expected to confirm before calling it.
+//! Local file backup (`sync_file_export` / `sync_file_import`) is a separate
+//! one-shot feature, independent of the connected provider: the passphrase
+//! is supplied per call and never persisted.
 
 use std::path::PathBuf;
 
+use serde::Deserialize;
 use tauri::State;
+use tokio::sync::oneshot;
 
 use crate::crypto;
 use crate::domain::now;
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 use crate::state::AppState;
-use crate::sync::{self, GistClient, GistVersion, VaultSnapshot};
+use crate::sync::{self, oauth, ProviderConfig, ProviderKind, SyncVersion};
 
-const TOKEN_KEY: &str = "sync.gist.token";
-const GIST_ID_KEY: &str = "sync.gist.id";
-const PASSPHRASE_KEY: &str = "sync.gist.passphrase";
-const LAST_SYNCED_KEY: &str = "sync.gist.last_synced_at";
+const PROVIDER_KEY: &str = "sync.provider";
+const CONFIG_KEY: &str = "sync.provider_config";
+const ACCOUNT_KEY: &str = "sync.account";
+const PASSPHRASE_KEY: &str = "sync.passphrase";
+const LAST_SYNCED_KEY: &str = "sync.last_synced_at";
 
-/// Non-secret view of the gist sync configuration handed to the UI. The token
-/// and passphrase are never returned — only whether each is stored.
+/// Non-secret view of the sync state handed to the UI.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SyncConfig {
-    pub has_token: bool,
-    pub has_passphrase: bool,
-    pub gist_id: Option<String>,
+pub struct SyncStatus {
+    /// Connected provider, `None` when sync is not set up.
+    pub provider: Option<ProviderKind>,
+    /// Human-readable account label (GitHub login, e-mail, username, ...).
+    pub account: Option<String>,
+    /// Non-secret location detail (gist id, bucket, server URL).
+    pub detail: Option<String>,
     pub last_synced_at: Option<String>,
+    /// Which OAuth providers this build carries client ids for; the UI
+    /// disables the others with a setup hint.
+    pub oauth_ready: OAuthReady,
 }
 
-async fn read_token(state: &AppState) -> AppResult<String> {
-    settings_repo::get(&state.db, TOKEN_KEY)
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthReady {
+    pub gist: bool,
+    pub gdrive: bool,
+    pub onedrive: bool,
+}
+
+/// Outcome of `sync_connect`, tagged so the frontend can branch without
+/// treating a passphrase mismatch as a hard error.
+#[derive(serde::Serialize)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum ConnectOutcome {
+    Connected,
+    /// A backup exists but the passphrase can't decrypt it. Nothing was
+    /// persisted — retry with another passphrase, or `force: true` to
+    /// overwrite the remote.
+    PassphraseMismatch,
+}
+
+/// Resolved account label returned by a completed OAuth flow.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthAccount {
+    pub account: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WebdavSettings {
+    url: String,
+    username: String,
+    password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct S3Settings {
+    endpoint: String,
+    #[serde(default)]
+    region: String,
+    bucket: String,
+    #[serde(default)]
+    prefix: String,
+    access_key: String,
+    secret_key: String,
+    #[serde(default)]
+    path_style: bool,
+}
+
+async fn stored_config(state: &AppState) -> AppResult<Option<ProviderConfig>> {
+    let Some(raw) = settings_repo::get(&state.db, CONFIG_KEY)
         .await?
-        .filter(|t| !t.is_empty())
-        .ok_or_else(|| AppError::Invalid("no GitHub token configured for sync".into()))
+        .filter(|v| !v.is_empty())
+    else {
+        return Ok(None);
+    };
+    Ok(Some(serde_json::from_str(&raw)?))
 }
 
-async fn read_passphrase(state: &AppState) -> AppResult<String> {
+async fn require_config(state: &AppState) -> AppResult<ProviderConfig> {
+    stored_config(state)
+        .await?
+        .ok_or_else(|| AppError::Invalid("sync is not connected".into()))
+}
+
+async fn require_passphrase(state: &AppState) -> AppResult<String> {
     settings_repo::get(&state.db, PASSPHRASE_KEY)
         .await?
         .filter(|p| !p.is_empty())
         .ok_or_else(|| AppError::Invalid("no vault passphrase configured for sync".into()))
 }
 
-async fn read_gist_id(state: &AppState) -> AppResult<Option<String>> {
-    Ok(settings_repo::get(&state.db, GIST_ID_KEY)
-        .await?
-        .filter(|id| !id.is_empty()))
-}
-
-/// Resolve the linked gist id, auto-discovering it from the token's existing
-/// gists (and caching the result) when it isn't cached locally yet.
-async fn resolve_gist_id(state: &AppState, token: &str) -> AppResult<Option<String>> {
-    if let Some(id) = read_gist_id(state).await? {
-        return Ok(Some(id));
-    }
-    let discovered = GistClient::new(token).find_vault_gist().await?;
-    if let Some(id) = &discovered {
-        settings_repo::set(&state.db, GIST_ID_KEY, id).await?;
-    }
-    Ok(discovered)
+/// Persist the provider's (possibly mutated) config — refreshed OAuth
+/// tokens, discovered gist ids — after any provider operation.
+async fn persist_config(state: &AppState, config: &ProviderConfig) -> AppResult<()> {
+    settings_repo::set(&state.db, CONFIG_KEY, &serde_json::to_string(config)?).await
 }
 
 async fn mark_synced(state: &AppState) -> AppResult<()> {
@@ -107,196 +145,308 @@ async fn mark_synced(state: &AppState) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub async fn sync_get_config(state: State<'_, AppState>) -> AppResult<SyncConfig> {
-    let has_token = settings_repo::get(&state.db, TOKEN_KEY)
+pub async fn sync_get_status(state: State<'_, AppState>) -> AppResult<SyncStatus> {
+    let config = stored_config(&state).await?;
+    let account = settings_repo::get(&state.db, ACCOUNT_KEY)
         .await?
-        .is_some_and(|t| !t.is_empty());
-    let has_passphrase = settings_repo::get(&state.db, PASSPHRASE_KEY)
-        .await?
-        .is_some_and(|p| !p.is_empty());
-    let gist_id = read_gist_id(&state).await?;
+        .filter(|v| !v.is_empty());
     let last_synced_at = settings_repo::get(&state.db, LAST_SYNCED_KEY)
         .await?
-        .filter(|t| !t.is_empty());
-    Ok(SyncConfig {
-        has_token,
-        has_passphrase,
-        gist_id,
+        .filter(|v| !v.is_empty());
+    Ok(SyncStatus {
+        provider: config.as_ref().map(|c| c.kind()),
+        detail: config.as_ref().and_then(|c| c.detail()),
+        account,
         last_synced_at,
+        oauth_ready: OAuthReady {
+            gist: oauth::GITHUB_CLIENT_ID.is_some_and(|v| !v.is_empty()),
+            gdrive: oauth::GOOGLE_CLIENT_ID.is_some_and(|v| !v.is_empty())
+                && oauth::GOOGLE_CLIENT_SECRET.is_some_and(|v| !v.is_empty()),
+            onedrive: oauth::MS_CLIENT_ID.is_some_and(|v| !v.is_empty()),
+        },
     })
 }
 
-/// Outcome of [`sync_connect`]. Tagged so the frontend can branch without
-/// treating a passphrase mismatch as a hard error.
-#[derive(serde::Serialize)]
-#[serde(
-    tag = "status",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-pub enum ConnectOutcome {
-    /// Connected (and, if a remote backup existed, merged into the local
-    /// vault). `gist_id` is `None` when this is the first device to connect.
-    Connected { gist_id: Option<String> },
-    /// A backup already exists on the account but the given passphrase can't
-    /// decrypt it. Nothing was persisted — call again with `force: true` to
-    /// overwrite the remote backup, or retry with a different passphrase.
-    PassphraseMismatch { gist_id: String },
+/// Run the OAuth flow for `provider`, streaming progress (device code /
+/// browser opened) through `on_event`. The resulting credential is parked in
+/// [`AppState`] — never returned to the webview — for the follow-up
+/// `sync_connect` to claim; only the account label goes back to the UI.
+#[tauri::command]
+pub async fn sync_oauth_start(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    provider: String,
+    on_event: tauri::ipc::Channel<oauth::OAuthEvent>,
+) -> AppResult<OAuthAccount> {
+    let kind = ProviderKind::parse(&provider)?;
+
+    let (cancel_tx, cancel_rx) = oneshot::channel();
+    {
+        let mut slot = state.sync_oauth.lock();
+        // A restarted flow supersedes (and aborts) the previous one.
+        if let Some(prev) = slot.cancel.take() {
+            let _ = prev.send(());
+        }
+        slot.cancel = Some(cancel_tx);
+    }
+
+    let result = match kind {
+        ProviderKind::Gist => oauth::github_device_flow(&on_event, cancel_rx).await,
+        ProviderKind::Gdrive => oauth::google_flow(&app, &on_event, cancel_rx).await,
+        ProviderKind::Onedrive => oauth::microsoft_flow(&app, &on_event, cancel_rx).await,
+        ProviderKind::Webdav | ProviderKind::S3 => {
+            Err(AppError::Invalid("this provider does not use OAuth".into()))
+        }
+    };
+
+    match result {
+        // Superseded by a newer flow — leave its cancel slot alone.
+        Err(AppError::Cancelled) => Err(AppError::Cancelled),
+        Err(err) => {
+            state.sync_oauth.lock().cancel = None;
+            Err(err)
+        }
+        Ok(outcome) => {
+            let account = outcome.account.clone();
+            let mut slot = state.sync_oauth.lock();
+            slot.cancel = None;
+            slot.pending = Some((kind, outcome));
+            Ok(OAuthAccount { account })
+        }
+    }
 }
 
-/// Link this device to a GitHub account for sync. The token and passphrase
-/// are only persisted once resolved: if a backup already exists on the
-/// account, it's pulled and decrypted with `passphrase` first (and merged in
-/// on success). A decrypt failure is reported as
-/// [`ConnectOutcome::PassphraseMismatch`] instead of an error so nothing is
-/// left half-configured; pass `force: true` to skip verification and
-/// overwrite the remote backup with this device's local data instead.
-///
-/// Once connected, the token/gist/passphrase are immutable from the UI — call
-/// `sync_disconnect` first to reconnect with different credentials.
+#[tauri::command]
+pub async fn sync_oauth_cancel(state: State<'_, AppState>) -> AppResult<()> {
+    if let Some(cancel) = state.sync_oauth.lock().cancel.take() {
+        let _ = cancel.send(());
+    }
+    Ok(())
+}
+
+/// Build the provider config for a connect attempt: OAuth kinds claim the
+/// parked credential (peeked, not consumed — a passphrase mismatch must not
+/// force the user back through the browser), credential kinds parse the
+/// user-supplied `settings`. Returns the config plus the account label.
+fn build_config(
+    state: &AppState,
+    kind: ProviderKind,
+    settings: Option<serde_json::Value>,
+) -> AppResult<(ProviderConfig, String)> {
+    match kind {
+        ProviderKind::Gist | ProviderKind::Gdrive | ProviderKind::Onedrive => {
+            let slot = state.sync_oauth.lock();
+            let Some((pending_kind, outcome)) = slot.pending.as_ref() else {
+                return Err(AppError::Invalid("authorize with the provider first".into()));
+            };
+            if *pending_kind != kind {
+                return Err(AppError::Invalid("authorize with the provider first".into()));
+            }
+            let config = match (&outcome.credential, kind) {
+                (oauth::OAuthCredential::GithubToken(token), ProviderKind::Gist) => {
+                    ProviderConfig::Gist {
+                        token: token.clone(),
+                        gist_id: None,
+                    }
+                }
+                (oauth::OAuthCredential::Tokens(tokens), ProviderKind::Gdrive) => {
+                    ProviderConfig::Gdrive {
+                        tokens: tokens.clone(),
+                    }
+                }
+                (oauth::OAuthCredential::Tokens(tokens), ProviderKind::Onedrive) => {
+                    ProviderConfig::Onedrive {
+                        tokens: tokens.clone(),
+                    }
+                }
+                _ => return Err(AppError::Invalid("authorize with the provider first".into())),
+            };
+            Ok((config, outcome.account.clone()))
+        }
+        ProviderKind::Webdav => {
+            let s: WebdavSettings = parse_settings(settings)?;
+            if s.url.trim().is_empty() {
+                return Err(AppError::Invalid("server URL is required".into()));
+            }
+            let account = s.username.clone();
+            Ok((
+                ProviderConfig::Webdav {
+                    url: s.url.trim().to_string(),
+                    username: s.username,
+                    password: s.password,
+                },
+                account,
+            ))
+        }
+        ProviderKind::S3 => {
+            let s: S3Settings = parse_settings(settings)?;
+            for (value, label) in [
+                (&s.endpoint, "endpoint"),
+                (&s.bucket, "bucket"),
+                (&s.access_key, "access key"),
+                (&s.secret_key, "secret key"),
+            ] {
+                if value.trim().is_empty() {
+                    return Err(AppError::Invalid(format!("{label} is required")));
+                }
+            }
+            let region = match s.region.trim() {
+                "" => "us-east-1".to_string(),
+                r => r.to_string(),
+            };
+            let account = s.bucket.clone();
+            Ok((
+                ProviderConfig::S3 {
+                    endpoint: s.endpoint.trim().to_string(),
+                    region,
+                    bucket: s.bucket.trim().to_string(),
+                    prefix: s.prefix.trim().to_string(),
+                    access_key: s.access_key.trim().to_string(),
+                    secret_key: s.secret_key,
+                    path_style: s.path_style,
+                },
+                account,
+            ))
+        }
+    }
+}
+
+fn parse_settings<T: serde::de::DeserializeOwned>(
+    settings: Option<serde_json::Value>,
+) -> AppResult<T> {
+    let value = settings.ok_or_else(|| AppError::Invalid("provider settings are required".into()))?;
+    serde_json::from_value(value)
+        .map_err(|e| AppError::Invalid(format!("invalid provider settings: {e}")))
+}
+
 #[tauri::command]
 pub async fn sync_connect(
     state: State<'_, AppState>,
-    token: String,
+    provider: String,
+    settings: Option<serde_json::Value>,
     passphrase: String,
     force: bool,
 ) -> AppResult<ConnectOutcome> {
-    let token = token.trim().to_string();
-    if token.is_empty() {
-        return Err(AppError::Invalid("access token is required".into()));
-    }
     if passphrase.is_empty() {
         return Err(AppError::Invalid("passphrase is required".into()));
     }
+    if stored_config(&state).await?.is_some() {
+        return Err(AppError::Invalid(
+            "sync is already connected — disconnect first to switch providers".into(),
+        ));
+    }
+    let kind = ProviderKind::parse(&provider)?;
+    let (config, account) = build_config(&state, kind, settings)?;
+    let mut backend = sync::make_provider(config)?;
 
-    let client = GistClient::new(&token);
-    let mut gist_id = client.find_vault_gist().await?;
-
-    if let Some(id) = &gist_id {
-        if !force {
-            let envelope = client.pull(id).await?;
-            match crypto::decrypt(&envelope, &passphrase) {
-                Ok(bytes) => {
-                    let snapshot: VaultSnapshot = serde_json::from_slice(&bytes)?;
-                    sync::import_snapshot(&state.db, &snapshot).await?;
-                }
-                Err(AppError::Crypto(_)) => {
-                    return Ok(ConnectOutcome::PassphraseMismatch {
-                        gist_id: id.clone(),
-                    });
-                }
-                Err(err) => return Err(err),
+    // Probe the target before persisting anything: an existing backup is
+    // merged in (or reported as a mismatch); only then does the connection
+    // become real.
+    let remote = backend.pull_latest().await?;
+    match remote {
+        Some(envelope) if !force => match crypto::decrypt(&envelope, &passphrase) {
+            Ok(bytes) => {
+                let snapshot = serde_json::from_slice(&bytes)?;
+                sync::import_snapshot(&state.db, &snapshot).await?;
             }
-        }
+            Err(AppError::Crypto(_)) => return Ok(ConnectOutcome::PassphraseMismatch),
+            Err(err) => return Err(err),
+        },
+        _ => {}
     }
 
-    settings_repo::set(&state.db, TOKEN_KEY, &token).await?;
-    settings_repo::set(&state.db, PASSPHRASE_KEY, &passphrase).await?;
-
+    // Seal the (merged) local vault and make it the newest backup, so a
+    // fresh connect always leaves the remote current.
+    let sealed = sync::export_encrypted(&state.db, &passphrase).await?;
     if force {
-        if let Some(id) = &gist_id {
-            // Delete rather than patch: patching would keep the old,
-            // undecryptable revisions in the gist's history, where the
-            // version list would keep surfacing them forever.
-            client.delete(id).await?;
-            let envelope = sync::export_encrypted(&state.db, &passphrase).await?;
-            let new_id = client.push(None, &envelope).await?;
-            settings_repo::set(&state.db, GIST_ID_KEY, &new_id).await?;
-            gist_id = Some(new_id);
-        }
-    } else if let Some(id) = &gist_id {
-        settings_repo::set(&state.db, GIST_ID_KEY, id).await?;
+        backend.reset(&sealed).await?;
+    } else {
+        backend.push(&sealed).await?;
     }
 
-    if gist_id.is_some() {
-        mark_synced(&state).await?;
-    }
+    settings_repo::set(&state.db, PROVIDER_KEY, &provider).await?;
+    persist_config(&state, &backend.config()).await?;
+    settings_repo::set(&state.db, ACCOUNT_KEY, &account).await?;
+    settings_repo::set(&state.db, PASSPHRASE_KEY, &passphrase).await?;
+    mark_synced(&state).await?;
+    state.sync_oauth.lock().pending = None;
 
-    Ok(ConnectOutcome::Connected { gist_id })
+    Ok(ConnectOutcome::Connected)
 }
 
-/// Forget the token, gist id and passphrase (the remote gist itself is left
-/// untouched on GitHub).
+/// Forget the provider connection and credentials. Remote backups are left
+/// untouched.
 #[tauri::command]
 pub async fn sync_disconnect(state: State<'_, AppState>) -> AppResult<()> {
-    settings_repo::set(&state.db, TOKEN_KEY, "").await?;
-    settings_repo::set(&state.db, GIST_ID_KEY, "").await?;
-    settings_repo::set(&state.db, PASSPHRASE_KEY, "").await?;
-    settings_repo::set(&state.db, LAST_SYNCED_KEY, "").await
+    for key in [
+        PROVIDER_KEY,
+        CONFIG_KEY,
+        ACCOUNT_KEY,
+        PASSPHRASE_KEY,
+        LAST_SYNCED_KEY,
+    ] {
+        settings_repo::set(&state.db, key, "").await?;
+    }
+    state.sync_oauth.lock().pending = None;
+    Ok(())
 }
 
-/// Merge the local vault with the gist (pulling+merging first when a gist is
-/// linked, to avoid clobbering changes made from another device) and push the
-/// result. Creates the gist on first use. Returns the gist id.
+/// Merge the remote backup into the local vault (so edits from other devices
+/// survive), then push the result as a new backup revision.
 #[tauri::command]
-pub async fn sync_push(state: State<'_, AppState>) -> AppResult<String> {
-    let token = read_token(&state).await?;
-    let passphrase = read_passphrase(&state).await?;
-    let client = GistClient::new(&token);
-    let mut gist_id = resolve_gist_id(&state, &token).await?;
+pub async fn sync_push(state: State<'_, AppState>) -> AppResult<()> {
+    let config = require_config(&state).await?;
+    let passphrase = require_passphrase(&state).await?;
+    let mut backend = sync::make_provider(config)?;
 
-    // Pull-merge before push: without this, a device that hasn't seen a
-    // teammate's edits would overwrite them wholesale instead of merging.
-    if let Some(id) = &gist_id {
-        match client.pull(id).await {
-            Ok(envelope) => {
-                sync::import_encrypted(&state.db, &envelope, &passphrase)
-                    .await
-                    .map_err(|_| {
-                        AppError::Invalid(
-                            "could not decrypt the remote vault with this passphrase — \
-                             use the passphrase that was used for the last push/restore"
-                                .into(),
-                        )
-                    })?;
-            }
-            // The cached gist id points at a gist that no longer exists
-            // (deleted on GitHub); forget it and push a fresh one instead of
-            // failing outright.
-            Err(AppError::NotFound(_)) => {
-                gist_id = None;
-            }
-            Err(err) => return Err(err),
-        }
+    if let Some(envelope) = backend.pull_latest().await? {
+        sync::import_encrypted(&state.db, &envelope, &passphrase)
+            .await
+            .map_err(|err| match err {
+                AppError::Crypto(_) => AppError::Invalid(
+                    "could not decrypt the remote backup with the stored passphrase — \
+                     it was re-encrypted elsewhere; disconnect and reconnect to resolve"
+                        .into(),
+                ),
+                other => other,
+            })?;
     }
 
-    let envelope = sync::export_encrypted(&state.db, &passphrase).await?;
-    let new_id = client.push(gist_id.as_deref(), &envelope).await?;
+    let sealed = sync::export_encrypted(&state.db, &passphrase).await?;
+    backend.push(&sealed).await?;
 
-    settings_repo::set(&state.db, GIST_ID_KEY, &new_id).await?;
-    mark_synced(&state).await?;
-    Ok(new_id)
+    persist_config(&state, &backend.config()).await?;
+    mark_synced(&state).await
 }
 
-/// List the linked gist's backup history, newest first.
+/// Backup history of the connected provider, newest first.
 #[tauri::command]
-pub async fn sync_list_gist_versions(state: State<'_, AppState>) -> AppResult<Vec<GistVersion>> {
-    let token = read_token(&state).await?;
-    let gist_id = resolve_gist_id(&state, &token).await?.ok_or_else(|| {
-        AppError::NotFound("no backups yet — back up once from any device first".into())
-    })?;
-    GistClient::new(&token).list_versions(&gist_id).await
+pub async fn sync_list_versions(state: State<'_, AppState>) -> AppResult<Vec<SyncVersion>> {
+    let config = require_config(&state).await?;
+    let mut backend = sync::make_provider(config)?;
+    let versions = backend.list_versions().await?;
+    persist_config(&state, &backend.config()).await?;
+    Ok(versions)
 }
 
-/// Roll the local vault back to one specific historical revision of the
-/// gist. This replaces local data outright (see [`sync::restore_snapshot`]) —
-/// it is not a merge, unlike every other sync path.
+/// Roll the local vault back to one specific backup revision. This replaces
+/// local data outright (see [`sync::restore_snapshot`]) — it is not a merge.
 #[tauri::command]
-pub async fn sync_restore_gist_version(state: State<'_, AppState>, sha: String) -> AppResult<()> {
-    let token = read_token(&state).await?;
-    let passphrase = read_passphrase(&state).await?;
-    let gist_id = resolve_gist_id(&state, &token)
-        .await?
-        .ok_or_else(|| AppError::NotFound("no vault gist linked yet".into()))?;
+pub async fn sync_restore_version(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    let config = require_config(&state).await?;
+    let passphrase = require_passphrase(&state).await?;
+    let mut backend = sync::make_provider(config)?;
 
-    let envelope = GistClient::new(&token).pull_at(&gist_id, &sha).await?;
+    let envelope = backend.pull_version(&id).await?;
     sync::restore_encrypted(&state.db, &envelope, &passphrase).await?;
+
+    persist_config(&state, &backend.config()).await?;
     mark_synced(&state).await
 }
 
 /// Encrypt the full data set with a caller-supplied passphrase and write it
-/// to `path`. Unlike the gist path, this passphrase is never persisted — the
-/// caller must supply it again for every export/import.
+/// to `path`. Independent of the connected provider; the passphrase is never
+/// persisted.
 #[tauri::command]
 pub async fn sync_file_export(
     state: State<'_, AppState>,

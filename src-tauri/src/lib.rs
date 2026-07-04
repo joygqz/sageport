@@ -95,12 +95,14 @@ pub fn run() {
             commands::sftp::sftp_transfer_history_delete,
             commands::sftp::sftp_transfer_history_clear,
             // sync
-            commands::sync::sync_get_config,
+            commands::sync::sync_get_status,
+            commands::sync::sync_oauth_start,
+            commands::sync::sync_oauth_cancel,
             commands::sync::sync_connect,
             commands::sync::sync_disconnect,
             commands::sync::sync_push,
-            commands::sync::sync_list_gist_versions,
-            commands::sync::sync_restore_gist_version,
+            commands::sync::sync_list_versions,
+            commands::sync::sync_restore_version,
             commands::sync::sync_file_export,
             commands::sync::sync_file_import,
             // window chrome

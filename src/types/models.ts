@@ -203,30 +203,53 @@ export interface AiSession extends AiSessionSummary {
   messages: AiChatMessage[];
 }
 
-/** Non-secret view of the GitHub Gist sync configuration. */
-export interface SyncConfig {
-  /** Whether a GitHub token is stored (the token itself is never exposed). */
-  hasToken: boolean;
-  /** Whether a vault passphrase is stored (never exposed). */
-  hasPassphrase: boolean;
-  /** Id of the linked vault gist, once known (pushed or auto-discovered). */
-  gistId: string | null;
-  /** ISO timestamp of the last successful push/restore, if any. */
+/** The five connectable sync backends (one active at a time). */
+export type SyncProviderKind = "gist" | "gdrive" | "onedrive" | "webdav" | "s3";
+
+/** Non-secret view of the sync state (see `sync.status`). */
+export interface SyncStatus {
+  /** Connected provider, or null when sync is not set up. */
+  provider: SyncProviderKind | null;
+  /** Human-readable account label (GitHub login, e-mail, username, ...). */
+  account: string | null;
+  /** Non-secret location detail (gist id, bucket, server URL). */
+  detail: string | null;
+  /** ISO timestamp of the last successful backup/restore, if any. */
   lastSyncedAt: string | null;
+  /** OAuth providers this build carries client ids for. */
+  oauthReady: { gist: boolean; gdrive: boolean; onedrive: boolean };
 }
 
 /** Result of `sync.connect`: either linked, or blocked on a passphrase that
- * doesn't decrypt the account's existing backup (see `sync.connect`). */
+ * doesn't decrypt the target's existing backup. */
 export type SyncConnectOutcome =
-  | { status: "connected"; gistId: string | null }
-  | { status: "passphraseMismatch"; gistId: string };
+  | { status: "connected" }
+  | { status: "passphraseMismatch" };
 
-/** One historical revision of the vault gist (see `sync.listVersions`). */
-export interface GistVersion {
-  sha: string;
-  committedAt: string;
-  additions: number;
-  deletions: number;
+/** Progress of an in-flight OAuth flow (streamed from `sync.oauthStart`). */
+export type SyncOAuthEvent =
+  | { type: "deviceCode"; userCode: string; verificationUri: string }
+  | { type: "browser" };
+
+/** Credential-based provider settings passed to `sync.connect`. */
+export type SyncProviderSettings =
+  | { url: string; username: string; password: string } // webdav
+  | {
+      endpoint: string;
+      region: string;
+      bucket: string;
+      prefix: string;
+      accessKey: string;
+      secretKey: string;
+      pathStyle: boolean;
+    }; // s3
+
+/** One historical backup revision (see `sync.listVersions`). */
+export interface SyncVersion {
+  /** Provider-scoped id, fed back into `sync.restoreVersion`. */
+  id: string;
+  createdAt: string;
+  sizeBytes: number | null;
 }
 
 // --- SSH event payloads (emitted from Rust) ---

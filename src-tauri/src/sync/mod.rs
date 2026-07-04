@@ -2,19 +2,26 @@
 //!
 //! Everything the UI owns is serialized into a [`VaultSnapshot`], sealed with
 //! the user's passphrase ([`crate::crypto`]), and shipped as an opaque
-//! [`EncryptedEnvelope`]. Two transports consume that envelope:
+//! [`EncryptedEnvelope`]. Two consumers exist for that envelope:
 //!
-//! * [`GistClient`] — pushes/pulls the vault to a secret GitHub Gist for
-//!   zero-backend multi-device sync.
-//! * the file helpers below — write/read the vault to a local path for manual
-//!   backup and restore.
+//! * a [`provider::SyncProvider`] — one of five remote backends (GitHub
+//!   Gist, Google Drive, OneDrive, WebDAV, S3-compatible), exactly one of
+//!   which is connected at a time;
+//! * the file helpers below — write/read the vault to a local path for the
+//!   standalone one-shot backup/restore feature.
 //!
-//! Importing always performs a last-write-wins merge keyed on `updated_at`, so
-//! both transports drive the exact same reconciliation path.
+//! Importing always performs a last-write-wins merge keyed on `updated_at`,
+//! so every transport drives the exact same reconciliation path.
 
+mod gdrive;
 mod gist;
+pub mod oauth;
+mod onedrive;
+mod provider;
+mod s3;
+mod webdav;
 
-pub use gist::{GistClient, GistVersion};
+pub use provider::{make_provider, ProviderConfig, ProviderKind, SyncVersion};
 
 use std::path::Path;
 

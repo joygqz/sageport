@@ -2,7 +2,7 @@ import { ArrowUpCircle, Cloud, CloudOff, FolderSync } from "lucide-react";
 
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { useSyncConfig } from "@/features/sync/api";
+import { useSyncStatus } from "@/features/sync/api";
 import { useSftpStore } from "@/features/sftp/store";
 import { useUpdateStatus } from "@/features/updates/api";
 import { useLayoutStore } from "./layout";
@@ -108,17 +108,17 @@ function TransfersItem() {
 
 function SyncItem() {
   const { t } = useI18n();
-  const { data: config } = useSyncConfig();
+  const { data: status } = useSyncStatus();
   const openSettings = useTabsStore((s) => s.openSettings);
 
-  const connected = Boolean(config?.hasToken);
+  const connected = Boolean(status?.provider);
   return (
     <StatusBarItem
       onClick={() => openSettings("sync")}
       title={
-        connected && config?.lastSyncedAt
+        connected && status?.lastSyncedAt
           ? t("statusBar.lastSynced", {
-              time: new Date(config.lastSyncedAt).toLocaleString(),
+              time: new Date(status.lastSyncedAt).toLocaleString(),
             })
           : undefined
       }
