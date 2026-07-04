@@ -102,11 +102,11 @@ export const useLayoutStore = create<LayoutState>()(
     (set, get) => ({
       activity: "hosts",
       sidebarVisible: true,
-      sidebarWidth: 260,
+      sidebarWidth: 250,
       panelVisible: false,
-      panelHeight: 240,
+      panelHeight: 250,
       auxVisible: false,
-      auxWidth: 340,
+      auxWidth: 250,
 
       selectActivity: (activity) =>
         set((s) =>
