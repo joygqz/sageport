@@ -20,7 +20,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 /** localStorage key, mirroring the theme provider's persistence strategy. */
 export const LOCALE_STORAGE_KEY = "sageport.locale";
 
-function isLocale(value: unknown): value is Locale {
+export function isLocale(value: unknown): value is Locale {
   return (
     typeof value === "string" && (LOCALES as readonly string[]).includes(value)
   );

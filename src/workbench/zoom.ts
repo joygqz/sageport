@@ -23,6 +23,9 @@ const STEP = 0.1;
 export const ZOOM_LEVEL_MIN = -3;
 export const ZOOM_LEVEL_MAX = 5;
 
+/** Settings-table key the zoom level rides along with vault sync under. */
+export const ZOOM_SYNC_KEY = "appearance.zoomLevel";
+
 export function zoomFactor(level: number): number {
   return 1 + level * STEP;
 }
@@ -76,6 +79,9 @@ interface ZoomState {
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
+  /** Set an absolute level (clamped) — used to apply a level merged in from
+   * another device via sync. */
+  setLevel: (level: number) => void;
   /** Re-apply the persisted level to the document, on workbench mount. */
   init: () => void;
 }
@@ -92,6 +98,7 @@ export const useZoomStore = create<ZoomState>()(
         zoomIn: () => setLevel(clamp(get().level + 1)),
         zoomOut: () => setLevel(clamp(get().level - 1)),
         resetZoom: () => setLevel(0),
+        setLevel: (level: number) => setLevel(clamp(level)),
         init: () => applyZoom(get().level),
       };
     },

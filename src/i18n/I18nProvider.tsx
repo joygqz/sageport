@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { detectLocale, LOCALE_STORAGE_KEY, type Locale } from "./config";
+import { useSettingSync } from "@/lib/settingSync";
+import { detectLocale, isLocale, LOCALE_STORAGE_KEY, type Locale } from "./config";
 import { I18nContext } from "./i18n-context";
 import { translate } from "./translate";
+
+/** Settings-table key the chosen locale rides along with vault sync under. */
+const LOCALE_SYNC_KEY = "appearance.locale";
 
 /** Provides the active locale and a `t()` translator, persisted to localStorage. */
 export function I18nProvider({ children }: { children: React.ReactNode }) {
@@ -13,10 +17,22 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = locale;
   }, [locale]);
 
-  const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
-    localStorage.setItem(LOCALE_STORAGE_KEY, next);
-  }, []);
+  // Reconciles with a locale choice merged in from another device (on
+  // mount, and whenever a sync connect/push/restore invalidates queries).
+  const pushLocale = useSettingSync(LOCALE_SYNC_KEY, locale, (remote) => {
+    if (!isLocale(remote)) return;
+    setLocaleState(remote);
+    localStorage.setItem(LOCALE_STORAGE_KEY, remote);
+  });
+
+  const setLocale = useCallback(
+    (next: Locale) => {
+      setLocaleState(next);
+      localStorage.setItem(LOCALE_STORAGE_KEY, next);
+      pushLocale(next);
+    },
+    [pushLocale],
+  );
 
   const t = useCallback(
     (

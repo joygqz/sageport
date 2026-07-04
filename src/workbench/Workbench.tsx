@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { ResizeHandle } from "@/components/ui";
+import { useSettingSync } from "@/lib/settingSync";
 import { IS_MACOS } from "@/lib/platform";
 import { Toaster } from "@/components/ui/toaster";
 import { AssistantPanel } from "@/features/ai/AssistantPanel";
@@ -18,7 +19,7 @@ import { useOverlayStore } from "./overlays";
 import { SideBar } from "./SideBar";
 import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
-import { syncTrafficLights, useZoomStore } from "./zoom";
+import { syncTrafficLights, useZoomStore, ZOOM_SYNC_KEY } from "./zoom";
 
 /**
  * The workbench: a fixed chrome of title bar, activity bar, side bar,
@@ -53,6 +54,20 @@ export function Workbench() {
   useEffect(() => {
     useZoomStore.getState().init();
   }, []);
+
+  // Reconciles with a zoom level merged in from another device (on mount,
+  // and whenever a sync connect/push/restore invalidates queries), and pushes
+  // this device's own zoom changes back out so they ride along with sync.
+  const zoomLevel = useZoomStore((s) => s.level);
+  const pushZoom = useSettingSync(ZOOM_SYNC_KEY, String(zoomLevel), (remote) => {
+    const level = Number(remote);
+    if (Number.isFinite(level)) useZoomStore.getState().setLevel(level);
+  });
+  useEffect(() => {
+    return useZoomStore.subscribe((state, prev) => {
+      if (state.level !== prev.level) pushZoom(String(state.level));
+    });
+  }, [pushZoom]);
 
   // AppKit resets the traffic lights to their default position whenever the
   // window re-lays out its chrome (resize, fullscreen transitions, theme
