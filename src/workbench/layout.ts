@@ -104,9 +104,9 @@ export const useLayoutStore = create<LayoutState>()(
       sidebarVisible: true,
       sidebarWidth: 260,
       panelVisible: false,
-      panelHeight: 320,
+      panelHeight: 240,
       auxVisible: false,
-      auxWidth: 380,
+      auxWidth: 340,
 
       selectActivity: (activity) =>
         set((s) =>
