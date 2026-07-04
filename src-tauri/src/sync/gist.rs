@@ -16,7 +16,7 @@ use serde_json::json;
 use crate::crypto::EncryptedEnvelope;
 use crate::error::{AppError, AppResult};
 
-use super::provider::{ProviderConfig, SyncProvider, SyncVersion};
+use super::provider::{ProviderConfig, SyncProvider, SyncVersion, KEEP_VERSIONS};
 
 const API: &str = "https://api.github.com";
 const FILENAME: &str = "sageport-vault.json";
@@ -207,6 +207,7 @@ impl SyncProvider for GistProvider {
             })
             .collect();
         versions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        versions.truncate(KEEP_VERSIONS);
         Ok(versions)
     }
 

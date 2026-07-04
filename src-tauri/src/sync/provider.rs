@@ -25,7 +25,7 @@ use super::webdav::WebdavProvider;
 
 /// How many backup revisions the timestamped-object providers keep before
 /// pruning the oldest on push. Gist history is capped by GitHub itself.
-pub const KEEP_VERSIONS: usize = 30;
+pub const KEEP_VERSIONS: usize = 10;
 
 const FILE_PREFIX: &str = "sageport-vault-";
 const FILE_SUFFIX: &str = ".json";

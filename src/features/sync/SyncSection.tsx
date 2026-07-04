@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { History, RotateCcw } from "lucide-react";
+import { History, RefreshCw, RotateCcw } from "lucide-react";
 
 import {
   Badge,
@@ -15,6 +15,7 @@ import {
   PasswordInput,
   Separator,
   Spinner,
+  Tooltip,
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
@@ -136,9 +137,7 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
               : t("settings.sync.connected.neverSynced")}
           </span>
         </div>
-        <Badge variant="primary">
-          {t("settings.sync.connected.badge")}
-        </Badge>
+        <Badge variant="primary">{t("settings.sync.connected.badge")}</Badge>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -170,23 +169,58 @@ function formatSize(bytes: number): string {
 
 function VersionsCard() {
   const { t } = useI18n();
-  const { data: versions, isLoading, isError } = useSyncVersions(true);
+  const {
+    data: versions,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useSyncVersions(true);
   const [target, setTarget] = useState<SyncVersion | null>(null);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const showLoading = isLoading || manualRefreshing;
+  const visibleVersions = manualRefreshing ? undefined : versions;
+
+  const doRefresh = async () => {
+    setManualRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setManualRefreshing(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h3 className="text-sm font-medium text-foreground">
-          {t("settings.sync.versions.title")}
-        </h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-sm font-medium text-foreground">
+            {t("settings.sync.versions.title")}
+          </h3>
+          <Tooltip content={t("settings.sync.versions.refreshButton")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              onClick={() => void doRefresh()}
+              disabled={isFetching || manualRefreshing}
+              aria-label={t("settings.sync.versions.refreshButton")}
+            >
+              <RefreshCw
+                className={showLoading ? "size-3.5 animate-spin" : "size-3.5"}
+              />
+            </Button>
+          </Tooltip>
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {t("settings.sync.versions.description")}
         </p>
       </div>
 
-      {isLoading && (
+      {showLoading && (
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <Spinner /> …
+          <Spinner />
+          <span>{t("settings.sync.versions.loading")}</span>
         </div>
       )}
 
@@ -196,13 +230,18 @@ function VersionsCard() {
         </p>
       )}
 
-      {!isLoading && !isError && (!versions || versions.length === 0) && (
-        <EmptyState icon={History} title={t("settings.sync.versions.empty")} />
-      )}
+      {!showLoading &&
+        !isError &&
+        (!visibleVersions || visibleVersions.length === 0) && (
+          <EmptyState
+            icon={History}
+            title={t("settings.sync.versions.empty")}
+          />
+        )}
 
-      {!!versions?.length && (
+      {!!visibleVersions?.length && (
         <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border">
-          {versions.map((v, idx) => (
+          {visibleVersions.map((v, idx) => (
             <li
               key={v.id}
               className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"

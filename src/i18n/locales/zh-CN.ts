@@ -488,9 +488,11 @@ export const zhCN: Dictionary = {
       versions: {
         title: "备份历史",
         description: "恢复会用所选备份替换全部本地数据，此操作无法撤销。",
+        loading: "正在加载备份历史",
         loadError: "加载备份历史失败",
         empty: "暂无备份",
         latestBadge: "最新",
+        refreshButton: "刷新",
         restoreButton: "恢复",
         restoreConfirmTitle: "恢复此备份",
         restoreConfirmDescription:

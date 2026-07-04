@@ -502,9 +502,11 @@ export const en = {
         title: "Backup history",
         description:
           "Restoring replaces all local data with the selected backup and cannot be undone.",
+        loading: "Loading backup history",
         loadError: "Failed to load backup history",
         empty: "No backups yet",
         latestBadge: "Latest",
+        refreshButton: "Refresh",
         restoreButton: "Restore",
         restoreConfirmTitle: "Restore this backup",
         restoreConfirmDescription:
