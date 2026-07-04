@@ -69,20 +69,22 @@ export function Workbench() {
     });
   }, [pushZoom]);
 
-  // AppKit resets the traffic lights to their default position whenever the
-  // window re-lays out its chrome (resize, fullscreen transitions, theme
-  // change) — push them back to the title bar's center each time.
+  // The native side keeps the traffic lights centered through window
+  // resizes and fullscreen transitions itself, synchronously inside
+  // AppKit's layout pass (see src-tauri/src/commands/window.rs) — an async
+  // webview round-trip would always land a frame late and jitter. From
+  // here they only need a re-sync when the target inset changes without a
+  // resize: zoom changes (handled in zoom.ts) and theme changes, where
+  // AppKit re-creates the buttons at their default spot.
   useEffect(() => {
     if (!IS_MACOS) return;
-    const appWindow = getCurrentWindow();
-    const unlisteners: Array<() => void> = [];
-    void appWindow.onResized(() => syncTrafficLights()).then((un) => {
-      unlisteners.push(un);
-    });
-    void appWindow.onThemeChanged(() => syncTrafficLights()).then((un) => {
-      unlisteners.push(un);
-    });
-    return () => unlisteners.forEach((un) => un());
+    let unlisten: (() => void) | undefined;
+    void getCurrentWindow()
+      .onThemeChanged(() => syncTrafficLights())
+      .then((un) => {
+        unlisten = un;
+      });
+    return () => unlisten?.();
   }, []);
 
   const layout = useLayoutStore();

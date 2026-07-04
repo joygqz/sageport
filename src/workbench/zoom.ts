@@ -47,9 +47,11 @@ const BASE_ROOT_FONT_PX = 15;
  * grows and shrinks with the UI zoom. Both the height and the left inset
  * follow the live root font-size, so the lights track the zoom level like
  * every other title-bar element (their padding reservation in TitleBar is
- * rem-based too). Also re-invoked from the workbench on window resize /
- * theme change, since AppKit resets the buttons to their default spot on
- * those.
+ * rem-based too). This only declares the target inset — the native side
+ * persists it and re-applies it itself through window resizes and
+ * fullscreen transitions (see src-tauri/src/commands/window.rs), so it only
+ * needs re-invoking when the inset changes: zoom changes (here) and theme
+ * changes (Workbench).
  */
 export function syncTrafficLights() {
   if (!IS_MACOS) return;

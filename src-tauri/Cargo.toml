@@ -76,7 +76,11 @@ rusty-s3 = "0.7"      # SigV4 presigning for S3-compatible storage
 
 # Re-center the macOS traffic lights in the custom title bar at runtime
 # (public AppKit API via the same bindings tauri/tao already compile).
+# objc2-foundation/block2 back the NSNotificationCenter observer that
+# re-applies the inset synchronously inside AppKit's resize layout pass.
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = [
   "std",
   "NSButton",
@@ -84,6 +88,14 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "NSResponder",
   "NSView",
   "NSWindow",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSNotification",
+  "NSObject",
+  "NSOperation",
+  "NSString",
+  "block2",
 ] }
 
 [features]
