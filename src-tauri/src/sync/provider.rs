@@ -53,7 +53,11 @@ impl ProviderKind {
 /// Full (secret-bearing) configuration of the active provider, persisted as
 /// one JSON blob in the settings table. Never serialized to the frontend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ProviderConfig {
     Gist {
         token: String,

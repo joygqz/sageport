@@ -101,9 +101,13 @@ pub async fn rename(pool: &SqlitePool, id: &str, title: &str) -> AppResult<AiSes
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
-    sqlx::query("DELETE FROM ai_sessions WHERE id = ?")
+    let affected = sqlx::query("DELETE FROM ai_sessions WHERE id = ?")
         .bind(id)
         .execute(pool)
-        .await?;
+        .await?
+        .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("ai session {id}")));
+    }
     Ok(())
 }

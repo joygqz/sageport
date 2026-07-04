@@ -240,10 +240,14 @@ fn build_config(
         ProviderKind::Gist | ProviderKind::Gdrive | ProviderKind::Onedrive => {
             let slot = state.sync_oauth.lock();
             let Some((pending_kind, outcome)) = slot.pending.as_ref() else {
-                return Err(AppError::Invalid("authorize with the provider first".into()));
+                return Err(AppError::Invalid(
+                    "authorize with the provider first".into(),
+                ));
             };
             if *pending_kind != kind {
-                return Err(AppError::Invalid("authorize with the provider first".into()));
+                return Err(AppError::Invalid(
+                    "authorize with the provider first".into(),
+                ));
             }
             let config = match (&outcome.credential, kind) {
                 (oauth::OAuthCredential::GithubToken(token), ProviderKind::Gist) => {
@@ -262,7 +266,11 @@ fn build_config(
                         tokens: tokens.clone(),
                     }
                 }
-                _ => return Err(AppError::Invalid("authorize with the provider first".into())),
+                _ => {
+                    return Err(AppError::Invalid(
+                        "authorize with the provider first".into(),
+                    ))
+                }
             };
             Ok((config, outcome.account.clone()))
         }
@@ -317,7 +325,8 @@ fn build_config(
 fn parse_settings<T: serde::de::DeserializeOwned>(
     settings: Option<serde_json::Value>,
 ) -> AppResult<T> {
-    let value = settings.ok_or_else(|| AppError::Invalid("provider settings are required".into()))?;
+    let value =
+        settings.ok_or_else(|| AppError::Invalid("provider settings are required".into()))?;
     serde_json::from_value(value)
         .map_err(|e| AppError::Invalid(format!("invalid provider settings: {e}")))
 }

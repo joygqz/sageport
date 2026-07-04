@@ -6,6 +6,15 @@ use crate::repository::{host_repo, identity_repo, key_repo};
 use crate::ssh::{AuthMethod, ConnectParams};
 use crate::state::AppState;
 
+fn valid_port(port: i64) -> AppResult<u16> {
+    let port = u16::try_from(port)
+        .map_err(|_| AppError::Invalid("port must be between 1 and 65535".into()))?;
+    if port == 0 {
+        return Err(AppError::Invalid("port must be between 1 and 65535".into()));
+    }
+    Ok(port)
+}
+
 /// Open an interactive SSH session for `host_id` under the caller-provided
 /// `session_id` (one per terminal tab). Progress arrives via `ssh://status`
 /// and output via `ssh://data` events.
@@ -24,7 +33,7 @@ pub async fn ssh_connect(
     let params = ConnectParams {
         session_id,
         host: host.address.clone(),
-        port: host.port as u16,
+        port: valid_port(host.port)?,
         username,
         auth,
         cols,

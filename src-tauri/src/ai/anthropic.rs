@@ -217,8 +217,7 @@ impl StreamAccumulator {
                     tool_calls.push(ToolCall {
                         id,
                         name,
-                        arguments: serde_json::from_str(&input_json)
-                            .unwrap_or_else(|_| json!({})),
+                        arguments: serde_json::from_str(&input_json).unwrap_or_else(|_| json!({})),
                     });
                 }
             }

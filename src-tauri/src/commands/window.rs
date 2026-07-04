@@ -17,11 +17,7 @@ use crate::error::AppResult;
 /// (AppKit re-creates or re-lays-out the buttons on those). A no-op on
 /// other platforms.
 #[tauri::command]
-pub fn window_set_traffic_light_inset(
-    window: tauri::Window,
-    x: f64,
-    height: f64,
-) -> AppResult<()> {
+pub fn window_set_traffic_light_inset(window: tauri::Window, x: f64, height: f64) -> AppResult<()> {
     #[cfg(target_os = "macos")]
     {
         let win = window.clone();

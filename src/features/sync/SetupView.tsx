@@ -95,7 +95,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-2">
         {SYNC_PROVIDERS.map((p) => {
           const Icon = p.icon;
           const active = p.kind === kind;
@@ -105,7 +105,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
               onClick={() => selectProvider(p.kind)}
               aria-pressed={active}
               className={cn(
-                "flex flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors",
+                "flex min-w-0 flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors",
                 active
                   ? "border-primary bg-list-active/40 ring-1 ring-primary/40"
                   : "border-border hover:border-ring hover:bg-list-hover",
@@ -233,7 +233,7 @@ function OAuthPanel({
         <p className="text-sm text-muted-foreground">
           {t("settings.sync.setup.deviceCodeHint")}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <code className="rounded-md border border-border bg-background px-3 py-1.5 font-mono text-base font-semibold tracking-widest text-foreground">
             {phase.userCode}
           </code>
@@ -246,7 +246,7 @@ function OAuthPanel({
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           </Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
             size="sm"
@@ -280,9 +280,9 @@ function OAuthPanel({
 
   if (phase.step === "authorized") {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
         <Check className="size-4 text-primary" />
-        <p className="flex-1 text-sm text-foreground">
+        <p className="min-w-0 flex-1 text-sm text-foreground">
           {t("settings.sync.setup.authorizedAs", { account: phase.account })}
         </p>
         <Button variant="ghost" size="sm" onClick={() => void begin()}>
@@ -353,7 +353,7 @@ function ConnectForm({
               spellCheck={false}
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
             <Field label={t("settings.sync.setup.usernameLabel")}>
               <Input
                 value={webdav.username}
@@ -391,7 +391,7 @@ function ConnectForm({
               spellCheck={false}
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
             <Field label={t("settings.sync.setup.s3BucketLabel")} required>
               <Input
                 value={s3.bucket}
@@ -413,7 +413,7 @@ function ConnectForm({
               />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
             <Field label={t("settings.sync.setup.s3AccessKeyLabel")} required>
               <PasswordInput
                 value={s3.accessKey}

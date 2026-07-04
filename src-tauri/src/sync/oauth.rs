@@ -71,14 +71,21 @@ impl OAuthTokens {
 
     pub fn needs_refresh(&self) -> bool {
         chrono::DateTime::parse_from_rfc3339(&self.expires_at)
-            .map(|t| (t.with_timezone(&chrono::Utc) - chrono::Utc::now()).num_seconds() < REFRESH_LEEWAY_SECS)
+            .map(|t| {
+                (t.with_timezone(&chrono::Utc) - chrono::Utc::now()).num_seconds()
+                    < REFRESH_LEEWAY_SECS
+            })
             .unwrap_or(true)
     }
 }
 
 /// Progress events streamed to the UI while a flow is in flight.
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum OAuthEvent {
     /// GitHub device flow: show this code and link to the user.
     DeviceCode {
@@ -134,7 +141,9 @@ async fn post_form_json(url: &str, form: &[(&str, &str)]) -> AppResult<Value> {
             .as_str()
             .or(body["error"].as_str())
             .unwrap_or("unknown error");
-        return Err(AppError::Other(format!("oauth token request failed: {detail}")));
+        return Err(AppError::Other(format!(
+            "oauth token request failed: {detail}"
+        )));
     }
     Ok(body)
 }
@@ -172,7 +181,9 @@ pub async fn github_device_flow(
             _ = tokio::time::sleep(Duration::from_secs(interval)) => {}
         }
         if tokio::time::Instant::now() > deadline {
-            return Err(AppError::Invalid("the device code expired — try again".into()));
+            return Err(AppError::Invalid(
+                "the device code expired — try again".into(),
+            ));
         }
 
         let resp = post_form_json(
@@ -192,15 +203,21 @@ pub async fn github_device_flow(
                 continue;
             }
             Some("expired_token") => {
-                return Err(AppError::Invalid("the device code expired — try again".into()))
+                return Err(AppError::Invalid(
+                    "the device code expired — try again".into(),
+                ))
             }
             Some("access_denied") => {
-                return Err(AppError::Invalid("authorization was denied on GitHub".into()))
+                return Err(AppError::Invalid(
+                    "authorization was denied on GitHub".into(),
+                ))
             }
             Some(other) => return Err(AppError::Other(format!("GitHub OAuth failed: {other}"))),
             None => {
                 let token = json_str(&resp, "access_token")?;
-                let account = github_login(&token).await.unwrap_or_else(|_| "GitHub".into());
+                let account = github_login(&token)
+                    .await
+                    .unwrap_or_else(|_| "GitHub".into());
                 return Ok(OAuthOutcome {
                     credential: OAuthCredential::GithubToken(token),
                     account,
@@ -237,7 +254,10 @@ fn pkce() -> Pkce {
     rand::rngs::OsRng.fill_bytes(&mut raw);
     let verifier = URL_SAFE_NO_PAD.encode(raw);
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
-    Pkce { verifier, challenge }
+    Pkce {
+        verifier,
+        challenge,
+    }
 }
 
 fn random_state() -> String {
@@ -252,7 +272,11 @@ pub async fn google_flow(
     cancel: tokio::sync::oneshot::Receiver<()>,
 ) -> AppResult<OAuthOutcome> {
     let client_id = require(GOOGLE_CLIENT_ID, "Google", "SAGEPORT_GOOGLE_CLIENT_ID")?;
-    let client_secret = require(GOOGLE_CLIENT_SECRET, "Google", "SAGEPORT_GOOGLE_CLIENT_SECRET")?;
+    let client_secret = require(
+        GOOGLE_CLIENT_SECRET,
+        "Google",
+        "SAGEPORT_GOOGLE_CLIENT_SECRET",
+    )?;
 
     let listener = bind_loopback().await?;
     let redirect_uri = format!("http://127.0.0.1:{}", listener_port(&listener)?);
@@ -288,12 +312,13 @@ pub async fn google_flow(
     .await?;
 
     let access_token = json_str(&resp, "access_token")?;
-    let refresh_token = json_str(&resp, "refresh_token").map_err(|_| {
-        AppError::Other("Google did not return a refresh token — try again".into())
-    })?;
+    let refresh_token = json_str(&resp, "refresh_token")
+        .map_err(|_| AppError::Other("Google did not return a refresh token — try again".into()))?;
     let expires_in = resp["expires_in"].as_i64().unwrap_or(3600);
 
-    let account = google_email(&access_token).await.unwrap_or_else(|_| "Google".into());
+    let account = google_email(&access_token)
+        .await
+        .unwrap_or_else(|_| "Google".into());
     Ok(OAuthOutcome {
         credential: OAuthCredential::Tokens(OAuthTokens::from_grant(
             access_token,
@@ -360,7 +385,9 @@ pub async fn microsoft_flow(
     let refresh_token = json_str(&resp, "refresh_token")?;
     let expires_in = resp["expires_in"].as_i64().unwrap_or(3600);
 
-    let account = microsoft_account(&access_token).await.unwrap_or_else(|_| "Microsoft".into());
+    let account = microsoft_account(&access_token)
+        .await
+        .unwrap_or_else(|_| "Microsoft".into());
     Ok(OAuthOutcome {
         credential: OAuthCredential::Tokens(OAuthTokens::from_grant(
             access_token,
@@ -392,7 +419,11 @@ async fn microsoft_account(access_token: &str) -> AppResult<String> {
 
 pub async fn refresh_google(tokens: &OAuthTokens) -> AppResult<OAuthTokens> {
     let client_id = require(GOOGLE_CLIENT_ID, "Google", "SAGEPORT_GOOGLE_CLIENT_ID")?;
-    let client_secret = require(GOOGLE_CLIENT_SECRET, "Google", "SAGEPORT_GOOGLE_CLIENT_SECRET")?;
+    let client_secret = require(
+        GOOGLE_CLIENT_SECRET,
+        "Google",
+        "SAGEPORT_GOOGLE_CLIENT_SECRET",
+    )?;
     let resp = post_form_json(
         GOOGLE_TOKEN_URL,
         &[
@@ -513,8 +544,15 @@ async fn run_loopback(
         }
 
         if let Some(err) = error {
-            respond(&mut stream, 200, "Authorization failed — you can close this tab.").await;
-            return Err(AppError::Invalid(format!("authorization was denied: {err}")));
+            respond(
+                &mut stream,
+                200,
+                "Authorization failed — you can close this tab.",
+            )
+            .await;
+            return Err(AppError::Invalid(format!(
+                "authorization was denied: {err}"
+            )));
         }
         let Some(code) = code else {
             respond(&mut stream, 404, "Not found").await;

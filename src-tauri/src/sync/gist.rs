@@ -133,7 +133,11 @@ impl GistProvider {
     }
 
     /// Create (id `None`) or update the vault gist; returns the gist id.
-    async fn upload(&self, gist_id: Option<&str>, envelope: &EncryptedEnvelope) -> AppResult<String> {
+    async fn upload(
+        &self,
+        gist_id: Option<&str>,
+        envelope: &EncryptedEnvelope,
+    ) -> AppResult<String> {
         let content = serde_json::to_string_pretty(envelope)?;
         let body = json!({
             "description": DESCRIPTION,
@@ -211,7 +215,8 @@ impl SyncProvider for GistProvider {
             .resolve_gist_id()
             .await?
             .ok_or_else(|| AppError::NotFound("no vault gist linked yet".into()))?;
-        self.fetch_envelope(&format!("{API}/gists/{id}/{sha}")).await
+        self.fetch_envelope(&format!("{API}/gists/{id}/{sha}"))
+            .await
     }
 
     async fn reset(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {

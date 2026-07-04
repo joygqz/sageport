@@ -94,7 +94,8 @@ export const zhCN: Dictionary = {
     connectFailed: "连接失败",
     credentialsMissing:
       "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
-    authFailed: "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
+    authFailed:
+      "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
     closed: "会话已结束",
     reconnect: "重新连接",
     status: {
@@ -153,6 +154,7 @@ export const zhCN: Dictionary = {
     addressRequired: "地址为必填项",
     addressPlaceholder: "10.0.0.4 或 host.example.com",
     port: "端口",
+    portInvalid: "端口必须在 1 到 65535 之间",
     credentials: "凭据",
     customCredentials: "自定义凭据",
     usingIdentityHint: "用户名和认证方式来自所选身份。",
@@ -300,9 +302,11 @@ export const zhCN: Dictionary = {
     mkdirError: "创建文件夹失败",
     renameError: "重命名失败",
     deleteError: "删除失败",
+    transferError: "启动传输失败",
     credentialsMissing:
       "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
-    authFailed: "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
+    authFailed:
+      "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
     cancelTransfer: "取消传输",
     history: {
       title: "传输历史",
@@ -401,7 +405,8 @@ export const zhCN: Dictionary = {
       title: "同步",
       description:
         "将主机、密钥、代码片段和设置备份到你选择的存储。数据在离开本设备前先用口令进行端到端加密。切换存储需先断开连接。",
-      corruptRemoteBackup: "从已连接存储获取的备份数据似乎已损坏，或来自不兼容的应用版本。",
+      corruptRemoteBackup:
+        "从已连接存储获取的备份数据似乎已损坏，或来自不兼容的应用版本。",
       provider: {
         gistTagline: "你 GitHub 账户下的私密 Gist",
         gdriveTagline: "Google Drive 中的隐藏应用文件夹",
@@ -492,8 +497,10 @@ export const zhCN: Dictionary = {
         exportFailed: "导出失败",
         importedTitle: "备份已恢复",
         importFailed: "恢复失败",
-        importWrongPassphrase: "口令与加密此文件时使用的口令不一致，请检查后重试。",
-        importInvalidFile: "所选文件不是有效的 Sageport 备份文件，请确认选择了正确的文件。",
+        importWrongPassphrase:
+          "口令与加密此文件时使用的口令不一致，请检查后重试。",
+        importInvalidFile:
+          "所选文件不是有效的 Sageport 备份文件，请确认选择了正确的文件。",
         passphraseDialogTitle: "输入备份口令",
         passphraseDialogConfirm: "继续",
       },

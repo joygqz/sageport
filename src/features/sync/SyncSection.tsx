@@ -117,9 +117,9 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
         </p>
       </div>
 
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
         <Icon className="size-6 shrink-0 text-foreground" />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 basis-64 flex-col">
           <span className="text-sm font-medium text-foreground">
             {meta.name}
             {status.account && (
@@ -141,7 +141,7 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
         </Badge>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={doPush} loading={push.isPending}>
           {t("settings.sync.connected.pushButton")}
         </Button>
@@ -205,9 +205,9 @@ function VersionsCard() {
           {versions.map((v, idx) => (
             <li
               key={v.id}
-              className="flex items-center justify-between gap-3 px-3 py-2.5"
+              className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"
             >
-              <div className="flex min-w-0 flex-col gap-0.5">
+              <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-foreground">
                     {new Date(v.createdAt).toLocaleString()}
@@ -356,7 +356,7 @@ function FileBackupCard() {
         </p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
           onClick={() => setAction("export")}

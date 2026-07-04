@@ -67,7 +67,10 @@ impl WebdavProvider {
     /// the parent must exist.
     async fn ensure_collection(&self) -> AppResult<()> {
         let resp = self
-            .request(Method::from_bytes(b"MKCOL").expect("valid method"), self.base.clone())
+            .request(
+                Method::from_bytes(b"MKCOL").expect("valid method"),
+                self.base.clone(),
+            )
             .send()
             .await
             .map_err(net_err)?;
@@ -104,7 +107,9 @@ impl WebdavProvider {
             401 => return Err(unauthorized()),
             404 => return Ok(Vec::new()),
             s if !resp.status().is_success() && s != 207 => {
-                return Err(AppError::Other(format!("WebDAV PROPFIND failed (status {s})")));
+                return Err(AppError::Other(format!(
+                    "WebDAV PROPFIND failed (status {s})"
+                )));
             }
             _ => {}
         }
@@ -130,7 +135,9 @@ impl WebdavProvider {
                 return Err(AppError::NotFound(format!("backup {name} not found")))
             }
             s if !s.is_success() => {
-                return Err(AppError::Other(format!("WebDAV download failed (status {s})")))
+                return Err(AppError::Other(format!(
+                    "WebDAV download failed (status {s})"
+                )))
             }
             _ => {}
         }
@@ -150,9 +157,9 @@ impl WebdavProvider {
             .map_err(net_err)?;
         match resp.status() {
             StatusCode::UNAUTHORIZED => Err(unauthorized()),
-            s if !s.is_success() => {
-                Err(AppError::Other(format!("WebDAV upload failed (status {s})")))
-            }
+            s if !s.is_success() => Err(AppError::Other(format!(
+                "WebDAV upload failed (status {s})"
+            ))),
             _ => Ok(()),
         }
     }
@@ -166,9 +173,9 @@ impl WebdavProvider {
         match resp.status() {
             StatusCode::UNAUTHORIZED => Err(unauthorized()),
             StatusCode::NOT_FOUND => Ok(()),
-            s if !s.is_success() => {
-                Err(AppError::Other(format!("WebDAV delete failed (status {s})")))
-            }
+            s if !s.is_success() => Err(AppError::Other(format!(
+                "WebDAV delete failed (status {s})"
+            ))),
             _ => Ok(()),
         }
     }

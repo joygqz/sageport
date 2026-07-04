@@ -5,6 +5,17 @@ use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
 use crate::sshkey;
 
+fn normalize(mut input: SshKeyInput) -> AppResult<SshKeyInput> {
+    input.name = input.name.trim().to_string();
+    input.public_key = input.public_key.take().map(|v| v.trim().to_string());
+    input.private_key = input.private_key.take().map(|v| v.trim().to_string());
+
+    if input.name.is_empty() {
+        return Err(AppError::Invalid("key name is required".into()));
+    }
+    Ok(input)
+}
+
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<SshKey>> {
     let rows = sqlx::query_as::<_, SshKey>(
         "SELECT * FROM keys WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE",
@@ -37,7 +48,7 @@ fn with_derived_public_key(mut input: SshKeyInput) -> AppResult<SshKeyInput> {
 }
 
 pub async fn create(pool: &SqlitePool, input: SshKeyInput) -> AppResult<SshKey> {
-    let input = with_derived_public_key(input)?;
+    let input = with_derived_public_key(normalize(input)?)?;
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -61,7 +72,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResul
     // Re-derive the public key when a new private key is sent without one,
     // same as `create` — otherwise re-uploading just the private key would
     // leave a stale public key behind.
-    let input = with_derived_public_key(input)?;
+    let input = with_derived_public_key(normalize(input)?)?;
     let ts = now();
     let affected = sqlx::query(
         "UPDATE keys SET name = ?, updated_at = ?, revision = revision + 1
@@ -144,13 +155,19 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     }
 
     let ts = now();
-    sqlx::query(
-        "UPDATE keys SET deleted_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+    let affected = sqlx::query(
+        "UPDATE keys
+         SET deleted_at = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(&ts)
     .bind(&ts)
     .bind(id)
     .execute(pool)
-    .await?;
+    .await?
+    .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("key {id}")));
+    }
     Ok(())
 }

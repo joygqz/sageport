@@ -128,7 +128,7 @@ function HostFormBody({
     const base = {
       label: values.label.trim(),
       address: values.address.trim(),
-      port: Number(values.port) || 22,
+      port: values.port,
       groupId: values.groupId || null,
       notes: values.notes.trim() || null,
     };
@@ -221,8 +221,21 @@ function HostFormBody({
               })}
             />
           </Field>
-          <Field label={t("hostForm.port")}>
-            <Input type="number" {...register("port")} />
+          <Field label={t("hostForm.port")} error={errors.port?.message}>
+            <Input
+              type="number"
+              min={1}
+              max={65535}
+              step={1}
+              {...register("port", {
+                valueAsNumber: true,
+                required: t("hostForm.portInvalid"),
+                min: { value: 1, message: t("hostForm.portInvalid") },
+                max: { value: 65535, message: t("hostForm.portInvalid") },
+                validate: (value) =>
+                  Number.isInteger(value) || t("hostForm.portInvalid"),
+              })}
+            />
           </Field>
         </div>
 

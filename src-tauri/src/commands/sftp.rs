@@ -16,6 +16,15 @@ use crate::repository::transfer_repo::{self, TransferRow};
 use crate::sftp::{self, Endpoint, FileEntry, SftpConnectParams, SftpManager};
 use crate::state::AppState;
 
+fn valid_port(port: i64) -> AppResult<u16> {
+    let port = u16::try_from(port)
+        .map_err(|_| AppError::Invalid("port must be between 1 and 65535".into()))?;
+    if port == 0 {
+        return Err(AppError::Invalid("port must be between 1 and 65535".into()));
+    }
+    Ok(port)
+}
+
 /// One end of a transfer, as sent from the frontend.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -87,7 +96,7 @@ pub async fn sftp_connect(
     let params = SftpConnectParams {
         connection_id,
         host: host.address.clone(),
-        port: host.port as u16,
+        port: valid_port(host.port)?,
         username,
         auth,
     };
@@ -207,8 +216,6 @@ pub async fn fs_transfer(
     let pool = state.db.clone();
     let source: Endpoint = source.into();
     let dest: Endpoint = dest.into();
-    let cancel = mgr.register_transfer(&transfer_id);
-
     transfer_repo::create(
         &pool,
         &transfer_id,
@@ -220,18 +227,30 @@ pub async fn fs_transfer(
     )
     .await?;
 
-    std::thread::Builder::new()
+    let cancel = mgr.register_transfer(&transfer_id);
+    let cleanup_mgr = mgr.clone();
+    let cleanup_pool = pool.clone();
+    let cleanup_transfer_id = transfer_id.clone();
+    let thread_transfer_id = transfer_id.clone();
+    let spawn = std::thread::Builder::new()
         .name(format!("sftp-xfer-{transfer_id}"))
         .spawn(move || {
             // `transfer` already emits a terminal done/error/cancelled event on
             // its own; here we just persist the outcome to history.
-            let outcome =
-                sftp::transfer(&app, &mgr, &transfer_id, &source, &dest, compress, cancel);
-            mgr.unregister_transfer(&transfer_id);
+            let outcome = sftp::transfer(
+                &app,
+                &mgr,
+                &thread_transfer_id,
+                &source,
+                &dest,
+                compress,
+                cancel,
+            );
+            mgr.unregister_transfer(&thread_transfer_id);
             tauri::async_runtime::block_on(async {
                 let _ = transfer_repo::finish(
                     &pool,
-                    &transfer_id,
+                    &thread_transfer_id,
                     outcome.transferred,
                     outcome.total,
                     outcome.status,
@@ -239,8 +258,21 @@ pub async fn fs_transfer(
                 )
                 .await;
             });
-        })
-        .map_err(AppError::Io)?;
+        });
+    if let Err(err) = spawn {
+        cleanup_mgr.unregister_transfer(&cleanup_transfer_id);
+        let message = err.to_string();
+        let _ = transfer_repo::finish(
+            &cleanup_pool,
+            &cleanup_transfer_id,
+            0,
+            0,
+            "error",
+            Some(&message),
+        )
+        .await;
+        return Err(AppError::Io(err));
+    }
     Ok(())
 }
 
@@ -258,7 +290,7 @@ pub async fn sftp_transfer_history_list(
     state: State<'_, AppState>,
     limit: Option<i64>,
 ) -> AppResult<Vec<TransferHistoryEntry>> {
-    let rows = transfer_repo::list(&state.db, limit.unwrap_or(200)).await?;
+    let rows = transfer_repo::list(&state.db, limit.unwrap_or(200).clamp(1, 1000)).await?;
     Ok(rows.into_iter().map(Into::into).collect())
 }
 

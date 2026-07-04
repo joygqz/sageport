@@ -3,6 +3,23 @@ use sqlx::SqlitePool;
 use crate::domain::{new_id, now, Snippet, SnippetInput};
 use crate::error::{AppError, AppResult};
 
+fn normalize(mut input: SnippetInput) -> AppResult<SnippetInput> {
+    input.name = input.name.trim().to_string();
+    input.command = input.command.trim().to_string();
+    input.description = input
+        .description
+        .take()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
+    if input.name.is_empty() {
+        return Err(AppError::Invalid("snippet name is required".into()));
+    }
+    if input.command.is_empty() {
+        return Err(AppError::Invalid("snippet command is required".into()));
+    }
+    Ok(input)
+}
+
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Snippet>> {
     let rows = sqlx::query_as::<_, Snippet>(
         "SELECT * FROM snippets WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE",
@@ -21,6 +38,7 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Snippet> {
 }
 
 pub async fn create(pool: &SqlitePool, input: SnippetInput) -> AppResult<Snippet> {
+    let input = normalize(input)?;
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -39,6 +57,7 @@ pub async fn create(pool: &SqlitePool, input: SnippetInput) -> AppResult<Snippet
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: SnippetInput) -> AppResult<Snippet> {
+    let input = normalize(input)?;
     let ts = now();
     let affected = sqlx::query(
         "UPDATE snippets SET name = ?, command = ?, description = ?, updated_at = ?, revision = revision + 1
@@ -60,13 +79,19 @@ pub async fn update(pool: &SqlitePool, id: &str, input: SnippetInput) -> AppResu
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let ts = now();
-    sqlx::query(
-        "UPDATE snippets SET deleted_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+    let affected = sqlx::query(
+        "UPDATE snippets
+         SET deleted_at = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(&ts)
     .bind(&ts)
     .bind(id)
     .execute(pool)
-    .await?;
+    .await?
+    .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("snippet {id}")));
+    }
     Ok(())
 }

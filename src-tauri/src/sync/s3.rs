@@ -82,9 +82,7 @@ impl S3Provider {
     /// Vault object names (basenames, prefix stripped), newest first.
     async fn list_names(&self) -> AppResult<Vec<(String, Option<u64>)>> {
         let mut action = self.bucket.list_objects_v2(Some(&self.credentials));
-        action
-            .query_mut()
-            .insert("prefix", self.prefix.clone());
+        action.query_mut().insert("prefix", self.prefix.clone());
         let url = action.sign(SIGN_TTL);
         let resp = self.http.get(url).send().await.map_err(net_err)?;
         let status = resp.status();
@@ -117,7 +115,11 @@ impl S3Provider {
         }
         let bytes = resp.bytes().await.map_err(net_err)?;
         if !status.is_success() {
-            return Err(api_err("download", status, &String::from_utf8_lossy(&bytes)));
+            return Err(api_err(
+                "download",
+                status,
+                &String::from_utf8_lossy(&bytes),
+            ));
         }
         Ok(serde_json::from_slice(&bytes)?)
     }

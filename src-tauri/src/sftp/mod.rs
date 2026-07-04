@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::Arc;
@@ -847,12 +847,30 @@ pub fn transfer(
     // Compression only pays off for a directory that actually crosses the
     // network; a local→local copy gains nothing from archiving.
     let crosses_network = source.connection_id.is_some() || dest_dir.connection_id.is_some();
+    let name = base_name(&source.path);
+    if let Err(e) = validate_transfer_target(mgr, source, dest_dir, &name) {
+        emit_xfer(
+            app,
+            transfer_id,
+            0,
+            0,
+            &name,
+            "error",
+            None,
+            Some(e.to_string()),
+        );
+        return TransferOutcome {
+            transferred: 0,
+            total: 0,
+            status: "error",
+            message: Some(e.to_string()),
+        };
+    }
     if compress && crosses_network && is_dir(mgr, source).unwrap_or(false) {
         return transfer_compressed(app, mgr, transfer_id, source, dest_dir, cancel);
     }
 
     let total = source_size(mgr, source).unwrap_or(0);
-    let name = base_name(&source.path);
     let progress = ProgressCtx {
         transfer_id: transfer_id.to_string(),
         base: 0,
@@ -1021,6 +1039,115 @@ fn copy_file(
 }
 
 // --- small endpoint helpers ---
+
+fn validate_transfer_target(
+    mgr: &SftpManager,
+    source: &Endpoint,
+    dest_dir: &Endpoint,
+    name: &str,
+) -> AppResult<()> {
+    if source.connection_id != dest_dir.connection_id {
+        return Ok(());
+    }
+
+    let source_is_dir = is_dir(mgr, source)?;
+    match &source.connection_id {
+        None => {
+            let source_path = normalize_local_path(Path::new(&source.path));
+            let target_path = normalize_local_path(Path::new(&dest_dir.path)).join(name);
+            let target_path = clean_local_path(&target_path);
+            if source_path == target_path {
+                return Err(AppError::Invalid(
+                    "cannot copy a file or folder onto itself".into(),
+                ));
+            }
+            if source_is_dir && target_path.starts_with(&source_path) {
+                return Err(AppError::Invalid(
+                    "cannot copy a folder into itself or one of its subfolders".into(),
+                ));
+            }
+        }
+        Some(_) => {
+            let source_path = normalize_remote_path(&source.path);
+            let target_path = normalize_remote_path(&join_remote(&dest_dir.path, name));
+            if source_path == target_path {
+                return Err(AppError::Invalid(
+                    "cannot copy a file or folder onto itself".into(),
+                ));
+            }
+            if source_is_dir && remote_is_child_path(&source_path, &target_path) {
+                return Err(AppError::Invalid(
+                    "cannot copy a folder into itself or one of its subfolders".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn normalize_local_path(path: &Path) -> PathBuf {
+    let absolute = fs::canonicalize(path).unwrap_or_else(|_| {
+        if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(path)
+        }
+    });
+    clean_local_path(&absolute)
+}
+
+fn clean_local_path(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                out.push(component.as_os_str());
+            }
+        }
+    }
+    out
+}
+
+fn normalize_remote_path(path: &str) -> String {
+    let absolute = path.starts_with('/');
+    let mut parts = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            part => parts.push(part),
+        }
+    }
+    let body = parts.join("/");
+    if absolute {
+        if body.is_empty() {
+            "/".to_string()
+        } else {
+            format!("/{body}")
+        }
+    } else if body.is_empty() {
+        ".".to_string()
+    } else {
+        body
+    }
+}
+
+fn remote_is_child_path(parent: &str, child: &str) -> bool {
+    if parent == "/" {
+        return child != "/";
+    }
+    child
+        .strip_prefix(parent)
+        .is_some_and(|rest| rest.starts_with('/'))
+}
 
 /// Size of a single file at `ep` (0 if it cannot be determined).
 fn file_size(mgr: &SftpManager, ep: &Endpoint) -> AppResult<u64> {
@@ -1463,4 +1590,23 @@ fn remote_archive_name() -> String {
 /// Single-quote a string for safe interpolation into a `/bin/sh` command.
 fn sh_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remote_path_normalization_preserves_root_boundaries() {
+        assert_eq!(normalize_remote_path("/srv/app/../app/."), "/srv/app");
+        assert!(remote_is_child_path("/srv/app", "/srv/app/logs"));
+        assert!(!remote_is_child_path("/srv/app", "/srv/application"));
+        assert!(!remote_is_child_path("/srv/app", "/srv/app"));
+    }
+
+    #[test]
+    fn local_path_cleaning_removes_dot_segments() {
+        let cleaned = clean_local_path(Path::new("/tmp/sageport/../sageport/./file"));
+        assert!(cleaned.ends_with(Path::new("sageport/file")));
+    }
 }

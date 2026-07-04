@@ -35,8 +35,8 @@ export const AUX_MIN = 240;
 const ACTIVITY_BAR_W = 45; // w-12 = 3rem
 const TITLE_BAR_H = 33.75; // h-9 = 2.25rem
 const STATUS_BAR_H = 22.5; // h-6 = 1.5rem
-/** The editor area never gives up more than this. */
-const EDITOR_MIN_W = 220;
+/** The editor area keeps a small reserve so docked side regions cannot erase it. */
+const EDITOR_MIN_W = 70;
 const EDITOR_MIN_H = 70;
 
 /** Live zoom factor scaling every rem-based size in the app. */

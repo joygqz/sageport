@@ -4,12 +4,50 @@ use crate::domain::{auth, new_id, now, Host, HostInput};
 use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
 
+const MIN_PORT: i64 = 1;
+const MAX_PORT: i64 = u16::MAX as i64;
+
+fn clean_optional(value: &mut Option<String>) {
+    *value = value
+        .take()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
+}
+
 /// Inline credential fields (`username`/`auth_type`/`key_id`/`password`) are
 /// redundant once `identity_id` is set, and `key_id`/`password` are mutually
 /// exclusive depending on `auth_type`. Clear whatever doesn't apply so
 /// switching to an identity — or between auth types — can't leave a stale
 /// secret behind, regardless of what the caller sent.
-fn normalize(mut input: HostInput) -> HostInput {
+fn normalize(mut input: HostInput) -> AppResult<HostInput> {
+    input.label = input.label.trim().to_string();
+    input.address = input.address.trim().to_string();
+    clean_optional(&mut input.group_id);
+    clean_optional(&mut input.identity_id);
+    clean_optional(&mut input.username);
+    clean_optional(&mut input.auth_type);
+    clean_optional(&mut input.key_id);
+    clean_optional(&mut input.os_hint);
+    clean_optional(&mut input.color);
+    clean_optional(&mut input.notes);
+
+    if input.label.is_empty() {
+        return Err(AppError::Invalid("host label is required".into()));
+    }
+    if input.address.is_empty() {
+        return Err(AppError::Invalid("host address is required".into()));
+    }
+    if !(MIN_PORT..=MAX_PORT).contains(&input.port) {
+        return Err(AppError::Invalid(format!(
+            "port must be between {MIN_PORT} and {MAX_PORT}"
+        )));
+    }
+    if let Some(auth_type) = input.auth_type.as_deref() {
+        if !matches!(auth_type, auth::PASSWORD | auth::KEY | auth::AGENT) {
+            return Err(AppError::Invalid(format!("unknown auth type: {auth_type}")));
+        }
+    }
+
     if input.identity_id.is_some() {
         input.username = None;
         input.auth_type = None;
@@ -23,7 +61,7 @@ fn normalize(mut input: HostInput) -> HostInput {
             input.password = Some(String::new());
         }
     }
-    input
+    Ok(input)
 }
 
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Host>> {
@@ -44,7 +82,7 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Host> {
 }
 
 pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
-    let input = normalize(input);
+    let input = normalize(input)?;
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -75,7 +113,7 @@ pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<Host> {
-    let input = normalize(input);
+    let input = normalize(input)?;
     let ts = now();
     let affected = sqlx::query(
         "UPDATE hosts SET
@@ -119,14 +157,20 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let ts = now();
-    sqlx::query(
-        "UPDATE hosts SET deleted_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+    let affected = sqlx::query(
+        "UPDATE hosts
+         SET deleted_at = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(&ts)
     .bind(&ts)
     .bind(id)
     .execute(pool)
-    .await?;
+    .await?
+    .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("host {id}")));
+    }
     Ok(())
 }
 

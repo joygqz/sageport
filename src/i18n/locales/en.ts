@@ -157,6 +157,7 @@ export const en = {
     addressRequired: "Address is required",
     addressPlaceholder: "10.0.0.4 or host.example.com",
     port: "Port",
+    portInvalid: "Port must be between 1 and 65535",
     credentials: "Credentials",
     customCredentials: "Custom credentials",
     usingIdentityHint:
@@ -309,6 +310,7 @@ export const en = {
     mkdirError: "Failed to create folder",
     renameError: "Failed to rename",
     deleteError: "Failed to delete",
+    transferError: "Failed to start transfer",
     credentialsMissing:
       "This host is missing sign-in credentials. Add a username and password, or link a saved identity, in host settings.",
     authFailed:

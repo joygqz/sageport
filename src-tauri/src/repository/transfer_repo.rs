@@ -7,7 +7,7 @@
 use sqlx::SqlitePool;
 
 use crate::domain::now;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct TransferRow {
@@ -65,13 +65,17 @@ pub async fn finish(
     message: Option<&str>,
 ) -> AppResult<()> {
     let ts = now();
+    let transferred_bytes = i64::try_from(transferred_bytes)
+        .map_err(|_| AppError::Invalid("transferred byte count is too large".into()))?;
+    let total_bytes = i64::try_from(total_bytes)
+        .map_err(|_| AppError::Invalid("total byte count is too large".into()))?;
     sqlx::query(
         "UPDATE sftp_transfers
          SET transferred_bytes = ?, total_bytes = ?, status = ?, message = ?, finished_at = ?
          WHERE id = ?",
     )
-    .bind(transferred_bytes as i64)
-    .bind(total_bytes as i64)
+    .bind(transferred_bytes)
+    .bind(total_bytes)
     .bind(status)
     .bind(message)
     .bind(&ts)
@@ -98,10 +102,14 @@ pub async fn list(pool: &SqlitePool, limit: i64) -> AppResult<Vec<TransferRow>> 
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
-    sqlx::query("DELETE FROM sftp_transfers WHERE id = ?")
+    let affected = sqlx::query("DELETE FROM sftp_transfers WHERE id = ?")
         .bind(id)
         .execute(pool)
-        .await?;
+        .await?
+        .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("transfer {id}")));
+    }
     Ok(())
 }
 

@@ -285,18 +285,17 @@ pub(crate) fn is_ssh_would_block(e: &ssh2::Error) -> bool {
 }
 
 pub(crate) fn is_ssh_transport_error(e: &ssh2::Error) -> bool {
-    match e.code() {
+    matches!(
+        e.code(),
         ssh2::ErrorCode::Session(
             LIBSSH2_SOCKET_SEND
-            | LIBSSH2_TIMEOUT
-            | LIBSSH2_SOCKET_DISCONNECT
-            | LIBSSH2_SOCKET_TIMEOUT
-            | LIBSSH2_SOCKET_RECV
-            | LIBSSH2_BAD_SOCKET,
-        )
-        | ssh2::ErrorCode::SFTP(LIBSSH2_FX_NO_CONNECTION | LIBSSH2_FX_CONNECTION_LOST) => true,
-        _ => false,
-    }
+                | LIBSSH2_TIMEOUT
+                | LIBSSH2_SOCKET_DISCONNECT
+                | LIBSSH2_SOCKET_TIMEOUT
+                | LIBSSH2_SOCKET_RECV
+                | LIBSSH2_BAD_SOCKET,
+        ) | ssh2::ErrorCode::SFTP(LIBSSH2_FX_NO_CONNECTION | LIBSSH2_FX_CONNECTION_LOST)
+    )
 }
 
 pub(crate) fn map_ssh_error(e: ssh2::Error) -> AppError {
@@ -475,35 +474,6 @@ fn run_session_inner(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn output_queue_retries_the_same_front_slice_after_would_block() {
-        let mut queue = OutputQueue::default();
-        queue.push(b"abcdef".to_vec());
-
-        assert_eq!(queue.current_slice(), Some(&b"abcdef"[..]));
-        let len = queue.current_len().unwrap();
-        queue.mark_retry(len);
-        queue.push(b"gh".to_vec());
-
-        assert_eq!(queue.current_slice(), Some(&b"abcdef"[..]));
-    }
-
-    #[test]
-    fn output_queue_advances_after_successful_partial_write() {
-        let mut queue = OutputQueue::default();
-        queue.push(b"abcdef".to_vec());
-        queue.mark_retry(6);
-
-        queue.advance(2);
-
-        assert_eq!(queue.current_slice(), Some(&b"cdef"[..]));
-    }
-}
-
 /// libssh2 codes meaning "the server understood the request and rejected
 /// these credentials", as opposed to a network/protocol-level failure —
 /// distinguished so a wrong password/key surfaces as [`AppError::Auth`]
@@ -551,4 +521,33 @@ pub(crate) fn authenticate(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn output_queue_retries_the_same_front_slice_after_would_block() {
+        let mut queue = OutputQueue::default();
+        queue.push(b"abcdef".to_vec());
+
+        assert_eq!(queue.current_slice(), Some(&b"abcdef"[..]));
+        let len = queue.current_len().unwrap();
+        queue.mark_retry(len);
+        queue.push(b"gh".to_vec());
+
+        assert_eq!(queue.current_slice(), Some(&b"abcdef"[..]));
+    }
+
+    #[test]
+    fn output_queue_advances_after_successful_partial_write() {
+        let mut queue = OutputQueue::default();
+        queue.push(b"abcdef".to_vec());
+        queue.mark_retry(6);
+
+        queue.advance(2);
+
+        assert_eq!(queue.current_slice(), Some(&b"cdef"[..]));
+    }
 }

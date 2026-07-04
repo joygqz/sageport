@@ -26,11 +26,11 @@ pub use provider::{make_provider, ProviderConfig, ProviderKind, SyncVersion};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+use sqlx::{Executor, Sqlite, SqlitePool};
 
 use crate::crypto::{self, EncryptedEnvelope};
 use crate::domain::{now, Group, Host, Identity, Snippet, SshKey};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 
 const SNAPSHOT_VERSION: u32 = 2;
@@ -91,11 +91,31 @@ impl VaultSnapshot {
                 + self.snippets.len()
                 + self.settings.len(),
         );
-        out.extend(self.groups.iter().map(|g| format!("g:{}:{}", g.id, g.revision)));
-        out.extend(self.hosts.iter().map(|h| format!("h:{}:{}", h.id, h.revision)));
-        out.extend(self.identities.iter().map(|i| format!("i:{}:{}", i.id, i.revision)));
-        out.extend(self.keys.iter().map(|k| format!("k:{}:{}", k.id, k.revision)));
-        out.extend(self.snippets.iter().map(|s| format!("s:{}:{}", s.id, s.revision)));
+        out.extend(
+            self.groups
+                .iter()
+                .map(|g| format!("g:{}:{}", g.id, g.revision)),
+        );
+        out.extend(
+            self.hosts
+                .iter()
+                .map(|h| format!("h:{}:{}", h.id, h.revision)),
+        );
+        out.extend(
+            self.identities
+                .iter()
+                .map(|i| format!("i:{}:{}", i.id, i.revision)),
+        );
+        out.extend(
+            self.keys
+                .iter()
+                .map(|k| format!("k:{}:{}", k.id, k.revision)),
+        );
+        out.extend(
+            self.snippets
+                .iter()
+                .map(|s| format!("s:{}:{}", s.id, s.revision)),
+        );
         out.extend(
             self.settings
                 .iter()
@@ -137,24 +157,31 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
 
 /// Last-write-wins merge of an incoming snapshot into the local database.
 pub async fn import_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
+    validate_snapshot(snapshot)?;
+    let mut tx = pool.begin().await?;
+    sqlx::query("PRAGMA defer_foreign_keys = ON")
+        .execute(&mut *tx)
+        .await?;
+
     for g in &snapshot.groups {
-        merge_group(pool, g).await?;
+        merge_group(&mut *tx, g).await?;
     }
     for i in &snapshot.identities {
-        merge_identity(pool, i).await?;
+        merge_identity(&mut *tx, i).await?;
     }
     for k in &snapshot.keys {
-        merge_key(pool, k).await?;
+        merge_key(&mut *tx, k).await?;
     }
     for h in &snapshot.hosts {
-        merge_host(pool, h).await?;
+        merge_host(&mut *tx, h).await?;
     }
     for s in &snapshot.snippets {
-        merge_snippet(pool, s).await?;
+        merge_snippet(&mut *tx, s).await?;
     }
     for entry in &snapshot.settings {
-        merge_setting(pool, entry).await?;
+        merge_setting(&mut *tx, entry).await?;
     }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -187,36 +214,47 @@ pub async fn import_encrypted(
 /// Children are cleared before parents so no FK ever dangles mid-restore, and
 /// parents are (re)inserted before children so every foreign key resolves.
 pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
-    sqlx::query("DELETE FROM hosts").execute(pool).await?;
-    sqlx::query("DELETE FROM identities").execute(pool).await?;
-    sqlx::query("DELETE FROM keys").execute(pool).await?;
-    sqlx::query("DELETE FROM groups").execute(pool).await?;
-    sqlx::query("DELETE FROM snippets").execute(pool).await?;
+    validate_snapshot(snapshot)?;
+    let mut tx = pool.begin().await?;
+    sqlx::query("PRAGMA defer_foreign_keys = ON")
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("DELETE FROM hosts").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM identities")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM keys").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM groups").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM snippets")
+        .execute(&mut *tx)
+        .await?;
     // Never touch per-device state (sync connection, cached update info) —
     // rolling back to an old backup must not repoint or disconnect sync, or
     // clobber this device's own update-check cache.
-    settings_repo::delete_all_excluding_prefixes(pool, EXCLUDED_SETTINGS_PREFIXES).await?;
+    delete_settings_excluding_prefixes(&mut *tx, EXCLUDED_SETTINGS_PREFIXES).await?;
 
     // The tables above are now empty, so every insert below always takes the
     // plain-insert branch of the upsert (no row can conflict).
     for g in &snapshot.groups {
-        merge_group(pool, g).await?;
+        merge_group(&mut *tx, g).await?;
     }
     for k in &snapshot.keys {
-        merge_key(pool, k).await?;
+        merge_key(&mut *tx, k).await?;
     }
     for i in &snapshot.identities {
-        merge_identity(pool, i).await?;
+        merge_identity(&mut *tx, i).await?;
     }
     for h in &snapshot.hosts {
-        merge_host(pool, h).await?;
+        merge_host(&mut *tx, h).await?;
     }
     for s in &snapshot.snippets {
-        merge_snippet(pool, s).await?;
+        merge_snippet(&mut *tx, s).await?;
     }
     for entry in &snapshot.settings {
-        merge_setting(pool, entry).await?;
+        merge_setting(&mut *tx, entry).await?;
     }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -247,6 +285,16 @@ pub fn read_envelope_file(path: &Path) -> AppResult<EncryptedEnvelope> {
     Ok(serde_json::from_slice(&bytes)?)
 }
 
+fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
+    if snapshot.version == 0 || snapshot.version > SNAPSHOT_VERSION {
+        return Err(AppError::Invalid(format!(
+            "unsupported vault version {}",
+            snapshot.version
+        )));
+    }
+    Ok(())
+}
+
 async fn fetch_all<T>(pool: &SqlitePool, table: &str) -> AppResult<Vec<T>>
 where
     T: for<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> + Send + Unpin,
@@ -258,7 +306,10 @@ where
 
 // --- Per-table LWW upserts (only overwrite when the incoming row is newer) ---
 
-async fn merge_group(pool: &SqlitePool, g: &Group) -> AppResult<()> {
+async fn merge_group<'e, E>(executor: E, g: &Group) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     sqlx::query(
         "INSERT INTO groups (id, name, parent_id, sort_order, created_at, updated_at, deleted_at, revision)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -269,11 +320,14 @@ async fn merge_group(pool: &SqlitePool, g: &Group) -> AppResult<()> {
     )
     .bind(&g.id).bind(&g.name).bind(&g.parent_id).bind(g.sort_order)
     .bind(&g.created_at).bind(&g.updated_at).bind(&g.deleted_at).bind(g.revision)
-    .execute(pool).await?;
+    .execute(executor).await?;
     Ok(())
 }
 
-async fn merge_identity(pool: &SqlitePool, i: &Identity) -> AppResult<()> {
+async fn merge_identity<'e, E>(executor: E, i: &Identity) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     sqlx::query(
         "INSERT INTO identities (id, name, username, auth_type, key_id, password, created_at, updated_at, deleted_at, revision)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -285,11 +339,14 @@ async fn merge_identity(pool: &SqlitePool, i: &Identity) -> AppResult<()> {
     )
     .bind(&i.id).bind(&i.name).bind(&i.username).bind(&i.auth_type).bind(&i.key_id).bind(&i.password)
     .bind(&i.created_at).bind(&i.updated_at).bind(&i.deleted_at).bind(i.revision)
-    .execute(pool).await?;
+    .execute(executor).await?;
     Ok(())
 }
 
-async fn merge_key(pool: &SqlitePool, k: &SshKey) -> AppResult<()> {
+async fn merge_key<'e, E>(executor: E, k: &SshKey) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     sqlx::query(
         "INSERT INTO keys (id, name, public_key, private_key, passphrase, created_at, updated_at, deleted_at, revision)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -301,11 +358,14 @@ async fn merge_key(pool: &SqlitePool, k: &SshKey) -> AppResult<()> {
     )
     .bind(&k.id).bind(&k.name).bind(&k.public_key).bind(&k.private_key).bind(&k.passphrase)
     .bind(&k.created_at).bind(&k.updated_at).bind(&k.deleted_at).bind(k.revision)
-    .execute(pool).await?;
+    .execute(executor).await?;
     Ok(())
 }
 
-async fn merge_host(pool: &SqlitePool, h: &Host) -> AppResult<()> {
+async fn merge_host<'e, E>(executor: E, h: &Host) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     sqlx::query(
         "INSERT INTO hosts
            (id, label, address, port, group_id, identity_id, username, auth_type, key_id,
@@ -324,11 +384,14 @@ async fn merge_host(pool: &SqlitePool, h: &Host) -> AppResult<()> {
     .bind(&h.identity_id).bind(&h.username).bind(&h.auth_type).bind(&h.key_id)
     .bind(&h.os_hint).bind(&h.color).bind(&h.notes).bind(&h.password).bind(&h.last_used_at)
     .bind(&h.created_at).bind(&h.updated_at).bind(&h.deleted_at).bind(h.revision)
-    .execute(pool).await?;
+    .execute(executor).await?;
     Ok(())
 }
 
-async fn merge_snippet(pool: &SqlitePool, s: &Snippet) -> AppResult<()> {
+async fn merge_snippet<'e, E>(executor: E, s: &Snippet) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     sqlx::query(
         "INSERT INTO snippets (id, name, command, description, created_at, updated_at, deleted_at, revision)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -339,11 +402,14 @@ async fn merge_snippet(pool: &SqlitePool, s: &Snippet) -> AppResult<()> {
     )
     .bind(&s.id).bind(&s.name).bind(&s.command).bind(&s.description)
     .bind(&s.created_at).bind(&s.updated_at).bind(&s.deleted_at).bind(s.revision)
-    .execute(pool).await?;
+    .execute(executor).await?;
     Ok(())
 }
 
-async fn merge_setting(pool: &SqlitePool, entry: &SettingEntry) -> AppResult<()> {
+async fn merge_setting<'e, E>(executor: E, entry: &SettingEntry) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     // Defense in depth: even if a snapshot somehow carried a `sync.*` or
     // `update.*` key (old export, hand-edited file, ...) never let it
     // overwrite this device's own sync connection or update-check cache.
@@ -353,5 +419,40 @@ async fn merge_setting(pool: &SqlitePool, entry: &SettingEntry) -> AppResult<()>
     {
         return Ok(());
     }
-    settings_repo::merge(pool, &entry.key, &entry.value, &entry.updated_at).await
+    sqlx::query(
+        "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+         WHERE excluded.updated_at > settings.updated_at",
+    )
+    .bind(&entry.key)
+    .bind(&entry.value)
+    .bind(&entry.updated_at)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn delete_settings_excluding_prefixes<'e, E>(executor: E, prefixes: &[&str]) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    if prefixes.is_empty() {
+        sqlx::query("DELETE FROM settings")
+            .execute(executor)
+            .await?;
+        return Ok(());
+    }
+
+    let clause = prefixes
+        .iter()
+        .map(|_| "key NOT LIKE ?")
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let sql = format!("DELETE FROM settings WHERE {clause}");
+    let mut query = sqlx::query(&sql);
+    for prefix in prefixes {
+        query = query.bind(format!("{prefix}%"));
+    }
+    query.execute(executor).await?;
+    Ok(())
 }

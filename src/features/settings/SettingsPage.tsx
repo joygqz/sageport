@@ -55,37 +55,39 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
   const setSection = useTabsStore((s) => s.setSettingsSection);
 
   return (
-    <div className="flex h-full bg-background">
-      <nav className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-border p-2">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const active = section === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setSection(item.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
-                active
-                  ? "bg-list-active text-list-active-foreground"
-                  : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4 shrink-0" />
-              <span className="truncate">{t(item.labelKey)}</span>
-            </button>
-          );
-        })}
-      </nav>
+    <div className="settings-page h-full bg-background">
+      <div className="settings-layout">
+        <nav className="settings-nav flex shrink-0 flex-col gap-0.5 border-r border-border p-2">
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            const active = section === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setSection(item.id)}
+                className={cn(
+                  "settings-nav-button flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
+                  active
+                    ? "bg-list-active text-list-active-foreground"
+                    : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="truncate">{t(item.labelKey)}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-      <ScrollArea className="min-w-0 flex-1">
-        <div className="flex max-w-2xl flex-col gap-6 p-6">
-          {section === "appearance" && <AppearanceSection />}
-          {section === "ai" && <AiSection />}
-          {section === "sync" && <SyncSection />}
-          {section === "about" && <AboutSection />}
-        </div>
-      </ScrollArea>
+        <ScrollArea className="min-h-0 min-w-0 flex-1">
+          <div className="settings-content flex min-w-0 max-w-2xl flex-col gap-6 p-6">
+            {section === "appearance" && <AppearanceSection />}
+            {section === "ai" && <AiSection />}
+            {section === "sync" && <SyncSection />}
+            {section === "about" && <AboutSection />}
+          </div>
+        </ScrollArea>
+      </div>
     </div>
   );
 }
@@ -105,7 +107,7 @@ function AppearanceSection() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-3">
         {THEMES.map((candidate) => (
           <ThemeCard
             key={candidate.id}
@@ -216,7 +218,7 @@ function ThemeCard({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "group flex flex-col overflow-hidden rounded-lg border text-left transition-colors",
+        "group flex min-w-0 flex-col overflow-hidden rounded-lg border text-left transition-colors",
         active
           ? "border-primary ring-2 ring-primary/40"
           : "border-border hover:border-ring",

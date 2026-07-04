@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
-import { errorCode, errorMessage } from "@/lib/toast";
+import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type {
   FileEntry,
   Host,
@@ -285,7 +285,8 @@ export const useSftpStore = create<SftpState>((set, get) => {
         // until entries load; "error" is terminal here and never reaches
         // that point, so nothing else would clear the spinner.
         ...(status === "error" ? { loading: false } : null),
-        error: status === "error" ? describeConnectError(code, message) : message,
+        error:
+          status === "error" ? describeConnectError(code, message) : message,
       });
       // On first connect, resolve the remote home directory and list it.
       if (status === "connected" && !tab.cwd) {
@@ -351,7 +352,9 @@ export const useSftpStore = create<SftpState>((set, get) => {
             { connectionId: dstTab.connectionId, path: dstTab.cwd },
             compress,
           )
-          .catch(() => {});
+          .catch((err) => {
+            toast.error(t("sftp.transferError"), errorMessage(err));
+          });
       }
     },
   };

@@ -3,6 +3,19 @@ use sqlx::SqlitePool;
 use crate::domain::{new_id, now, Group, GroupInput};
 use crate::error::{AppError, AppResult};
 
+fn normalize(mut input: GroupInput) -> AppResult<GroupInput> {
+    input.name = input.name.trim().to_string();
+    input.parent_id = input
+        .parent_id
+        .take()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
+    if input.name.is_empty() {
+        return Err(AppError::Invalid("group name is required".into()));
+    }
+    Ok(input)
+}
+
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Group>> {
     let rows = sqlx::query_as::<_, Group>(
         "SELECT * FROM groups WHERE deleted_at IS NULL ORDER BY sort_order, name COLLATE NOCASE",
@@ -21,6 +34,7 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Group> {
 }
 
 pub async fn create(pool: &SqlitePool, input: GroupInput) -> AppResult<Group> {
+    let input = normalize(input)?;
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -39,6 +53,10 @@ pub async fn create(pool: &SqlitePool, input: GroupInput) -> AppResult<Group> {
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: GroupInput) -> AppResult<Group> {
+    let input = normalize(input)?;
+    if input.parent_id.as_deref() == Some(id) {
+        return Err(AppError::Invalid("a group cannot be its own parent".into()));
+    }
     let ts = now();
     let affected = sqlx::query(
         "UPDATE groups
@@ -64,6 +82,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: GroupInput) -> AppResult
 /// otherwise they are moved to ungrouped rather than left pointing at a
 /// deleted group.
 pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResult<()> {
+    get(pool, id).await?;
     let ts = now();
     if delete_hosts {
         sqlx::query(
@@ -85,13 +104,19 @@ pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResul
         .execute(pool)
         .await?;
     }
-    sqlx::query(
-        "UPDATE groups SET deleted_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+    let affected = sqlx::query(
+        "UPDATE groups
+         SET deleted_at = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(&ts)
     .bind(&ts)
     .bind(id)
     .execute(pool)
-    .await?;
+    .await?
+    .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("group {id}")));
+    }
     Ok(())
 }

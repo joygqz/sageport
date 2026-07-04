@@ -55,37 +55,3 @@ pub async fn all_excluding_prefixes(
     let rows: Vec<(String, String, String)> = query.fetch_all(pool).await?;
     Ok(rows)
 }
-
-/// Upsert a setting only if `updated_at` is newer than what's stored
-/// (last-write-wins), mirroring the merge semantics of the entity tables.
-pub async fn merge(pool: &SqlitePool, key: &str, value: &str, updated_at: &str) -> AppResult<()> {
-    sqlx::query(
-        "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-         WHERE excluded.updated_at > settings.updated_at",
-    )
-    .bind(key)
-    .bind(value)
-    .bind(updated_at)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
-/// Delete every setting except those under `prefixes` (dot-separated). Used
-/// before a destructive vault restore so a rollback can't wipe out per-device
-/// state (the local sync connection, cached update-check results).
-pub async fn delete_all_excluding_prefixes(pool: &SqlitePool, prefixes: &[&str]) -> AppResult<()> {
-    let clause = prefixes
-        .iter()
-        .map(|_| "key NOT LIKE ?")
-        .collect::<Vec<_>>()
-        .join(" AND ");
-    let sql = format!("DELETE FROM settings WHERE {clause}");
-    let mut query = sqlx::query(&sql);
-    for prefix in prefixes {
-        query = query.bind(format!("{prefix}%"));
-    }
-    query.execute(pool).await?;
-    Ok(())
-}

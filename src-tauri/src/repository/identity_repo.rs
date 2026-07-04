@@ -4,10 +4,38 @@ use crate::domain::{auth, new_id, now, Identity, IdentityInput};
 use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
 
+fn clean_optional(value: &mut Option<String>) {
+    *value = value
+        .take()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
+}
+
 /// Only one of `key_id` / `password` is meaningful for a given `auth_type`;
 /// clear whichever one doesn't apply so switching auth methods can't leave a
 /// stale secret or key reference behind.
-fn normalize(mut input: IdentityInput) -> IdentityInput {
+fn normalize(mut input: IdentityInput) -> AppResult<IdentityInput> {
+    input.name = input.name.trim().to_string();
+    input.username = input.username.trim().to_string();
+    input.auth_type = input.auth_type.trim().to_string();
+    clean_optional(&mut input.key_id);
+
+    if input.name.is_empty() {
+        return Err(AppError::Invalid("identity name is required".into()));
+    }
+    if input.username.is_empty() {
+        return Err(AppError::Invalid("username is required".into()));
+    }
+    if !matches!(
+        input.auth_type.as_str(),
+        auth::PASSWORD | auth::KEY | auth::AGENT
+    ) {
+        return Err(AppError::Invalid(format!(
+            "unknown auth type: {}",
+            input.auth_type
+        )));
+    }
+
     if input.auth_type == auth::KEY {
         input.password = Some(String::new());
     } else {
@@ -16,7 +44,7 @@ fn normalize(mut input: IdentityInput) -> IdentityInput {
             input.password = Some(String::new());
         }
     }
-    input
+    Ok(input)
 }
 
 async fn hosts_using(pool: &SqlitePool, id: &str) -> AppResult<i64> {
@@ -47,7 +75,7 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Identity> {
 }
 
 pub async fn create(pool: &SqlitePool, input: IdentityInput) -> AppResult<Identity> {
-    let input = normalize(input);
+    let input = normalize(input)?;
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -70,7 +98,7 @@ pub async fn create(pool: &SqlitePool, input: IdentityInput) -> AppResult<Identi
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: IdentityInput) -> AppResult<Identity> {
-    let input = normalize(input);
+    let input = normalize(input)?;
     let ts = now();
     let affected = sqlx::query(
         "UPDATE identities SET
@@ -113,13 +141,19 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     }
 
     let ts = now();
-    sqlx::query(
-        "UPDATE identities SET deleted_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+    let affected = sqlx::query(
+        "UPDATE identities
+         SET deleted_at = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(&ts)
     .bind(&ts)
     .bind(id)
     .execute(pool)
-    .await?;
+    .await?
+    .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("identity {id}")));
+    }
     Ok(())
 }

@@ -64,21 +64,21 @@ impl GdriveProvider {
         let mut files: Vec<DriveFile> = Vec::new();
         let mut page_token: Option<String> = None;
         loop {
-            let mut req = self
-                .http
-                .get(FILES_API)
-                .bearer_auth(&token)
-                .query(&[
-                    ("spaces", "appDataFolder"),
-                    ("fields", "nextPageToken,files(id,name,size)"),
-                    ("pageSize", "1000"),
-                ]);
+            let mut req = self.http.get(FILES_API).bearer_auth(&token).query(&[
+                ("spaces", "appDataFolder"),
+                ("fields", "nextPageToken,files(id,name,size)"),
+                ("pageSize", "1000"),
+            ]);
             if let Some(t) = &page_token {
                 req = req.query(&[("pageToken", t.as_str())]);
             }
             let body = send_json(req).await?;
             let page: FileList = serde_json::from_value(body)?;
-            files.extend(page.files.into_iter().filter(|f| is_vault_filename(&f.name)));
+            files.extend(
+                page.files
+                    .into_iter()
+                    .filter(|f| is_vault_filename(&f.name)),
+            );
             match page.next_page_token {
                 Some(t) => page_token = Some(t),
                 None => break,
@@ -113,8 +113,9 @@ impl GdriveProvider {
         // content part), which reqwest's form-data helper can't produce —
         // build the body by hand.
         let boundary = "sageport-vault-upload";
-        let metadata =
-            serde_json::to_string(&serde_json::json!({ "name": name, "parents": ["appDataFolder"] }))?;
+        let metadata = serde_json::to_string(
+            &serde_json::json!({ "name": name, "parents": ["appDataFolder"] }),
+        )?;
         let content = serde_json::to_string_pretty(envelope)?;
         let body = format!(
             "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n\

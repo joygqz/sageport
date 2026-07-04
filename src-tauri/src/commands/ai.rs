@@ -145,25 +145,21 @@ pub async fn ai_chat(
         api_key: &api_key,
         protocol,
     };
-    let chat = ai::chat(
-        &ep,
-        &model,
-        &messages,
-        &tools,
-        context.as_deref(),
-        |text| {
-            let _ = on_delta.send(ai::StreamEvent::Text {
-                text: text.to_string(),
-            });
-        },
-    );
+    let chat = ai::chat(&ep, &model, &messages, &tools, context.as_deref(), |text| {
+        let _ = on_delta.send(ai::StreamEvent::Text {
+            text: text.to_string(),
+        });
+    });
 
     let Some(request_id) = request_id else {
         return chat.await;
     };
 
     let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
-    state.ai_cancels.lock().insert(request_id.clone(), cancel_tx);
+    state
+        .ai_cancels
+        .lock()
+        .insert(request_id.clone(), cancel_tx);
     let result = tokio::select! {
         r = chat => r,
         _ = cancel_rx => Err(AppError::Cancelled),
