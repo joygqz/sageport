@@ -75,6 +75,37 @@ pub struct VaultSnapshot {
     pub settings: Vec<SettingEntry>,
 }
 
+impl VaultSnapshot {
+    /// Content fingerprint independent of `exported_at` (which changes on
+    /// every export even when nothing else did). Two snapshots with the same
+    /// fingerprint carry identical data — pushing one over the other would
+    /// only add a byte-different but semantically redundant backup revision.
+    /// `(id, revision)` is enough per entity table since every mutation bumps
+    /// `revision`; settings have no revision counter so `updated_at` stands in.
+    pub fn content_fingerprint(&self) -> Vec<String> {
+        let mut out = Vec::with_capacity(
+            self.groups.len()
+                + self.hosts.len()
+                + self.identities.len()
+                + self.keys.len()
+                + self.snippets.len()
+                + self.settings.len(),
+        );
+        out.extend(self.groups.iter().map(|g| format!("g:{}:{}", g.id, g.revision)));
+        out.extend(self.hosts.iter().map(|h| format!("h:{}:{}", h.id, h.revision)));
+        out.extend(self.identities.iter().map(|i| format!("i:{}:{}", i.id, i.revision)));
+        out.extend(self.keys.iter().map(|k| format!("k:{}:{}", k.id, k.revision)));
+        out.extend(self.snippets.iter().map(|s| format!("s:{}:{}", s.id, s.revision)));
+        out.extend(
+            self.settings
+                .iter()
+                .map(|e| format!("e:{}:{}", e.key, e.updated_at)),
+        );
+        out.sort_unstable();
+        out
+    }
+}
+
 /// Collect every row (including tombstones). Secrets are columns on the rows.
 pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     let groups = fetch_all::<Group>(pool, "groups").await?;
@@ -133,14 +164,18 @@ pub async fn export_encrypted(pool: &SqlitePool, passphrase: &str) -> AppResult<
     crypto::encrypt(&bytes, passphrase)
 }
 
+/// Decrypt, merge, and hand back the remote snapshot so the caller can
+/// compare its [`VaultSnapshot::content_fingerprint`] against a fresh local
+/// export before deciding whether pushing again would be redundant.
 pub async fn import_encrypted(
     pool: &SqlitePool,
     envelope: &EncryptedEnvelope,
     passphrase: &str,
-) -> AppResult<()> {
+) -> AppResult<VaultSnapshot> {
     let bytes = crypto::decrypt(envelope, passphrase)?;
     let snapshot: VaultSnapshot = serde_json::from_slice(&bytes)?;
-    import_snapshot(pool, &snapshot).await
+    import_snapshot(pool, &snapshot).await?;
+    Ok(snapshot)
 }
 
 /// Point-in-time restore: unlike [`import_snapshot`], which only ever merges

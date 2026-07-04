@@ -17,7 +17,10 @@
 //!   over — old revisions sealed with an abandoned passphrase would
 //!   otherwise linger in the version list).
 //! * `sync_push` — pull-merge-push so a device that hasn't seen another
-//!   device's edits can't clobber them.
+//!   device's edits can't clobber them. The final push is skipped when the
+//!   merge left the vault content-identical to what the remote already
+//!   holds (see [`sync::VaultSnapshot::content_fingerprint`]), so reconnects
+//!   and no-op syncs don't spend a slot in the provider's version history.
 //! * `sync_list_versions` / `sync_restore_version` — browse backup history
 //!   and roll back. Restoring replaces local data outright (not a merge);
 //!   the frontend confirms before calling.
@@ -343,10 +346,12 @@ pub async fn sync_connect(
     // merged in (or reported as a mismatch); only then does the connection
     // become real.
     let remote = backend.pull_latest().await?;
+    let mut remote_fingerprint = None;
     match remote {
         Some(envelope) if !force => match crypto::decrypt(&envelope, &passphrase) {
             Ok(bytes) => {
-                let snapshot = serde_json::from_slice(&bytes)?;
+                let snapshot: sync::VaultSnapshot = serde_json::from_slice(&bytes)?;
+                remote_fingerprint = Some(snapshot.content_fingerprint());
                 sync::import_snapshot(&state.db, &snapshot).await?;
             }
             Err(AppError::Crypto(_)) => return Ok(ConnectOutcome::PassphraseMismatch),
@@ -355,13 +360,19 @@ pub async fn sync_connect(
         _ => {}
     }
 
-    // Seal the (merged) local vault and make it the newest backup, so a
-    // fresh connect always leaves the remote current.
-    let sealed = sync::export_encrypted(&state.db, &passphrase).await?;
-    if force {
-        backend.reset(&sealed).await?;
-    } else {
-        backend.push(&sealed).await?;
+    // Seal the (merged) local vault and make it the newest backup — but only
+    // when connecting actually changes what the remote holds. A bare
+    // reconnect to a target that already matches local data would otherwise
+    // stamp out a new, content-identical backup revision every time,
+    // needlessly burning through the provider's version history.
+    let snapshot = sync::export_snapshot(&state.db).await?;
+    if force || remote_fingerprint.as_ref() != Some(&snapshot.content_fingerprint()) {
+        let sealed = crypto::encrypt(&serde_json::to_vec(&snapshot)?, &passphrase)?;
+        if force {
+            backend.reset(&sealed).await?;
+        } else {
+            backend.push(&sealed).await?;
+        }
     }
 
     settings_repo::set(&state.db, PROVIDER_KEY, &provider).await?;
@@ -399,8 +410,9 @@ pub async fn sync_push(state: State<'_, AppState>) -> AppResult<()> {
     let passphrase = require_passphrase(&state).await?;
     let mut backend = sync::make_provider(config)?;
 
+    let mut remote_fingerprint = None;
     if let Some(envelope) = backend.pull_latest().await? {
-        sync::import_encrypted(&state.db, &envelope, &passphrase)
+        let snapshot = sync::import_encrypted(&state.db, &envelope, &passphrase)
             .await
             .map_err(|err| match err {
                 AppError::Crypto(_) => AppError::Invalid(
@@ -410,10 +422,18 @@ pub async fn sync_push(state: State<'_, AppState>) -> AppResult<()> {
                 ),
                 other => other,
             })?;
+        remote_fingerprint = Some(snapshot.content_fingerprint());
     }
 
-    let sealed = sync::export_encrypted(&state.db, &passphrase).await?;
-    backend.push(&sealed).await?;
+    // Skip pushing when the merged local vault already matches the remote —
+    // an unconditional push here would otherwise add a content-identical
+    // backup revision every time the user hits "sync now" with nothing new
+    // to contribute, crowding out the provider's limited version history.
+    let snapshot = sync::export_snapshot(&state.db).await?;
+    if remote_fingerprint.as_ref() != Some(&snapshot.content_fingerprint()) {
+        let sealed = crypto::encrypt(&serde_json::to_vec(&snapshot)?, &passphrase)?;
+        backend.push(&sealed).await?;
+    }
 
     persist_config(&state, &backend.config()).await?;
     mark_synced(&state).await
@@ -472,5 +492,6 @@ pub async fn sync_file_import(
         return Err(AppError::Invalid("passphrase is required".into()));
     }
     let envelope = sync::read_envelope_file(&PathBuf::from(path))?;
-    sync::import_encrypted(&state.db, &envelope, &passphrase).await
+    sync::import_encrypted(&state.db, &envelope, &passphrase).await?;
+    Ok(())
 }
