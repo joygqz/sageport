@@ -83,8 +83,8 @@ export function normalizeArgs(raw: unknown): Record<string, unknown> {
     : {};
 }
 
-/** Resolve which session a tool call should target. */
-function resolveSessionId(requested?: string): string | null {
+/** Resolve which terminal session a tool call should target. */
+export function resolveTerminalSessionId(requested?: string): string | null {
   const state = useTabsStore.getState();
   if (requested) {
     return terminalTabs(state.tabs).some((s) => s.id === requested)
@@ -92,6 +92,12 @@ function resolveSessionId(requested?: string): string | null {
       : null;
   }
   return targetTerminalId(state);
+}
+
+export function noTerminalSessionError(requested?: string): string {
+  return requested
+    ? `Error: no terminal session with id "${requested}". Call list_terminal_sessions to see valid ids.`
+    : "Error: no active terminal session. Call list_terminal_sessions first, then pass a sessionId.";
 }
 
 function sleep(ms: number) {
@@ -132,17 +138,11 @@ function listSessions(): string {
   );
 }
 
-function noSessionError(requested?: string): string {
-  return requested
-    ? `Error: no terminal session with id "${requested}". Call list_terminal_sessions to see valid ids.`
-    : "Error: no active terminal session. Call list_terminal_sessions first, then pass a sessionId.";
-}
-
 function readOutput(args: Record<string, unknown>): string {
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
-  const id = resolveSessionId(requested);
-  if (!id) return noSessionError(requested);
+  const id = resolveTerminalSessionId(requested);
+  if (!id) return noTerminalSessionError(requested);
 
   const lines =
     typeof args.lines === "number" && Number.isFinite(args.lines)
@@ -158,8 +158,8 @@ async function runCommand(args: Record<string, unknown>): Promise<string> {
 
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
-  const id = resolveSessionId(requested);
-  if (!id) return noSessionError(requested);
+  const id = resolveTerminalSessionId(requested);
+  if (!id) return noTerminalSessionError(requested);
 
   const timeoutMs = Math.min(
     typeof args.timeoutMs === "number" && args.timeoutMs > 0

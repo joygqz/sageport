@@ -13,7 +13,9 @@ import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 import {
   AI_TOOL_SPECS,
   executeTool,
+  noTerminalSessionError,
   normalizeArgs,
+  resolveTerminalSessionId,
   TOOLS_REQUIRING_APPROVAL,
 } from "./tools";
 
@@ -163,6 +165,31 @@ function deriveTitle(prompt: string): string {
     : firstLine;
 }
 
+type PreparedToolCall = {
+  call: AiToolCall;
+  preflightError?: string;
+};
+
+function prepareToolCall(call: AiToolCall): PreparedToolCall {
+  if (call.name !== "run_terminal_command") return { call };
+
+  const args = normalizeArgs(call.arguments);
+  const requested =
+    typeof args.sessionId === "string" ? args.sessionId : undefined;
+  const sessionId = resolveTerminalSessionId(requested);
+
+  if (!sessionId) {
+    return {
+      call: { ...call, arguments: args },
+      preflightError: noTerminalSessionError(requested),
+    };
+  }
+
+  // Approval is for a concrete terminal. If the user switches or closes tabs
+  // before clicking Allow, the command will not silently retarget elsewhere.
+  return { call: { ...call, arguments: { ...args, sessionId } } };
+}
+
 export const useAiStore = create<AiStoreState>((set, get) => {
   /** Immutably patch one session's runtime slice. */
   const patch = (id: string, fn: (r: RuntimeSession) => RuntimeSession) => {
@@ -187,10 +214,19 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     }
   };
 
-  const runToolCall = async (sessionId: string, call: AiToolCall) => {
+  const runToolCall = async (
+    sessionId: string,
+    call: AiToolCall,
+    preflightError?: string,
+  ) => {
     const args = normalizeArgs(call.arguments);
     const logId = crypto.randomUUID();
     const needsApproval = TOOLS_REQUIRING_APPROVAL.has(call.name);
+    const initialStatus: ToolStatus = preflightError
+      ? "error"
+      : needsApproval
+        ? "awaiting-approval"
+        : "running";
 
     patch(sessionId, (r) => ({
       ...r,
@@ -202,7 +238,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
           toolCallId: call.id,
           name: call.name,
           args,
-          status: needsApproval ? "awaiting-approval" : "running",
+          status: initialStatus,
+          result: preflightError,
         },
       ],
     }));
@@ -218,7 +255,9 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       }));
 
     let resultText: string;
-    if (needsApproval && !(await requestApproval(get, logId))) {
+    if (preflightError) {
+      resultText = preflightError;
+    } else if (needsApproval && !(await requestApproval(get, logId))) {
       resultText = "The user declined to run this command.";
       setToolStatus("denied", resultText);
     } else {
@@ -308,7 +347,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       }
 
       turnDone = true;
-      const toolCalls = result.toolCalls ?? [];
+      const preparedToolCalls = (result.toolCalls ?? []).map(prepareToolCall);
+      const toolCalls = preparedToolCalls.map((x) => x.call);
       patch(sessionId, (r) => ({
         ...r,
         history: [
@@ -342,7 +382,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       }));
 
       if (toolCalls.length === 0) return;
-      for (const call of toolCalls) {
+      for (const { call, preflightError } of preparedToolCalls) {
         if (stopped(sessionId)) {
           // Keep the conversation protocol-valid: every requested call gets
           // a result, even when the user aborted the run.
@@ -359,7 +399,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
           }));
           continue;
         }
-        await runToolCall(sessionId, call);
+        await runToolCall(sessionId, call, preflightError);
       }
       if (stopped(sessionId)) return;
     }

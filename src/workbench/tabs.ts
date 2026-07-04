@@ -74,6 +74,24 @@ export function terminalTabs(tabs: EditorTab[]): TerminalTab[] {
   return tabs.filter(isTerminal);
 }
 
+function findOpenTerminal(tabs: EditorTab[], id: string | null) {
+  return tabs.find((t): t is TerminalTab => t.id === id && isTerminal(t));
+}
+
+function closestTerminalId(tabs: EditorTab[], closedIndex: number) {
+  if (tabs.length === 0) return null;
+
+  const rightStart = Math.max(0, Math.min(closedIndex, tabs.length - 1));
+  for (let i = rightStart; i < tabs.length; i++) {
+    if (isTerminal(tabs[i])) return tabs[i].id;
+  }
+  const leftStart = Math.min(closedIndex - 1, tabs.length - 1);
+  for (let i = leftStart; i >= 0; i--) {
+    if (isTerminal(tabs[i])) return tabs[i].id;
+  }
+  return null;
+}
+
 /** The terminal the user is working in: the active tab if it is a terminal,
  * otherwise the most recently active one. */
 export function targetTerminalId(state: {
@@ -83,10 +101,7 @@ export function targetTerminalId(state: {
 }): string | null {
   const active = state.tabs.find((t) => t.id === state.activeId);
   if (active && isTerminal(active)) return active.id;
-  if (state.tabs.some((t) => t.id === state.lastTerminalId)) {
-    return state.lastTerminalId;
-  }
-  return null;
+  return findOpenTerminal(state.tabs, state.lastTerminalId)?.id ?? null;
 }
 
 export const useTabsStore = create<TabsState>((set, get) => ({
@@ -145,16 +160,21 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }
     set((s) => {
       const index = s.tabs.findIndex((t) => t.id === id);
+      if (index === -1) return s;
       const tabs = s.tabs.filter((t) => t.id !== id);
       // Activate the neighbor on the right, falling back to the left.
       const activeId =
         s.activeId === id
           ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null)
-          : s.activeId;
+          : tabs.some((t) => t.id === s.activeId)
+            ? s.activeId
+            : null;
+      const active = tabs.find((t) => t.id === activeId);
       const lastTerminalId =
-        s.lastTerminalId === id
-          ? (terminalTabs(tabs).at(-1)?.id ?? null)
-          : s.lastTerminalId;
+        findOpenTerminal(tabs, s.lastTerminalId)?.id ??
+        (active && isTerminal(active)
+          ? active.id
+          : closestTerminalId(tabs, index));
       return { tabs, activeId, lastTerminalId };
     });
   },
@@ -162,9 +182,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   setActive: (id) =>
     set((s) => {
       const tab = s.tabs.find((t) => t.id === id);
+      if (!tab) return s;
       return {
         activeId: id,
-        lastTerminalId: tab && isTerminal(tab) ? tab.id : s.lastTerminalId,
+        lastTerminalId: isTerminal(tab) ? tab.id : s.lastTerminalId,
       };
     }),
 
@@ -172,7 +193,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const { tabs, activeId, setActive } = get();
     if (tabs.length < 2) return;
     const index = tabs.findIndex((t) => t.id === activeId);
-    const next = tabs[(index + direction + tabs.length) % tabs.length];
+    const next =
+      index === -1
+        ? tabs[direction === 1 ? 0 : tabs.length - 1]
+        : tabs[(index + direction + tabs.length) % tabs.length];
     setActive(next.id);
   },
 

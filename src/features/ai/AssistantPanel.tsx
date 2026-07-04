@@ -5,6 +5,7 @@ import {
   Copy,
   History,
   KeyRound,
+  LoaderCircle,
   Pencil,
   Sparkles,
   Square,
@@ -80,6 +81,9 @@ export function AssistantPanel({ width }: { width: number }) {
 
   const log = runtime?.log ?? EMPTY_LOG;
   const pending = runtime?.pending ?? false;
+  const awaitingApproval = log.some(
+    (item) => item.kind === "tool" && item.status === "awaiting-approval",
+  );
 
   const [input, setInput] = useState("");
   const [modelOverride, setModelOverride] = useState<string | null>(null);
@@ -260,9 +264,9 @@ export function AssistantPanel({ width }: { width: number }) {
                   />
                 ))
               )}
-              {pending && (
+              {pending && !awaitingApproval && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Sparkles className="size-4 animate-pulse text-primary" />
+                  <LoaderCircle className="size-4 animate-spin text-primary" />
                   {t("ai.working")}
                 </div>
               )}
