@@ -6,9 +6,10 @@
 //! channel. This keeps all non-`Send` SSH state confined to one thread while
 //! exposing a simple async-free API to the rest of the app.
 
-use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::collections::{HashMap, VecDeque};
+use std::fmt;
+use std::io::{self, Read, Write};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -25,15 +26,30 @@ pub const EVENT_DATA: &str = "ssh://data";
 pub const EVENT_STATUS: &str = "ssh://status";
 
 /// How often to send an SSH keepalive probe on an otherwise idle session.
-const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
+pub(crate) const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Upper bound for the blocking connect/handshake/auth phase, so a dead
 /// network fails fast instead of hanging the session thread forever.
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// How many 32 KiB reads to drain per loop tick before yielding, so a burst
 /// of output (e.g. `cat` on a large file) still keeps the UI responsive.
 const MAX_READS_PER_TICK: usize = 16;
+
+/// Keep writes under libssh2's single SSH packet limit. More importantly, the
+/// exact same slice must be retried after EAGAIN, so we write one stable chunk
+/// at a time instead of repeatedly handing libssh2 a growing Vec.
+const MAX_WRITE_CHUNK: usize = 32_700;
+
+const LIBSSH2_EAGAIN: i32 = -37;
+const LIBSSH2_SOCKET_SEND: i32 = -7;
+const LIBSSH2_TIMEOUT: i32 = -9;
+const LIBSSH2_SOCKET_DISCONNECT: i32 = -13;
+const LIBSSH2_SOCKET_TIMEOUT: i32 = -30;
+const LIBSSH2_SOCKET_RECV: i32 = -43;
+const LIBSSH2_BAD_SOCKET: i32 = -45;
+const LIBSSH2_FX_NO_CONNECTION: i32 = 6;
+const LIBSSH2_FX_CONNECTION_LOST: i32 = 7;
 
 #[derive(Debug, Clone)]
 pub enum AuthMethod {
@@ -65,6 +81,61 @@ enum SessionCommand {
 
 struct SessionHandle {
     tx: Sender<SessionCommand>,
+}
+
+#[derive(Default)]
+struct OutputQueue {
+    chunks: VecDeque<Vec<u8>>,
+    front_offset: usize,
+    retry_len: Option<usize>,
+}
+
+impl OutputQueue {
+    fn push(&mut self, data: Vec<u8>) {
+        if !data.is_empty() {
+            self.chunks.push_back(data);
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.chunks.is_empty()
+    }
+
+    fn is_retrying(&self) -> bool {
+        self.retry_len.is_some()
+    }
+
+    fn current_len(&self) -> Option<usize> {
+        let front = self.chunks.front()?;
+        let remaining = front.len().checked_sub(self.front_offset)?;
+        if remaining == 0 {
+            return None;
+        }
+        Some(self.retry_len.unwrap_or(remaining.min(MAX_WRITE_CHUNK)))
+    }
+
+    fn current_slice(&self) -> Option<&[u8]> {
+        let len = self.current_len()?;
+        let front = self.chunks.front()?;
+        Some(&front[self.front_offset..self.front_offset + len])
+    }
+
+    fn mark_retry(&mut self, len: usize) {
+        self.retry_len = Some(len);
+    }
+
+    fn advance(&mut self, n: usize) {
+        self.retry_len = None;
+        self.front_offset += n;
+        while self
+            .chunks
+            .front()
+            .is_some_and(|front| self.front_offset >= front.len())
+        {
+            self.chunks.pop_front();
+            self.front_offset = 0;
+        }
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -205,8 +276,57 @@ fn run_session(app: AppHandle, params: ConnectParams, rx: Receiver<SessionComman
 /// A broken link mid-session (reset, NAT drop, server kill) surfaces as an
 /// opaque libssh2 transport error ("transport read"); translate it into a
 /// message a user can act on.
-fn connection_lost(e: std::io::Error) -> AppError {
+pub(crate) fn connection_lost(e: impl fmt::Display) -> AppError {
     AppError::Other(format!("connection lost: {e}"))
+}
+
+pub(crate) fn is_ssh_would_block(e: &ssh2::Error) -> bool {
+    e.code() == ssh2::ErrorCode::Session(LIBSSH2_EAGAIN)
+}
+
+pub(crate) fn is_ssh_transport_error(e: &ssh2::Error) -> bool {
+    match e.code() {
+        ssh2::ErrorCode::Session(
+            LIBSSH2_SOCKET_SEND
+            | LIBSSH2_TIMEOUT
+            | LIBSSH2_SOCKET_DISCONNECT
+            | LIBSSH2_SOCKET_TIMEOUT
+            | LIBSSH2_SOCKET_RECV
+            | LIBSSH2_BAD_SOCKET,
+        )
+        | ssh2::ErrorCode::SFTP(LIBSSH2_FX_NO_CONNECTION | LIBSSH2_FX_CONNECTION_LOST) => true,
+        _ => false,
+    }
+}
+
+pub(crate) fn map_ssh_error(e: ssh2::Error) -> AppError {
+    if is_ssh_transport_error(&e) {
+        connection_lost(e)
+    } else {
+        AppError::Ssh(e)
+    }
+}
+
+pub(crate) fn connect_tcp(host: &str, port: u16) -> AppResult<TcpStream> {
+    let mut last_error = None;
+    for addr in (host, port).to_socket_addrs()? {
+        match TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT) {
+            Ok(tcp) => {
+                // Interactive keystrokes and SFTP requests should not sit in
+                // Nagle's buffer.
+                let _ = tcp.set_nodelay(true);
+                return Ok(tcp);
+            }
+            Err(e) => last_error = Some(e),
+        }
+    }
+
+    Err(AppError::Io(last_error.unwrap_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("no address resolved for {host}:{port}"),
+        )
+    })))
 }
 
 fn run_session_inner(
@@ -216,9 +336,7 @@ fn run_session_inner(
 ) -> AppResult<()> {
     let id = &params.session_id;
 
-    let tcp = TcpStream::connect((params.host.as_str(), params.port))?;
-    // Interactive keystrokes should not sit in Nagle's buffer.
-    let _ = tcp.set_nodelay(true);
+    let tcp = connect_tcp(&params.host, params.port)?;
     let mut session = ssh2::Session::new()?;
     session.set_tcp_stream(tcp);
     // Bound the blocking connect phase (handshake + auth); 0 = no timeout.
@@ -251,27 +369,23 @@ fn run_session_inner(
     session.set_timeout(0);
     session.set_blocking(false);
 
-    let mut buf = [0u8; 32 * 1024];
-    // Bytes typed by the user that still need to reach the remote. In
-    // non-blocking mode a write can make only partial progress (EAGAIN) when the
-    // channel's send window is momentarily full, so we keep the remainder here
-    // and retry on later iterations instead of treating it as a fatal error.
-    let mut outbuf: Vec<u8> = Vec::new();
-    let mut sent = 0usize;
-    let mut needs_flush = false;
+    let mut read_buf = [0u8; 32 * 1024];
+    let mut output = OutputQueue::default();
+    let mut pending_resize: Option<(u32, u32)> = None;
     let mut next_keepalive = Instant::now() + KEEPALIVE_INTERVAL;
     loop {
         let mut made_progress = false;
 
-        // Drain pending control commands first.
+        // Drain pending control commands first. Input is appended as immutable
+        // chunks so a libssh2 EAGAIN retry can reuse the exact same slice.
         loop {
             match rx.try_recv() {
                 Ok(SessionCommand::Input(data)) => {
-                    outbuf.extend_from_slice(&data);
+                    output.push(data);
                     made_progress = true;
                 }
                 Ok(SessionCommand::Resize(cols, rows)) => {
-                    let _ = channel.request_pty_size(cols, rows, None, None);
+                    pending_resize = Some((cols, rows));
                 }
                 Ok(SessionCommand::Close) => {
                     let _ = channel.close();
@@ -282,49 +396,59 @@ fn run_session_inner(
             }
         }
 
-        // Push queued input to the remote. WouldBlock just means the send window
-        // is full right now; we keep the rest and let the next iteration retry
-        // while reads below continue draining the window.
-        while sent < outbuf.len() {
-            match channel.write(&outbuf[sent..]) {
-                Ok(0) => break,
-                Ok(n) => {
-                    sent += n;
-                    needs_flush = true;
-                    made_progress = true;
+        // If the last write returned EAGAIN, libssh2 requires us to retry that
+        // exact same buffer before starting unrelated channel operations.
+        if !output.is_retrying() {
+            if let Some((cols, rows)) = pending_resize {
+                match channel.request_pty_size(cols, rows, None, None) {
+                    Ok(()) => {
+                        pending_resize = None;
+                        made_progress = true;
+                    }
+                    Err(ref e) if is_ssh_would_block(e) => {}
+                    // A resize is advisory; a rejected resize should not tear
+                    // down an otherwise healthy shell.
+                    Err(_) => pending_resize = None,
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
-                Err(e) => return Err(connection_lost(e)),
             }
-        }
-        if sent > 0 && sent == outbuf.len() {
-            outbuf.clear();
-            sent = 0;
-        }
-        if needs_flush {
-            match channel.flush() {
-                Ok(()) => needs_flush = false,
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-                Err(e) => return Err(connection_lost(e)),
+
+            // Drain remote output before writing. This gives libssh2 a chance to
+            // process window-adjust packets before channel_write performs its own
+            // incoming-flow drain.
+            for _ in 0..MAX_READS_PER_TICK {
+                match channel.read(&mut read_buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        made_progress = true;
+                        let _ = app.emit(
+                            EVENT_DATA,
+                            DataEvent {
+                                id: id.clone(),
+                                data: STANDARD.encode(&read_buf[..n]),
+                            },
+                        );
+                    }
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
+                    Err(e) => return Err(connection_lost(e)),
+                }
             }
         }
 
-        // Drain what the remote has ready, bounded per tick so a firehose of
-        // output cannot starve input handling.
-        for _ in 0..MAX_READS_PER_TICK {
-            match channel.read(&mut buf) {
+        // Push queued input to the remote. WouldBlock means the send window or
+        // socket is not ready; the front chunk is kept untouched and retried
+        // verbatim on the next pass.
+        while let Some(len) = output.current_len() {
+            let result = channel.write(output.current_slice().expect("current write chunk"));
+            match result {
                 Ok(0) => break,
                 Ok(n) => {
+                    output.advance(n);
                     made_progress = true;
-                    let _ = app.emit(
-                        EVENT_DATA,
-                        DataEvent {
-                            id: id.clone(),
-                            data: STANDARD.encode(&buf[..n]),
-                        },
-                    );
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    output.mark_retry(len);
+                    break;
+                }
                 Err(e) => return Err(connection_lost(e)),
             }
         }
@@ -333,25 +457,50 @@ fn run_session_inner(
             return Ok(());
         }
 
-        // Send a keepalive probe when due — but only while our own outbound
-        // side is idle. libssh2 must never start a new packet while another
-        // one is partially written (EAGAIN mid-packet), or the transport
-        // stream corrupts and the server drops the connection — the classic
-        // cause of sudden "transport read" failures on busy sessions.
-        if outbuf.is_empty() && !needs_flush && Instant::now() >= next_keepalive {
+        // Send keepalive only when channel operations are otherwise quiescent.
+        if output.is_empty() && pending_resize.is_none() && Instant::now() >= next_keepalive {
             match session.keepalive_send() {
                 // Probe sent (or nothing to do): schedule the next one.
                 Ok(_) => next_keepalive = Instant::now() + KEEPALIVE_INTERVAL,
                 // EAGAIN: socket buffer full right now, retry next tick.
-                Err(ref e) if e.code() == ssh2::ErrorCode::Session(-37) => {}
+                Err(ref e) if is_ssh_would_block(e) => {}
                 // Keepalive failing outright means the link is gone.
-                Err(e) => return Err(connection_lost(std::io::Error::other(e))),
+                Err(e) => return Err(connection_lost(e)),
             }
         }
 
         if !made_progress {
             std::thread::sleep(Duration::from_millis(5));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn output_queue_retries_the_same_front_slice_after_would_block() {
+        let mut queue = OutputQueue::default();
+        queue.push(b"abcdef".to_vec());
+
+        assert_eq!(queue.current_slice(), Some(&b"abcdef"[..]));
+        let len = queue.current_len().unwrap();
+        queue.mark_retry(len);
+        queue.push(b"gh".to_vec());
+
+        assert_eq!(queue.current_slice(), Some(&b"abcdef"[..]));
+    }
+
+    #[test]
+    fn output_queue_advances_after_successful_partial_write() {
+        let mut queue = OutputQueue::default();
+        queue.push(b"abcdef".to_vec());
+        queue.mark_retry(6);
+
+        queue.advance(2);
+
+        assert_eq!(queue.current_slice(), Some(&b"cdef"[..]));
     }
 }
 
@@ -397,7 +546,9 @@ pub(crate) fn authenticate(
     .map_err(map_auth_error)?;
 
     if !session.authenticated() {
-        return Err(AppError::Auth("the server rejected these credentials".into()));
+        return Err(AppError::Auth(
+            "the server rejected these credentials".into(),
+        ));
     }
     Ok(())
 }

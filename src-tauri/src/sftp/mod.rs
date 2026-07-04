@@ -9,11 +9,10 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
@@ -22,7 +21,10 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
 use crate::error::{AppError, AppResult};
-use crate::ssh::{authenticate, AuthMethod};
+use crate::ssh::{
+    authenticate, connect_tcp, connection_lost, is_ssh_would_block, map_ssh_error, AuthMethod,
+    CONNECT_TIMEOUT, KEEPALIVE_INTERVAL,
+};
 
 pub const EVENT_STATUS: &str = "sftp://status";
 pub const EVENT_TRANSFER: &str = "sftp://transfer";
@@ -155,7 +157,7 @@ struct ProgressCtx {
 
 #[derive(Default)]
 pub struct SftpManager {
-    conns: Mutex<HashMap<String, Sender<SftpRequest>>>,
+    conns: Arc<Mutex<HashMap<String, Sender<SftpRequest>>>>,
     /// Cancellation flags for in-flight transfers, keyed by `transfer_id`.
     cancel_flags: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
@@ -193,12 +195,27 @@ impl SftpManager {
     pub fn connect(&self, app: AppHandle, params: SftpConnectParams) -> AppResult<()> {
         let (tx, rx) = mpsc::channel::<SftpRequest>();
         let id = params.connection_id.clone();
-        self.conns.lock().insert(id.clone(), tx);
+        {
+            let mut conns = self.conns.lock();
+            if conns.contains_key(&id) {
+                return Ok(());
+            }
+            conns.insert(id.clone(), tx);
+        }
 
-        std::thread::Builder::new()
+        let conns = self.conns.clone();
+        let thread_id = id.clone();
+        let spawn = std::thread::Builder::new()
             .name(format!("sftp-{id}"))
-            .spawn(move || run_connection(app, params, rx))
-            .map_err(AppError::Io)?;
+            .spawn(move || {
+                run_connection(app, params, rx);
+                conns.lock().remove(&thread_id);
+            });
+
+        if let Err(e) = spawn {
+            self.conns.lock().remove(&id);
+            return Err(AppError::Io(e));
+        }
 
         Ok(())
     }
@@ -318,6 +335,58 @@ fn emit_error_status(app: &AppHandle, id: &str, err: &AppError) {
     );
 }
 
+fn is_connection_lost_error(err: &AppError) -> bool {
+    matches!(err, AppError::Other(message) if message.starts_with("connection lost:"))
+}
+
+fn send_reply<T>(
+    app: &AppHandle,
+    id: &str,
+    reply: Sender<AppResult<T>>,
+    result: AppResult<T>,
+) -> bool {
+    let fatal = result
+        .as_ref()
+        .err()
+        .filter(|err| is_connection_lost_error(err))
+        .map(|err| AppError::Other(err.to_string()));
+    if let Some(err) = &fatal {
+        emit_error_status(app, id, err);
+    }
+    let _ = reply.send(result);
+    fatal.is_some()
+}
+
+fn map_remote_io_error(e: io::Error) -> AppError {
+    match e.kind() {
+        io::ErrorKind::TimedOut
+        | io::ErrorKind::ConnectionAborted
+        | io::ErrorKind::ConnectionReset
+        | io::ErrorKind::BrokenPipe
+        | io::ErrorKind::UnexpectedEof => connection_lost(e),
+        io::ErrorKind::Other => {
+            let message = e.to_string();
+            if message.contains("transport read")
+                || message.contains("draining incoming flow")
+                || message.contains("socket")
+            {
+                connection_lost(message)
+            } else {
+                AppError::Io(io::Error::other(message))
+            }
+        }
+        _ => AppError::Io(e),
+    }
+}
+
+fn map_stream_error(e: io::Error, remote: bool) -> AppError {
+    if remote {
+        map_remote_io_error(e)
+    } else {
+        AppError::Io(e)
+    }
+}
+
 /// Worker thread entry point: establish the session, then serve requests until
 /// closed or the channel disconnects.
 fn run_connection(app: AppHandle, params: SftpConnectParams, rx: Receiver<SftpRequest>) {
@@ -334,81 +403,127 @@ fn run_connection(app: AppHandle, params: SftpConnectParams, rx: Receiver<SftpRe
 
     emit_status(&app, &id, "connected");
 
-    while let Ok(req) = rx.recv() {
-        match req {
-            SftpRequest::List(path, reply) => {
-                let _ = reply.send(list_dir(&sftp, &path));
+    let mut clean_close = true;
+    loop {
+        let req = match rx.recv_timeout(KEEPALIVE_INTERVAL) {
+            Ok(req) => req,
+            Err(RecvTimeoutError::Timeout) => {
+                match session.keepalive_send() {
+                    Ok(_) => {}
+                    Err(ref e) if is_ssh_would_block(e) => {}
+                    Err(e) => {
+                        let err = connection_lost(e);
+                        emit_error_status(&app, &id, &err);
+                        clean_close = false;
+                        break;
+                    }
+                }
+                continue;
             }
-            SftpRequest::Realpath(path, reply) => {
-                let _ = reply.send(
-                    sftp.realpath(Path::new(&path))
-                        .map(|p| p.to_string_lossy().into_owned())
-                        .map_err(AppError::Ssh),
-                );
-            }
-            SftpRequest::Mkdir(path, reply) => {
-                let _ = reply.send(sftp.mkdir(Path::new(&path), 0o755).map_err(AppError::Ssh));
-            }
-            SftpRequest::Rename(from, to, reply) => {
-                let _ = reply.send(
-                    sftp.rename(Path::new(&from), Path::new(&to), None)
-                        .map_err(AppError::Ssh),
-                );
-            }
+            Err(RecvTimeoutError::Disconnected) => break,
+        };
+
+        let fatal = match req {
+            SftpRequest::List(path, reply) => send_reply(&app, &id, reply, list_dir(&sftp, &path)),
+            SftpRequest::Realpath(path, reply) => send_reply(
+                &app,
+                &id,
+                reply,
+                sftp.realpath(Path::new(&path))
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(map_ssh_error),
+            ),
+            SftpRequest::Mkdir(path, reply) => send_reply(
+                &app,
+                &id,
+                reply,
+                sftp.mkdir(Path::new(&path), 0o755).map_err(map_ssh_error),
+            ),
+            SftpRequest::Rename(from, to, reply) => send_reply(
+                &app,
+                &id,
+                reply,
+                sftp.rename(Path::new(&from), Path::new(&to), None)
+                    .map_err(map_ssh_error),
+            ),
             SftpRequest::Remove {
                 path,
                 is_dir,
                 reply,
-            } => {
-                let _ = reply.send(remove_path(&sftp, Path::new(&path), is_dir));
-            }
+            } => send_reply(
+                &app,
+                &id,
+                reply,
+                remove_path(&sftp, Path::new(&path), is_dir),
+            ),
             SftpRequest::Download {
                 remote,
                 local,
                 progress,
                 reply,
-            } => {
-                let _ = reply.send(download(&app, &sftp, &remote, &local, &progress));
-            }
+            } => send_reply(
+                &app,
+                &id,
+                reply,
+                download(&app, &sftp, &remote, &local, &progress),
+            ),
             SftpRequest::Upload {
                 local,
                 remote,
                 progress,
                 reply,
-            } => {
-                let _ = reply.send(upload(&app, &sftp, &local, &remote, &progress));
-            }
+            } => send_reply(
+                &app,
+                &id,
+                reply,
+                upload(&app, &sftp, &local, &remote, &progress),
+            ),
             SftpRequest::Exec { command, reply } => {
-                let _ = reply.send(exec_command(&session, &command));
+                send_reply(&app, &id, reply, exec_command(&session, &command))
             }
             SftpRequest::Close => break,
+        };
+
+        if fatal {
+            clean_close = false;
+            break;
         }
     }
 
-    emit_status(&app, &id, "closed");
+    if clean_close {
+        emit_status(&app, &id, "closed");
+    }
 }
 
 fn open_sftp(params: &SftpConnectParams) -> AppResult<(ssh2::Session, ssh2::Sftp)> {
-    let tcp = TcpStream::connect((params.host.as_str(), params.port))?;
+    let tcp = connect_tcp(&params.host, params.port)?;
     let mut session = ssh2::Session::new()?;
     session.set_tcp_stream(tcp);
-    session.handshake()?;
+    session.set_timeout(CONNECT_TIMEOUT.as_millis() as u32);
+    session.handshake().map_err(map_ssh_error)?;
     authenticate(&session, &params.username, &params.auth)?;
-    let sftp = session.sftp()?;
+    let sftp = session.sftp().map_err(map_ssh_error)?;
+    session.set_keepalive(false, KEEPALIVE_INTERVAL.as_secs() as u32);
+    session.set_timeout(0);
     Ok((session, sftp))
 }
 
 /// Run `command` on an exec channel, returning its stdout. A non-zero exit
 /// status maps to an error carrying the command's stderr.
 fn exec_command(session: &ssh2::Session, command: &str) -> AppResult<String> {
-    let mut channel = session.channel_session()?;
-    channel.exec(command)?;
+    let mut channel = session.channel_session().map_err(map_ssh_error)?;
+    channel.exec(command).map_err(map_ssh_error)?;
     let mut stdout = String::new();
-    channel.read_to_string(&mut stdout)?;
+    channel
+        .read_to_string(&mut stdout)
+        .map_err(map_remote_io_error)?;
     let mut stderr = String::new();
-    channel.stderr().read_to_string(&mut stderr)?;
-    channel.wait_close()?;
-    let code = channel.exit_status()?;
+    channel
+        .stderr()
+        .read_to_string(&mut stderr)
+        .map_err(map_remote_io_error)?;
+    channel.wait_close().map_err(map_ssh_error)?;
+    let code = channel.exit_status().map_err(map_ssh_error)?;
     if code != 0 {
         let detail = stderr.trim();
         let detail = if detail.is_empty() {
@@ -427,9 +542,9 @@ fn exec_command(session: &ssh2::Session, command: &str) -> AppResult<String> {
 /// `rmdir` only succeeds on an empty directory (mirroring local `remove_dir_all`).
 fn remove_path(sftp: &ssh2::Sftp, path: &Path, is_dir: bool) -> AppResult<()> {
     if !is_dir {
-        return sftp.unlink(path).map_err(AppError::Ssh);
+        return sftp.unlink(path).map_err(map_ssh_error);
     }
-    for (child, stat) in sftp.readdir(path)? {
+    for (child, stat) in sftp.readdir(path).map_err(map_ssh_error)? {
         let name = child.file_name().and_then(|n| n.to_str());
         // `readdir` does not include "." / ".."; guard anyway.
         if matches!(name, Some(".") | Some("..")) {
@@ -440,13 +555,13 @@ fn remove_path(sftp: &ssh2::Sftp, path: &Path, is_dir: bool) -> AppResult<()> {
         let child_is_dir = stat.is_dir() && !is_symlink;
         remove_path(sftp, &child, child_is_dir)?;
     }
-    sftp.rmdir(path).map_err(AppError::Ssh)
+    sftp.rmdir(path).map_err(map_ssh_error)
 }
 
 fn list_dir(sftp: &ssh2::Sftp, path: &str) -> AppResult<Vec<FileEntry>> {
     let base = Path::new(path);
     let mut entries = Vec::new();
-    for (child, stat) in sftp.readdir(base)? {
+    for (child, stat) in sftp.readdir(base).map_err(map_ssh_error)? {
         let name = child
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
@@ -488,9 +603,16 @@ fn download(
     local: &Path,
     progress: &ProgressCtx,
 ) -> AppResult<()> {
-    let mut remote_file = sftp.open(Path::new(remote))?;
+    let mut remote_file = sftp.open(Path::new(remote)).map_err(map_ssh_error)?;
     let mut local_file = fs::File::create(local)?;
-    stream(app, &mut remote_file, &mut local_file, progress)
+    stream(
+        app,
+        &mut remote_file,
+        true,
+        &mut local_file,
+        false,
+        progress,
+    )
 }
 
 fn upload(
@@ -501,15 +623,24 @@ fn upload(
     progress: &ProgressCtx,
 ) -> AppResult<()> {
     let mut local_file = fs::File::open(local)?;
-    let mut remote_file = sftp.create(Path::new(remote))?;
-    stream(app, &mut local_file, &mut remote_file, progress)
+    let mut remote_file = sftp.create(Path::new(remote)).map_err(map_ssh_error)?;
+    stream(
+        app,
+        &mut local_file,
+        false,
+        &mut remote_file,
+        true,
+        progress,
+    )
 }
 
 /// Copy `reader` → `writer` in chunks, emitting `sftp://transfer` progress.
 fn stream(
     app: &AppHandle,
     reader: &mut impl Read,
+    remote_reader: bool,
     writer: &mut impl Write,
+    remote_writer: bool,
     progress: &ProgressCtx,
 ) -> AppResult<()> {
     let mut buf = vec![0u8; CHUNK_SIZE];
@@ -518,17 +649,23 @@ fn stream(
         if progress.cancel.load(Ordering::Relaxed) {
             return Err(AppError::Cancelled);
         }
-        let n = reader.read(&mut buf)?;
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| map_stream_error(e, remote_reader))?;
         if n == 0 {
             break;
         }
-        writer.write_all(&buf[..n])?;
+        writer
+            .write_all(&buf[..n])
+            .map_err(|e| map_stream_error(e, remote_writer))?;
         done += n as u64;
         if !progress.silent {
             emit_transfer(app, progress, done, "active", None);
         }
     }
-    writer.flush()?;
+    writer
+        .flush()
+        .map_err(|e| map_stream_error(e, remote_writer))?;
     Ok(())
 }
 
@@ -843,7 +980,7 @@ fn copy_file(
         (None, None) => {
             let mut reader = fs::File::open(&source.path)?;
             let mut writer = fs::File::create(&dest.path)?;
-            stream(app, &mut reader, &mut writer, &file_progress)?;
+            stream(app, &mut reader, false, &mut writer, false, &file_progress)?;
         }
         // local → remote (worker uploads and emits progress)
         (None, Some(dest_id)) => {

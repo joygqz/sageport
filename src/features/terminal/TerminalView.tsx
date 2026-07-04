@@ -109,11 +109,31 @@ export function TerminalView({
     registerTerminal(sessionId, { term, fit, search });
 
     let disposed = false;
+    let inputReady = false;
+    let pendingInput = "";
+    let sendingInput = false;
     const unlisteners: Array<() => void> = [];
+
+    const flushInput = () => {
+      if (!inputReady || sendingInput || disposed || pendingInput.length === 0) {
+        return;
+      }
+      const data = pendingInput;
+      pendingInput = "";
+      sendingInput = true;
+      void ipc.ssh
+        .send(sessionId, data)
+        .catch(() => {})
+        .finally(() => {
+          sendingInput = false;
+          flushInput();
+        });
+    };
 
     // Forward keystrokes to the remote shell.
     const dataSub = term.onData((data) => {
-      void ipc.ssh.send(sessionId, data).catch(() => {});
+      pendingInput += data;
+      flushInput();
     });
 
     // Register event listeners *before* connecting so the backend's
@@ -152,7 +172,10 @@ export function TerminalView({
           cols: term.cols,
           rows: term.rows,
         });
+        inputReady = true;
+        flushInput();
       } catch (err) {
+        pendingInput = "";
         if (!disposed) {
           setStatus(
             sessionId,
@@ -188,6 +211,7 @@ export function TerminalView({
 
     return () => {
       disposed = true;
+      pendingInput = "";
       observer.disconnect();
       dataSub.dispose();
       unlisteners.forEach((un) => un());
