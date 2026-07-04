@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -7,6 +7,7 @@ import {
   Pencil,
   Plug,
   Plus,
+  RefreshCw,
   Server,
   Trash2,
 } from "lucide-react";
@@ -27,15 +28,29 @@ import {
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
-import type { Host } from "@/types/models";
+import type { Host, HostHealthCheck } from "@/types/models";
 import { useLayoutStore } from "@/workbench/layout";
 import { useOverlayStore } from "@/workbench/overlays";
 import { SideBarView } from "@/workbench/SideBarView";
 import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 import { useSftpStore } from "@/features/sftp/store";
-import { useDeleteGroup, useDeleteHost, useGroups, useHosts } from "./api";
+import {
+  useCheckHostHealth,
+  useDeleteGroup,
+  useDeleteHost,
+  useGroups,
+  useHosts,
+} from "./api";
 
 const UNGROUPED = "__ungrouped__";
+const HEALTH_REASON_KEYS = {
+  timeout: "hosts.health.reason.timeout",
+  refused: "hosts.health.reason.refused",
+  dns: "hosts.health.reason.dns",
+  invalidPort: "hosts.health.reason.invalidPort",
+  network: "hosts.health.reason.network",
+  unknown: "hosts.health.reason.unknown",
+} as const;
 
 /**
  * The host explorer: hosts grouped into collapsible sections, filterable,
@@ -48,10 +63,20 @@ export function HostsView() {
   const { data: groups = [] } = useGroups();
   const deleteHost = useDeleteHost();
   const deleteGroup = useDeleteGroup();
+  const checkHealth = useCheckHostHealth();
   const openHostForm = useOverlayStore((s) => s.openHostForm);
   const openGroupForm = useOverlayStore((s) => s.openGroupForm);
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [healthByHost, setHealthByHost] = useState<
+    Record<string, HostHealthCheck>
+  >({});
+  const [checkingHosts, setCheckingHosts] = useState<Record<string, number>>(
+    {},
+  );
+  const healthRequestSeq = useRef(0);
+  const latestHealthRequest = useRef<Record<string, number>>({});
+  const [checkingAll, setCheckingAll] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const searching = query.trim().length > 0;
@@ -152,11 +177,81 @@ export function HostsView() {
     });
   };
 
+  const runHealthCheck = (hostIds?: string[]) => {
+    const all = hostIds == null;
+    const ids = hostIds ?? hosts.map((host) => host.id);
+    if (ids.length === 0) return;
+    const requestId = ++healthRequestSeq.current;
+    for (const id of ids) latestHealthRequest.current[id] = requestId;
+
+    setHealthByHost((current) => {
+      const next = { ...current };
+      for (const id of ids) delete next[id];
+      return next;
+    });
+    if (all) setCheckingAll(true);
+    setCheckingHosts((current) => {
+      const next = { ...current };
+      for (const id of ids) next[id] = requestId;
+      return next;
+    });
+
+    const finishHost = (result: HostHealthCheck) => {
+      if (latestHealthRequest.current[result.hostId] !== requestId) return;
+      delete latestHealthRequest.current[result.hostId];
+      setHealthByHost((current) => ({
+        ...current,
+        [result.hostId]: result,
+      }));
+      setCheckingHosts((current) => {
+        if (current[result.hostId] !== requestId) return current;
+        const next = { ...current };
+        delete next[result.hostId];
+        return next;
+      });
+    };
+
+    void checkHealth
+      .mutateAsync({ hostIds, onResult: finishHost })
+      .then((results) => {
+        for (const result of results) finishHost(result);
+      })
+      .catch((err) => {
+        toast.error(t("hosts.health.error"), errorMessage(err));
+      })
+      .finally(() => {
+        if (all) setCheckingAll(false);
+        setCheckingHosts((current) => {
+          const next = { ...current };
+          for (const id of ids) {
+            if (latestHealthRequest.current[id] === requestId) {
+              delete latestHealthRequest.current[id];
+            }
+            if (next[id] === requestId) delete next[id];
+          }
+          return next;
+        });
+      });
+  };
+
   return (
     <SideBarView
       title={t("hosts.viewTitle")}
       actions={
         <>
+          <Tooltip content={t("hosts.health.checkAll")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              disabled={hosts.length === 0 || checkingAll}
+              onClick={() => runHealthCheck()}
+            >
+              <RefreshCw
+                className={cn("size-4", checkingAll && "animate-spin")}
+              />
+            </Button>
+          </Tooltip>
           <Tooltip content={t("hosts.newHost")}>
             <Button
               size="icon"
@@ -221,6 +316,9 @@ export function HostsView() {
                 <HostRow
                   key={host.id}
                   host={host}
+                  health={healthByHost[host.id]}
+                  checking={(checkingHosts[host.id] ?? 0) > 0}
+                  onCheckHealth={() => runHealthCheck([host.id])}
                   onEdit={() => openHostForm(host.id)}
                   onDelete={() => requestDeleteHost(host)}
                 />
@@ -299,10 +397,16 @@ function GroupSection({
 
 function HostRow({
   host,
+  health,
+  checking,
+  onCheckHealth,
   onEdit,
   onDelete,
 }: {
   host: Host;
+  health?: HostHealthCheck;
+  checking: boolean;
+  onCheckHealth: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -321,6 +425,19 @@ function HostRow({
     addRemoteTab("right", host);
   };
 
+  const healthTooltip = connected
+    ? t("hosts.health.connected")
+    : health
+      ? health.status === "online"
+        ? t("hosts.health.online", { ms: health.latencyMs ?? 0 })
+        : t("hosts.health.offline", {
+            reason: t(
+              HEALTH_REASON_KEYS[health.errorKind ?? "unknown"] ??
+                "hosts.health.reason.unknown",
+            ),
+          })
+      : t("hosts.health.unknown");
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -328,25 +445,50 @@ function HostRow({
           onDoubleClick={() => openTerminal(host)}
           className="group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover"
         >
-          <span
-            className={cn(
-              "size-1.5 shrink-0 rounded-full",
-              connected ? "bg-success" : "bg-muted-foreground/40",
-            )}
-          />
+          <Tooltip content={healthTooltip}>
+            <span
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                connected || health?.status === "online"
+                  ? "bg-success"
+                  : health?.status === "offline"
+                    ? "bg-destructive"
+                    : "bg-muted-foreground/40",
+              )}
+            />
+          </Tooltip>
           <span className="truncate text-sm">{host.label}</span>
           <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
             {host.username ? `${host.username}@` : ""}
             {host.address}
           </span>
-          <Tooltip content={t("hosts.connect")}>
-            <button
-              onClick={() => openTerminal(host)}
-              className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover:opacity-100"
-            >
-              <Plug className="size-3.5" />
-            </button>
-          </Tooltip>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Tooltip content={t("hosts.health.check")}>
+              <button
+                disabled={checking}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onCheckHealth();
+                }}
+                className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground disabled:opacity-40 group-hover:opacity-100"
+              >
+                <RefreshCw
+                  className={cn("size-3.5", checking && "animate-spin")}
+                />
+              </button>
+            </Tooltip>
+            <Tooltip content={t("hosts.connect")}>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openTerminal(host);
+                }}
+                className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover:opacity-100"
+              >
+                <Plug className="size-3.5" />
+              </button>
+            </Tooltip>
+          </div>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
@@ -355,6 +497,9 @@ function HostRow({
         </ContextMenuItem>
         <ContextMenuItem onSelect={openSftp}>
           <FolderSync /> {t("hosts.openSftp")}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={onCheckHealth}>
+          <RefreshCw /> {t("hosts.health.check")}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={onEdit}>

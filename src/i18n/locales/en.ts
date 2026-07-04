@@ -129,6 +129,23 @@ export const en = {
     ungrouped: "Ungrouped",
     connect: "Connect",
     openSftp: "Browse files",
+    health: {
+      check: "Check connection",
+      checkAll: "Check all connections",
+      connected: "Terminal connected",
+      online: "Reachable, {ms} ms latency",
+      offline: "Unreachable: {reason}",
+      unknown: "Connection not checked",
+      error: "Failed to check connection",
+      reason: {
+        timeout: "The connection timed out.",
+        refused: "The connection was refused. Check the SSH service and port.",
+        dns: "The host address could not be resolved.",
+        invalidPort: "The port is invalid.",
+        network: "The network is unreachable. Check the network or firewall.",
+        unknown: "The connection failed.",
+      },
+    },
     deleteHost: {
       title: "Delete host",
       description: "This permanently deletes {label} and cannot be undone.",

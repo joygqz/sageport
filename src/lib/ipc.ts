@@ -15,6 +15,7 @@ import type {
   Group,
   GroupInput,
   Host,
+  HostHealthCheck,
   HostInput,
   Identity,
   IdentityInput,
@@ -59,6 +60,17 @@ export const ipc = {
     update: (id: string, input: HostInput) =>
       invoke<Host>("hosts_update", { id, input }),
     remove: (id: string) => invoke<void>("hosts_delete", { id }),
+    checkHealth: (
+      hostIds?: string[],
+      onResult?: (result: HostHealthCheck) => void,
+    ) => {
+      const channel = new Channel<HostHealthCheck>();
+      channel.onmessage = (result) => onResult?.(result);
+      return invoke<HostHealthCheck[]>("hosts_check_health", {
+        hostIds,
+        onResult: channel,
+      });
+    },
   },
   identities: {
     list: () => invoke<Identity[]>("identities_list"),

@@ -38,6 +38,24 @@ export interface Host {
   revision: number;
 }
 
+export type HostHealthStatus = "online" | "offline";
+export type HostHealthErrorKind =
+  | "timeout"
+  | "refused"
+  | "dns"
+  | "invalidPort"
+  | "network"
+  | "unknown";
+
+export interface HostHealthCheck {
+  hostId: string;
+  status: HostHealthStatus;
+  latencyMs: number | null;
+  checkedAt: string;
+  errorKind: HostHealthErrorKind | null;
+  error: string | null;
+}
+
 export interface Identity {
   id: string;
   name: string;

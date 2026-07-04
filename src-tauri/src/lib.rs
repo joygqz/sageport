@@ -55,6 +55,7 @@ pub fn run() {
             commands::hosts::hosts_create,
             commands::hosts::hosts_update,
             commands::hosts::hosts_delete,
+            commands::hosts::hosts_check_health,
             // identities
             commands::identities::identities_list,
             commands::identities::identities_create,

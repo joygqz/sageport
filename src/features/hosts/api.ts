@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
-import type { GroupInput, HostInput } from "@/types/models";
+import type { GroupInput, HostHealthCheck, HostInput } from "@/types/models";
 
 export const hostKeys = {
   hosts: ["hosts"] as const,
@@ -41,6 +41,18 @@ export function useDeleteHost() {
   return useMutation({
     mutationFn: (id: string) => ipc.hosts.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: hostKeys.hosts }),
+  });
+}
+
+export function useCheckHostHealth() {
+  return useMutation({
+    mutationFn: ({
+      hostIds,
+      onResult,
+    }: {
+      hostIds?: string[];
+      onResult?: (result: HostHealthCheck) => void;
+    }) => ipc.hosts.checkHealth(hostIds, onResult),
   });
 }
 
