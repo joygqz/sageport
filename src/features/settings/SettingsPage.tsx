@@ -79,7 +79,7 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
       </nav>
 
       <ScrollArea className="min-w-0 flex-1">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+        <div className="flex max-w-2xl flex-col gap-6 p-6">
           {section === "appearance" && <AppearanceSection />}
           {section === "ai" && <AiSection />}
           {section === "sync" && <SyncSection />}
