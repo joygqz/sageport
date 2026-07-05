@@ -288,6 +288,30 @@ export const useSftpStore = create<SftpState>((set, get) => {
       const found = findByConnection(connectionId);
       if (!found) return;
       const { side, tab } = found;
+      // On first connect, keep the tab in "connecting" while the remote home
+      // directory resolves and the initial listing loads, so the status dot
+      // flips to connected together with the entries — not before them.
+      if (status === "connected" && !tab.cwd) {
+        void (async () => {
+          let error: string | undefined;
+          try {
+            const home = await ipc.sftp.home(connectionId);
+            await loadEntries(side, tab.id, home);
+          } catch (err) {
+            error = errorMessage(err);
+          }
+          // A "closed"/"error" event may have landed while loading; don't
+          // overwrite a terminal status with "connected".
+          const current = get().panes[side].tabs.find((x) => x.id === tab.id);
+          if (!current || current.status !== "connecting") return;
+          patchTab(side, tab.id, {
+            status: "connected",
+            loading: false,
+            ...(error ? { error } : null),
+          });
+        })();
+        return;
+      }
       patchTab(side, tab.id, {
         status,
         // The initial connect leaves `loading: true` (set by addRemoteTab)
@@ -297,20 +321,6 @@ export const useSftpStore = create<SftpState>((set, get) => {
         error:
           status === "error" ? describeConnectError(code, message) : message,
       });
-      // On first connect, resolve the remote home directory and list it.
-      if (status === "connected" && !tab.cwd) {
-        void (async () => {
-          try {
-            const home = await ipc.sftp.home(connectionId);
-            await loadEntries(side, tab.id, home);
-          } catch (err) {
-            patchTab(side, tab.id, {
-              loading: false,
-              error: errorMessage(err),
-            });
-          }
-        })();
-      }
     },
 
     applyTransfer: (e) => {
