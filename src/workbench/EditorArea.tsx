@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { FileText, Plus, Settings, TerminalSquare, X } from "lucide-react";
 
 import {
@@ -250,17 +250,16 @@ function Watermark() {
     // than the hints, auto margins collapse to zero and the content clips at
     // one edge instead of spilling out past both.
     <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-      <div className="m-auto flex min-w-max flex-col gap-2.5 p-3">
+      {/* One shared grid so the shortcut column starts at a common left
+          edge across rows, labels right-aligned against it — VSCode style. */}
+      <div className="m-auto grid min-w-max grid-cols-[auto_auto] items-center gap-x-4 gap-y-2.5 p-3">
         {hints.map((hint) => (
-          <div
-            key={hint.label}
-            className="grid grid-cols-[1fr_auto] items-center gap-4"
-          >
+          <Fragment key={hint.label}>
             <span className="text-right text-sm text-muted-foreground">
               {hint.label}
             </span>
             <Kbd keys={hint.keys} />
-          </div>
+          </Fragment>
         ))}
       </div>
     </div>

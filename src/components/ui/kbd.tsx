@@ -5,37 +5,38 @@ import { cn } from "@/lib/utils";
 
 /** Platform-aware display names for modifier tokens used in shortcuts. */
 const MODIFIER_LABELS: Record<string, string> = IS_MACOS
-  ? { mod: "⌘", shift: "⇧", alt: "⌥" }
-  : { mod: "Ctrl", shift: "Shift", alt: "Alt" };
+  ? { mod: "⌘", ctrl: "⌃", shift: "⇧", alt: "⌥" }
+  : { mod: "Ctrl", ctrl: "Ctrl", shift: "Shift", alt: "Alt" };
 
-function formatShortcut(keys: string[]): string[] {
-  return keys.map((k) => MODIFIER_LABELS[k] ?? k);
-}
-
-interface KbdProps extends React.HTMLAttributes<HTMLElement> {
+interface KbdProps {
   /** Shortcut tokens, e.g. ["mod", "P"]. Rendered platform-aware. */
-  keys?: string[];
+  keys: string[];
+  /** Merged into each keycap, e.g. to shrink them in dense chrome. */
+  className?: string;
 }
 
-export function Kbd({ className, keys, children, ...props }: KbdProps) {
-  const parts = keys ? formatShortcut(keys) : null;
-
+/**
+ * Keyboard shortcut, VSCode-style: one keycap per key. macOS shows bare
+ * symbol caps (⇧ ⌘ P); other platforms join caps with "+" (Ctrl+Shift+P).
+ */
+export function Kbd({ keys, className }: KbdProps) {
   return (
-    <kbd
-      className={cn(
-        "inline-flex h-5 min-w-5 items-center justify-center gap-x-0.5 rounded border border-border bg-muted px-1.5 font-mono text-2xs font-medium text-muted-foreground",
-        className,
-      )}
-      {...props}
-    >
-      {parts
-        ? parts.map((part, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && !IS_MACOS && "+"}
-              <span>{part}</span>
-            </React.Fragment>
-          ))
-        : children}
+    <kbd className="inline-flex items-center gap-1 font-sans">
+      {keys.map((key, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && !IS_MACOS && (
+            <span className="text-2xs text-muted-foreground">+</span>
+          )}
+          <span
+            className={cn(
+              "flex h-5 min-w-5 items-center justify-center rounded border border-border bg-muted px-1 font-mono text-2xs font-medium text-muted-foreground",
+              className,
+            )}
+          >
+            {MODIFIER_LABELS[key] ?? key}
+          </span>
+        </React.Fragment>
+      ))}
     </kbd>
   );
 }

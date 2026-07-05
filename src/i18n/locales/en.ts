@@ -417,7 +417,7 @@ export const en = {
       languageHint: "Sets the display language of the app.",
       zoom: "Zoom",
       zoomHint:
-        "Scales the whole interface, including the terminal. Shortcuts: {keys}.",
+        "Scales the whole interface, including the terminal. Shortcuts:",
       zoomIn: "Zoom in",
       zoomOut: "Zoom out",
       zoomReset: "Reset",

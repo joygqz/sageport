@@ -12,12 +12,12 @@ import {
   Button,
   Field,
   Input,
+  Kbd,
   ScrollArea,
   Select,
   Tooltip,
 } from "@/components/ui";
 import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
-import { IS_MACOS } from "@/lib/platform";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { THEMES, useTheme, type ThemeDefinition } from "@/themes";
@@ -150,12 +150,18 @@ function ZoomField() {
   const resetZoom = useZoomStore((s) => s.resetZoom);
 
   const percent = Math.round(zoomFactor(level) * 100);
-  const keys = IS_MACOS ? "⌘+ / ⌘− / ⌘0" : "Ctrl+ / Ctrl− / Ctrl0";
 
   return (
     <Field
       label={t("settings.appearance.zoom")}
-      hint={t("settings.appearance.zoomHint", { keys })}
+      hint={
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          {t("settings.appearance.zoomHint")}
+          <Kbd keys={["mod", "+"]} className="h-4 min-w-4" />
+          <Kbd keys={["mod", "−"]} className="h-4 min-w-4" />
+          <Kbd keys={["mod", "0"]} className="h-4 min-w-4" />
+        </span>
+      }
     >
       <div className="flex items-center gap-1.5">
         <Tooltip content={t("settings.appearance.zoomOut")}>

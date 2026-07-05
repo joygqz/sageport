@@ -405,7 +405,7 @@ export const zhCN: Dictionary = {
       language: "语言",
       languageHint: "设置应用的显示语言。",
       zoom: "缩放",
-      zoomHint: "缩放整个界面，包括终端。快捷键：{keys}。",
+      zoomHint: "缩放整个界面，包括终端。快捷键：",
       zoomIn: "放大",
       zoomOut: "缩小",
       zoomReset: "重置",
