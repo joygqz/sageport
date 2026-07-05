@@ -50,7 +50,10 @@ export function useSyncDisconnect() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => ipc.sync.disconnect(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["sync"] }),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: versionsKey });
+      return qc.invalidateQueries({ queryKey: ["sync"] });
+    },
   });
 }
 
