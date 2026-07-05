@@ -11,9 +11,18 @@
  * The single source of truth is scripts/logo.svg. Edit that, run this, done.
  * `tauri icon` fans the source out into .icns (macOS), .ico (Windows),
  * the Square*Logo.png set (Windows Store) and every PNG size Tauri bundles.
+ * It also refreshes the in-app copies: src/assets/app-logo.svg (title-bar
+ * logo) and public/app-icon.png (About page).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  copyFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -67,10 +76,26 @@ try {
     ['tauri', 'icon', pngPath, '--output', outDir],
     { stdio: 'inherit', cwd: root },
   );
+  // In-app raster copy (About page & friends), from the same master render.
+  if (pngPath.toLowerCase().endsWith('.png')) {
+    copyFileSync(pngPath, join(root, 'public', 'app-icon.png'));
+    log('copied → public/app-icon.png');
+  }
 } catch {
   fail('`tauri icon` failed — is @tauri-apps/cli installed?');
 } finally {
   if (tmp) rmSync(tmp, { recursive: true, force: true });
+}
+
+// In-app vector copy: the title bar renders this at 16px CSS so it stays
+// crisp at any UI zoom. Only refreshable when the source is an SVG.
+if (isSvg) {
+  writeFileSync(
+    join(root, 'src', 'assets', 'app-logo.svg'),
+    '<!-- GENERATED from scripts/logo.svg — edit that file and run `pnpm icon` -->\n' +
+      readFileSync(source, 'utf8'),
+  );
+  log('copied → src/assets/app-logo.svg (title-bar logo)');
 }
 
 log(`done → ${outDir}`);

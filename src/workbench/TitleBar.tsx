@@ -1,5 +1,6 @@
 import { PanelBottom, PanelRight, Search } from "lucide-react";
 
+import appLogo from "@/assets/app-logo.svg";
 import { Kbd, Tooltip } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { IS_MACOS } from "@/lib/platform";
@@ -11,7 +12,8 @@ import { WindowControls } from "./WindowControls";
 /**
  * Draggable window title bar. The center hosts the command center (quick
  * open trigger); the right edge holds layout toggles and, on platforms
- * without native decorations, the window controls.
+ * without native decorations, the window controls plus a VSCode-style app
+ * logo on the left (macOS has the traffic lights there instead).
  */
 export function TitleBar() {
   const { t } = useI18n();
@@ -39,7 +41,20 @@ export function TitleBar() {
         IS_MACOS ? "pl-[5.35rem]" : "pl-2",
       )}
     >
-      <div data-tauri-drag-region className="h-full" />
+      <div data-tauri-drag-region className="flex h-full items-center">
+        {/* App logo, VSCode-style: 16px CSS (size-4, rem-based so it zooms
+            with the UI), generated from the master icon by `pnpm icon`.
+            pointer-events-none keeps mousedown on the drag-region div so
+            dragging and double-click-to-maximize still work over it. */}
+        {!IS_MACOS && (
+          <img
+            src={appLogo}
+            alt=""
+            draggable={false}
+            className="pointer-events-none size-4 shrink-0 select-none"
+          />
+        )}
+      </div>
 
       <button
         onClick={() => openPalette("quick")}
