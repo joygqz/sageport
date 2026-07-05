@@ -142,12 +142,12 @@ export const en = {
       unknown: "Connection not checked",
       error: "Failed to check connection",
       reason: {
-        timeout: "The connection timed out.",
-        refused: "The connection was refused. Check the SSH service and port.",
-        dns: "The host address could not be resolved.",
-        invalidPort: "The port is invalid.",
-        network: "The network is unreachable. Check the network or firewall.",
-        unknown: "The connection failed.",
+        timeout: "The connection timed out",
+        refused: "The connection was refused. Check the SSH service and port",
+        dns: "The host address could not be resolved",
+        invalidPort: "The port is invalid",
+        network: "The network is unreachable. Check the network or firewall",
+        unknown: "The connection failed",
       },
     },
     deleteHost: {

@@ -139,12 +139,12 @@ export const zhCN: Dictionary = {
       unknown: "尚未检查连接",
       error: "检查连接失败",
       reason: {
-        timeout: "连接超时。",
-        refused: "连接被拒绝，请检查 SSH 服务和端口。",
-        dns: "无法解析主机地址。",
-        invalidPort: "端口无效。",
-        network: "网络不可达，请检查网络或防火墙。",
-        unknown: "连接失败。",
+        timeout: "连接超时",
+        refused: "连接被拒绝，请检查 SSH 服务和端口",
+        dns: "无法解析主机地址",
+        invalidPort: "端口无效",
+        network: "网络不可达，请检查网络或防火墙",
+        unknown: "连接失败",
       },
     },
     deleteHost: {
