@@ -27,9 +27,9 @@ import { useZoomStore, zoomFactor } from "./zoom";
 
 export type Activity = "hosts" | "credentials" | "snippets";
 
-export const SIDEBAR_MIN = 170;
-export const PANEL_MIN = 100;
-export const AUX_MIN = 240;
+export const SIDEBAR_MIN = 220;
+export const PANEL_MIN = 220;
+export const AUX_MIN = 220;
 
 /** Fixed chrome that competes with the resizable parts for space. */
 const ACTIVITY_BAR_W = 45; // w-12 = 3rem
