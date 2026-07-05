@@ -189,31 +189,53 @@ export function TerminalView({
     })();
 
     // Refit on container resize and inform the remote PTY. Coalesced to one
-    // fit per frame so drag-resizing a panel doesn't thrash the renderer.
+    // measurement per frame, then split by axis the way VSCode does: row
+    // changes are cheap and applied immediately, but column changes reflow
+    // the whole scrollback and force the remote app to repaint, so they are
+    // debounced until the drag/resize settles.
     let fitQueued = false;
+    let pendingCols = 0;
+    let colsTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const applyResize = (cols: number, rows: number) => {
+      if (cols === term.cols && rows === term.rows) return;
+      term.resize(cols, rows);
+      void ipc.ssh.resize(sessionId, term.cols, term.rows).catch(() => {});
+    };
+
     const observer = new ResizeObserver(() => {
       if (fitQueued) return;
       fitQueued = true;
-      requestAnimationFrame(() => {
+      // Defer to a macrotask, not requestAnimationFrame: observer and rAF
+      // callbacks both run in the pre-paint phase, so resizing there clears
+      // the WebGL canvas after xterm's own rAF redraw has already run for
+      // this frame — every drag step paints one textless frame. From a task,
+      // the canvas resize and xterm's redraw land in the same frame.
+      setTimeout(() => {
         fitQueued = false;
         if (disposed) return;
         const el = containerRef.current;
         // Skip zero-size passes (e.g. mid-layout) — fitting to them would
         // clamp the PTY to a bogus size and repaint visibly.
         if (!el || el.clientWidth === 0 || el.clientHeight === 0) return;
-        try {
-          fit.fit();
-          void ipc.ssh.resize(sessionId, term.cols, term.rows).catch(() => {});
-        } catch {
-          /* element not measurable */
+        const dims = fit.proposeDimensions();
+        if (!dims || !(dims.cols > 0) || !(dims.rows > 0)) return;
+        if (dims.rows !== term.rows) applyResize(term.cols, dims.rows);
+        if (dims.cols !== term.cols) {
+          pendingCols = dims.cols;
+          clearTimeout(colsTimer);
+          colsTimer = setTimeout(() => {
+            if (!disposed) applyResize(pendingCols, term.rows);
+          }, 100);
         }
-      });
+      }, 0);
     });
     observer.observe(containerRef.current!);
 
     return () => {
       disposed = true;
       pendingInput = "";
+      clearTimeout(colsTimer);
       observer.disconnect();
       dataSub.dispose();
       unlisteners.forEach((un) => un());
