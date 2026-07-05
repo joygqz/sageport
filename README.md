@@ -22,7 +22,7 @@ Sageport consolidates the tools of routine server operations — terminal, file 
 
 ## Features
 
-**Terminal** — GPU-accelerated rendering via xterm.js with WebGL. Tabbed concurrent sessions that persist in the background without reflow, protocol-level keepalives with one-click reconnect, scrollback search (<kbd>⌘ F</kbd>), clickable links, and full Unicode support.
+**Terminal** — GPU-accelerated rendering via xterm.js with WebGL. Tabbed concurrent sessions that persist in the background without reflow, protocol-level keepalives with one-click reconnect, scrollback search (<kbd>⌘</kbd> <kbd>F</kbd>), clickable links, and full Unicode support.
 
 **Hosts & credentials** — Hosts organized into collapsible groups with live connection indicators. Credentials are decoupled from hosts, so one identity can be reused across servers. The built-in key manager generates and imports Ed25519, RSA, and ECDSA keys in OpenSSH format, with optional passphrase protection.
 
@@ -34,7 +34,7 @@ Sageport consolidates the tools of routine server operations — terminal, file 
 
 **Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials — encrypted end to end with a passphrase-derived key. Only ciphertext ever leaves the device. Syncs hosts, credentials, snippets, and interface preferences (locale, theme, zoom). Automatic last-write-wins conflict resolution, revision history with restore, and encrypted export/import for offline backups.
 
-**Interface** — Six full themes (terminal palette included), English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘ P</kbd> / <kbd>⌘ ⇧ P</kbd>), and automatic updates.
+**Interface** — Six full themes (terminal palette included), English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘</kbd> <kbd>P</kbd> / <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd>), and automatic updates.
 
 ## Installation
 
@@ -50,10 +50,10 @@ The application updates itself; the status bar indicates when a new version is a
 
 ## Quick start
 
-1. **Add a host** — <kbd>⌘ N</kbd>, then enter the address and choose password or key authentication.
-2. **Connect** — <kbd>⌘ P</kbd>, type the host name, press Enter.
-3. **Transfer files** — <kbd>⌘ J</kbd> opens the dual-pane file panel.
-4. **AI assistant** (optional) — set an API key under *Settings → AI*, then <kbd>⌘ L</kbd> to chat.
+1. **Add a host** — <kbd>⌘</kbd> <kbd>N</kbd>, then enter the address and choose password or key authentication.
+2. **Connect** — <kbd>⌘</kbd> <kbd>P</kbd>, type the host name, press Enter.
+3. **Transfer files** — <kbd>⌘</kbd> <kbd>J</kbd> opens the dual-pane file panel.
+4. **AI assistant** (optional) — set an API key under *Settings → AI*, then <kbd>⌘</kbd> <kbd>L</kbd> to chat.
 5. **Sync** (optional) — under *Settings → Sync*, pick a provider (GitHub, Google Drive, OneDrive, WebDAV, or S3), authorize or enter credentials, then set a passphrase; enter the same passphrase on another device to restore.
 
 On Windows and Linux, substitute <kbd>Ctrl</kbd> for <kbd>⌘</kbd>.
