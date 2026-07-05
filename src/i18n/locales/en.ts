@@ -33,7 +33,7 @@ export const en = {
 
   titleBar: {
     commandCenter: "Search hosts",
-    togglePanel: "Toggle file transfer panel",
+    togglePanel: "Toggle files panel",
     toggleAssistant: "Toggle AI assistant",
   },
 
@@ -69,7 +69,7 @@ export const en = {
     group: { new: "New group" },
     view: {
       toggleSidebar: "Toggle side bar",
-      togglePanel: "Toggle file transfer panel",
+      togglePanel: "Toggle files panel",
       toggleAssistant: "Toggle AI assistant",
     },
     tab: { close: "Close tab" },
@@ -79,6 +79,10 @@ export const en = {
   editor: {
     newSession: "New session",
     closeTab: "Close tab",
+    unsavedTitle: "Save changes?",
+    unsavedDescription:
+      "{name} has unsaved changes. Your changes will be lost if you don't save them.",
+    discard: "Don't save",
   },
 
   statusBar: {
@@ -302,7 +306,7 @@ export const en = {
   },
 
   sftp: {
-    panelTitle: "File transfer",
+    panelTitle: "Files",
     hidePanel: "Hide panel",
     local: "Local",
     newTab: "New tab",
@@ -328,6 +332,12 @@ export const en = {
     renameError: "Failed to rename",
     deleteError: "Failed to delete",
     transferError: "Failed to start transfer",
+    transferFailed: "Transfer failed",
+    toggleHidden: "Show hidden files",
+    editor: {
+      tooLarge: "File is too large to edit (2 MB max)",
+      saveError: "Failed to save file",
+    },
     credentialsMissing:
       "This host is missing sign-in credentials. Add a username and password, or link a saved identity, in host settings.",
     authFailed:
@@ -338,7 +348,6 @@ export const en = {
       empty: "No transfers yet",
       clear: "Clear history",
       clearConfirm: "This removes all transfer history and cannot be undone.",
-      deleteConfirm: "This removes the entry from the transfer history.",
       clearError: "Failed to update history",
       loadError: "Failed to load transfer history",
       status: {

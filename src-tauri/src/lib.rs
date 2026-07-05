@@ -97,6 +97,8 @@ pub fn run() {
             commands::sftp::fs_mkdir,
             commands::sftp::fs_rename,
             commands::sftp::fs_delete,
+            commands::sftp::fs_read_text,
+            commands::sftp::fs_write_text,
             commands::sftp::fs_transfer,
             commands::sftp::fs_transfer_cancel,
             commands::sftp::sftp_transfer_history_list,

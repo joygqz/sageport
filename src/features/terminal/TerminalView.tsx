@@ -81,9 +81,6 @@ export function TerminalView({
         '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace',
       fontSize: terminalFontSize(),
       lineHeight: 1.25,
-      cursorBlink: true,
-      cursorStyle: "bar",
-      cursorInactiveStyle: "outline",
       allowProposedApi: true,
       // Alt acts as Meta so shell word motions (alt+arrows) work on macOS.
       macOptionIsMeta: true,
@@ -115,7 +112,12 @@ export function TerminalView({
     const unlisteners: Array<() => void> = [];
 
     const flushInput = () => {
-      if (!inputReady || sendingInput || disposed || pendingInput.length === 0) {
+      if (
+        !inputReady ||
+        sendingInput ||
+        disposed ||
+        pendingInput.length === 0
+      ) {
         return;
       }
       const data = pendingInput;

@@ -79,24 +79,19 @@ export function TransferHistoryDialog({
     });
   };
 
-  const confirmDeleteOne = (id: string) => {
-    setConfirmState({
-      title: t("common.delete"),
-      description: t("sftp.history.deleteConfirm"),
-      cancelLabel: t("common.cancel"),
-      actions: [
-        {
-          label: t("common.delete"),
-          variant: "destructive",
-          onSelect: () => void onDeleteOne(id),
-        },
-      ],
-    });
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[70vh] max-w-2xl flex-col gap-4">
+      <DialogContent
+        className="flex max-h-[70vh] max-w-2xl flex-col gap-4"
+        // While the nested confirm dialog is up, its clicks and Escape land
+        // "outside" this content — don't let them dismiss the history too.
+        onInteractOutside={(e) => {
+          if (confirmState) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (confirmState) e.preventDefault();
+        }}
+      >
         <DialogHeader className="flex-row items-center justify-between gap-2 space-y-0">
           <DialogTitle>{t("sftp.history.title")}</DialogTitle>
           {!!entries?.length && (
@@ -179,7 +174,7 @@ export function TransferHistoryDialog({
                       size="icon"
                       variant="ghost"
                       className="size-6 shrink-0 opacity-0 group-hover:opacity-100"
-                      onClick={() => confirmDeleteOne(e.id)}
+                      onClick={() => void onDeleteOne(e.id)}
                     >
                       <Trash2 className="size-3.5" />
                     </Button>

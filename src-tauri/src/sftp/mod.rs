@@ -14,7 +14,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::Arc;
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, UNIX_EPOCH};
 
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -31,6 +31,14 @@ pub const EVENT_TRANSFER: &str = "sftp://transfer";
 
 /// Chunk size used when streaming file contents to/from a remote host.
 const CHUNK_SIZE: usize = 64 * 1024;
+
+/// Bound on each blocking libssh2 call after the session is up. A connection
+/// that dies silently (sleep/wake, NAT timeout) would otherwise leave the
+/// worker — and every UI request behind it — hanging in a read forever; with
+/// a bound, the call fails, maps to "connection lost", and the tab shows an
+/// error instead. Applies per call (one 64 KiB chunk, one dirent, …), so slow
+/// but progressing transfers are unaffected.
+const OP_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Parameters needed to open a remote SFTP connection. Resolved by the command
 /// layer from a host's stored credentials.
@@ -132,7 +140,23 @@ enum SftpRequest {
         command: String,
         reply: Sender<AppResult<String>>,
     },
+    /// Read a whole remote file (capped at [`MAX_EDIT_BYTES`]) for the editor.
+    ReadFile(String, Sender<AppResult<Vec<u8>>>),
+    /// Overwrite a remote file with the given bytes (editor save).
+    WriteFile {
+        path: String,
+        data: Vec<u8>,
+        reply: Sender<AppResult<()>>,
+    },
     Close,
+}
+
+/// Cap for files opened in the built-in text editor.
+pub const MAX_EDIT_BYTES: u64 = 2 * 1024 * 1024;
+
+/// Error returned when a file exceeds [`MAX_EDIT_BYTES`].
+pub fn edit_too_large_error() -> AppError {
+    AppError::Invalid("file is too large to edit (2 MB max)".into())
 }
 
 /// Per-file progress context so a worker can emit byte-accurate events while a
@@ -285,6 +309,18 @@ impl SftpManager {
     fn exec(&self, id: &str, command: &str) -> AppResult<String> {
         self.request(id, |reply| SftpRequest::Exec {
             command: command.to_string(),
+            reply,
+        })
+    }
+
+    pub fn read_file(&self, id: &str, path: &str) -> AppResult<Vec<u8>> {
+        self.request(id, |reply| SftpRequest::ReadFile(path.to_string(), reply))
+    }
+
+    pub fn write_file(&self, id: &str, path: &str, data: Vec<u8>) -> AppResult<()> {
+        self.request(id, |reply| SftpRequest::WriteFile {
+            path: path.to_string(),
+            data,
             reply,
         })
     }
@@ -479,7 +515,19 @@ fn run_connection(app: AppHandle, params: SftpConnectParams, rx: Receiver<SftpRe
                 upload(&app, &sftp, &local, &remote, &progress),
             ),
             SftpRequest::Exec { command, reply } => {
-                send_reply(&app, &id, reply, exec_command(&session, &command))
+                // Remote `tar`/`rm` for compressed transfers can legitimately
+                // stay quiet far longer than OP_TIMEOUT while still making
+                // progress, so exec runs unbounded.
+                session.set_timeout(0);
+                let result = exec_command(&session, &command);
+                session.set_timeout(OP_TIMEOUT.as_millis() as u32);
+                send_reply(&app, &id, reply, result)
+            }
+            SftpRequest::ReadFile(path, reply) => {
+                send_reply(&app, &id, reply, read_file(&sftp, &path))
+            }
+            SftpRequest::WriteFile { path, data, reply } => {
+                send_reply(&app, &id, reply, write_file(&sftp, &path, &data))
             }
             SftpRequest::Close => break,
         };
@@ -504,7 +552,7 @@ fn open_sftp(params: &SftpConnectParams) -> AppResult<(ssh2::Session, ssh2::Sftp
     authenticate(&session, &params.username, &params.auth)?;
     let sftp = session.sftp().map_err(map_ssh_error)?;
     session.set_keepalive(false, KEEPALIVE_INTERVAL.as_secs() as u32);
-    session.set_timeout(0);
+    session.set_timeout(OP_TIMEOUT.as_millis() as u32);
     Ok((session, sftp))
 }
 
@@ -594,6 +642,23 @@ fn file_entry(name: String, path: &Path, stat: &ssh2::FileStat) -> FileEntry {
         permissions: perm,
         is_symlink,
     }
+}
+
+fn read_file(sftp: &ssh2::Sftp, path: &str) -> AppResult<Vec<u8>> {
+    let stat = sftp.stat(Path::new(path)).map_err(map_ssh_error)?;
+    if stat.size.unwrap_or(0) > MAX_EDIT_BYTES {
+        return Err(edit_too_large_error());
+    }
+    let mut file = sftp.open(Path::new(path)).map_err(map_ssh_error)?;
+    let mut buf = Vec::with_capacity(stat.size.unwrap_or(0) as usize);
+    file.read_to_end(&mut buf).map_err(map_remote_io_error)?;
+    Ok(buf)
+}
+
+fn write_file(sftp: &ssh2::Sftp, path: &str, data: &[u8]) -> AppResult<()> {
+    let mut file = sftp.create(Path::new(path)).map_err(map_ssh_error)?;
+    file.write_all(data).map_err(map_remote_io_error)?;
+    Ok(())
 }
 
 fn download(

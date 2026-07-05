@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { History, X } from "lucide-react";
+import { Eye, EyeOff, History, X } from "lucide-react";
 
 import { Button, Tooltip } from "@/components/ui";
 import { useI18n } from "@/i18n";
@@ -23,6 +23,8 @@ export function SftpPanel({ height }: { height: number }) {
   const ratio = useSftpStore((s) => s.ratio);
   const setRatio = useSftpStore((s) => s.setRatio);
   const addLocalTab = useSftpStore((s) => s.addLocalTab);
+  const showHidden = useSftpStore((s) => s.showHidden);
+  const toggleHidden = useSftpStore((s) => s.toggleHidden);
   const setPanelVisible = useLayoutStore((s) => s.setPanelVisible);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -72,6 +74,20 @@ export function SftpPanel({ height }: { height: number }) {
           {t("sftp.panelTitle")}
         </h2>
         <div className="flex items-center gap-0.5">
+          <Tooltip content={t("sftp.toggleHidden")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn("size-6", showHidden && "text-foreground")}
+              onClick={toggleHidden}
+            >
+              {showHidden ? (
+                <Eye className="size-4" />
+              ) : (
+                <EyeOff className="size-4" />
+              )}
+            </Button>
+          </Tooltip>
           <Tooltip content={t("sftp.history.title")}>
             <Button
               size="icon"
@@ -119,7 +135,10 @@ export function SftpPanel({ height }: { height: number }) {
   );
 }
 
-/** Live progress for in-flight and just-finished transfers. */
+/**
+ * Live progress for in-flight transfers. Finished ones leave the store (and
+ * this strip) immediately, so only "active" rows ever render here.
+ */
 function TransferStrip() {
   const { t } = useI18n();
   const transfers = useSftpStore((s) => s.transfers);
@@ -129,73 +148,50 @@ function TransferStrip() {
   if (active.length === 0) return null;
 
   return (
-    <div className="flex max-h-24 flex-col gap-1 overflow-y-auto border-t border-border bg-surface px-2 py-1.5">
+    <div className="flex max-h-24 flex-col overflow-y-auto border-t border-border bg-surface px-2">
       {active.map((tx) => {
         const pct =
           tx.total > 0 ? Math.round((tx.transferred / tx.total) * 100) : 0;
         // While compressing/extracting there is no byte denominator, so show
         // an indeterminate bar instead of a stuck 0%.
         const indeterminate =
-          tx.status === "active" &&
           tx.total === 0 &&
           (tx.phase === "compressing" || tx.phase === "extracting");
         return (
-          <div key={tx.transferId} className="flex items-center gap-2 text-xs">
-            <span className="flex w-40 shrink-0 items-baseline gap-1.5 truncate">
-              <span className="truncate" title={tx.file}>
-                {tx.file}
-              </span>
-              {tx.phase && tx.status === "active" && (
-                <span className="shrink-0 text-2xs text-muted-foreground">
-                  {t(`sftp.phase.${tx.phase}`)}
-                </span>
-              )}
+          <div
+            key={tx.transferId}
+            className="flex h-7 items-center gap-2 text-xs"
+          >
+            <span className="min-w-0 shrink truncate" title={tx.file}>
+              {tx.file}
             </span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            {tx.phase && (
+              <span className="shrink-0 text-2xs text-muted-foreground">
+                {t(`sftp.phase.${tx.phase}`)}
+              </span>
+            )}
+            <div className="h-1 min-w-16 flex-1 overflow-hidden rounded-full bg-muted">
               <div
                 className={cn(
-                  "h-full rounded-full transition-all",
-                  tx.status === "error"
-                    ? "bg-destructive"
-                    : tx.status === "cancelled"
-                      ? "bg-muted-foreground/50"
-                      : "bg-primary",
+                  "h-full rounded-full bg-primary transition-all",
                   indeterminate && "animate-pulse",
                 )}
-                style={{
-                  width: `${
-                    tx.status === "done" || tx.status === "cancelled"
-                      ? 100
-                      : indeterminate
-                        ? 100
-                        : pct
-                  }%`,
-                }}
+                style={{ width: `${indeterminate ? 100 : pct}%` }}
               />
             </div>
-            <span className="w-10 shrink-0 text-right text-muted-foreground">
-              {tx.status === "error"
-                ? "!"
-                : tx.status === "done"
-                  ? "✓"
-                  : tx.status === "cancelled"
-                    ? "×"
-                    : indeterminate
-                      ? "…"
-                      : `${pct}%`}
+            <span className="w-9 shrink-0 text-right tabular-nums text-muted-foreground">
+              {indeterminate ? "…" : `${pct}%`}
             </span>
-            {tx.status === "active" && (
-              <Tooltip content={t("sftp.cancelTransfer")}>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-5 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => cancelTransfer(tx.transferId)}
-                >
-                  <X className="size-3" />
-                </Button>
-              </Tooltip>
-            )}
+            <Tooltip content={t("sftp.cancelTransfer")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-5 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={() => cancelTransfer(tx.transferId)}
+              >
+                <X className="size-3" />
+              </Button>
+            </Tooltip>
           </div>
         );
       })}

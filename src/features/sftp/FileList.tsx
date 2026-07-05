@@ -10,10 +10,18 @@ import {
   ScrollArea,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
+import { useTabsStore } from "@/workbench/tabs";
 import { dragState } from "./dnd";
-import { parentPath, useSftpStore, type PaneSide, type SftpTab } from "./store";
+import {
+  MAX_EDIT_BYTES,
+  parentPath,
+  useSftpStore,
+  type PaneSide,
+  type SftpTab,
+} from "./store";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -61,10 +69,24 @@ export function FileList({
   const navigate = useSftpStore((s) => s.navigate);
   const setSelected = useSftpStore((s) => s.setSelected);
   const transfer = useSftpStore((s) => s.transfer);
+  const showHidden = useSftpStore((s) => s.showHidden);
+  const openFile = useTabsStore((s) => s.openFile);
+
+  const openEditor = (entry: FileEntry) => {
+    if (entry.size > MAX_EDIT_BYTES) {
+      toast.error(t("sftp.editor.tooLarge"));
+      return;
+    }
+    openFile({
+      connectionId: tab.connectionId,
+      path: entry.path,
+      name: entry.name,
+    });
+  };
 
   const open = (entry: FileEntry) => {
     if (entry.kind === "dir") void navigate(side, tab.id, entry.path);
-    else void transfer(side, [entry]);
+    else openEditor(entry);
   };
 
   const onRowClick = (e: React.MouseEvent, entry: FileEntry) => {
@@ -94,6 +116,11 @@ export function FileList({
       </div>
     );
   }
+
+  // Dotfiles stay out of sight unless the panel-level toggle is on.
+  const entries = showHidden
+    ? tab.entries
+    : tab.entries.filter((e) => !e.name.startsWith("."));
 
   const canGoUp = !!tab.cwd && parentPath(tab.cwd) !== tab.cwd;
   const sendLabel = side === "left" ? t("sftp.sendRight") : t("sftp.sendLeft");
@@ -126,7 +153,7 @@ export function FileList({
             </tr>
           )}
 
-          {tab.entries.length === 0 ? (
+          {entries.length === 0 ? (
             <tr>
               <td colSpan={3}>
                 <EmptyState
@@ -137,7 +164,7 @@ export function FileList({
               </td>
             </tr>
           ) : (
-            tab.entries.map((entry) => {
+            entries.map((entry) => {
               const selected = tab.selected.includes(entry.path);
               return (
                 <ContextMenu key={entry.path}>
@@ -147,9 +174,7 @@ export function FileList({
                       onDragStart={() => {
                         dragState.fromSide = side;
                         dragState.entries = selected
-                          ? tab.entries.filter((e) =>
-                              tab.selected.includes(e.path),
-                            )
+                          ? entries.filter((e) => tab.selected.includes(e.path))
                           : [entry];
                       }}
                       onClick={(e) => onRowClick(e, entry)}
@@ -193,6 +218,11 @@ export function FileList({
                         onSelect={() => void navigate(side, tab.id, entry.path)}
                       >
                         {t("sftp.open")}
+                      </ContextMenuItem>
+                    )}
+                    {entry.kind === "file" && (
+                      <ContextMenuItem onSelect={() => openEditor(entry)}>
+                        {t("common.edit")}
                       </ContextMenuItem>
                     )}
                     <ContextMenuSeparator />

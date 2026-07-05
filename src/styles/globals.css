@@ -236,6 +236,112 @@
   }
 }
 
+/*
+ * Syntax highlighting tokens for the file editor (see FileEditor.tsx: the
+ * CodeMirror highlight style assigns classes only). Base values follow
+ * VSCode Light Modern; the `.dark` overrides follow Dark Modern, so token
+ * colors track the active theme's appearance.
+ */
+.tok-keyword {
+  color: #0000ff;
+}
+.tok-controlKeyword {
+  color: #af00db;
+}
+.tok-atom {
+  color: #0000ff;
+}
+.tok-string {
+  color: #a31515;
+}
+.tok-string2 {
+  color: #811f3f;
+}
+.tok-number {
+  color: #098658;
+}
+.tok-comment {
+  color: #008000;
+}
+.tok-function {
+  color: #795e26;
+}
+.tok-type {
+  color: #267f99;
+}
+.tok-tag {
+  color: #800000;
+}
+.tok-attribute {
+  color: #e50000;
+}
+.tok-variable {
+  color: #001080;
+}
+.tok-meta {
+  color: #808080;
+}
+.tok-invalid {
+  color: var(--color-destructive);
+}
+.tok-heading {
+  color: #800000;
+  font-weight: 600;
+}
+.tok-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+.tok-emphasis {
+  font-style: italic;
+}
+.tok-strong {
+  font-weight: 600;
+}
+
+.dark .tok-keyword {
+  color: #569cd6;
+}
+.dark .tok-controlKeyword {
+  color: #c586c0;
+}
+.dark .tok-atom {
+  color: #569cd6;
+}
+.dark .tok-string {
+  color: #ce9178;
+}
+.dark .tok-string2 {
+  color: #d16969;
+}
+.dark .tok-number {
+  color: #b5cea8;
+}
+.dark .tok-comment {
+  color: #6a9955;
+}
+.dark .tok-function {
+  color: #dcdcaa;
+}
+.dark .tok-type {
+  color: #4ec9b0;
+}
+.dark .tok-tag {
+  color: #569cd6;
+}
+.dark .tok-attribute {
+  color: #9cdcfe;
+}
+.dark .tok-variable {
+  color: #9cdcfe;
+}
+.dark .tok-meta {
+  color: #d4d4d4;
+}
+.dark .tok-heading {
+  color: #569cd6;
+}
+
 @layer components {
   .settings-page {
     container-type: inline-size;

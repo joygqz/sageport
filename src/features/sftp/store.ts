@@ -26,6 +26,9 @@ function describeConnectError(code?: string | null, message?: string) {
   return message;
 }
 
+/** Editor size cap, mirrored from the backend's `MAX_EDIT_BYTES`. */
+export const MAX_EDIT_BYTES = 2 * 1024 * 1024;
+
 export type PaneSide = "left" | "right";
 export type TabKind = "local" | "remote";
 export type TabStatus = SftpStatusKind | "idle";
@@ -54,10 +57,13 @@ interface SftpState {
   /** Left pane width as a fraction of the panel (0-1). */
   ratio: number;
   panes: Record<PaneSide, PaneState>;
-  /** In-flight / recently finished transfers, keyed by id. */
+  /** In-flight transfers, keyed by id; finished ones drop out immediately. */
   transfers: Record<string, TransferEvent>;
+  /** Whether dotfiles are listed; off by default. */
+  showHidden: boolean;
 
   setRatio: (r: number) => void;
+  toggleHidden: () => void;
 
   addLocalTab: (side: PaneSide) => Promise<void>;
   addRemoteTab: (side: PaneSide, host: Host) => void;
@@ -183,10 +189,13 @@ export const useSftpStore = create<SftpState>((set, get) => {
     ratio: 0.5,
     panes: { left: emptyPane(), right: emptyPane() },
     transfers: {},
+    showHidden: false,
 
     // The px-based pane minimum is enforced at the drag site (SftpPanel),
     // where the container width is known; this only guards the invariant.
     setRatio: (r) => set({ ratio: Math.max(0, Math.min(r, 1)) }),
+
+    toggleHidden: () => set((s) => ({ showHidden: !s.showHidden })),
 
     addLocalTab: async (side) => {
       const id = crypto.randomUUID();
@@ -305,24 +314,23 @@ export const useSftpStore = create<SftpState>((set, get) => {
     },
 
     applyTransfer: (e) => {
-      set((s) => ({ transfers: { ...s.transfers, [e.transferId]: e } }));
-      if (
-        e.status === "done" ||
-        e.status === "error" ||
-        e.status === "cancelled"
-      ) {
-        // Refresh both panes so the destination reflects the new file, then
-        // drop the entry from the strip after a short delay.
-        void get().refresh("left", get().panes.left.activeTabId ?? "");
-        void get().refresh("right", get().panes.right.activeTabId ?? "");
-        setTimeout(() => {
-          set((s) => {
-            const rest = { ...s.transfers };
-            delete rest[e.transferId];
-            return { transfers: rest };
-          });
-        }, 4000);
+      if (e.status === "active") {
+        set((s) => ({ transfers: { ...s.transfers, [e.transferId]: e } }));
+        return;
       }
+      // Terminal: drop the strip entry right away. Failures surface as a
+      // toast; everything is recorded in the history dialog either way.
+      set((s) => {
+        const rest = { ...s.transfers };
+        delete rest[e.transferId];
+        return { transfers: rest };
+      });
+      if (e.status === "error") {
+        toast.error(t("sftp.transferFailed"), e.message);
+      }
+      // Refresh both panes so the destination reflects the new file.
+      void get().refresh("left", get().panes.left.activeTabId ?? "");
+      void get().refresh("right", get().panes.right.activeTabId ?? "");
     },
 
     cancelTransfer: (transferId) => {

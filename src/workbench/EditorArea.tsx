@@ -1,14 +1,26 @@
 import { useEffect, useRef } from "react";
-import { Plus, Settings, TerminalSquare, X } from "lucide-react";
+import { FileText, Plus, Settings, TerminalSquare, X } from "lucide-react";
 
-import { Kbd, Tooltip } from "@/components/ui";
+import {
+  ConfirmDialog,
+  Kbd,
+  Tooltip,
+  type ConfirmState,
+} from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { SettingsPage } from "@/features/settings/SettingsPage";
+import { FileEditor } from "@/features/sftp/FileEditor";
 import { TerminalEditor } from "@/features/terminal/TerminalEditor";
 import { focusTerminal } from "@/features/terminal/registry";
 import { useOverlayStore } from "./overlays";
-import { useTabsStore, type EditorTab, type TerminalStatus } from "./tabs";
+import {
+  isFileDirty,
+  useTabsStore,
+  type EditorTab,
+  type FileTab,
+  type TerminalStatus,
+} from "./tabs";
 
 const statusDot: Record<TerminalStatus, string> = {
   idle: "bg-muted-foreground/40",
@@ -29,8 +41,41 @@ export function EditorArea() {
   const activeId = useTabsStore((s) => s.activeId);
   const setActive = useTabsStore((s) => s.setActive);
   const close = useTabsStore((s) => s.close);
+  const saveFile = useTabsStore((s) => s.saveFile);
   const openPalette = useOverlayStore((s) => s.openPalette);
   const stripRef = useRef<HTMLDivElement>(null);
+  const pendingCloseId = useTabsStore((s) => s.pendingCloseId);
+  const clearPendingClose = useTabsStore((s) => s.clearPendingClose);
+
+  // Any close path (tab button, middle click, Cmd+W) on a dirty file tab
+  // parks its id in `pendingCloseId`; render the save / discard / cancel
+  // prompt straight from that state.
+  const pendingTab = tabs.find(
+    (tab): tab is FileTab => tab.id === pendingCloseId && tab.kind === "file",
+  );
+  const confirmState: ConfirmState | null = pendingTab
+    ? {
+        title: t("editor.unsavedTitle"),
+        description: t("editor.unsavedDescription", {
+          name: pendingTab.title,
+        }),
+        cancelLabel: t("common.cancel"),
+        actions: [
+          {
+            label: t("editor.discard"),
+            variant: "secondary",
+            onSelect: () => close(pendingTab.id, { force: true }),
+          },
+          {
+            label: t("common.save"),
+            onSelect: async () => {
+              if (await saveFile(pendingTab.id))
+                close(pendingTab.id, { force: true });
+            },
+          },
+        ],
+      }
+    : null;
 
   // Keep the active tab in view and hand focus to its terminal, so switching
   // tabs (mouse or shortcut) lands keystrokes in the shell immediately.
@@ -90,12 +135,16 @@ export function EditorArea() {
           >
             {tab.kind === "terminal" ? (
               <TerminalEditor tab={tab} active={tab.id === activeId} />
+            ) : tab.kind === "file" ? (
+              <FileEditor tab={tab} />
             ) : (
               <SettingsPage section={tab.section} />
             )}
           </div>
         ))}
       </div>
+
+      <ConfirmDialog state={confirmState} onClose={clearPendingClose} />
     </div>
   );
 }
@@ -115,6 +164,7 @@ function TabItem({
   const openTerminal = useTabsStore((s) => s.openTerminal);
 
   const title = tab.kind === "settings" ? t("settings.title") : tab.title;
+  const dirty = tab.kind === "file" && isFileDirty(tab);
 
   return (
     <div
@@ -150,6 +200,8 @@ function TabItem({
             )}
           />
         </span>
+      ) : tab.kind === "file" ? (
+        <FileText className="size-3.5 shrink-0" />
       ) : (
         <Settings className="size-3.5 shrink-0" />
       )}
@@ -163,13 +215,21 @@ function TabItem({
         }}
         aria-label={t("editor.closeTab")}
         className={cn(
-          "shrink-0 rounded p-0.5 transition-opacity hover:bg-accent",
-          active
-            ? "opacity-60 hover:opacity-100"
-            : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100",
+          "group/close flex size-4.5 shrink-0 items-center justify-center rounded transition-opacity hover:bg-accent",
+          dirty
+            ? "opacity-100"
+            : active
+              ? "opacity-60 hover:opacity-100"
+              : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100",
         )}
       >
-        <X className="size-3.5" />
+        {/* Unsaved indicator: a dot that turns into a close icon on hover. */}
+        {dirty && (
+          <span className="size-2 rounded-full bg-foreground group-hover/close:hidden" />
+        )}
+        <X
+          className={cn("size-3.5", dirty && "hidden group-hover/close:block")}
+        />
       </button>
     </div>
   );

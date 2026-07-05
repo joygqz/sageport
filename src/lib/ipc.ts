@@ -142,6 +142,10 @@ export const ipc = {
       invoke<void>("fs_rename", { connectionId, from, to }),
     remove: (connectionId: string | null, path: string, isDir: boolean) =>
       invoke<void>("fs_delete", { connectionId, path, isDir }),
+    readText: (connectionId: string | null, path: string) =>
+      invoke<string>("fs_read_text", { connectionId, path }),
+    writeText: (connectionId: string | null, path: string, content: string) =>
+      invoke<void>("fs_write_text", { connectionId, path, content }),
     transfer: (
       transferId: string,
       source: FsEndpoint,

@@ -31,7 +31,7 @@ export const zhCN: Dictionary = {
 
   titleBar: {
     commandCenter: "搜索主机",
-    togglePanel: "显示或隐藏文件传输面板",
+    togglePanel: "显示或隐藏文件管理面板",
     toggleAssistant: "显示或隐藏 AI 助手",
   },
 
@@ -67,7 +67,7 @@ export const zhCN: Dictionary = {
     group: { new: "新建分组" },
     view: {
       toggleSidebar: "显示或隐藏侧边栏",
-      togglePanel: "显示或隐藏文件传输面板",
+      togglePanel: "显示或隐藏文件管理面板",
       toggleAssistant: "显示或隐藏 AI 助手",
     },
     tab: { close: "关闭标签页" },
@@ -77,6 +77,9 @@ export const zhCN: Dictionary = {
   editor: {
     newSession: "新建会话",
     closeTab: "关闭标签页",
+    unsavedTitle: "是否保存更改？",
+    unsavedDescription: "{name} 有未保存的更改，不保存将丢失这些更改。",
+    discard: "不保存",
   },
 
   statusBar: {
@@ -294,7 +297,7 @@ export const zhCN: Dictionary = {
   },
 
   sftp: {
-    panelTitle: "文件传输",
+    panelTitle: "文件管理",
     hidePanel: "隐藏面板",
     local: "本地",
     newTab: "新建标签页",
@@ -320,6 +323,12 @@ export const zhCN: Dictionary = {
     renameError: "重命名失败",
     deleteError: "删除失败",
     transferError: "启动传输失败",
+    transferFailed: "传输失败",
+    toggleHidden: "显示隐藏文件",
+    editor: {
+      tooLarge: "文件过大，暂不支持编辑（上限 2 MB）",
+      saveError: "保存文件失败",
+    },
     credentialsMissing:
       "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
     authFailed:
@@ -330,7 +339,6 @@ export const zhCN: Dictionary = {
       empty: "暂无传输记录",
       clear: "清空历史",
       clearConfirm: "将清空全部传输历史，此操作无法撤销。",
-      deleteConfirm: "将从传输历史中移除该记录。",
       clearError: "更新历史失败",
       loadError: "加载传输历史失败",
       status: {

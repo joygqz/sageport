@@ -196,6 +196,48 @@ pub async fn fs_delete(
     }
 }
 
+/// Read a text file for the built-in editor. Refuses files larger than
+/// [`sftp::MAX_EDIT_BYTES`] and content that is not valid UTF-8.
+#[tauri::command]
+pub async fn fs_read_text(
+    state: State<'_, AppState>,
+    connection_id: Option<String>,
+    path: String,
+) -> AppResult<String> {
+    let bytes = match connection_id {
+        None => {
+            blocking_local(move || {
+                if std::fs::metadata(&path)?.len() > sftp::MAX_EDIT_BYTES {
+                    return Err(sftp::edit_too_large_error());
+                }
+                Ok(std::fs::read(&path)?)
+            })
+            .await?
+        }
+        Some(id) => blocking(state.sftp.clone(), move |mgr| mgr.read_file(&id, &path)).await?,
+    };
+    String::from_utf8(bytes).map_err(|_| AppError::Invalid("file is not UTF-8 text".into()))
+}
+
+/// Overwrite a file with the editor's content.
+#[tauri::command]
+pub async fn fs_write_text(
+    state: State<'_, AppState>,
+    connection_id: Option<String>,
+    path: String,
+    content: String,
+) -> AppResult<()> {
+    match connection_id {
+        None => blocking_local(move || Ok(std::fs::write(&path, content)?)).await,
+        Some(id) => {
+            blocking(state.sftp.clone(), move |mgr| {
+                mgr.write_file(&id, &path, content.into_bytes())
+            })
+            .await
+        }
+    }
+}
+
 /// Copy `source` into the directory `dest`. Runs on its own thread; progress is
 /// reported via `sftp://transfer` events keyed by `transfer_id`. When `compress`
 /// is set and `source` is a directory crossing the network, it is shipped as a
