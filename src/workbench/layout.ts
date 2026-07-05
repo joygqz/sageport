@@ -77,24 +77,55 @@ function maxWidthFor(other: number): number {
   );
 }
 
-function clampSidebar(width: number, s: { auxVisible: boolean; auxWidth: number }) {
+export interface SashLimits {
+  min: number;
+  max: number;
+}
+
+/**
+ * Live drag bounds per sash. Queried at gesture time (not baked into
+ * renders) because they move with the window size, the zoom factor and the
+ * sibling panels; the sashes use them to switch to VSCode's directional
+ * at-limit cursors.
+ */
+export function sidebarLimits(
+  s: Pick<LayoutState, "auxVisible" | "auxWidth"> = useLayoutStore.getState(),
+): SashLimits {
   const min = SIDEBAR_MIN * uiScale();
-  const roomMax = maxWidthFor(s.auxVisible ? s.auxWidth : 0);
-  return clamp(width, min, Math.max(min, roomMax));
+  return { min, max: Math.max(min, maxWidthFor(s.auxVisible ? s.auxWidth : 0)) };
 }
 
-function clampAux(width: number, s: { sidebarVisible: boolean; sidebarWidth: number }) {
+export function auxLimits(
+  s: Pick<LayoutState, "sidebarVisible" | "sidebarWidth"> = useLayoutStore.getState(),
+): SashLimits {
   const min = AUX_MIN * uiScale();
-  const roomMax = maxWidthFor(s.sidebarVisible ? s.sidebarWidth : 0);
-  return clamp(width, min, Math.max(min, roomMax));
+  return {
+    min,
+    max: Math.max(min, maxWidthFor(s.sidebarVisible ? s.sidebarWidth : 0)),
+  };
 }
 
-function clampPanel(height: number) {
+export function panelLimits(): SashLimits {
   const min = PANEL_MIN * uiScale();
   const roomMax =
     window.innerHeight -
     (TITLE_BAR_H + STATUS_BAR_H + EDITOR_MIN_H) * uiScale();
-  return clamp(height, min, Math.max(min, roomMax));
+  return { min, max: Math.max(min, roomMax) };
+}
+
+function clampSidebar(width: number, s: { auxVisible: boolean; auxWidth: number }) {
+  const { min, max } = sidebarLimits(s);
+  return clamp(width, min, max);
+}
+
+function clampAux(width: number, s: { sidebarVisible: boolean; sidebarWidth: number }) {
+  const { min, max } = auxLimits(s);
+  return clamp(width, min, max);
+}
+
+function clampPanel(height: number) {
+  const { min, max } = panelLimits();
+  return clamp(height, min, max);
 }
 
 export const useLayoutStore = create<LayoutState>()(

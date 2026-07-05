@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, History, X } from "lucide-react";
 
-import { Button, Tooltip } from "@/components/ui";
+import { Button, ResizeHandle, Tooltip } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/workbench/layout";
@@ -41,27 +41,28 @@ export function SftpPanel({ height }: { height: number }) {
     }
   }, [addLocalTab]);
 
-  const startSplitDrag = (e: React.PointerEvent) => {
-    e.preventDefault();
-    const onMove = (ev: PointerEvent) => {
-      const rect = bodyRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0) return;
-      // Each pane keeps a usable minimum width (in px, so it holds at any
-      // panel size, and zoom-scaled like every layout constraint). When the
-      // panel is too narrow for two minimums the divider stays centered.
-      const min = Math.min(
-        (PANE_MIN_W * zoomFactor(useZoomStore.getState().level)) / rect.width,
-        0.5,
-      );
-      const ratio = (ev.clientX - rect.left) / rect.width;
-      setRatio(Math.max(min, Math.min(ratio, 1 - min)));
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+  // The divider drags in px (like every sash) but persists as a ratio, so
+  // both panes keep their share when the panel resizes. Sizes are measured
+  // live off the body element — a render-baked width would go stale.
+  const bodyWidth = () => bodyRef.current?.getBoundingClientRect().width ?? 0;
+
+  // Each pane keeps a usable minimum width (in px, so it holds at any
+  // panel size, and zoom-scaled like every layout constraint). When the
+  // panel is too narrow for two minimums the divider stays centered.
+  const splitLimits = () => {
+    const width = bodyWidth();
+    const min = Math.min(
+      PANE_MIN_W * zoomFactor(useZoomStore.getState().level),
+      width / 2,
+    );
+    return { min, max: width - min };
+  };
+
+  const setSplit = (px: number) => {
+    const width = bodyWidth();
+    if (width === 0) return;
+    const { min, max } = splitLimits();
+    setRatio(Math.max(min, Math.min(px, max)) / width);
   };
 
   return (
@@ -116,13 +117,12 @@ export function SftpPanel({ height }: { height: number }) {
         <div style={{ width: `${ratio * 100}%` }} className="flex min-w-0">
           <FilePane side="left" />
         </div>
-        <div className="group relative z-10 w-0 shrink-0 select-none">
-          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-primary group-active:bg-primary" />
-          <div
-            onPointerDown={startSplitDrag}
-            className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize"
-          />
-        </div>
+        <ResizeHandle
+          axis="x"
+          getSize={() => ratio * bodyWidth()}
+          onResize={setSplit}
+          limits={splitLimits}
+        />
         <div className="flex min-w-0 flex-1">
           <FilePane side="right" />
         </div>

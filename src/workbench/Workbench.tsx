@@ -14,7 +14,7 @@ import { ActivityBar } from "./ActivityBar";
 import { CommandPalette } from "./CommandPalette";
 import { EditorArea } from "./EditorArea";
 import { useKeybindings } from "./keybindings";
-import { useLayoutStore } from "./layout";
+import { auxLimits, panelLimits, sidebarLimits, useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { SideBar } from "./SideBar";
 import { StatusBar } from "./StatusBar";
@@ -104,20 +104,42 @@ export function Workbench() {
             width 0 pulls the side bar back open. */}
         <ResizeHandle
           axis="x"
+          sashId="sidebar"
           size={layout.sidebarVisible ? layout.sidebarWidth : 0}
           onResize={layout.setSidebarWidth}
+          limits={sidebarLimits}
         />
-
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <EditorArea />
           {layout.panelVisible && (
             <>
+              {/* The corners where this sash meets the side sashes resize
+                  both panels in one diagonal drag (VSCode-style); each
+                  corner mirrors the linked sash's own props, including the
+                  sidebar's drag-open-from-hidden behavior. */}
               <ResizeHandle
                 axis="y"
                 reverse
+                sashId="panel"
                 size={layout.panelHeight}
                 onResize={layout.setPanelHeight}
+                limits={panelLimits}
+                startCorner={{
+                  targetId: "sidebar",
+                  size: layout.sidebarVisible ? layout.sidebarWidth : 0,
+                  onResize: layout.setSidebarWidth,
+                }}
+                endCorner={
+                  layout.auxVisible
+                    ? {
+                        targetId: "aux",
+                        size: layout.auxWidth,
+                        reverse: true,
+                        onResize: layout.setAuxWidth,
+                      }
+                    : undefined
+                }
               />
               <SftpPanel height={layout.panelHeight} />
             </>
@@ -129,8 +151,10 @@ export function Workbench() {
             <ResizeHandle
               axis="x"
               reverse
+              sashId="aux"
               size={layout.auxWidth}
               onResize={layout.setAuxWidth}
+              limits={auxLimits}
             />
             <AssistantPanel width={layout.auxWidth} />
           </>
