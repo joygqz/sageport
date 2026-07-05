@@ -62,7 +62,17 @@ function Tooltip({
   if (content == null) return <>{children}</>;
   return (
     <TooltipRoot delayDuration={delayDuration}>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipTrigger
+        asChild
+        onFocus={(e) => {
+          // Only keyboard (:focus-visible) focus may open the tooltip;
+          // programmatic focus (e.g. a dropdown restoring focus on close)
+          // would otherwise leave it stuck open.
+          if (!e.currentTarget.matches(":focus-visible")) e.preventDefault();
+        }}
+      >
+        {children}
+      </TooltipTrigger>
       <TooltipContent side={side} {...props}>
         {content}
       </TooltipContent>
