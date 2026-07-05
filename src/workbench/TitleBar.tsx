@@ -43,7 +43,7 @@ export function TitleBar() {
 
       <button
         onClick={() => openPalette("quick")}
-        className="flex h-6 items-center justify-center gap-2 rounded-md border border-border bg-background/60 px-2 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+        className="flex h-6 items-center justify-center gap-2 rounded-md border border-input bg-background/60 px-2 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
       >
         <Search className="size-3.5 shrink-0" />
         <span className="truncate">{t("titleBar.commandCenter")}</span>

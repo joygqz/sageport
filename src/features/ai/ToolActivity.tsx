@@ -48,7 +48,7 @@ export function ToolActivity({
     typeof item.args.command === "string" ? item.args.command : undefined;
 
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-surface text-xs">
+    <div className="overflow-hidden rounded-md border border-input bg-surface text-xs">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}

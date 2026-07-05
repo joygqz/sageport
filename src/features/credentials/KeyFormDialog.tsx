@@ -112,7 +112,7 @@ function KeyFormBody({ onClose }: { onClose: () => void }) {
     <>
       <DialogToolbar>{t("credentials.keys.formTitle")}</DialogToolbar>
       <div className="flex flex-col gap-4 p-5">
-        <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface p-1">
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-input bg-surface p-1">
           {(["generate", "import"] as const).map((m) => (
             <button
               key={m}

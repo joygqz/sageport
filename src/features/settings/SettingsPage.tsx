@@ -227,7 +227,7 @@ function ThemeCard({
         "group flex min-w-0 flex-col overflow-hidden rounded-lg border text-left transition-colors",
         active
           ? "border-primary ring-2 ring-primary/40"
-          : "border-border hover:border-ring",
+          : "border-input hover:border-ring",
       )}
     >
       <div className="flex h-16" style={{ backgroundColor: colors.background }}>

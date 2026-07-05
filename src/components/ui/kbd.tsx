@@ -29,7 +29,7 @@ export function Kbd({ keys, className }: KbdProps) {
           )}
           <span
             className={cn(
-              "flex h-5 min-w-5 items-center justify-center rounded border border-border bg-muted px-1 font-mono text-2xs font-medium text-muted-foreground",
+              "flex h-5 min-w-5 items-center justify-center rounded border border-input bg-muted px-1 font-mono text-2xs font-medium text-muted-foreground",
               className,
             )}
           >

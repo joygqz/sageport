@@ -27,7 +27,7 @@ export function AboutSection() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-input p-4">
         <UpdateStatusView state={state} />
 
         {state.status !== "checking" && (

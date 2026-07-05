@@ -2,7 +2,9 @@ import { cva } from "class-variance-authority";
 
 /**
  * GitHub's `.btn` language: every non-ghost variant carries a 1px border
- * (transparent for solid fills, --border for the neutral default button).
+ * (transparent for solid fills, --input for the neutral default button —
+ * controls share the form-input border token; --border is reserved for
+ * structural dividers).
  * Hover/active states use solid tokens rather than opacity-diluted ones —
  * a flat, near-invisible hover was a defect this design fixed, not a look
  * to preserve.
@@ -15,9 +17,9 @@ export const buttonVariants = cva(
         primary:
           "border-transparent bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80",
         secondary:
-          "border-border bg-secondary text-secondary-foreground hover:bg-accent active:bg-accent",
+          "border-input bg-secondary text-secondary-foreground hover:bg-accent active:bg-accent",
         outline:
-          "border-border bg-transparent hover:bg-accent hover:text-accent-foreground",
+          "border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
         ghost:
           "border-transparent hover:bg-accent hover:text-accent-foreground",
         destructive:

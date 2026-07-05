@@ -531,12 +531,12 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
   th: ({ node: _node, ...props }) => (
     <th
-      className="border border-border px-2 py-1 text-left font-medium"
+      className="border border-input px-2 py-1 text-left font-medium"
       {...props}
     />
   ),
   td: ({ node: _node, ...props }) => (
-    <td className="border border-border px-2 py-1" {...props} />
+    <td className="border border-input px-2 py-1" {...props} />
   ),
   code: ({ node: _node, className: _className, ...props }) => (
     <code
@@ -569,7 +569,7 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-terminal-background">
+    <div className="overflow-hidden rounded-md border border-input bg-terminal-background">
       <div className="flex items-center justify-between border-b border-border px-2 py-1">
         <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
           {t("ai.commandLabel")}
