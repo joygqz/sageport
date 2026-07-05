@@ -20,6 +20,27 @@
 
 use crate::error::AppResult;
 
+/// The inset the frontend declares at zoom level 0: x is `TRAFFIC_LIGHT_X`
+/// and height is `TITLE_BAR_REM` × the 15px base root font (see
+/// src/workbench/zoom.ts). Keep in sync with those constants.
+const DEFAULT_INSET_X: f64 = 13.0;
+const DEFAULT_INSET_HEIGHT: f64 = 33.75;
+
+/// Apply the zoom-0 inset natively at startup, before the window first
+/// paints. Without this the buttons sit at AppKit's default spot until the
+/// webview loads and the frontend's first `syncTrafficLights` lands — a
+/// visible jump. A persisted non-zero zoom still shifts them once on load,
+/// but only by the small zoom delta. Main thread only (call from setup).
+/// A no-op on other platforms.
+pub fn preset_traffic_light_inset(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    if let Ok(ptr) = window.ns_window() {
+        macos::set_inset(ptr.cast(), DEFAULT_INSET_X, DEFAULT_INSET_HEIGHT);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = window;
+}
+
 /// Center the macOS traffic lights vertically within a title bar of
 /// `height` logical pixels, keeping their left edge at `x`. The first call
 /// installs native observers that keep re-applying the inset through

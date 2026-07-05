@@ -34,6 +34,13 @@ pub fn run() {
             let pool = tauri::async_runtime::block_on(db::init(&db_path))?;
             app.manage(AppState::new(pool));
 
+            // Position the macOS traffic lights for the custom title bar
+            // before the window first paints; otherwise they sit at AppKit's
+            // default spot until the frontend loads and visibly jump.
+            if let Some(window) = app.get_webview_window("main") {
+                commands::window::preset_traffic_light_inset(&window);
+            }
+
             // Check for an update on every launch; status flows to every
             // window (present or future) over `update::EVENT`.
             let handle = app.handle().clone();
