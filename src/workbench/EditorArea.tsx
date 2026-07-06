@@ -127,10 +127,16 @@ export function EditorArea() {
             key={tab.id}
             // Inactive panes keep their layout (visibility, not display):
             // hidden terminals stay fitted to their real size, so activating
-            // a tab never triggers a visible refit/flicker.
+            // a tab never triggers a visible refit/flicker. visibility:hidden
+            // hides the canvas, but xterm's overlay scrollbar is a separately
+            // GPU-composited layer that can still repaint for a frame during a
+            // window resize — a phantom scrollbar flashing through from the
+            // hidden terminal. Drop it from the render tree while hidden.
             className={cn(
               "absolute inset-0",
-              tab.id === activeId ? "visible" : "invisible",
+              tab.id === activeId
+                ? "visible"
+                : "invisible [&_.xterm_.scrollbar]:hidden",
             )}
           >
             {tab.kind === "terminal" ? (

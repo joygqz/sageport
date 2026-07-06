@@ -16,10 +16,9 @@ import { useTerminalSearch } from "./search";
 import { TerminalView } from "./TerminalView";
 
 /**
- * One terminal editor: the xterm canvas inside a gutter painted with the
- * terminal background (so the padding is invisible), plus a find bar and a
- * full-pane overlay for the non-interactive states (connecting / error /
- * closed).
+ * One terminal editor: the xterm canvas behind a left gutter painted with
+ * the terminal background, plus a find bar and a full-pane overlay for the
+ * non-interactive states (connecting / error / closed).
  */
 export function TerminalEditor({
   tab,
@@ -32,7 +31,10 @@ export function TerminalEditor({
   const searchOpen = useTerminalSearch((s) => s.openFor === tab.id);
 
   return (
-    <div className="relative h-full w-full bg-terminal-background p-2">
+    // Left padding only (4px, VSCode's terminal inset): the overlay
+    // scrollbar is drawn inside the xterm element along its right edge, so
+    // right/vertical padding would push it off the pane edge.
+    <div className="relative h-full w-full bg-terminal-background pl-1">
       <TerminalView
         sessionId={tab.id}
         hostId={tab.hostId}

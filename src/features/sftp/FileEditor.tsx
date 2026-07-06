@@ -46,6 +46,33 @@ const editorTheme = EditorView.theme({
     lineHeight: "1.5",
     overflow: "auto",
   },
+  // Match xterm 6's VSCode-style scrollbar (14px, flat, foreground at
+  // 20/40/50% opacity) instead of the app-wide pill-shaped scrollbar.
+  ".cm-scroller::-webkit-scrollbar": {
+    width: "14px",
+    height: "14px",
+  },
+  ".cm-scroller::-webkit-scrollbar-track": {
+    backgroundColor: "transparent",
+  },
+  ".cm-scroller::-webkit-scrollbar-corner": {
+    backgroundColor: "transparent",
+  },
+  ".cm-scroller::-webkit-scrollbar-thumb": {
+    backgroundColor:
+      "color-mix(in srgb, var(--color-terminal-foreground) 20%, transparent)",
+    borderRadius: "0",
+    border: "none",
+    backgroundClip: "border-box",
+  },
+  ".cm-scroller::-webkit-scrollbar-thumb:hover": {
+    backgroundColor:
+      "color-mix(in srgb, var(--color-terminal-foreground) 40%, transparent)",
+  },
+  ".cm-scroller::-webkit-scrollbar-thumb:active": {
+    backgroundColor:
+      "color-mix(in srgb, var(--color-terminal-foreground) 50%, transparent)",
+  },
   ".cm-content": {
     padding: "0.5rem 0",
     // CodeMirror's base theme hardcodes a black caret (it can't know the
