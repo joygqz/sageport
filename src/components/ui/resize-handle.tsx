@@ -209,9 +209,8 @@ export function ResizeHandle({
  * The junction square where two orthogonal sashes meet. Dragging it feeds
  * the pointer's own-axis delta to this sash and the cross-axis delta to the
  * orthogonal one, so both panels resize in a single gesture; hovering (or
- * dragging) marks both sashes hot. Diagonal cursors assume the workbench
- * geometry — panels dock left/right of the corner and below it — matching
- * how VSCode orients its orthogonal drag handles.
+ * dragging) marks both sashes hot. The four-way cursor matches the fact
+ * that this handle moves both dimensions at once.
  */
 function Corner({
   ownId,
@@ -245,7 +244,7 @@ function Corner({
     [],
   );
 
-  const cursor = position === "start" ? "nesw-resize" : "nwse-resize";
+  const cursor = "move";
 
   const onPointerDown = (e: React.PointerEvent) => {
     dragging.current = true;
