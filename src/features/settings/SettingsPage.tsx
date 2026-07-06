@@ -157,8 +157,8 @@ function ZoomField() {
       hint={
         <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
           {t("settings.appearance.zoomHint")}
-          <Kbd keys={["mod", "+"]} className="h-4 min-w-4" />
-          <Kbd keys={["mod", "−"]} className="h-4 min-w-4" />
+          <Kbd keys={["mod", "+"]} className="h-4 min-w-4" /> /
+          <Kbd keys={["mod", "−"]} className="h-4 min-w-4" /> /
           <Kbd keys={["mod", "0"]} className="h-4 min-w-4" />
         </span>
       }
