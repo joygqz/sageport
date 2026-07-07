@@ -235,29 +235,6 @@ export function HostsView() {
       title={t("hosts.viewTitle")}
       actions={
         <>
-          <Tooltip content={t("hosts.health.checkAll")}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6"
-              disabled={hosts.length === 0 || checkingAll}
-              onClick={() => runHealthCheck()}
-            >
-              <RefreshCw
-                className={cn("size-4", checkingAll && "animate-spin")}
-              />
-            </Button>
-          </Tooltip>
-          <Tooltip content={t("hosts.import.action")}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6"
-              onClick={() => setImportOpen(true)}
-            >
-              <FileInput className="size-4" />
-            </Button>
-          </Tooltip>
           <Tooltip content={t("hosts.newHost")}>
             <Button
               size="icon"
@@ -276,6 +253,29 @@ export function HostsView() {
               onClick={() => openGroupForm()}
             >
               <FolderPlus className="size-4" />
+            </Button>
+          </Tooltip>
+          <Tooltip content={t("hosts.import.action")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              onClick={() => setImportOpen(true)}
+            >
+              <FileInput className="size-4" />
+            </Button>
+          </Tooltip>
+          <Tooltip content={t("hosts.health.checkAll")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              disabled={hosts.length === 0 || checkingAll}
+              onClick={() => runHealthCheck()}
+            >
+              <RefreshCw
+                className={cn("size-4", checkingAll && "animate-spin")}
+              />
             </Button>
           </Tooltip>
         </>
