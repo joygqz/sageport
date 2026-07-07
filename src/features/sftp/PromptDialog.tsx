@@ -1,15 +1,6 @@
 import { useState } from "react";
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Input,
-} from "@/components/ui";
-import { useI18n } from "@/i18n";
+import { FormBody, FormDialog, Input } from "@/components/ui";
 
 export interface PromptState {
   title: string;
@@ -26,11 +17,14 @@ export function PromptDialog({
   onClose: () => void;
 }) {
   return (
-    <Dialog open={!!state} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-sm">
-        {state && <PromptForm state={state} onClose={onClose} />}
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={!!state}
+      onClose={onClose}
+      width="w-[420px]"
+      title={state?.title}
+    >
+      {state && <PromptForm state={state} onClose={onClose} />}
+    </FormDialog>
   );
 }
 
@@ -41,7 +35,6 @@ function PromptForm({
   state: PromptState;
   onClose: () => void;
 }) {
-  const { t } = useI18n();
   const [value, setValue] = useState(state.initial);
 
   const submit = () => {
@@ -52,24 +45,16 @@ function PromptForm({
   };
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{state.title}</DialogTitle>
-      </DialogHeader>
+    <FormBody
+      onClose={onClose}
+      onSubmit={submit}
+      submitLabel={state.confirmLabel}
+    >
       <Input
         autoFocus
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") submit();
-        }}
       />
-      <DialogFooter>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
-        <Button onClick={submit}>{state.confirmLabel}</Button>
-      </DialogFooter>
-    </>
+    </FormBody>
   );
 }

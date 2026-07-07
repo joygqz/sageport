@@ -1,14 +1,7 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogToolbar,
-  Field,
-  Input,
-} from "@/components/ui";
+import { Field, FormBody, FormDialog, Input } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { useCreateGroup, useGroups, useUpdateGroup } from "./api";
@@ -26,15 +19,16 @@ export function GroupFormDialog({
   groupId: string | null;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        showClose={false}
-        className="flex w-[420px] max-w-[92vw] flex-col gap-0 p-0"
-      >
-        <GroupFormBody groupId={groupId} onClose={onClose} />
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={open}
+      onClose={onClose}
+      width="w-[420px]"
+      title={groupId ? t("groupForm.editTitle") : t("groupForm.newTitle")}
+    >
+      <GroupFormBody groupId={groupId} onClose={onClose} />
+    </FormDialog>
   );
 }
 
@@ -55,14 +49,9 @@ function GroupFormBody({
   const {
     register,
     handleSubmit,
-    reset,
     setFocus,
     formState: { errors },
-  } = useForm<FormValues>({ defaultValues: { name: "" } });
-
-  useEffect(() => {
-    if (group) reset({ name: group.name });
-  }, [group, reset]);
+  } = useForm<FormValues>({ defaultValues: { name: group?.name ?? "" } });
 
   useEffect(() => {
     setFocus("name");
@@ -83,34 +72,18 @@ function GroupFormBody({
   });
 
   return (
-    <>
-      <DialogToolbar>
-        {groupId ? t("groupForm.editTitle") : t("groupForm.newTitle")}
-      </DialogToolbar>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4 p-5">
-        <Field
-          label={t("groupForm.name")}
-          error={errors.name?.message}
-          required
-        >
-          <Input
-            placeholder={t("groupForm.namePlaceholder")}
-            {...register("name", { required: t("groupForm.nameRequired") })}
-          />
-        </Field>
-
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            loading={createGroup.isPending || updateGroup.isPending}
-          >
-            {groupId ? t("common.save") : t("common.create")}
-          </Button>
-        </div>
-      </form>
-    </>
+    <FormBody
+      onClose={onClose}
+      onSubmit={onSubmit}
+      submitLabel={groupId ? t("common.save") : t("common.create")}
+      pending={createGroup.isPending || updateGroup.isPending}
+    >
+      <Field label={t("groupForm.name")} error={errors.name?.message} required>
+        <Input
+          placeholder={t("groupForm.namePlaceholder")}
+          {...register("name", { required: t("groupForm.nameRequired") })}
+        />
+      </Field>
+    </FormBody>
   );
 }

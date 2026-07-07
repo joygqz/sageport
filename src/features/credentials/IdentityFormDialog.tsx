@@ -1,11 +1,9 @@
 import { useState } from "react";
 
 import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogToolbar,
   Field,
+  FormBody,
+  FormDialog,
   Input,
   PasswordInput,
   Select,
@@ -24,15 +22,19 @@ export function IdentityFormDialog({
   identity: Identity | null;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        showClose={false}
-        className="flex w-[460px] max-w-[92vw] flex-col gap-0 p-0"
-      >
-        {open && <IdentityFormBody identity={identity} onClose={onClose} />}
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={open}
+      onClose={onClose}
+      title={
+        identity
+          ? t("credentials.identities.editTitle")
+          : t("credentials.identities.newTitle")
+      }
+    >
+      <IdentityFormBody identity={identity} onClose={onClose} />
+    </FormDialog>
   );
 }
 
@@ -88,89 +90,75 @@ function IdentityFormBody({
   };
 
   return (
-    <>
-      <DialogToolbar>
-        {editing
-          ? t("credentials.identities.editTitle")
-          : t("credentials.identities.newTitle")}
-      </DialogToolbar>
-      <div className="flex flex-col gap-4 p-5">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t("credentials.identities.name")} required>
-            <Input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("credentials.identities.namePlaceholder")}
-            />
-          </Field>
-          <Field label={t("credentials.identities.username")} required>
-            <Input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="root"
-            />
-          </Field>
-        </div>
+    <FormBody
+      onClose={onClose}
+      onSubmit={submit}
+      submitLabel={editing ? t("common.saveChanges") : t("common.create")}
+      pending={createIdentity.isPending || updateIdentity.isPending}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={t("credentials.identities.name")} required>
+          <Input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("credentials.identities.namePlaceholder")}
+          />
+        </Field>
+        <Field label={t("credentials.identities.username")} required>
+          <Input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="root"
+          />
+        </Field>
+      </div>
 
-        <Field label={t("credentials.identities.authentication")}>
-          <Select
-            value={authType}
-            onChange={(e) => setAuthType(e.target.value as AuthType)}
-          >
-            <option value="password">{t("common.auth.password")}</option>
-            <option value="key">{t("common.auth.key")}</option>
-            <option value="agent">{t("common.auth.agent")}</option>
+      <Field label={t("credentials.identities.authentication")}>
+        <Select
+          value={authType}
+          onChange={(e) => setAuthType(e.target.value as AuthType)}
+        >
+          <option value="password">{t("common.auth.password")}</option>
+          <option value="key">{t("common.auth.key")}</option>
+          <option value="agent">{t("common.auth.agent")}</option>
+        </Select>
+      </Field>
+
+      {authType === "password" && (
+        <Field
+          label={t("credentials.identities.password")}
+          hint={
+            editing ? t("credentials.identities.passwordKeepHint") : undefined
+          }
+        >
+          <PasswordInput
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="off"
+          />
+        </Field>
+      )}
+
+      {authType === "key" && (
+        <Field
+          label={t("credentials.identities.sshKey")}
+          hint={
+            keys.length === 0
+              ? t("credentials.identities.noKeysHint")
+              : undefined
+          }
+        >
+          <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
+            <option value="">{t("hostForm.selectKey")}</option>
+            {keys.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.name}
+              </option>
+            ))}
           </Select>
         </Field>
-
-        {authType === "password" && (
-          <Field
-            label={t("credentials.identities.password")}
-            hint={
-              editing ? t("credentials.identities.passwordKeepHint") : undefined
-            }
-          >
-            <PasswordInput
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
-        )}
-
-        {authType === "key" && (
-          <Field
-            label={t("credentials.identities.sshKey")}
-            hint={
-              keys.length === 0
-                ? t("credentials.identities.noKeysHint")
-                : undefined
-            }
-          >
-            <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
-              <option value="">{t("hostForm.selectKey")}</option>
-              {keys.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        )}
-
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            onClick={submit}
-            loading={createIdentity.isPending || updateIdentity.isPending}
-          >
-            {editing ? t("common.saveChanges") : t("common.create")}
-          </Button>
-        </div>
-      </div>
-    </>
+      )}
+    </FormBody>
   );
 }

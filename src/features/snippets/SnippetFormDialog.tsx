@@ -1,14 +1,6 @@
 import { useState } from "react";
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogToolbar,
-  Field,
-  Input,
-  Textarea,
-} from "@/components/ui";
+import { Field, FormBody, FormDialog, Input, Textarea } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import type { Snippet } from "@/types/models";
@@ -23,15 +15,16 @@ export function SnippetFormDialog({
   snippet: Snippet | null;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        showClose={false}
-        className="flex w-[480px] max-w-[92vw] flex-col gap-0 p-0"
-      >
-        {open && <SnippetFormBody snippet={snippet} onClose={onClose} />}
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={open}
+      onClose={onClose}
+      width="w-[480px]"
+      title={snippet ? t("snippets.editTitle") : t("snippets.newTitle")}
+    >
+      <SnippetFormBody snippet={snippet} onClose={onClose} />
+    </FormDialog>
   );
 }
 
@@ -72,48 +65,36 @@ function SnippetFormBody({
   };
 
   return (
-    <>
-      <DialogToolbar>
-        {snippet ? t("snippets.editTitle") : t("snippets.newTitle")}
-      </DialogToolbar>
-      <div className="flex flex-col gap-4 p-5">
-        <Field label={t("snippets.name")} required>
-          <Input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("snippets.namePlaceholder")}
-          />
-        </Field>
-        <Field label={t("snippets.command")} required>
-          <Textarea
-            rows={3}
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            placeholder={t("snippets.commandPlaceholder")}
-            className="font-mono text-xs"
-          />
-        </Field>
-        <Field label={t("snippets.description")}>
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t("snippets.descriptionPlaceholder")}
-          />
-        </Field>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            onClick={submit}
-            loading={createSnippet.isPending || updateSnippet.isPending}
-          >
-            {snippet ? t("common.saveChanges") : t("common.create")}
-          </Button>
-        </div>
-      </div>
-    </>
+    <FormBody
+      onClose={onClose}
+      onSubmit={submit}
+      submitLabel={snippet ? t("common.saveChanges") : t("common.create")}
+      pending={createSnippet.isPending || updateSnippet.isPending}
+    >
+      <Field label={t("snippets.name")} required>
+        <Input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("snippets.namePlaceholder")}
+        />
+      </Field>
+      <Field label={t("snippets.command")} required>
+        <Textarea
+          rows={3}
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          placeholder={t("snippets.commandPlaceholder")}
+          className="font-mono text-xs"
+        />
+      </Field>
+      <Field label={t("snippets.description")}>
+        <Input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t("snippets.descriptionPlaceholder")}
+        />
+      </Field>
+    </FormBody>
   );
 }

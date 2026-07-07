@@ -4,17 +4,16 @@ import { FileUp } from "lucide-react";
 
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogToolbar,
   Field,
+  FormBody,
+  FormDialog,
   Input,
   PasswordInput,
+  SegmentedControl,
   Select,
   Textarea,
 } from "@/components/ui";
 import { useI18n, type TKey } from "@/i18n";
-import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
 import type { SshKeyAlgorithm } from "@/types/models";
 import { useCreateSshKey, useGenerateSshKey, useImportSshKeyFile } from "./api";
@@ -37,15 +36,16 @@ export function KeyFormDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
-    <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        showClose={false}
-        className="flex w-[520px] max-w-[92vw] flex-col gap-0 p-0"
-      >
-        {isOpen && <KeyFormBody onClose={onClose} />}
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={isOpen}
+      onClose={onClose}
+      width="w-[520px]"
+      title={t("credentials.keys.formTitle")}
+    >
+      <KeyFormBody onClose={onClose} />
+    </FormDialog>
   );
 }
 
@@ -108,119 +108,97 @@ function KeyFormBody({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <>
-      <DialogToolbar>{t("credentials.keys.formTitle")}</DialogToolbar>
-      <div className="flex flex-col gap-4 p-5">
-        <div className="grid grid-cols-2 gap-1 rounded-lg border border-input bg-surface p-1">
-          {(["generate", "import"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors",
-                mode === m
-                  ? "bg-background font-medium text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t(
-                m === "generate"
-                  ? "credentials.keys.modeGenerate"
-                  : "credentials.keys.modeImport",
-              )}
-            </button>
-          ))}
-        </div>
+    <FormBody
+      onClose={onClose}
+      onSubmit={submit}
+      submitLabel={
+        mode === "generate"
+          ? t("credentials.keys.generateAction")
+          : t("credentials.keys.importAction")
+      }
+      pending={generateKey.isPending || createKey.isPending}
+    >
+      <SegmentedControl
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: "generate", label: t("credentials.keys.modeGenerate") },
+          { value: "import", label: t("credentials.keys.modeImport") },
+        ]}
+      />
 
-        <Field label={t("credentials.keys.name")} required>
-          <Input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("credentials.keys.namePlaceholder")}
-          />
-        </Field>
+      <Field label={t("credentials.keys.name")} required>
+        <Input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("credentials.keys.namePlaceholder")}
+        />
+      </Field>
 
-        {mode === "generate" ? (
-          <>
-            <Field label={t("credentials.keys.algorithmLabel")}>
-              <Select
-                value={algorithm}
-                onChange={(e) =>
-                  setAlgorithm(e.target.value as SshKeyAlgorithm)
-                }
-              >
-                {ALGORITHMS.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {t(a.labelKey)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field
-              label={t("credentials.keys.passphrase")}
-              hint={t("credentials.keys.generatePassphraseHint")}
+      {mode === "generate" ? (
+        <>
+          <Field label={t("credentials.keys.algorithmLabel")}>
+            <Select
+              value={algorithm}
+              onChange={(e) => setAlgorithm(e.target.value as SshKeyAlgorithm)}
             >
-              <PasswordInput
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-                autoComplete="off"
-              />
-            </Field>
-          </>
-        ) : (
-          <>
-            <Field
-              label={t("credentials.keys.privateKey")}
-              required
-              hint={t("credentials.keys.privateKeyHint")}
-            >
-              <div className="flex flex-col gap-2">
-                <Textarea
-                  rows={5}
-                  value={privateKey}
-                  onChange={(e) => setPrivateKey(e.target.value)}
-                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-                  className="font-mono text-xs"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="self-start"
-                  onClick={pickFile}
-                  loading={importFile.isPending}
-                >
-                  <FileUp /> {t("credentials.keys.chooseFile")}
-                </Button>
-              </div>
-            </Field>
-            <Field
-              label={t("credentials.keys.passphrase")}
-              hint={t("credentials.keys.passphraseHint")}
-            >
-              <PasswordInput
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-                autoComplete="off"
-              />
-            </Field>
-          </>
-        )}
-
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            onClick={submit}
-            loading={generateKey.isPending || createKey.isPending}
+              {ALGORITHMS.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {t(a.labelKey)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label={t("credentials.keys.passphrase")}
+            hint={t("credentials.keys.generatePassphraseHint")}
           >
-            {mode === "generate"
-              ? t("credentials.keys.generateAction")
-              : t("credentials.keys.importAction")}
-          </Button>
-        </div>
-      </div>
-    </>
+            <PasswordInput
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+        </>
+      ) : (
+        <>
+          <Field
+            label={t("credentials.keys.privateKey")}
+            required
+            hint={t("credentials.keys.privateKeyHint")}
+          >
+            <div className="flex flex-col gap-2">
+              <Textarea
+                rows={5}
+                value={privateKey}
+                onChange={(e) => setPrivateKey(e.target.value)}
+                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                className="font-mono text-xs"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="self-start"
+                onClick={pickFile}
+                loading={importFile.isPending}
+              >
+                <FileUp /> {t("credentials.keys.chooseFile")}
+              </Button>
+            </div>
+          </Field>
+          <Field
+            label={t("credentials.keys.passphrase")}
+            hint={t("credentials.keys.passphraseHint")}
+          >
+            <PasswordInput
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+        </>
+      )}
+    </FormBody>
   );
 }
