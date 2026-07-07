@@ -171,6 +171,12 @@ export const useSftpStore = create<SftpState>((set, get) => {
     const pane = get().panes[side];
     const tab = pane.tabs.find((t) => t.id === tabId);
     if (!tab) return;
+    if (
+      tab.kind === "remote" &&
+      (!path || tab.status === "closed" || tab.status === "error")
+    ) {
+      return;
+    }
     patchTab(side, tabId, { loading: true, error: undefined });
     try {
       const entries = await ipc.sftp.list(tab.connectionId, path);
@@ -279,6 +285,9 @@ export const useSftpStore = create<SftpState>((set, get) => {
 
     refresh: (side, tabId) => {
       const tab = get().panes[side].tabs.find((t) => t.id === tabId);
+      if (tab?.kind === "remote" && (tab.status !== "connected" || !tab.cwd)) {
+        return Promise.resolve();
+      }
       return tab ? loadEntries(side, tabId, tab.cwd) : Promise.resolve();
     },
 

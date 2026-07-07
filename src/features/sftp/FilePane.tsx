@@ -64,6 +64,10 @@ export function FilePane({ side }: { side: PaneSide }) {
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const active = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
+  const activeReady =
+    !!active?.cwd &&
+    !active.loading &&
+    (active.kind === "local" || active.status === "connected");
 
   const onMkdir = (tab: SftpTab) =>
     setPrompt({
@@ -240,6 +244,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 size="icon"
                 variant="ghost"
                 className="size-6"
+                disabled={!activeReady}
                 onClick={() => void refresh(side, active.id)}
               >
                 <RefreshCw className="size-3.5" />
@@ -250,6 +255,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 size="icon"
                 variant="ghost"
                 className="size-6"
+                disabled={!activeReady}
                 onClick={() => onMkdir(active)}
               >
                 <FolderPlus className="size-3.5" />
