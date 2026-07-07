@@ -287,6 +287,8 @@ export type SshStatusKind = "connecting" | "connected" | "closed" | "error";
 
 export interface SshStatusEvent {
   id: string;
+  /** Connection attempt for this tab; filters stale events after reconnect. */
+  attempt: number;
   status: SshStatusKind;
   message?: string;
   /** Machine-readable `AppError::code`, set only when `status` is "error". */
@@ -295,6 +297,8 @@ export interface SshStatusEvent {
 
 export interface SshDataEvent {
   id: string;
+  /** Connection attempt for this tab; filters stale output after reconnect. */
+  attempt: number;
   /** Base64-encoded raw terminal bytes. */
   data: string;
 }

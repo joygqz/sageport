@@ -99,6 +99,8 @@ export const zhCN: Dictionary = {
       "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
     authFailed:
       "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
+    connectTimedOut:
+      "连接未能及时完成，请检查网络、防火墙、SSH 服务或服务器登录策略。",
     closed: "会话已结束",
     reconnect: "重新连接",
     status: {

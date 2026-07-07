@@ -111,6 +111,7 @@ export const ipc = {
   ssh: {
     connect: (params: {
       sessionId: string;
+      attempt: number;
       hostId: string;
       cols: number;
       rows: number;

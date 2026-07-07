@@ -24,6 +24,8 @@ function decodeBase64(b64: string): Uint8Array {
   return bytes;
 }
 
+const CONNECT_WATCHDOG_MS = 45_000;
+
 /**
  * Attach the GPU renderer. xterm transparently falls back to its DOM
  * renderer if WebGL is unavailable or the context is later lost (e.g. GPU
@@ -109,13 +111,27 @@ export function TerminalView({
     let inputReady = false;
     let pendingInput = "";
     let sendingInput = false;
+    let connectSettled = false;
+    let connectTimedOut = false;
+    let connectWatchdog: ReturnType<typeof setTimeout> | undefined;
     const unlisteners: Array<() => void> = [];
+
+    const clearConnectWatchdog = () => {
+      clearTimeout(connectWatchdog);
+      connectWatchdog = undefined;
+    };
+
+    const settleConnect = () => {
+      connectSettled = true;
+      clearConnectWatchdog();
+    };
 
     const flushInput = () => {
       if (
         !inputReady ||
         sendingInput ||
         disposed ||
+        connectTimedOut ||
         pendingInput.length === 0
       ) {
         return;
@@ -144,10 +160,23 @@ export function TerminalView({
     void (async () => {
       const [unData, unStatus] = await Promise.all([
         ipc.ssh.onData((e) => {
-          if (e.id === sessionId && !disposed) term.write(decodeBase64(e.data));
+          if (
+            e.id === sessionId &&
+            e.attempt === attempt &&
+            !disposed &&
+            !connectTimedOut
+          ) {
+            term.write(decodeBase64(e.data));
+          }
         }),
         ipc.ssh.onStatus((e) => {
-          if (e.id === sessionId && !disposed) {
+          if (
+            e.id === sessionId &&
+            e.attempt === attempt &&
+            !disposed &&
+            !connectTimedOut
+          ) {
+            if (e.status !== "connecting") settleConnect();
             setStatus(
               sessionId,
               e.status,
@@ -167,9 +196,17 @@ export function TerminalView({
       unlisteners.push(unData, unStatus);
 
       setStatus(sessionId, "connecting");
+      connectWatchdog = setTimeout(() => {
+        if (disposed || connectSettled) return;
+        connectTimedOut = true;
+        pendingInput = "";
+        setStatus(sessionId, "error", t("terminal.connectTimedOut"));
+        void ipc.ssh.disconnect(sessionId).catch(() => {});
+      }, CONNECT_WATCHDOG_MS);
       try {
         await ipc.ssh.connect({
           sessionId,
+          attempt,
           hostId,
           cols: term.cols,
           rows: term.rows,
@@ -177,8 +214,9 @@ export function TerminalView({
         inputReady = true;
         flushInput();
       } catch (err) {
+        settleConnect();
         pendingInput = "";
-        if (!disposed) {
+        if (!disposed && !connectTimedOut) {
           setStatus(
             sessionId,
             "error",
@@ -235,6 +273,7 @@ export function TerminalView({
     return () => {
       disposed = true;
       pendingInput = "";
+      clearConnectWatchdog();
       clearTimeout(colsTimer);
       observer.disconnect();
       dataSub.dispose();

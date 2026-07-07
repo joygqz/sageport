@@ -102,6 +102,8 @@ export const en = {
       "This host is missing sign-in credentials. Add a username and password, or link a saved identity, in host settings.",
     authFailed:
       "The server rejected these credentials. Check the username, password, or key for this host.",
+    connectTimedOut:
+      "The connection did not finish in time. Check the network, firewall, SSH service, or server login policy.",
     closed: "Session ended",
     reconnect: "Reconnect",
     status: {

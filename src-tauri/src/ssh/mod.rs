@@ -65,6 +65,7 @@ pub enum AuthMethod {
 #[derive(Debug, Clone)]
 pub struct ConnectParams {
     pub session_id: String,
+    pub attempt: u32,
     pub host: String,
     pub port: u16,
     pub username: String,
@@ -81,6 +82,7 @@ enum SessionCommand {
 
 struct SessionHandle {
     tx: Sender<SessionCommand>,
+    attempt: u32,
 }
 
 #[derive(Default)]
@@ -142,6 +144,7 @@ impl OutputQueue {
 #[serde(rename_all = "camelCase")]
 struct DataEvent {
     id: String,
+    attempt: u32,
     /// Base64-encoded raw bytes (terminal output may be binary).
     data: String,
 }
@@ -150,6 +153,7 @@ struct DataEvent {
 #[serde(rename_all = "camelCase")]
 struct StatusEvent {
     id: String,
+    attempt: u32,
     /// "connecting" | "connected" | "closed" | "error"
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -176,34 +180,56 @@ impl SessionManager {
     /// progress is reported through `ssh://status` events.
     pub fn connect(&self, app: AppHandle, params: ConnectParams) -> AppResult<()> {
         let id = params.session_id.clone();
+        let attempt = params.attempt;
         let (tx, rx) = mpsc::channel::<SessionCommand>();
 
-        {
+        let old_session = {
             let mut sessions = self.sessions.lock();
-            if sessions.contains_key(&id) {
-                // A live session already exists for this id (e.g. React
-                // StrictMode re-invoked `connect`). Ignore the duplicate:
+            if sessions
+                .get(&id)
+                .is_some_and(|handle| handle.attempt == attempt)
+            {
+                // A live session already exists for this id+attempt (e.g.
+                // React StrictMode re-invoked `connect`). Ignore the duplicate:
                 // spawning a second thread would orphan the first, which then
                 // emits a spurious "closed" for the shared id and stomps the
                 // tab's status back to a disconnected state.
                 return Ok(());
             }
-            sessions.insert(id.clone(), SessionHandle { tx });
+            sessions.insert(id.clone(), SessionHandle { tx, attempt })
+        };
+        if let Some(handle) = old_session {
+            let _ = handle.tx.send(SessionCommand::Close);
         }
 
         let sessions = self.sessions.clone();
         let thread_id = id.clone();
+        let thread_attempt = attempt;
         let spawn = std::thread::Builder::new()
             .name(format!("ssh-{id}"))
             .spawn(move || {
                 run_session(app, params, rx);
                 // Drop our handle on exit so the map only ever holds live
-                // sessions and a later reconnect with this id is not blocked.
-                sessions.lock().remove(&thread_id);
+                // sessions. Only the thread that owns the current attempt may
+                // remove it; an older timed-out attempt can finish late after a
+                // reconnect has already installed a replacement handle.
+                let mut sessions = sessions.lock();
+                if sessions
+                    .get(&thread_id)
+                    .is_some_and(|handle| handle.attempt == thread_attempt)
+                {
+                    sessions.remove(&thread_id);
+                }
             });
 
         if let Err(e) = spawn {
-            self.sessions.lock().remove(&id);
+            let mut sessions = self.sessions.lock();
+            if sessions
+                .get(&id)
+                .is_some_and(|handle| handle.attempt == attempt)
+            {
+                sessions.remove(&id);
+            }
             return Err(AppError::Io(e));
         }
 
@@ -237,11 +263,12 @@ impl SessionManager {
     }
 }
 
-fn emit_status(app: &AppHandle, id: &str, status: &str) {
+fn emit_status(app: &AppHandle, id: &str, attempt: u32, status: &str) {
     let _ = app.emit(
         EVENT_STATUS,
         StatusEvent {
             id: id.to_string(),
+            attempt,
             status: status.to_string(),
             message: None,
             code: None,
@@ -249,11 +276,12 @@ fn emit_status(app: &AppHandle, id: &str, status: &str) {
     );
 }
 
-fn emit_error_status(app: &AppHandle, id: &str, err: &AppError) {
+fn emit_error_status(app: &AppHandle, id: &str, attempt: u32, err: &AppError) {
     let _ = app.emit(
         EVENT_STATUS,
         StatusEvent {
             id: id.to_string(),
+            attempt,
             status: "error".to_string(),
             message: Some(err.to_string()),
             code: Some(err.code().to_string()),
@@ -264,12 +292,13 @@ fn emit_error_status(app: &AppHandle, id: &str, err: &AppError) {
 /// Blocking session lifecycle, run on a dedicated thread.
 fn run_session(app: AppHandle, params: ConnectParams, rx: Receiver<SessionCommand>) {
     let id = params.session_id.clone();
-    emit_status(&app, &id, "connecting");
+    let attempt = params.attempt;
+    emit_status(&app, &id, attempt, "connecting");
 
     if let Err(e) = run_session_inner(&app, &params, rx) {
-        emit_error_status(&app, &id, &e);
+        emit_error_status(&app, &id, attempt, &e);
     } else {
-        emit_status(&app, &id, "closed");
+        emit_status(&app, &id, attempt, "closed");
     }
 }
 
@@ -334,6 +363,7 @@ fn run_session_inner(
     rx: Receiver<SessionCommand>,
 ) -> AppResult<()> {
     let id = &params.session_id;
+    let attempt = params.attempt;
 
     let tcp = connect_tcp(&params.host, params.port)?;
     let mut session = ssh2::Session::new()?;
@@ -352,7 +382,7 @@ fn run_session_inner(
     )?;
     channel.shell()?;
 
-    emit_status(app, id, "connected");
+    emit_status(app, id, attempt, "connected");
 
     // Ask libssh2 to keep the connection alive so idle sessions are not
     // dropped by the server or an intervening NAT/firewall. `want_reply =
@@ -423,6 +453,7 @@ fn run_session_inner(
                             EVENT_DATA,
                             DataEvent {
                                 id: id.clone(),
+                                attempt,
                                 data: STANDARD.encode(&read_buf[..n]),
                             },
                         );

@@ -23,6 +23,7 @@ pub async fn ssh_connect(
     app: AppHandle,
     state: State<'_, AppState>,
     session_id: String,
+    attempt: u32,
     host_id: String,
     cols: u32,
     rows: u32,
@@ -32,6 +33,7 @@ pub async fn ssh_connect(
 
     let params = ConnectParams {
         session_id,
+        attempt,
         host: host.address.clone(),
         port: valid_port(host.port)?,
         username,
