@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a defect in Sageport
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Sageport version
+      placeholder: 0.4.3
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: Describe the defect and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect to a host
+        2. Open the SFTP panel
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots

@@ -1,6 +1,6 @@
-# 同步 OAuth 应用注册指南
+# Sync OAuth app registration guide
 
-同步功能里 GitHub Gist、Google Drive、Microsoft OneDrive 三个提供方使用浏览器授权登录，不需要用户手动粘贴令牌。桌面应用无法内置共享密钥，因此**每个分发者需要自行注册（免费的）OAuth 应用**，并在编译时通过环境变量注入 Client ID：
+The GitHub Gist, Google Drive, and Microsoft OneDrive sync providers sign in through the browser, so users never paste tokens by hand. A desktop app cannot ship a shared secret, which means **every distributor must register their own (free) OAuth apps** and inject the client IDs at compile time through environment variables:
 
 ```bash
 export SAGEPORT_GITHUB_CLIENT_ID="Iv1.xxxxxxxx"
@@ -11,41 +11,41 @@ export SAGEPORT_MS_CLIENT_ID="00000000-0000-0000-0000-000000000000"
 pnpm tauri build
 ```
 
-未注入某个提供方的 Client ID 时，应用会正常构建运行，只是该提供方的登录按钮显示为不可用，并提示查看本文档。
+If a provider's client ID is missing, the app still builds and runs normally; that provider's sign-in button is simply disabled with a pointer to this document.
 
-## GitHub（Device Flow）
+## GitHub (device flow)
 
-1. 打开 <https://github.com/settings/developers> → **New OAuth App**（个人账户即可）。
-2. 任意填写名称/主页；**Authorization callback URL** 填 `http://127.0.0.1`（Device Flow 不使用回调，但该字段必填）。
-3. 创建后进入应用设置，勾选 **Enable Device Flow**。
-4. 复制 **Client ID** 到 `SAGEPORT_GITHUB_CLIENT_ID`。**不需要** Client Secret。
+1. Open <https://github.com/settings/developers> → **New OAuth App** (a personal account is fine).
+2. Fill in any name and homepage; set **Authorization callback URL** to `http://127.0.0.1` (device flow never uses the callback, but the field is required).
+3. After creating the app, open its settings and check **Enable Device Flow**.
+4. Copy the **Client ID** into `SAGEPORT_GITHUB_CLIENT_ID`. No client secret is needed.
 
-授权时应用向用户展示一次性代码，用户在 <https://github.com/login/device> 输入即可。授权范围仅 `gist`。
+During authorization the app shows a one-time code that the user enters at <https://github.com/login/device>. The only requested scope is `gist`.
 
-## Google（Desktop App + PKCE）
+## Google (desktop app + PKCE)
 
-1. 打开 <https://console.cloud.google.com/> 创建项目，启用 **Google Drive API**。
-2. **APIs & Services → OAuth consent screen**：选择 External，填写基本信息，添加授权范围 `.../auth/drive.appdata` 与 `openid`、`email`。
-   - 应用处于 Testing 状态时，需把使用者的 Google 账号加入 **Test users**（上限 100 人）；对外发布需要通过 Google 审核。
-3. **Credentials → Create Credentials → OAuth client ID**，类型选择 **Desktop app**。
-4. 复制 Client ID / Client Secret 到 `SAGEPORT_GOOGLE_CLIENT_ID` / `SAGEPORT_GOOGLE_CLIENT_SECRET`。
-   - Google 对 Desktop 类型强制发放 Client Secret，但[官方文档明确其不作为机密对待](https://developers.google.com/identity/protocols/oauth2/native-app)，编译进客户端是标准做法。
+1. Open <https://console.cloud.google.com/>, create a project, and enable the **Google Drive API**.
+2. Under **APIs & Services → OAuth consent screen**, choose External, fill in the basics, and add the scopes `.../auth/drive.appdata`, `openid`, and `email`.
+   - While the app is in Testing status, each user's Google account must be added under **Test users** (limit 100); public release requires Google's verification review.
+3. Under **Credentials → Create Credentials → OAuth client ID**, choose the **Desktop app** type.
+4. Copy the client ID and client secret into `SAGEPORT_GOOGLE_CLIENT_ID` / `SAGEPORT_GOOGLE_CLIENT_SECRET`.
+   - Google always issues a client secret for the Desktop type, but the [official docs state it is not treated as confidential](https://developers.google.com/identity/protocols/oauth2/native-app); compiling it into the client is standard practice.
 
-备份存放在 Drive 的 `appDataFolder`（应用专属隐藏空间），应用只能访问自己创建的数据。
+Backups are stored in Drive's `appDataFolder`, a hidden app-scoped space where the app can only access data it created itself.
 
-## Microsoft（公共客户端 + PKCE）
+## Microsoft (public client + PKCE)
 
-1. 打开 <https://entra.microsoft.com/> → **App registrations → New registration**。
-2. **Supported account types** 选择 *Accounts in any organizational directory and personal Microsoft accounts*（覆盖个人版与商业版 OneDrive）。
-3. **Redirect URI** 类型选 **Mobile and desktop applications**，填 `http://localhost`（Entra 对 localhost 允许任意端口）。
-4. **Authentication** 页确认 *Allow public client flows* 为 **Yes**。
-5. **API permissions** 添加 Microsoft Graph 委托权限：`Files.ReadWrite.AppFolder`、`User.Read`、`offline_access`。
-6. 复制 **Application (client) ID** 到 `SAGEPORT_MS_CLIENT_ID`。**不需要** Client Secret。
+1. Open <https://entra.microsoft.com/> → **App registrations → New registration**.
+2. For **Supported account types**, choose *Accounts in any organizational directory and personal Microsoft accounts* (covers both personal and business OneDrive).
+3. For **Redirect URI**, choose the **Mobile and desktop applications** type and enter `http://localhost` (Entra accepts any port on localhost).
+4. On the **Authentication** page, confirm *Allow public client flows* is **Yes**.
+5. Under **API permissions**, add the Microsoft Graph delegated permissions `Files.ReadWrite.AppFolder`, `User.Read`, and `offline_access`.
+6. Copy the **Application (client) ID** into `SAGEPORT_MS_CLIENT_ID`. No client secret is needed.
 
-备份存放在用户 OneDrive 的 `应用/Sageport` 文件夹（Graph `special/approot`）。
+Backups are stored in the user's OneDrive under `Apps/Sageport` (Graph `special/approot`).
 
-## 安全说明
+## Security notes
 
-- 所有备份先在本地用用户口令做 Argon2id + AES-256-GCM 端到端加密，云端只见密文。
-- OAuth 令牌只保存在本机数据库，且属于 `sync.*` 设置前缀，永远不会随备份上传（见 `src-tauri/src/sync/mod.rs` 的 `EXCLUDED_SETTINGS_PREFIXES`）。
-- Google/Microsoft 使用系统浏览器 + 回环端口 + PKCE（RFC 8252 推荐的原生应用授权方式）；GitHub 使用 Device Flow。授权码交换均在 Rust 进程内完成，令牌不经过 WebView。
+- Every backup is end-to-end encrypted locally with the user's passphrase (Argon2id + AES-256-GCM) before upload; the cloud only ever sees ciphertext.
+- OAuth tokens live only in the local database under the `sync.*` settings prefix and are never included in backups (see `EXCLUDED_SETTINGS_PREFIXES` in `src-tauri/src/sync/mod.rs`).
+- Google and Microsoft use the system browser with a loopback port and PKCE (the RFC 8252 recommendation for native apps); GitHub uses the device flow. Authorization-code exchanges happen entirely in the Rust process, so tokens never pass through the WebView.
