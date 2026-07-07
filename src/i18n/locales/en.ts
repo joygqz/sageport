@@ -366,6 +366,18 @@ export const en = {
     transferError: "Failed to start transfer",
     transferFailed: "Transfer failed",
     toggleHidden: "Show hidden files",
+    permissions: {
+      action: "Permissions",
+      title: "Permissions for {name}",
+      owner: "Owner",
+      group: "Group",
+      others: "Others",
+      read: "Read",
+      write: "Write",
+      execute: "Execute",
+      octal: "Octal",
+      error: "Failed to change permissions",
+    },
     editor: {
       tooLarge: "File is too large to edit (2 MB max)",
       saveError: "Failed to save file",

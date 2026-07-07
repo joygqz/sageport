@@ -30,6 +30,7 @@ import type { FileEntry } from "@/types/models";
 import { useHosts } from "@/features/hosts/api";
 import { dragState } from "./dnd";
 import { FileList } from "./FileList";
+import { PermissionsDialog } from "./PermissionsDialog";
 import { PromptDialog, type PromptState } from "./PromptDialog";
 import {
   joinPath,
@@ -63,6 +64,10 @@ export function FilePane({ side }: { side: PaneSide }) {
   const tabStripRef = useRef<HTMLDivElement>(null);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [permTarget, setPermTarget] = useState<{
+    tab: SftpTab;
+    entry: FileEntry;
+  } | null>(null);
   const active = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
   const activeReady =
     !!active?.cwd &&
@@ -266,6 +271,7 @@ export function FilePane({ side }: { side: PaneSide }) {
             tab={active}
             onRename={(entry) => onRename(active, entry)}
             onDelete={(entry) => confirmDelete(active, entry)}
+            onPermissions={(entry) => setPermTarget({ tab: active, entry })}
           />
         </>
       ) : (
@@ -308,6 +314,14 @@ export function FilePane({ side }: { side: PaneSide }) {
       <ConfirmDialog
         state={confirmState}
         onClose={() => setConfirmState(null)}
+      />
+      <PermissionsDialog
+        connectionId={permTarget?.tab.connectionId ?? null}
+        entry={permTarget?.entry ?? null}
+        onClose={() => setPermTarget(null)}
+        onSaved={() => {
+          if (permTarget) void refresh(side, permTarget.tab.id);
+        }}
       />
     </div>
   );

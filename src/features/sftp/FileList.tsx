@@ -59,11 +59,13 @@ export function FileList({
   tab,
   onRename,
   onDelete,
+  onPermissions,
 }: {
   side: PaneSide;
   tab: SftpTab;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
+  onPermissions: (entry: FileEntry) => void;
 }) {
   const { t } = useI18n();
   const navigate = useSftpStore((s) => s.navigate);
@@ -228,6 +230,11 @@ export function FileList({
                     <ContextMenuItem onSelect={() => onRename(entry)}>
                       {t("sftp.rename")}
                     </ContextMenuItem>
+                    {entry.permissions !== null && !entry.isSymlink && (
+                      <ContextMenuItem onSelect={() => onPermissions(entry)}>
+                        {t("sftp.permissions.action")}
+                      </ContextMenuItem>
+                    )}
                     <ContextMenuItem
                       destructive
                       onSelect={() => onDelete(entry)}

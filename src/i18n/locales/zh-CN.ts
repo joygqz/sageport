@@ -359,6 +359,18 @@ export const zhCN: Dictionary = {
     transferError: "启动传输失败",
     transferFailed: "传输失败",
     toggleHidden: "显示隐藏文件",
+    permissions: {
+      action: "权限",
+      title: "{name} 的权限",
+      owner: "所有者",
+      group: "群组",
+      others: "其他",
+      read: "读",
+      write: "写",
+      execute: "执行",
+      octal: "八进制",
+      error: "修改权限失败",
+    },
     editor: {
       tooLarge: "文件过大，暂不支持编辑（上限 2 MB）",
       saveError: "保存文件失败",
