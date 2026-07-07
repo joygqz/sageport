@@ -25,6 +25,7 @@ import type {
   SftpStatusEvent,
   Snippet,
   SnippetInput,
+  SshConfigHost,
   SshDataEvent,
   SshKey,
   SshKeyGenerateInput,
@@ -59,6 +60,10 @@ export const ipc = {
     update: (id: string, input: HostInput) =>
       invoke<Host>("hosts_update", { id, input }),
     remove: (id: string) => invoke<void>("hosts_delete", { id }),
+    importPreview: () =>
+      invoke<SshConfigHost[]>("ssh_config_import_preview"),
+    importApply: (hosts: SshConfigHost[]) =>
+      invoke<number>("ssh_config_import_apply", { hosts }),
     checkHealth: (
       hostIds?: string[],
       onResult?: (result: HostHealthCheck) => void,

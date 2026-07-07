@@ -7,6 +7,7 @@ pub mod settings;
 pub mod sftp;
 pub mod snippets;
 pub mod ssh;
+pub mod ssh_config;
 pub mod sync;
 pub mod update;
 pub mod window;

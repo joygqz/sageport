@@ -121,6 +121,23 @@ export const en = {
     newHost: "New host",
     newGroup: "New group",
     noMatches: "No matching hosts",
+    import: {
+      action: "Import from SSH config",
+      title: "Import from SSH config",
+      description:
+        "These hosts were found in ~/.ssh/config. Choose which to add.",
+      empty: "No importable hosts found in ~/.ssh/config.",
+      selectAll: "Select all",
+      column: {
+        alias: "Alias",
+        address: "Address",
+        user: "User",
+      },
+      viaJump: "via {jump}",
+      submit: "Import {count}",
+      success: "Imported {count} hosts",
+      error: "Could not import from SSH config",
+    },
     empty: {
       title: "No hosts yet",
       description: "Add a host to start a terminal session.",

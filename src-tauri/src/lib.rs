@@ -76,6 +76,8 @@ pub fn run() {
             commands::ssh::ssh_resize,
             commands::ssh::ssh_disconnect,
             commands::ssh::ssh_host_key_respond,
+            commands::ssh_config::ssh_config_import_preview,
+            commands::ssh_config::ssh_config_import_apply,
             commands::sftp::fs_connect,
             commands::sftp::fs_disconnect,
             commands::sftp::fs_home,

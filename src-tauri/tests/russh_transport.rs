@@ -80,10 +80,7 @@ struct AcceptAllClient;
 
 impl client::Handler for AcceptAllClient {
     type Error = russh::Error;
-    async fn check_server_key(
-        &mut self,
-        _key: &ssh_key::PublicKey,
-    ) -> Result<bool, Self::Error> {
+    async fn check_server_key(&mut self, _key: &ssh_key::PublicKey) -> Result<bool, Self::Error> {
         Ok(true)
     }
 }
@@ -122,7 +119,10 @@ async fn password_auth_shell_echo_and_exec_roundtrip() {
         .authenticate_password(USER, PASSWORD)
         .await
         .expect("auth call");
-    assert!(matches!(result, AuthResult::Success), "password auth failed");
+    assert!(
+        matches!(result, AuthResult::Success),
+        "password auth failed"
+    );
 
     let mut channel = handle.channel_open_session().await.expect("open session");
     channel

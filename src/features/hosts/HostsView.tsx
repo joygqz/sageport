@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  FileInput,
   FolderPlus,
   FolderSync,
   Pencil,
@@ -41,6 +42,7 @@ import {
   useGroups,
   useHosts,
 } from "./api";
+import { SshConfigImportDialog } from "./SshConfigImportDialog";
 
 const UNGROUPED = "__ungrouped__";
 const HEALTH_REASON_KEYS = {
@@ -72,6 +74,7 @@ export function HostsView() {
   const healthRequestSeq = useRef(0);
   const latestHealthRequest = useRef<Record<string, number>>({});
   const [checkingAll, setCheckingAll] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const searching = query.trim().length > 0;
@@ -245,6 +248,16 @@ export function HostsView() {
               />
             </Button>
           </Tooltip>
+          <Tooltip content={t("hosts.import.action")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              onClick={() => setImportOpen(true)}
+            >
+              <FileInput className="size-4" />
+            </Button>
+          </Tooltip>
           <Tooltip content={t("hosts.newHost")}>
             <Button
               size="icon"
@@ -324,6 +337,10 @@ export function HostsView() {
       <ConfirmDialog
         state={confirmState}
         onClose={() => setConfirmState(null)}
+      />
+      <SshConfigImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
       />
     </SideBarView>
   );

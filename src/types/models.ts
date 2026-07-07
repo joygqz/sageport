@@ -34,6 +34,15 @@ export interface Host {
   revision: number;
 }
 
+export interface SshConfigHost {
+  alias: string;
+  hostName: string;
+  user: string | null;
+  port: number;
+  identityFile: string | null;
+  proxyJump: string | null;
+}
+
 export type HostHealthStatus = "online" | "offline";
 export type HostHealthErrorKind =
   "timeout" | "refused" | "dns" | "invalidPort" | "network" | "unknown";

@@ -122,6 +122,22 @@ export const zhCN: Dictionary = {
     newHost: "新建主机",
     newGroup: "新建分组",
     noMatches: "没有匹配的主机",
+    import: {
+      action: "从 SSH 配置导入",
+      title: "从 SSH 配置导入",
+      description: "在 ~/.ssh/config 中发现以下主机，请选择要添加的项。",
+      empty: "~/.ssh/config 中没有可导入的主机。",
+      selectAll: "全选",
+      column: {
+        alias: "别名",
+        address: "地址",
+        user: "用户",
+      },
+      viaJump: "经由 {jump}",
+      submit: "导入 {count} 项",
+      success: "已导入 {count} 台主机",
+      error: "从 SSH 配置导入失败",
+    },
     empty: {
       title: "暂无主机",
       description: "添加主机后即可开始终端会话。",
