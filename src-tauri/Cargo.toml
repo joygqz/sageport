@@ -43,7 +43,8 @@ argon2 = "0.5"
 rand = "0.8"
 base64 = "0.22"
 
-ssh2 = { version = "0.9", features = ["vendored-openssl"] }
+russh = "0.62.2"
+russh-sftp = "2.3.0"
 
 ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "ecdsa", "p256", "p384", "p521", "encryption", "std"] }
 

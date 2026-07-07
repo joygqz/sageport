@@ -1,22 +1,11 @@
-use std::sync::Arc;
-
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
 use crate::error::{AppError, AppResult};
 use crate::repository::host_repo;
 use crate::repository::transfer_repo::{self, TransferRow};
-use crate::sftp::{self, Endpoint, FileEntry, SftpConnectParams, SftpManager};
+use crate::sftp::{self, ops, Endpoint, FileEntry, SftpConnectParams};
 use crate::state::AppState;
-
-fn valid_port(port: i64) -> AppResult<u16> {
-    let port = u16::try_from(port)
-        .map_err(|_| AppError::Invalid("port must be between 1 and 65535".into()))?;
-    if port == 0 {
-        return Err(AppError::Invalid("port must be between 1 and 65535".into()));
-    }
-    Ok(port)
-}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,30 +60,33 @@ impl From<TransferRow> for TransferHistoryEntry {
 }
 
 #[tauri::command]
-pub async fn sftp_connect(
+pub async fn fs_connect(
     app: AppHandle,
     state: State<'_, AppState>,
     connection_id: String,
     host_id: String,
 ) -> AppResult<()> {
     let host = host_repo::get(&state.db, &host_id).await?;
-    let (username, auth) = super::ssh::resolve_credentials(&state, &host).await?;
+    let hops = super::ssh::build_hops(&state, &host).await?;
 
-    let params = SftpConnectParams {
-        connection_id,
-        host: host.address.clone(),
-        port: valid_port(host.port)?,
-        username,
-        auth,
-    };
-
-    state.sftp.connect(app, params)?;
+    state.sftp.connect(
+        app,
+        state.host_key_prompts.clone(),
+        SftpConnectParams {
+            connection_id,
+            hops,
+        },
+    );
     Ok(())
 }
 
 #[tauri::command]
-pub async fn sftp_disconnect(state: State<'_, AppState>, connection_id: String) -> AppResult<()> {
-    state.sftp.disconnect(&connection_id);
+pub async fn fs_disconnect(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    connection_id: String,
+) -> AppResult<()> {
+    state.sftp.disconnect(&app, &connection_id);
     Ok(())
 }
 
@@ -112,7 +104,7 @@ pub async fn fs_home(
                 .map_err(|e| AppError::Other(format!("home dir unavailable: {e}")))?;
             Ok(home.to_string_lossy().into_owned())
         }
-        Some(id) => blocking(state.sftp.clone(), move |mgr| mgr.realpath(&id, ".")).await,
+        Some(id) => state.sftp.realpath(&id, ".").await,
     }
 }
 
@@ -123,8 +115,8 @@ pub async fn fs_list(
     path: String,
 ) -> AppResult<Vec<FileEntry>> {
     match connection_id {
-        None => blocking_local(move || sftp::local_list(&path)).await,
-        Some(id) => blocking(state.sftp.clone(), move |mgr| mgr.list(&id, &path)).await,
+        None => local(move || ops::local_list(&path)).await,
+        Some(id) => state.sftp.list(&id, &path).await,
     }
 }
 
@@ -135,8 +127,8 @@ pub async fn fs_mkdir(
     path: String,
 ) -> AppResult<()> {
     match connection_id {
-        None => blocking_local(move || Ok(std::fs::create_dir(&path)?)).await,
-        Some(id) => blocking(state.sftp.clone(), move |mgr| mgr.mkdir(&id, &path)).await,
+        None => local(move || Ok(std::fs::create_dir(&path)?)).await,
+        Some(id) => state.sftp.mkdir(&id, &path).await,
     }
 }
 
@@ -148,8 +140,8 @@ pub async fn fs_rename(
     to: String,
 ) -> AppResult<()> {
     match connection_id {
-        None => blocking_local(move || Ok(std::fs::rename(&from, &to)?)).await,
-        Some(id) => blocking(state.sftp.clone(), move |mgr| mgr.rename(&id, &from, &to)).await,
+        None => local(move || Ok(std::fs::rename(&from, &to)?)).await,
+        Some(id) => state.sftp.rename(&id, &from, &to).await,
     }
 }
 
@@ -162,7 +154,7 @@ pub async fn fs_delete(
 ) -> AppResult<()> {
     match connection_id {
         None => {
-            blocking_local(move || {
+            local(move || {
                 if is_dir {
                     std::fs::remove_dir_all(&path)?;
                 } else {
@@ -172,12 +164,20 @@ pub async fn fs_delete(
             })
             .await
         }
-        Some(id) => {
-            blocking(state.sftp.clone(), move |mgr| {
-                mgr.remove(&id, &path, is_dir)
-            })
-            .await
-        }
+        Some(id) => state.sftp.remove(&id, &path, is_dir).await,
+    }
+}
+
+#[tauri::command]
+pub async fn fs_chmod(
+    state: State<'_, AppState>,
+    connection_id: Option<String>,
+    path: String,
+    mode: u32,
+) -> AppResult<()> {
+    match connection_id {
+        None => local(move || ops::local_chmod(&path, mode)).await,
+        Some(id) => state.sftp.chmod(&id, &path, mode).await,
     }
 }
 
@@ -189,7 +189,7 @@ pub async fn fs_read_text(
 ) -> AppResult<String> {
     let bytes = match connection_id {
         None => {
-            blocking_local(move || {
+            local(move || {
                 if std::fs::metadata(&path)?.len() > sftp::MAX_EDIT_BYTES {
                     return Err(sftp::edit_too_large_error());
                 }
@@ -197,7 +197,7 @@ pub async fn fs_read_text(
             })
             .await?
         }
-        Some(id) => blocking(state.sftp.clone(), move |mgr| mgr.read_file(&id, &path)).await?,
+        Some(id) => state.sftp.read_file(&id, &path).await?,
     };
     String::from_utf8(bytes).map_err(|_| AppError::Invalid("file is not UTF-8 text".into()))
 }
@@ -210,13 +210,8 @@ pub async fn fs_write_text(
     content: String,
 ) -> AppResult<()> {
     match connection_id {
-        None => blocking_local(move || Ok(std::fs::write(&path, content)?)).await,
-        Some(id) => {
-            blocking(state.sftp.clone(), move |mgr| {
-                mgr.write_file(&id, &path, content.into_bytes())
-            })
-            .await
-        }
+        None => local(move || Ok(std::fs::write(&path, content)?)).await,
+        Some(id) => state.sftp.write_file(&id, &path, content.as_bytes()).await,
     }
 }
 
@@ -245,49 +240,20 @@ pub async fn fs_transfer(
     .await?;
 
     let cancel = mgr.register_transfer(&transfer_id);
-    let cleanup_mgr = mgr.clone();
-    let cleanup_pool = pool.clone();
-    let cleanup_transfer_id = transfer_id.clone();
-    let thread_transfer_id = transfer_id.clone();
-    let spawn = std::thread::Builder::new()
-        .name(format!("sftp-xfer-{transfer_id}"))
-        .spawn(move || {
-            let outcome = sftp::transfer(
-                &app,
-                &mgr,
-                &thread_transfer_id,
-                &source,
-                &dest,
-                compress,
-                cancel,
-            );
-            mgr.unregister_transfer(&thread_transfer_id);
-            tauri::async_runtime::block_on(async {
-                let _ = transfer_repo::finish(
-                    &pool,
-                    &thread_transfer_id,
-                    outcome.transferred,
-                    outcome.total,
-                    outcome.status,
-                    outcome.message.as_deref(),
-                )
-                .await;
-            });
-        });
-    if let Err(err) = spawn {
-        cleanup_mgr.unregister_transfer(&cleanup_transfer_id);
-        let message = err.to_string();
+    tokio::spawn(async move {
+        let outcome =
+            sftp::transfer(&app, &mgr, &transfer_id, &source, &dest, compress, cancel).await;
+        mgr.unregister_transfer(&transfer_id);
         let _ = transfer_repo::finish(
-            &cleanup_pool,
-            &cleanup_transfer_id,
-            0,
-            0,
-            "error",
-            Some(&message),
+            &pool,
+            &transfer_id,
+            outcome.transferred,
+            outcome.total,
+            outcome.status,
+            outcome.message.as_deref(),
         )
         .await;
-        return Err(AppError::Io(err));
-    }
+    });
     Ok(())
 }
 
@@ -298,7 +264,7 @@ pub async fn fs_transfer_cancel(state: State<'_, AppState>, transfer_id: String)
 }
 
 #[tauri::command]
-pub async fn sftp_transfer_history_list(
+pub async fn fs_history_list(
     state: State<'_, AppState>,
     limit: Option<i64>,
 ) -> AppResult<Vec<TransferHistoryEntry>> {
@@ -307,26 +273,16 @@ pub async fn sftp_transfer_history_list(
 }
 
 #[tauri::command]
-pub async fn sftp_transfer_history_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
+pub async fn fs_history_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
     transfer_repo::delete(&state.db, &id).await
 }
 
 #[tauri::command]
-pub async fn sftp_transfer_history_clear(state: State<'_, AppState>) -> AppResult<()> {
+pub async fn fs_history_clear(state: State<'_, AppState>) -> AppResult<()> {
     transfer_repo::clear(&state.db).await
 }
 
-async fn blocking<T, F>(mgr: Arc<SftpManager>, f: F) -> AppResult<T>
-where
-    T: Send + 'static,
-    F: FnOnce(&SftpManager) -> AppResult<T> + Send + 'static,
-{
-    tauri::async_runtime::spawn_blocking(move || f(&mgr))
-        .await
-        .map_err(|e| AppError::Other(format!("task join error: {e}")))?
-}
-
-async fn blocking_local<T, F>(f: F) -> AppResult<T>
+async fn local<T, F>(f: F) -> AppResult<T>
 where
     T: Send + 'static,
     F: FnOnce() -> AppResult<T> + Send + 'static,

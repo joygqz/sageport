@@ -1,9 +1,13 @@
+use std::collections::HashSet;
+
 use tauri::{AppHandle, State};
 
 use crate::domain::{auth, Host};
 use crate::error::{AppError, AppResult};
 use crate::repository::{host_repo, identity_repo, key_repo};
-use crate::ssh::{AuthMethod, ConnectParams};
+use crate::ssh::{
+    resolve_host_key, AuthMethod, ConnectParams, Hop, HostKeyDecision, JUMP_DEPTH_LIMIT,
+};
 use crate::state::AppState;
 
 fn valid_port(port: i64) -> AppResult<u16> {
@@ -26,20 +30,20 @@ pub async fn ssh_connect(
     rows: u32,
 ) -> AppResult<()> {
     let host = host_repo::get(&state.db, &host_id).await?;
-    let (username, auth) = resolve_credentials(&state, &host).await?;
+    let hops = build_hops(&state, &host).await?;
 
     let params = ConnectParams {
         session_id,
         attempt,
-        host: host.address.clone(),
-        port: valid_port(host.port)?,
-        username,
-        auth,
+        hops,
         cols,
         rows,
+        startup_command: host.startup_command.clone(),
     };
 
-    state.ssh.connect(app, params)?;
+    state
+        .ssh
+        .connect(app, state.host_key_prompts.clone(), params);
     host_repo::touch_last_used(&state.db, &host_id).await?;
     Ok(())
 }
@@ -66,6 +70,49 @@ pub async fn ssh_resize(
 #[tauri::command]
 pub async fn ssh_disconnect(state: State<'_, AppState>, session_id: String) -> AppResult<()> {
     state.ssh.close(&session_id)
+}
+
+#[tauri::command]
+pub async fn ssh_host_key_respond(
+    state: State<'_, AppState>,
+    prompt_id: String,
+    decision: String,
+) -> AppResult<()> {
+    let decision = match decision.as_str() {
+        "reject" => HostKeyDecision::Reject,
+        "once" => HostKeyDecision::AcceptOnce,
+        "remember" => HostKeyDecision::AcceptRemember,
+        other => return Err(AppError::Invalid(format!("unknown decision: {other}"))),
+    };
+    resolve_host_key(&state.host_key_prompts, &prompt_id, decision);
+    Ok(())
+}
+
+pub(crate) async fn build_hops(state: &State<'_, AppState>, host: &Host) -> AppResult<Vec<Hop>> {
+    let mut chain = Vec::new();
+    let mut visited = HashSet::new();
+    let mut current = host.clone();
+    loop {
+        if !visited.insert(current.id.clone()) {
+            return Err(AppError::Invalid("the jump host chain has a loop".into()));
+        }
+        let (username, auth) = resolve_credentials(state, &current).await?;
+        chain.push(Hop {
+            host: current.address.clone(),
+            port: valid_port(current.port)?,
+            username,
+            auth,
+        });
+        match current.jump_host_id.clone() {
+            Some(jump_id) => current = host_repo::get(&state.db, &jump_id).await?,
+            None => break,
+        }
+        if chain.len() >= JUMP_DEPTH_LIMIT {
+            return Err(AppError::Invalid("the jump host chain is too deep".into()));
+        }
+    }
+    chain.reverse();
+    Ok(chain)
 }
 
 pub(crate) async fn resolve_credentials(
@@ -112,7 +159,6 @@ pub(crate) async fn resolve_credentials(
                 .ok_or_else(|| AppError::Invalid("no private key stored".into()))?;
             AuthMethod::Key {
                 private_key,
-                public_key: key.public_key,
                 passphrase: key.passphrase.filter(|p| !p.is_empty()),
             }
         }

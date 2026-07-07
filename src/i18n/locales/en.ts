@@ -186,10 +186,30 @@ export const en = {
     sshKey: "SSH key",
     selectKey: "Select a key",
     noKeysHint: "No keys yet. Add one in the Credentials view.",
+    jumpHost: "Jump host",
+    noJumpHost: "Connect directly",
+    jumpHostHint: "Route this connection through a bastion host.",
+    startupCommand: "Startup command",
+    startupCommandPlaceholder: "cd /var/www && tail -f app.log",
+    startupCommandHint: "Runs automatically each time the session opens.",
     notes: "Notes",
     notesPlaceholder: "Optional notes about this host",
     create: "Create host",
     saveError: "Failed to save host",
+  },
+
+  hostKey: {
+    unknownTitle: "Verify host key",
+    changedTitle: "Host key changed",
+    unknownDescription:
+      "You are connecting to {host} for the first time. Confirm its fingerprint before you trust it.",
+    changedDescription:
+      "The host key for {host} does not match the one on record. This can happen after a server rebuild, but it can also signal a man-in-the-middle attack.",
+    keyType: "Key type",
+    fingerprint: "Fingerprint",
+    reject: "Cancel",
+    once: "Connect once",
+    remember: "Trust and remember",
   },
 
   groupForm: {

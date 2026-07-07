@@ -25,6 +25,8 @@ fn normalize(mut input: HostInput) -> AppResult<HostInput> {
     clean_optional(&mut input.os_hint);
     clean_optional(&mut input.color);
     clean_optional(&mut input.notes);
+    clean_optional(&mut input.jump_host_id);
+    clean_optional(&mut input.startup_command);
 
     if input.label.is_empty() {
         return Err(AppError::Invalid("host label is required".into()));
@@ -83,8 +85,8 @@ pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
     sqlx::query(
         "INSERT INTO hosts
            (id, label, address, port, group_id, identity_id, username, auth_type, key_id,
-            os_hint, color, notes, password, created_at, updated_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+            os_hint, color, notes, jump_host_id, startup_command, password, created_at, updated_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
     )
     .bind(&id)
     .bind(&input.label)
@@ -98,6 +100,8 @@ pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
     .bind(&input.os_hint)
     .bind(&input.color)
     .bind(&input.notes)
+    .bind(&input.jump_host_id)
+    .bind(&input.startup_command)
     .bind(none_if_empty(input.password.as_deref()))
     .bind(&ts)
     .bind(&ts)
@@ -114,6 +118,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
         "UPDATE hosts SET
            label = ?, address = ?, port = ?, group_id = ?, identity_id = ?, username = ?,
            auth_type = ?, key_id = ?, os_hint = ?, color = ?, notes = ?,
+           jump_host_id = ?, startup_command = ?,
            updated_at = ?, revision = revision + 1
          WHERE id = ? AND deleted_at IS NULL",
     )
@@ -128,6 +133,8 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
     .bind(&input.os_hint)
     .bind(&input.color)
     .bind(&input.notes)
+    .bind(&input.jump_host_id)
+    .bind(&input.startup_command)
     .bind(&ts)
     .bind(id)
     .execute(pool)

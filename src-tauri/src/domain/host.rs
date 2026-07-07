@@ -19,6 +19,8 @@ pub struct Host {
     pub notes: Option<String>,
 
     pub password: Option<String>,
+    pub jump_host_id: Option<String>,
+    pub startup_command: Option<String>,
     pub last_used_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -49,6 +51,10 @@ pub struct HostInput {
     pub color: Option<String>,
     #[serde(default)]
     pub notes: Option<String>,
+    #[serde(default)]
+    pub jump_host_id: Option<String>,
+    #[serde(default)]
+    pub startup_command: Option<String>,
 
     #[serde(default)]
     pub password: Option<String>,

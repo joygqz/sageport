@@ -1,0 +1,2 @@
+ALTER TABLE hosts ADD COLUMN jump_host_id TEXT REFERENCES hosts (id) ON DELETE SET NULL;
+ALTER TABLE hosts ADD COLUMN startup_command TEXT;

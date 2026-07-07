@@ -17,6 +17,8 @@ import type {
   Host,
   HostHealthCheck,
   HostInput,
+  HostKeyDecision,
+  HostKeyEvent,
   Identity,
   IdentityInput,
   KeyFile,
@@ -117,16 +119,20 @@ export const ipc = {
       invoke<void>("ssh_resize", { sessionId, cols, rows }),
     disconnect: (sessionId: string) =>
       invoke<void>("ssh_disconnect", { sessionId }),
+    respondHostKey: (promptId: string, decision: HostKeyDecision) =>
+      invoke<void>("ssh_host_key_respond", { promptId, decision }),
     onData: (handler: (e: SshDataEvent) => void): Promise<UnlistenFn> =>
       listen<SshDataEvent>("ssh://data", (event) => handler(event.payload)),
     onStatus: (handler: (e: SshStatusEvent) => void): Promise<UnlistenFn> =>
       listen<SshStatusEvent>("ssh://status", (event) => handler(event.payload)),
+    onHostKey: (handler: (e: HostKeyEvent) => void): Promise<UnlistenFn> =>
+      listen<HostKeyEvent>("ssh://host-key", (event) => handler(event.payload)),
   },
   sftp: {
     connect: (connectionId: string, hostId: string) =>
-      invoke<void>("sftp_connect", { connectionId, hostId }),
+      invoke<void>("fs_connect", { connectionId, hostId }),
     disconnect: (connectionId: string) =>
-      invoke<void>("sftp_disconnect", { connectionId }),
+      invoke<void>("fs_disconnect", { connectionId }),
     home: (connectionId: string | null) =>
       invoke<string>("fs_home", { connectionId }),
     list: (connectionId: string | null, path: string) =>
@@ -141,6 +147,8 @@ export const ipc = {
       invoke<string>("fs_read_text", { connectionId, path }),
     writeText: (connectionId: string | null, path: string, content: string) =>
       invoke<void>("fs_write_text", { connectionId, path, content }),
+    chmod: (connectionId: string | null, path: string, mode: number) =>
+      invoke<void>("fs_chmod", { connectionId, path, mode }),
     transfer: (
       transferId: string,
       source: FsEndpoint,
@@ -150,10 +158,9 @@ export const ipc = {
     cancelTransfer: (transferId: string) =>
       invoke<void>("fs_transfer_cancel", { transferId }),
     historyList: (limit?: number) =>
-      invoke<TransferHistoryEntry[]>("sftp_transfer_history_list", { limit }),
-    historyDelete: (id: string) =>
-      invoke<void>("sftp_transfer_history_delete", { id }),
-    historyClear: () => invoke<void>("sftp_transfer_history_clear"),
+      invoke<TransferHistoryEntry[]>("fs_history_list", { limit }),
+    historyDelete: (id: string) => invoke<void>("fs_history_delete", { id }),
+    historyClear: () => invoke<void>("fs_history_clear"),
     onStatus: (handler: (e: SftpStatusEvent) => void): Promise<UnlistenFn> =>
       listen<SftpStatusEvent>("sftp://status", (event) =>
         handler(event.payload),
@@ -258,8 +265,6 @@ export const ipc = {
     check: () => invoke<UpdateStatus>("update_check"),
     install: () => invoke<UpdateStatus>("update_install"),
     onStatus: (handler: (e: UpdateStatus) => void): Promise<UnlistenFn> =>
-      listen<UpdateStatus>("sageport://update-status", (event) =>
-        handler(event.payload),
-      ),
+      listen<UpdateStatus>("update://status", (event) => handler(event.payload)),
   },
 };

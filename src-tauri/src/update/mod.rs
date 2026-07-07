@@ -1,5 +1,4 @@
-use std::sync::Mutex;
-
+use parking_lot::Mutex;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use tauri::{AppHandle, Emitter, Manager};
@@ -9,7 +8,7 @@ use crate::domain::now;
 use crate::repository::settings_repo;
 use crate::state::AppState;
 
-pub const EVENT: &str = "sageport://update-status";
+pub const EVENT: &str = "update://status";
 
 const LAST_CHECKED_AT_KEY: &str = "update.last_checked_at";
 const LAST_KNOWN_VERSION_KEY: &str = "update.last_known_version";
@@ -53,12 +52,12 @@ impl UpdateManager {
     }
 
     pub fn snapshot(&self) -> UpdateStatus {
-        self.status.lock().unwrap().clone()
+        self.status.lock().clone()
     }
 }
 
 fn set_status(app: &AppHandle, mgr: &UpdateManager, status: UpdateStatus) {
-    *mgr.status.lock().unwrap() = status.clone();
+    *mgr.status.lock() = status.clone();
     let _ = app.emit(EVENT, status);
 }
 
@@ -88,12 +87,12 @@ pub async fn check(app: &AppHandle) -> UpdateStatus {
                 version: update.version.clone(),
                 body: update.body.clone(),
             };
-            *state.update.pending.lock().unwrap() = Some(update);
+            *state.update.pending.lock() = Some(update);
             status
         }
         Ok(None) => {
             persist_check(&state.db, None).await;
-            *state.update.pending.lock().unwrap() = None;
+            *state.update.pending.lock() = None;
             UpdateStatus::UpToDate
         }
         Err(e) => UpdateStatus::Error {
@@ -107,7 +106,7 @@ pub async fn check(app: &AppHandle) -> UpdateStatus {
 
 pub async fn install(app: &AppHandle) -> UpdateStatus {
     let state = app.state::<AppState>();
-    let update = state.update.pending.lock().unwrap().clone();
+    let update = state.update.pending.lock().clone();
     let Some(update) = update else {
         let status = UpdateStatus::Error {
             message: "no update available to install".to_string(),

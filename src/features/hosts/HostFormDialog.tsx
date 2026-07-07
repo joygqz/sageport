@@ -17,7 +17,7 @@ import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import type { AuthType, HostInput } from "@/types/models";
 import { useIdentities, useSshKeys } from "@/features/credentials/api";
-import { useCreateHost, useGroups, useUpdateHost } from "./api";
+import { useCreateHost, useGroups, useHosts, useUpdateHost } from "./api";
 
 interface FormValues {
   label: string;
@@ -29,6 +29,8 @@ interface FormValues {
   password: string;
   keyId: string;
   groupId: string;
+  jumpHostId: string;
+  startupCommand: string;
   notes: string;
 }
 
@@ -42,6 +44,8 @@ const emptyValues: FormValues = {
   password: "",
   keyId: "",
   groupId: "",
+  jumpHostId: "",
+  startupCommand: "",
   notes: "",
 };
 
@@ -76,6 +80,7 @@ function HostFormBody({
 }) {
   const { t } = useI18n();
   const { data: groups = [] } = useGroups();
+  const { data: hosts = [] } = useHosts();
   const { data: keys = [], isLoading: keysLoading } = useSshKeys();
   const { data: identities = [], isLoading: identitiesLoading } =
     useIdentities();
@@ -111,6 +116,8 @@ function HostFormBody({
         password: host.password ?? "",
         keyId: host.keyId ?? "",
         groupId: host.groupId ?? "",
+        jumpHostId: host.jumpHostId ?? "",
+        startupCommand: host.startupCommand ?? "",
         notes: host.notes ?? "",
       });
     }
@@ -126,6 +133,8 @@ function HostFormBody({
       address: values.address.trim(),
       port: values.port,
       groupId: values.groupId || null,
+      jumpHostId: values.jumpHostId || null,
+      startupCommand: values.startupCommand.trim() || null,
       notes: values.notes.trim() || null,
     };
 
@@ -295,6 +304,31 @@ function HostFormBody({
           </Select>
         </Field>
       )}
+
+      <Field label={t("hostForm.jumpHost")} hint={t("hostForm.jumpHostHint")}>
+        <Select {...register("jumpHostId")}>
+          <option value="">{t("hostForm.noJumpHost")}</option>
+          {hosts
+            .filter((h) => h.id !== hostId)
+            .map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.label}
+              </option>
+            ))}
+        </Select>
+      </Field>
+
+      <Field
+        label={t("hostForm.startupCommand")}
+        hint={t("hostForm.startupCommandHint")}
+      >
+        <Textarea
+          rows={2}
+          placeholder={t("hostForm.startupCommandPlaceholder")}
+          className="font-mono text-xs"
+          {...register("startupCommand")}
+        />
+      </Field>
 
       <Field label={t("hostForm.notes")}>
         <Textarea

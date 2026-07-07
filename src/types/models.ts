@@ -24,6 +24,8 @@ export interface Host {
   osHint: string | null;
   color: string | null;
   notes: string | null;
+  jumpHostId: string | null;
+  startupCommand: string | null;
   password: string | null;
   lastUsedAt: string | null;
   createdAt: string;
@@ -99,6 +101,8 @@ export interface HostInput {
   osHint?: string | null;
   color?: string | null;
   notes?: string | null;
+  jumpHostId?: string | null;
+  startupCommand?: string | null;
 
   password?: string | null;
 }
@@ -257,6 +261,19 @@ export interface SshDataEvent {
   attempt: number;
 
   data: string;
+}
+
+export type HostKeyStatus = "unknown" | "changed";
+export type HostKeyDecision = "reject" | "once" | "remember";
+
+export interface HostKeyEvent {
+  promptId: string;
+  sessionId: string;
+  host: string;
+  port: number;
+  keyType: string;
+  fingerprint: string;
+  status: HostKeyStatus;
 }
 
 export interface AppError {

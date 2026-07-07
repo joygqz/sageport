@@ -9,7 +9,10 @@ pub enum AppError {
     Migration(#[from] sqlx::migrate::MigrateError),
 
     #[error("ssh error: {0}")]
-    Ssh(#[from] ssh2::Error),
+    Ssh(#[from] russh::Error),
+
+    #[error("sftp error: {0}")]
+    Sftp(#[from] russh_sftp::client::error::Error),
 
     #[error("authentication failed: {0}")]
     Auth(String),
@@ -44,6 +47,7 @@ impl AppError {
         match self {
             AppError::Database(_) | AppError::Migration(_) => "database",
             AppError::Ssh(_) => "ssh",
+            AppError::Sftp(_) => "sftp",
             AppError::Auth(_) => "auth",
             AppError::Io(_) => "io",
             AppError::Serde(_) => "serde",
@@ -55,6 +59,10 @@ impl AppError {
             AppError::Other(_) => "other",
         }
     }
+}
+
+pub fn connection_lost(e: impl std::fmt::Display) -> AppError {
+    AppError::Other(format!("connection lost: {e}"))
 }
 
 impl Serialize for AppError {

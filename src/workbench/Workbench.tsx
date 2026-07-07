@@ -10,6 +10,7 @@ import { GroupFormDialog } from "@/features/hosts/GroupFormDialog";
 import { HostFormDialog } from "@/features/hosts/HostFormDialog";
 import { SftpPanel } from "@/features/sftp/SftpPanel";
 import { bridgeSftpEvents } from "@/features/sftp/store";
+import { HostKeyDialog } from "@/features/terminal/HostKeyDialog";
 import { ActivityBar } from "./ActivityBar";
 import { CommandPalette } from "./CommandPalette";
 import { EditorArea } from "./EditorArea";
@@ -158,6 +159,7 @@ export function Workbench() {
         initialMode={overlay?.type === "palette" ? overlay.mode : "quick"}
         onClose={closeOverlay}
       />
+      <HostKeyDialog />
       <Toaster />
     </div>
   );

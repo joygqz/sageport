@@ -185,10 +185,29 @@ export const zhCN: Dictionary = {
     sshKey: "SSH 密钥",
     selectKey: "选择密钥",
     noKeysHint: "暂无密钥，请先在凭据视图中添加。",
+    jumpHost: "跳板机",
+    noJumpHost: "直接连接",
+    jumpHostHint: "通过一台堡垒机中转此连接。",
+    startupCommand: "启动命令",
+    startupCommandPlaceholder: "cd /var/www && tail -f app.log",
+    startupCommandHint: "每次打开会话时自动执行。",
     notes: "备注",
     notesPlaceholder: "关于此主机的备注，选填",
     create: "创建主机",
     saveError: "保存主机失败",
+  },
+
+  hostKey: {
+    unknownTitle: "验证主机密钥",
+    changedTitle: "主机密钥已变更",
+    unknownDescription: "你是首次连接 {host}。信任之前，请先核对其指纹。",
+    changedDescription:
+      "{host} 的主机密钥与记录不符。这可能是服务器重装所致，但也可能意味着中间人攻击。",
+    keyType: "密钥类型",
+    fingerprint: "指纹",
+    reject: "取消",
+    once: "仅本次连接",
+    remember: "信任并记住",
   },
 
   groupForm: {

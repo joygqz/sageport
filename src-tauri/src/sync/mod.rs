@@ -18,7 +18,7 @@ use crate::domain::{now, Group, Host, Identity, Snippet, SshKey};
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 
-const SNAPSHOT_VERSION: u32 = 4;
+const SNAPSHOT_VERSION: u32 = 5;
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["sync.", "update."];
 
@@ -316,20 +316,24 @@ where
     sqlx::query(
         "INSERT INTO hosts
            (id, label, address, port, group_id, identity_id, username, auth_type, key_id,
-            os_hint, color, notes, password, last_used_at, created_at, updated_at, deleted_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            os_hint, color, notes, jump_host_id, startup_command, password, last_used_at,
+            created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            label = excluded.label, address = excluded.address, port = excluded.port,
            group_id = excluded.group_id, identity_id = excluded.identity_id, username = excluded.username,
            auth_type = excluded.auth_type, key_id = excluded.key_id, os_hint = excluded.os_hint,
-           color = excluded.color, notes = excluded.notes, password = excluded.password,
-           last_used_at = excluded.last_used_at,
+           color = excluded.color, notes = excluded.notes,
+           jump_host_id = excluded.jump_host_id, startup_command = excluded.startup_command,
+           password = excluded.password, last_used_at = excluded.last_used_at,
            updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, revision = excluded.revision
          WHERE excluded.updated_at > hosts.updated_at",
     )
     .bind(&h.id).bind(&h.label).bind(&h.address).bind(h.port).bind(&h.group_id)
     .bind(&h.identity_id).bind(&h.username).bind(&h.auth_type).bind(&h.key_id)
-    .bind(&h.os_hint).bind(&h.color).bind(&h.notes).bind(&h.password).bind(&h.last_used_at)
+    .bind(&h.os_hint).bind(&h.color).bind(&h.notes)
+    .bind(&h.jump_host_id).bind(&h.startup_command)
+    .bind(&h.password).bind(&h.last_used_at)
     .bind(&h.created_at).bind(&h.updated_at).bind(&h.deleted_at).bind(h.revision)
     .execute(executor).await?;
     Ok(())
