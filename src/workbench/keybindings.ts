@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { useBroadcastStore } from "@/features/terminal/broadcast";
 import { useTerminalSearch } from "@/features/terminal/search";
 import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
@@ -29,6 +30,8 @@ export function useKeybindings() {
         run(() => tabs.openSettings());
       } else if (key === "b" && !e.shiftKey) {
         run(() => layout.toggleSidebar());
+      } else if (key === "b" && e.shiftKey) {
+        run(() => useBroadcastStore.getState().toggle());
       } else if (key === "j" && !e.shiftKey) {
         run(() => layout.togglePanel());
       } else if (key === "l" && !e.shiftKey) {

@@ -1,7 +1,8 @@
-import { ArrowUpCircle, Cloud, CloudOff, FolderSync } from "lucide-react";
+import { ArrowUpCircle, Cloud, CloudOff, FolderSync, Radio } from "lucide-react";
 
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { useBroadcastStore } from "@/features/terminal/broadcast";
 import { useSyncStatus } from "@/features/sync/api";
 import { useSftpStore } from "@/features/sftp/store";
 import { useUpdateStatus } from "@/features/updates/api";
@@ -28,6 +29,7 @@ export function StatusBar() {
     <footer className="flex h-6 shrink-0 items-center justify-between border-t border-border bg-surface px-1 text-2xs text-muted-foreground">
       <div className="flex h-full items-center">
         <SessionItem />
+        <BroadcastItem />
         <TransfersItem />
       </div>
       <div className="flex h-full items-center">
@@ -79,6 +81,20 @@ function SessionItem() {
       />
       <span className="max-w-48 truncate">{session.title}</span>
       <span>{t(`terminal.status.${session.status}`)}</span>
+    </StatusBarItem>
+  );
+}
+
+function BroadcastItem() {
+  const { t } = useI18n();
+  const enabled = useBroadcastStore((s) => s.enabled);
+  const toggle = useBroadcastStore((s) => s.toggle);
+  if (!enabled) return null;
+
+  return (
+    <StatusBarItem onClick={toggle} title={t("statusBar.broadcastHint")}>
+      <Radio className="size-3 animate-pulse text-warning" />
+      <span>{t("statusBar.broadcast")}</span>
     </StatusBarItem>
   );
 }

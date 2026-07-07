@@ -12,8 +12,9 @@ import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { errorCode, errorMessage } from "@/lib/toast";
 import { useTheme } from "@/themes/useTheme";
-import { useTabsStore } from "@/workbench/tabs";
+import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 import { terminalFontSize } from "@/workbench/zoom";
+import { useBroadcastStore } from "./broadcast";
 import { registerTerminal, unregisterTerminal } from "./registry";
 import { xtermTheme } from "./xterm-theme";
 
@@ -133,6 +134,13 @@ export function TerminalView({
     const dataSub = term.onData((data) => {
       pendingInput += data;
       flushInput();
+      if (useBroadcastStore.getState().enabled) {
+        for (const other of terminalTabs(useTabsStore.getState().tabs)) {
+          if (other.id !== sessionId && other.status === "connected") {
+            void ipc.ssh.send(other.id, data).catch(() => {});
+          }
+        }
+      }
     });
 
     void (async () => {

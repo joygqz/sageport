@@ -124,6 +124,8 @@ export const en = {
     lastSynced: "Last synced {time}",
     updateAvailable: "Update available",
     updateReady: "Restart to update",
+    broadcast: "Broadcasting input",
+    broadcastHint: "Typing is sent to every connected terminal. Click to stop.",
   },
 
   terminal: {

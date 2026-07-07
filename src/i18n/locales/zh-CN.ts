@@ -125,6 +125,8 @@ export const zhCN: Dictionary = {
     lastSynced: "上次同步于 {time}",
     updateAvailable: "有可用更新",
     updateReady: "重启以更新",
+    broadcast: "正在广播输入",
+    broadcastHint: "输入会发送到每个已连接的终端。点击停止。",
   },
 
   terminal: {
