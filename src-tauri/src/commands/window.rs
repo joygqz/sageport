@@ -1,6 +1,8 @@
 use crate::error::AppResult;
 
+#[cfg(target_os = "macos")]
 const DEFAULT_INSET_X: f64 = 13.0;
+#[cfg(target_os = "macos")]
 const DEFAULT_INSET_HEIGHT: f64 = 33.75;
 
 pub fn preset_traffic_light_inset(window: &tauri::WebviewWindow) {
