@@ -34,6 +34,47 @@ export interface Host {
   revision: number;
 }
 
+export type ForwardKind = "local" | "dynamic";
+
+export interface PortForward {
+  id: string;
+  hostId: string;
+  label: string;
+  kind: ForwardKind;
+  bindHost: string;
+  bindPort: number;
+  targetHost: string | null;
+  targetPort: number | null;
+  autoStart: number;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  revision: number;
+}
+
+export interface PortForwardInput {
+  hostId: string;
+  label: string;
+  kind: ForwardKind;
+  bindHost?: string;
+  bindPort: number;
+  targetHost?: string | null;
+  targetPort?: number | null;
+  autoStart?: boolean;
+}
+
+export type ForwardStatusKind =
+  | "starting"
+  | "active"
+  | "error"
+  | "stopped";
+
+export interface ForwardStatusEvent {
+  forwardId: string;
+  status: ForwardStatusKind;
+  message?: string;
+}
+
 export interface SshConfigHost {
   alias: string;
   hostName: string;

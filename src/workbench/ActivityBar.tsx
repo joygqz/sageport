@@ -1,4 +1,10 @@
-import { KeyRound, Server, Settings, SquareTerminal } from "lucide-react";
+import {
+  KeyRound,
+  Network,
+  Server,
+  Settings,
+  SquareTerminal,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Tooltip } from "@/components/ui";
@@ -11,6 +17,7 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "hosts", icon: Server, labelKey: "activityBar.hosts" },
   { id: "credentials", icon: KeyRound, labelKey: "activityBar.credentials" },
   { id: "snippets", icon: SquareTerminal, labelKey: "activityBar.snippets" },
+  { id: "forwards", icon: Network, labelKey: "activityBar.forwards" },
 ];
 
 export function ActivityBar() {

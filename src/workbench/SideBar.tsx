@@ -1,4 +1,5 @@
 import { CredentialsView } from "@/features/credentials/CredentialsView";
+import { ForwardsView } from "@/features/forwards/ForwardsView";
 import { HostsView } from "@/features/hosts/HostsView";
 import { SnippetsView } from "@/features/snippets/SnippetsView";
 import { useLayoutStore } from "./layout";
@@ -14,6 +15,7 @@ export function SideBar({ width }: { width: number }) {
       {activity === "hosts" && <HostsView />}
       {activity === "credentials" && <CredentialsView />}
       {activity === "snippets" && <SnippetsView />}
+      {activity === "forwards" && <ForwardsView />}
     </aside>
   );
 }

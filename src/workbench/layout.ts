@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 
 import { useZoomStore, zoomFactor } from "./zoom";
 
-export type Activity = "hosts" | "credentials" | "snippets";
+export type Activity = "hosts" | "credentials" | "snippets" | "forwards";
 
 export const SIDEBAR_MIN = 150;
 export const PANEL_MIN = 100;

@@ -2,6 +2,7 @@ pub mod agent;
 pub mod config_file;
 pub mod connect;
 pub mod exec;
+pub mod forward;
 pub mod handler;
 pub mod known_hosts;
 pub mod session;

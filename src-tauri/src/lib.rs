@@ -41,6 +41,11 @@ pub fn run() {
                 update::check(&handle).await;
             });
 
+            let forward_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                commands::forwards::start_auto_forwards(&forward_handle).await;
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -78,6 +83,13 @@ pub fn run() {
             commands::ssh::ssh_host_key_respond,
             commands::ssh_config::ssh_config_import_preview,
             commands::ssh_config::ssh_config_import_apply,
+            commands::forwards::forwards_list,
+            commands::forwards::forwards_active,
+            commands::forwards::forwards_create,
+            commands::forwards::forwards_update,
+            commands::forwards::forwards_delete,
+            commands::forwards::forward_start,
+            commands::forwards::forward_stop,
             commands::sftp::fs_connect,
             commands::sftp::fs_disconnect,
             commands::sftp::fs_home,

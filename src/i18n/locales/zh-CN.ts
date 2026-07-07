@@ -36,7 +36,45 @@ export const zhCN: Dictionary = {
     hosts: "主机",
     credentials: "凭据",
     snippets: "命令片段",
+    forwards: "端口转发",
     settings: "设置",
+  },
+
+  forwards: {
+    viewTitle: "端口转发",
+    new: "新建转发",
+    start: "启动",
+    stop: "停止",
+    startError: "启动转发失败",
+    label: "名称",
+    labelPlaceholder: "数据库隧道",
+    host: "主机",
+    selectHost: "选择主机",
+    bindHost: "本地地址",
+    bindPort: "本地端口",
+    targetHost: "目标主机",
+    targetHostPlaceholder: "localhost",
+    targetPort: "目标端口",
+    autoStart: "启动时自动开启",
+    kind: {
+      local: "本地 (-L)",
+      dynamic: "动态 SOCKS (-D)",
+    },
+    empty: {
+      title: "暂无转发",
+      description: "通过 SSH 把本地端口隧道到远程服务。",
+    },
+    delete: {
+      title: "删除转发",
+      description: "将删除 {name}，且无法撤销。",
+      error: "删除转发失败",
+    },
+    form: {
+      newTitle: "新建端口转发",
+      editTitle: "编辑端口转发",
+      required: "名称和主机为必填项",
+      saveError: "保存转发失败",
+    },
   },
 
   watermark: {

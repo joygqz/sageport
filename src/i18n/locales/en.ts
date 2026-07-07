@@ -34,7 +34,45 @@ export const en = {
     hosts: "Hosts",
     credentials: "Credentials",
     snippets: "Snippets",
+    forwards: "Port forwarding",
     settings: "Settings",
+  },
+
+  forwards: {
+    viewTitle: "Port forwarding",
+    new: "New forward",
+    start: "Start",
+    stop: "Stop",
+    startError: "Failed to start forward",
+    label: "Label",
+    labelPlaceholder: "Database tunnel",
+    host: "Host",
+    selectHost: "Select a host",
+    bindHost: "Local address",
+    bindPort: "Local port",
+    targetHost: "Target host",
+    targetHostPlaceholder: "localhost",
+    targetPort: "Target port",
+    autoStart: "Start automatically on launch",
+    kind: {
+      local: "Local (-L)",
+      dynamic: "Dynamic SOCKS (-D)",
+    },
+    empty: {
+      title: "No forwards yet",
+      description: "Tunnel a local port to a remote service over SSH.",
+    },
+    delete: {
+      title: "Delete forward",
+      description: "This removes {name} and cannot be undone.",
+      error: "Failed to delete forward",
+    },
+    form: {
+      newTitle: "New port forward",
+      editTitle: "Edit port forward",
+      required: "A label and host are required",
+      saveError: "Failed to save forward",
+    },
   },
 
   watermark: {

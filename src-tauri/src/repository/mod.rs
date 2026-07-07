@@ -1,4 +1,5 @@
 pub mod ai_session_repo;
+pub mod forward_repo;
 pub mod group_repo;
 pub mod host_repo;
 pub mod identity_repo;

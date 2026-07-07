@@ -22,6 +22,9 @@ import type {
   Identity,
   IdentityInput,
   KeyFile,
+  PortForward,
+  PortForwardInput,
+  ForwardStatusEvent,
   SftpStatusEvent,
   Snippet,
   SnippetInput,
@@ -260,6 +263,21 @@ export const ipc = {
         invoke<AiSessionSummary>("ai_session_rename", { id, title }),
       remove: (id: string) => invoke<void>("ai_session_delete", { id }),
     },
+  },
+  forwards: {
+    list: () => invoke<PortForward[]>("forwards_list"),
+    active: () => invoke<string[]>("forwards_active"),
+    create: (input: PortForwardInput) =>
+      invoke<PortForward>("forwards_create", { input }),
+    update: (id: string, input: PortForwardInput) =>
+      invoke<PortForward>("forwards_update", { id, input }),
+    remove: (id: string) => invoke<void>("forwards_delete", { id }),
+    start: (id: string) => invoke<void>("forward_start", { id }),
+    stop: (id: string) => invoke<void>("forward_stop", { id }),
+    onStatus: (handler: (e: ForwardStatusEvent) => void): Promise<UnlistenFn> =>
+      listen<ForwardStatusEvent>("forward://status", (event) =>
+        handler(event.payload),
+      ),
   },
   window: {
     setTrafficLightInset: (x: number, height: number) =>

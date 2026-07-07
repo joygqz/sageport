@@ -1,9 +1,11 @@
+mod forward;
 mod group;
 mod host;
 mod identity;
 mod key;
 mod snippet;
 
+pub use forward::*;
 pub use group::*;
 pub use host::*;
 pub use identity::*;

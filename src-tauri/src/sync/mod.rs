@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Executor, Sqlite, SqlitePool};
 
 use crate::crypto::{self, EncryptedEnvelope};
-use crate::domain::{now, Group, Host, Identity, Snippet, SshKey};
+use crate::domain::{now, Group, Host, Identity, PortForward, Snippet, SshKey};
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 
-const SNAPSHOT_VERSION: u32 = 5;
+const SNAPSHOT_VERSION: u32 = 6;
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["sync.", "update."];
 
@@ -42,6 +42,8 @@ pub struct VaultSnapshot {
     pub snippets: Vec<Snippet>,
     #[serde(default)]
     pub settings: Vec<SettingEntry>,
+    #[serde(default)]
+    pub port_forwards: Vec<PortForward>,
 }
 
 impl VaultSnapshot {
@@ -52,7 +54,8 @@ impl VaultSnapshot {
                 + self.identities.len()
                 + self.keys.len()
                 + self.snippets.len()
-                + self.settings.len(),
+                + self.settings.len()
+                + self.port_forwards.len(),
         );
         out.extend(
             self.groups
@@ -84,6 +87,11 @@ impl VaultSnapshot {
                 .iter()
                 .map(|e| format!("e:{}:{}", e.key, e.updated_at)),
         );
+        out.extend(
+            self.port_forwards
+                .iter()
+                .map(|f| format!("f:{}:{}", f.id, f.revision)),
+        );
         out.sort_unstable();
         out
     }
@@ -95,6 +103,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     let identities = fetch_all::<Identity>(pool, "identities").await?;
     let keys = fetch_all::<SshKey>(pool, "keys").await?;
     let snippets = fetch_all::<Snippet>(pool, "snippets").await?;
+    let port_forwards = fetch_all::<PortForward>(pool, "port_forwards").await?;
     let settings = settings_repo::all_excluding_prefixes(pool, EXCLUDED_SETTINGS_PREFIXES)
         .await?
         .into_iter()
@@ -114,6 +123,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
         keys,
         snippets,
         settings,
+        port_forwards,
     })
 }
 
@@ -138,6 +148,9 @@ pub async fn import_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> App
     }
     for s in &snapshot.snippets {
         merge_snippet(&mut *tx, s).await?;
+    }
+    for f in &snapshot.port_forwards {
+        merge_forward(&mut *tx, f).await?;
     }
     for entry in &snapshot.settings {
         merge_setting(&mut *tx, entry).await?;
@@ -179,6 +192,9 @@ pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> Ap
         .execute(&mut *tx)
         .await?;
 
+    sqlx::query("DELETE FROM port_forwards")
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM hosts").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM identities")
         .execute(&mut *tx)
@@ -205,6 +221,9 @@ pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> Ap
     }
     for s in &snapshot.snippets {
         merge_snippet(&mut *tx, s).await?;
+    }
+    for f in &snapshot.port_forwards {
+        merge_forward(&mut *tx, f).await?;
     }
     for entry in &snapshot.settings {
         merge_setting(&mut *tx, entry).await?;
@@ -305,6 +324,30 @@ where
     )
     .bind(&k.id).bind(&k.name).bind(&k.public_key).bind(&k.private_key).bind(&k.passphrase)
     .bind(&k.created_at).bind(&k.updated_at).bind(&k.deleted_at).bind(k.revision)
+    .execute(executor).await?;
+    Ok(())
+}
+
+async fn merge_forward<'e, E>(executor: E, f: &PortForward) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO port_forwards
+           (id, host_id, label, kind, bind_host, bind_port, target_host, target_port,
+            auto_start, created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           host_id = excluded.host_id, label = excluded.label, kind = excluded.kind,
+           bind_host = excluded.bind_host, bind_port = excluded.bind_port,
+           target_host = excluded.target_host, target_port = excluded.target_port,
+           auto_start = excluded.auto_start,
+           updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, revision = excluded.revision
+         WHERE excluded.updated_at > port_forwards.updated_at",
+    )
+    .bind(&f.id).bind(&f.host_id).bind(&f.label).bind(&f.kind)
+    .bind(&f.bind_host).bind(f.bind_port).bind(&f.target_host).bind(f.target_port)
+    .bind(f.auto_start).bind(&f.created_at).bind(&f.updated_at).bind(&f.deleted_at).bind(f.revision)
     .execute(executor).await?;
     Ok(())
 }

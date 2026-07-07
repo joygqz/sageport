@@ -6,6 +6,7 @@ use sqlx::SqlitePool;
 use tokio::sync::oneshot;
 
 use crate::sftp::SftpManager;
+use crate::ssh::forward::ForwardManager;
 use crate::ssh::{new_host_key_prompts, HostKeyPrompts, SessionManager};
 use crate::sync::{oauth::OAuthOutcome, ProviderKind};
 use crate::update::UpdateManager;
@@ -22,6 +23,8 @@ pub struct AppState {
 
     pub sftp: Arc<SftpManager>,
 
+    pub forwards: ForwardManager,
+
     pub host_key_prompts: HostKeyPrompts,
 
     pub update: UpdateManager,
@@ -37,6 +40,7 @@ impl AppState {
             db,
             ssh: SessionManager::new(),
             sftp: Arc::new(SftpManager::new()),
+            forwards: ForwardManager::new(),
             host_key_prompts: new_host_key_prompts(),
             update: UpdateManager::new(),
             ai_cancels: Mutex::new(HashMap::new()),
