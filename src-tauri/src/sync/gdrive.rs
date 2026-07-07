@@ -1,10 +1,3 @@
-//! Google Drive object store.
-//!
-//! Backups live in the app-scoped `appDataFolder` (hidden from the user's
-//! normal Drive view, only reachable with the `drive.appdata` scope). Access
-//! tokens are refreshed transparently; the updated token set surfaces through
-//! [`ObjectStore::config`].
-
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::Value;
@@ -104,9 +97,7 @@ impl ObjectStore for GdriveStore {
 
     async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
         let token = self.token().await?;
-        // Drive's multipart upload is `multipart/related` (metadata part +
-        // content part), which reqwest's form-data helper can't produce —
-        // build the body by hand.
+
         let boundary = "sageport-vault-upload";
         let metadata = serde_json::to_string(
             &serde_json::json!({ "name": name, "parents": ["appDataFolder"] }),

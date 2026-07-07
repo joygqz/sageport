@@ -1,9 +1,3 @@
-/**
- * TypeScript mirror of the Rust domain models (`src-tauri/src/domain`).
- * Kept in sync by hand for now; a future enhancement is generating these from
- * the Rust types (e.g. via `tauri-specta`) to remove the duplication.
- */
-
 export type AuthType = "password" | "key" | "agent";
 
 export interface Group {
@@ -40,12 +34,7 @@ export interface Host {
 
 export type HostHealthStatus = "online" | "offline";
 export type HostHealthErrorKind =
-  | "timeout"
-  | "refused"
-  | "dns"
-  | "invalidPort"
-  | "network"
-  | "unknown";
+  "timeout" | "refused" | "dns" | "invalidPort" | "network" | "unknown";
 
 export interface HostHealthCheck {
   hostId: string;
@@ -92,8 +81,6 @@ export interface Snippet {
   revision: number;
 }
 
-// --- Input payloads (match the Rust *Input structs) ---
-
 export interface GroupInput {
   name: string;
   parentId?: string | null;
@@ -112,7 +99,7 @@ export interface HostInput {
   osHint?: string | null;
   color?: string | null;
   notes?: string | null;
-  /** Stored inline on the host row. */
+
   password?: string | null;
 }
 
@@ -131,7 +118,6 @@ export interface SshKeyInput {
   passphrase?: string | null;
 }
 
-/** Algorithm choice for `keys.generate`. */
 export type SshKeyAlgorithm =
   "ed25519" | "ecdsaP256" | "ecdsaP384" | "ecdsaP521" | "rsa2048" | "rsa4096";
 
@@ -141,13 +127,11 @@ export interface SshKeyGenerateInput {
   passphrase?: string | null;
 }
 
-/** `keys.generate`'s response: the persisted key plus a one-time summary. */
 export interface GeneratedSshKey extends SshKey {
   fingerprint: string;
   algorithm: string;
 }
 
-/** A private key file read via `keys.importFile`, for prefilling the import form. */
 export interface KeyFile {
   name: string;
   privateKey: string;
@@ -162,7 +146,6 @@ export interface SnippetInput {
   description?: string | null;
 }
 
-/** Wire format spoken by the configured AI endpoint. */
 export type AiProtocol = "openai" | "anthropic";
 
 export interface AiConfig {
@@ -172,43 +155,34 @@ export interface AiConfig {
   model: string;
 }
 
-/** Canonical (provider-agnostic) conversation role. */
 export type AiRole = "system" | "user" | "assistant" | "tool";
 
-/** One tool invocation, requested by the model or reported back to it. */
 export interface AiToolCall {
   id: string;
   name: string;
   arguments: unknown;
 }
 
-/**
- * One turn of the canonical conversation sent to `ai_chat`. Never include a
- * `system` message — the backend always supplies its own.
- */
 export interface AiChatMessage {
   role: AiRole;
   content?: string;
-  /** Present on an `assistant` message that requested tool calls. */
+
   toolCalls?: AiToolCall[];
-  /** Present on a `tool` message: which call this answers. */
+
   toolCallId?: string;
 }
 
-/** JSON-Schema description of a tool the frontend can execute. */
 export interface AiToolSpec {
   name: string;
   description: string;
   parameters: unknown;
 }
 
-/** One model turn: a text reply and/or a batch of tool calls to run. */
 export interface AiChatResult {
   content?: string;
   toolCalls?: AiToolCall[];
 }
 
-/** Lightweight view of a saved chat session, for the history list. */
 export interface AiSessionSummary {
   id: string;
   title: string;
@@ -216,53 +190,39 @@ export interface AiSessionSummary {
   updatedAt: string;
 }
 
-/** A saved chat session's full conversation, loaded when opened. */
 export interface AiSession extends AiSessionSummary {
   messages: AiChatMessage[];
 }
 
-/** The five connectable sync backends (one active at a time). */
 export type SyncProviderKind = "gist" | "gdrive" | "onedrive" | "webdav" | "s3";
 
-/** Non-secret view of the sync state (see `sync.status`). */
 export interface SyncStatus {
-  /** Connected provider, or null when sync is not set up. */
   provider: SyncProviderKind | null;
-  /** Human-readable account label (GitHub login, e-mail, username, ...). */
+
   account: string | null;
-  /** Non-secret location detail (gist id, bucket, server URL). */
+
   detail: string | null;
-  /** ISO timestamp of the last successful backup/restore, if any. */
+
   lastSyncedAt: string | null;
-  /** OAuth providers this build carries client ids for. */
+
   oauthReady: { gist: boolean; gdrive: boolean; onedrive: boolean };
 }
 
-/** Result of `sync.connect`: either linked, or blocked on a passphrase that
- * doesn't decrypt the target's existing backup. */
 export type SyncConnectOutcome =
-  | { status: "connected" }
-  | { status: "passphraseMismatch" };
+  { status: "connected" } | { status: "passphraseMismatch" };
 
-/** Result of `sync.push`: either a new backup was written, or local data
- * already matches the latest backup. */
 export type SyncPushOutcome = { status: "pushed" } | { status: "unchanged" };
 
-/** Result of restoring a backup revision. `remoteSynced` is true when the
- * restored revision is also the provider's latest backup; otherwise the next
- * explicit push publishes the rollback. */
 export interface SyncRestoreOutcome {
   remoteSynced: boolean;
 }
 
-/** Progress of an in-flight OAuth flow (streamed from `sync.oauthStart`). */
 export type SyncOAuthEvent =
   | { type: "deviceCode"; userCode: string; verificationUri: string }
   | { type: "browser" };
 
-/** Credential-based provider settings passed to `sync.connect`. */
 export type SyncProviderSettings =
-  | { url: string; username: string; password: string } // webdav
+  | { url: string; username: string; password: string }
   | {
       endpoint: string;
       region: string;
@@ -271,35 +231,31 @@ export type SyncProviderSettings =
       accessKey: string;
       secretKey: string;
       pathStyle: boolean;
-    }; // s3
+    };
 
-/** One historical backup revision (see `sync.listVersions`). */
 export interface SyncVersion {
-  /** Provider-scoped id, fed back into `sync.restoreVersion`. */
   id: string;
   createdAt: string;
   sizeBytes: number | null;
 }
 
-// --- SSH event payloads (emitted from Rust) ---
-
 export type SshStatusKind = "connecting" | "connected" | "closed" | "error";
 
 export interface SshStatusEvent {
   id: string;
-  /** Connection attempt for this tab; filters stale events after reconnect. */
+
   attempt: number;
   status: SshStatusKind;
   message?: string;
-  /** Machine-readable `AppError::code`, set only when `status` is "error". */
+
   code?: string;
 }
 
 export interface SshDataEvent {
   id: string;
-  /** Connection attempt for this tab; filters stale output after reconnect. */
+
   attempt: number;
-  /** Base64-encoded raw terminal bytes. */
+
   data: string;
 }
 
@@ -308,8 +264,6 @@ export interface AppError {
   message: string;
 }
 
-// --- SFTP / filesystem (emitted from / consumed by the Rust SFTP layer) ---
-
 export type FileKind = "file" | "dir" | "symlink";
 
 export interface FileEntry {
@@ -317,9 +271,9 @@ export interface FileEntry {
   path: string;
   kind: FileKind;
   size: number;
-  /** Unix seconds, when known. */
+
   modified: number | null;
-  /** Unix permission bits, when known. */
+
   permissions: number | null;
   isSymlink: boolean;
 }
@@ -330,13 +284,12 @@ export interface SftpStatusEvent {
   connectionId: string;
   status: SftpStatusKind;
   message?: string;
-  /** Machine-readable `AppError::code`, set only when `status` is "error". */
+
   code?: string;
 }
 
 export type TransferStatus = "active" | "done" | "error" | "cancelled";
 
-/** Phase of a compressed transfer; absent for a plain byte-for-byte copy. */
 export type TransferPhase = "compressing" | "transferring" | "extracting";
 
 export interface TransferEvent {
@@ -349,13 +302,11 @@ export interface TransferEvent {
   message?: string;
 }
 
-/** One end of a transfer: `connectionId` null/undefined means the local FS. */
 export interface FsEndpoint {
   connectionId: string | null;
   path: string;
 }
 
-/** A persisted transfer history record ("active" while still in flight). */
 export interface TransferHistoryEntry {
   id: string;
   sourceLabel: string;
@@ -371,10 +322,6 @@ export interface TransferHistoryEntry {
   finishedAt: string | null;
 }
 
-/**
- * Lives in the Rust backend (`update::UpdateManager`), not component state —
- * so it survives the Settings dialog being closed and reopened mid-download.
- */
 export type UpdateStatus =
   | { status: "idle" }
   | { status: "checking" }

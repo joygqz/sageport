@@ -7,18 +7,12 @@ const dictionaries: Record<Locale, Dictionary> = {
   "zh-CN": zhCN,
 };
 
-/**
- * Every dot-separated path that resolves to a string leaf in the dictionary,
- * e.g. `"settings.appearance.language"`. Derived from the English dictionary so
- * keys are checked at compile time and autocompleted in editors.
- */
 export type TKey = LeafPaths<Dictionary>;
 
 type LeafPaths<T> = {
   [K in keyof T & string]: T[K] extends string ? K : `${K}.${LeafPaths<T[K]>}`;
 }[keyof T & string];
 
-/** Interpolation values substituted into `{placeholder}` tokens. */
 export type TParams = Record<string, string | number>;
 
 export type TFunction = (key: TKey, params?: TParams) => string;
@@ -40,11 +34,6 @@ function interpolate(template: string, params?: TParams): string {
   );
 }
 
-/**
- * Framework-agnostic lookup so non-React call sites (window titles, helpers)
- * can translate too. Falls back to the key itself if a string is missing,
- * and to the default locale's dictionary for an unknown locale.
- */
 export function translate(locale: Locale, key: TKey, params?: TParams): string {
   const dict = dictionaries[locale] ?? dictionaries[DEFAULT_LOCALE];
   return interpolate(resolve(dict, key), params);

@@ -1,9 +1,3 @@
-//! Data access for the persisted SFTP transfer history. A row is created when
-//! a transfer starts (`status = "active"`) and finalized once it settles
-//! (`"done"` | `"error"` | `"cancelled"`), so the history reflects transfers
-//! that were in flight when the app quit as still "active" — the frontend
-//! treats those the same as any other terminal state on load.
-
 use sqlx::SqlitePool;
 
 use crate::domain::now;
@@ -25,7 +19,6 @@ pub struct TransferRow {
     pub finished_at: Option<String>,
 }
 
-/// Insert a new "active" history row when a transfer starts.
 #[allow(clippy::too_many_arguments)]
 pub async fn create(
     pool: &SqlitePool,
@@ -55,7 +48,6 @@ pub async fn create(
     Ok(())
 }
 
-/// Finalize a transfer's row once it settles into a terminal status.
 pub async fn finish(
     pool: &SqlitePool,
     id: &str,
@@ -85,7 +77,6 @@ pub async fn finish(
     Ok(())
 }
 
-/// Newest-first transfer history, capped at `limit` rows.
 pub async fn list(pool: &SqlitePool, limit: i64) -> AppResult<Vec<TransferRow>> {
     let rows = sqlx::query_as::<_, TransferRow>(
         "SELECT id, source_label, source_path, source_connection_id, dest_path,

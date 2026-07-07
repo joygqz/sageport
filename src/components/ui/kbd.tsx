@@ -3,22 +3,16 @@ import * as React from "react";
 import { IS_MACOS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
-/** Platform-aware display names for modifier tokens used in shortcuts. */
 const MODIFIER_LABELS: Record<string, string> = IS_MACOS
   ? { mod: "⌘", ctrl: "⌃", shift: "⇧", alt: "⌥" }
   : { mod: "Ctrl", ctrl: "Ctrl", shift: "Shift", alt: "Alt" };
 
 interface KbdProps {
-  /** Shortcut tokens, e.g. ["mod", "P"]. Rendered platform-aware. */
   keys: string[];
-  /** Merged into each keycap, e.g. to shrink them in dense chrome. */
+
   className?: string;
 }
 
-/**
- * Keyboard shortcut, VSCode-style: one keycap per key. macOS shows bare
- * symbol caps (⇧ ⌘ P); other platforms join caps with "+" (Ctrl+Shift+P).
- */
 export function Kbd({ keys, className }: KbdProps) {
   return (
     <kbd className="inline-flex items-center gap-1 font-sans">

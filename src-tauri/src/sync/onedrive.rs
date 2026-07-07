@@ -1,12 +1,3 @@
-//! Microsoft OneDrive object store.
-//!
-//! Backups live in the app's own folder (`special/approot`, i.e.
-//! `Apps/<app name>` in the user's OneDrive). Objects are addressed by file
-//! name — Graph supports path addressing, so no id bookkeeping is needed.
-//! Access tokens refresh transparently; Microsoft rotates refresh tokens, so
-//! the updated set is persisted via [`ObjectStore::config`] after every
-//! operation.
-
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::Value;
@@ -18,8 +9,6 @@ use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
 
 const APPROOT: &str = "https://graph.microsoft.com/v1.0/me/drive/special/approot";
 
-/// Graph's simple-PUT upload cap; the vault would need thousands of hosts to
-/// get anywhere near it, so exceeding it is reported instead of chunked.
 const SIMPLE_UPLOAD_LIMIT: usize = 4 * 1024 * 1024;
 
 pub struct OnedriveStore {
@@ -73,7 +62,7 @@ impl ObjectStore for OnedriveStore {
                 .await
                 .map_err(net_err)?;
             let status = resp.status();
-            // A brand-new app folder doesn't exist until the first upload.
+
             if status.as_u16() == 404 {
                 return Ok(Vec::new());
             }
@@ -97,8 +86,7 @@ impl ObjectStore for OnedriveStore {
 
     async fn get(&mut self, id: &str) -> AppResult<Vec<u8>> {
         let token = self.token().await?;
-        // Graph answers with a 302 to a pre-authenticated download URL;
-        // reqwest follows it (and drops the auth header cross-origin).
+
         let resp = self
             .http
             .get(format!("{APPROOT}:/{id}:/content"))

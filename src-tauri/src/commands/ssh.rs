@@ -15,9 +15,6 @@ fn valid_port(port: i64) -> AppResult<u16> {
     Ok(port)
 }
 
-/// Open an interactive SSH session for `host_id` under the caller-provided
-/// `session_id` (one per terminal tab). Progress arrives via `ssh://status`
-/// and output via `ssh://data` events.
 #[tauri::command]
 pub async fn ssh_connect(
     app: AppHandle,
@@ -71,8 +68,6 @@ pub async fn ssh_disconnect(state: State<'_, AppState>, session_id: String) -> A
     state.ssh.close(&session_id)
 }
 
-/// Resolve effective username + auth method from a host, preferring a linked
-/// identity over inline fields. Secrets are read straight off the rows.
 pub(crate) async fn resolve_credentials(
     state: &State<'_, AppState>,
     host: &Host,

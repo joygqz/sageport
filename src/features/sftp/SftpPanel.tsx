@@ -10,14 +10,8 @@ import { FilePane } from "./FilePane";
 import { useSftpStore } from "./store";
 import { TransferHistoryDialog } from "./TransferHistoryDialog";
 
-/** Minimum width of one file pane, in CSS px at zoom level 0. */
 const PANE_MIN_W = 200;
 
-/**
- * The bottom panel: a dual-pane file browser (local or SFTP on either
- * side) with drag-and-drop transfer between the panes and a live progress
- * strip along the bottom edge.
- */
 export function SftpPanel({ height }: { height: number }) {
   const { t } = useI18n();
   const ratio = useSftpStore((s) => s.ratio);
@@ -30,25 +24,14 @@ export function SftpPanel({ height }: { height: number }) {
 
   const bodyRef = useRef<HTMLDivElement>(null);
 
-  // Seed the left pane with the local filesystem the first time the panel
-  // opens; the right pane stays empty until the user picks a destination.
-  // Reads live store state instead of a render-captured flag, since React's
-  // StrictMode double-invokes this effect on mount with the same stale
-  // closure and would otherwise seed two local tabs.
   useEffect(() => {
     if (useSftpStore.getState().panes.left.tabs.length === 0) {
       void addLocalTab("left");
     }
   }, [addLocalTab]);
 
-  // The divider drags in px (like every sash) but persists as a ratio, so
-  // both panes keep their share when the panel resizes. Sizes are measured
-  // live off the body element — a render-baked width would go stale.
   const bodyWidth = () => bodyRef.current?.getBoundingClientRect().width ?? 0;
 
-  // Each pane keeps a usable minimum width (in px, so it holds at any
-  // panel size, and zoom-scaled like every layout constraint). When the
-  // panel is too narrow for two minimums the divider stays centered.
   const splitLimits = () => {
     const width = bodyWidth();
     const min = Math.min(
@@ -112,7 +95,6 @@ export function SftpPanel({ height }: { height: number }) {
         </div>
       </div>
 
-      {/* Two panes with a draggable divider */}
       <div ref={bodyRef} className="flex min-h-0 flex-1">
         <div style={{ width: `${ratio * 100}%` }} className="flex min-w-0">
           <FilePane side="left" />
@@ -135,10 +117,6 @@ export function SftpPanel({ height }: { height: number }) {
   );
 }
 
-/**
- * Live progress for in-flight transfers. Finished ones leave the store (and
- * this strip) immediately, so only "active" rows ever render here.
- */
 function TransferStrip() {
   const { t } = useI18n();
   const transfers = useSftpStore((s) => s.transfers);
@@ -152,8 +130,7 @@ function TransferStrip() {
       {active.map((tx) => {
         const pct =
           tx.total > 0 ? Math.round((tx.transferred / tx.total) * 100) : 0;
-        // While compressing/extracting there is no byte denominator, so show
-        // an indeterminate bar instead of a stuck 0%.
+
         const indeterminate =
           tx.total === 0 &&
           (tx.phase === "compressing" || tx.phase === "extracting");

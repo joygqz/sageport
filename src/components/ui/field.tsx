@@ -13,7 +13,6 @@ interface FieldProps {
   children: React.ReactNode;
 }
 
-/** Form field wrapper: label, control slot, hint and validation message. */
 export function Field({
   label,
   htmlFor,

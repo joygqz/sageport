@@ -14,11 +14,6 @@ fn clean_optional(value: &mut Option<String>) {
         .filter(|v| !v.is_empty());
 }
 
-/// Inline credential fields (`username`/`auth_type`/`key_id`/`password`) are
-/// redundant once `identity_id` is set, and `key_id`/`password` are mutually
-/// exclusive depending on `auth_type`. Clear whatever doesn't apply so
-/// switching to an identity — or between auth types — can't leave a stale
-/// secret behind, regardless of what the caller sent.
 fn normalize(mut input: HostInput) -> AppResult<HostInput> {
     input.label = input.label.trim().to_string();
     input.address = input.address.trim().to_string();
@@ -142,8 +137,6 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
         return Err(AppError::NotFound(format!("host {id}")));
     }
 
-    // Only touch the stored password when the caller explicitly sent one; an
-    // empty string clears it.
     if input.password.is_some() {
         sqlx::query("UPDATE hosts SET password = ? WHERE id = ?")
             .bind(none_if_empty(input.password.as_deref()))
@@ -174,7 +167,6 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// Record a successful connection for recents / sorting.
 pub async fn touch_last_used(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let ts = now();
     sqlx::query("UPDATE hosts SET last_used_at = ? WHERE id = ?")

@@ -15,7 +15,6 @@ import { errorMessage, toast } from "@/lib/toast";
 import type { AuthType, Identity } from "@/types/models";
 import { useCreateIdentity, useSshKeys, useUpdateIdentity } from "./api";
 
-/** Create or edit a reusable identity (username + authentication method). */
 export function IdentityFormDialog({
   open,
   identity,
@@ -68,8 +67,7 @@ function IdentityFormBody({
       username: username.trim(),
       authType,
       keyId: authType === "key" ? keyId || null : null,
-      // Omit the password when editing and the field was left blank, so the
-      // stored secret is kept (the backend only touches it when sent).
+
       password:
         authType === "password"
           ? editing && !password

@@ -1,10 +1,3 @@
-//! AI assistant configuration. Credentials and preferences live in the settings
-//! table alongside the rest of the app's data — no OS keychain dependency.
-//!
-//! The assistant is vendor-neutral: the user supplies a base URL, an API key,
-//! and a protocol (OpenAI- or Anthropic-compatible). Models are fetched live
-//! from the provider rather than hard-coded.
-
 use tauri::State;
 
 use crate::ai::{self, Endpoint, Protocol};
@@ -18,7 +11,6 @@ const API_KEY_SETTING: &str = "ai.api_key";
 const PROTOCOL_SETTING: &str = "ai.protocol";
 const MODEL_SETTING: &str = "ai.model";
 
-/// Non-secret view of the AI configuration exposed to the UI.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfig {
@@ -28,8 +20,6 @@ pub struct AiConfig {
     pub model: String,
 }
 
-/// Payload for [`ai_set_config`]. `api_key` is only written when present and
-/// non-empty, so the saved key survives a base-URL/protocol edit.
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfigInput {
@@ -71,8 +61,6 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
     })
 }
 
-/// Persist the endpoint configuration. Switching protocols clears the selected
-/// model, since model ids are not portable across providers.
 #[tauri::command]
 pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> AppResult<()> {
     if stored_protocol(&state).await? != input.protocol {
@@ -91,7 +79,6 @@ pub async fn ai_set_model(state: State<'_, AppState>, model: String) -> AppResul
     settings_repo::set(&state.db, MODEL_SETTING, &model).await
 }
 
-/// Resolve the configured endpoint, erroring if no API key is set.
 async fn endpoint(state: &AppState) -> AppResult<(String, String, Protocol)> {
     let api_key = settings_repo::get(&state.db, API_KEY_SETTING)
         .await?
@@ -102,7 +89,6 @@ async fn endpoint(state: &AppState) -> AppResult<(String, String, Protocol)> {
     Ok((base_url, api_key, protocol))
 }
 
-/// Fetch the provider's available models for the chat-window picker.
 #[tauri::command]
 pub async fn ai_list_models(state: State<'_, AppState>) -> AppResult<Vec<String>> {
     let (base_url, api_key, protocol) = endpoint(&state).await?;
@@ -114,18 +100,6 @@ pub async fn ai_list_models(state: State<'_, AppState>) -> AppResult<Vec<String>
     .await
 }
 
-/// Ask the assistant for its next turn. `model` is chosen in the chat window;
-/// `messages` is the canonical conversation so far (never including a
-/// `system` entry — the backend always supplies its own); `tools` describes
-/// whatever the frontend can execute on the model's behalf; `context` is a
-/// snapshot of the user's workspace appended to the system prompt. The reply
-/// streams: text deltas flow over `on_delta` as they arrive and the complete
-/// turn is returned at the end. The frontend drives the agent loop: it runs
-/// any returned `toolCalls`, appends the results as `tool` messages, and
-/// calls this again until a final reply with no tool calls comes back.
-///
-/// When `request_id` is set the turn can be aborted mid-stream with
-/// [`ai_chat_cancel`], failing with the `cancelled` error code.
 #[tauri::command]
 pub async fn ai_chat(
     state: State<'_, AppState>,
@@ -168,7 +142,6 @@ pub async fn ai_chat(
     result
 }
 
-/// Abort an in-flight [`ai_chat`] turn. A no-op if the turn already finished.
 #[tauri::command]
 pub async fn ai_chat_cancel(state: State<'_, AppState>, request_id: String) -> AppResult<()> {
     if let Some(tx) = state.ai_cancels.lock().remove(&request_id) {
@@ -177,16 +150,6 @@ pub async fn ai_chat_cancel(state: State<'_, AppState>, request_id: String) -> A
     Ok(())
 }
 
-// --- Persisted chat sessions (history + multi-session support) ---
-//
-// A session is one saved conversation with the assistant, mirroring VS Code
-// Copilot's chat history: the user can start a new one at any time, switch
-// between past ones, rename or delete them. The frontend owns the running
-// agent loop (see `useAgent`/the ai store) and calls `ai_session_save` after
-// each turn; this layer only persists/retrieves the canonical message list —
-// it never talks to the model itself.
-
-/// One saved conversation, full detail (used when opening a session).
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSession {
@@ -197,7 +160,6 @@ pub struct AiSession {
     pub updated_at: String,
 }
 
-/// Lightweight view for the session list / history menu (no message bodies).
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSessionSummary {
@@ -230,30 +192,24 @@ impl From<AiSessionRow> for AiSessionSummary {
     }
 }
 
-/// Newest-first list of saved sessions, for the history menu.
 #[tauri::command]
 pub async fn ai_session_list(state: State<'_, AppState>) -> AppResult<Vec<AiSessionSummary>> {
     let rows = ai_session_repo::list(&state.db).await?;
     Ok(rows.into_iter().map(AiSessionSummary::from).collect())
 }
 
-/// Start a brand new, empty session and make it available immediately.
 #[tauri::command]
 pub async fn ai_session_create(state: State<'_, AppState>) -> AppResult<AiSession> {
     let row = ai_session_repo::create(&state.db).await?;
     AiSession::from_row(row)
 }
 
-/// Load one session's full conversation, e.g. when the user switches to it.
 #[tauri::command]
 pub async fn ai_session_get(state: State<'_, AppState>, id: String) -> AppResult<AiSession> {
     let row = ai_session_repo::get(&state.db, &id).await?;
     AiSession::from_row(row)
 }
 
-/// Persist the running conversation after an agent turn. `title` is only
-/// passed once, the first time a session gets a user message (auto-derived
-/// from it client-side) — later saves omit it so a later rename sticks.
 #[tauri::command]
 pub async fn ai_session_save(
     state: State<'_, AppState>,

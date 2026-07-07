@@ -15,11 +15,6 @@ import { focusTerminal, getTerminal } from "./registry";
 import { useTerminalSearch } from "./search";
 import { TerminalView } from "./TerminalView";
 
-/**
- * One terminal editor: the xterm canvas behind a left gutter painted with
- * the terminal background, plus a find bar and a full-pane overlay for the
- * non-interactive states (connecting / error / closed).
- */
 export function TerminalEditor({
   tab,
   active,
@@ -31,9 +26,6 @@ export function TerminalEditor({
   const searchOpen = useTerminalSearch((s) => s.openFor === tab.id);
 
   return (
-    // Left padding only (4px, VSCode's terminal inset): the overlay
-    // scrollbar is drawn inside the xterm element along its right edge, so
-    // right/vertical padding would push it off the pane edge.
     <div className="relative h-full w-full bg-terminal-background pl-1">
       <TerminalView
         sessionId={tab.id}
@@ -46,7 +38,6 @@ export function TerminalEditor({
   );
 }
 
-/** Match highlight colors, aligned with VSCode's find decorations. */
 const SEARCH_DECORATIONS = {
   matchBackground: "#ea5c0055",
   matchOverviewRuler: "#d18616",
@@ -54,11 +45,6 @@ const SEARCH_DECORATIONS = {
   activeMatchColorOverviewRuler: "#a0a0a0",
 };
 
-/**
- * VSCode-style find bar floating over the terminal's top-right corner.
- * Typing searches incrementally; Enter / shift+Enter step through matches;
- * Escape returns focus to the shell.
- */
 function SearchBar({ sessionId }: { sessionId: string }) {
   const { t } = useI18n();
   const close = useTerminalSearch((s) => s.close);
@@ -146,11 +132,6 @@ function SearchBar({ sessionId }: { sessionId: string }) {
   );
 }
 
-/**
- * Overlays the terminal while it has no live connection. Rendering status
- * here instead of writing lines into the terminal buffer keeps the
- * scrollback clean and always offers a recovery action.
- */
 function StatusOverlay({
   tab,
   onReconnect,
@@ -213,9 +194,6 @@ function StatusOverlay({
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    // `m-auto` instead of justify/items-center: when the pane is smaller
-    // than the status content, auto margins collapse to zero and the content
-    // clips at one edge instead of spilling out or squashing the icon.
     <div className="absolute inset-0 z-10 flex overflow-hidden bg-background/85 backdrop-blur-sm">
       <div className="m-auto flex flex-col items-center gap-3 p-3">
         {children}

@@ -2,7 +2,6 @@ import type { SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
-/** GitHub octocat mark (brand icon; lucide carries no brand icons). */
 export function GithubIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
@@ -11,7 +10,6 @@ export function GithubIcon(props: IconProps) {
   );
 }
 
-/** Google Drive triangle, reduced to a monochrome outline mark. */
 export function GdriveIcon(props: IconProps) {
   return (
     <svg
@@ -30,7 +28,6 @@ export function GdriveIcon(props: IconProps) {
   );
 }
 
-/** OneDrive cloud, monochrome outline. */
 export function OnedriveIcon(props: IconProps) {
   return (
     <svg

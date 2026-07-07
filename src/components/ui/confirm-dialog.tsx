@@ -21,11 +21,10 @@ export interface ConfirmState {
   title: string;
   description?: string;
   cancelLabel: string;
-  /** Rendered left-to-right after the cancel button; last one is typically the primary/destructive action. */
+
   actions: ConfirmAction[];
 }
 
-/** A themed stand-in for native confirm dialogs, supporting more than one action (e.g. destructive vs. non-destructive choices). */
 export function ConfirmDialog({
   state,
   onClose,

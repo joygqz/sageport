@@ -4,11 +4,10 @@ import type { Locale } from "./config";
 import type { TFunction } from "./translate";
 
 export interface I18nContextValue {
-  /** The active locale tag. */
   locale: Locale;
-  /** Switch the locale. */
+
   setLocale: (locale: Locale) => void;
-  /** Translate a typed key, with optional `{placeholder}` interpolation. */
+
   t: TFunction;
 }
 

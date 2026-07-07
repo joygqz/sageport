@@ -3,7 +3,6 @@ import { HostsView } from "@/features/hosts/HostsView";
 import { SnippetsView } from "@/features/snippets/SnippetsView";
 import { useLayoutStore } from "./layout";
 
-/** The side bar renders the view of whichever activity is selected. */
 export function SideBar({ width }: { width: number }) {
   const activity = useLayoutStore((s) => s.activity);
 

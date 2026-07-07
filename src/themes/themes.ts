@@ -1,10 +1,5 @@
 import type { ThemeDefinition } from "./types";
 
-/**
- * Built-in themes. Ordering here is the ordering in the theme picker:
- * dark themes first, then light, defaults first within each group.
- */
-
 const darkModern: ThemeDefinition = {
   id: "dark-modern",
   name: "Dark Modern",

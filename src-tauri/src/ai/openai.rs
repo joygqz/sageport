@@ -1,6 +1,3 @@
-//! OpenAI-compatible chat-completions wire format, including function
-//! (tool) calling.
-
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
@@ -8,7 +5,6 @@ use crate::error::{AppError, AppResult};
 
 use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec};
 
-/// Build a `POST /chat/completions` request body.
 pub(super) fn request_body(model: &str, messages: &[ChatMessage], tools: &[ToolSpec]) -> Value {
     let messages: Vec<Value> = messages.iter().map(message_to_json).collect();
 
@@ -73,9 +69,6 @@ fn message_to_json(m: &ChatMessage) -> Value {
     Value::Object(obj)
 }
 
-/// Accumulates a streamed chat-completions turn: text deltas are forwarded
-/// as they arrive, tool calls are assembled fragment by fragment (keyed by
-/// their stream `index`) until the arguments JSON is complete.
 #[derive(Default)]
 pub(super) struct StreamAccumulator {
     content: String,
@@ -90,9 +83,6 @@ struct PartialToolCall {
 }
 
 impl StreamAccumulator {
-    /// Consume one SSE `data:` payload. Payloads that don't parse are
-    /// skipped — OpenAI-compatible gateways are known to interleave
-    /// keep-alive or vendor-specific lines a strict parser would trip on.
     pub(super) fn feed(&mut self, data: &str, on_text: &mut dyn FnMut(&str)) {
         let Ok(chunk) = serde_json::from_str::<StreamChunk>(data) else {
             return;

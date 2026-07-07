@@ -29,7 +29,6 @@ const TOOL_LABEL_KEY: Record<string, TKey> = {
   run_terminal_command: "ai.tool.runTerminalCommand",
 };
 
-/** One collapsible card showing a single tool call the agent made. */
 export function ToolActivity({
   item,
   onApprove,

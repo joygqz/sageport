@@ -19,12 +19,10 @@ import {
   TOOLS_REQUIRING_APPROVAL,
 } from "./tools";
 
-/** Hard cap on model round-trips per user message, to bound a runaway loop. */
 const MAX_STEPS = 8;
-/** How much of the first prompt to use as an auto-generated session title. */
+
 const TITLE_MAX_LEN = 60;
 
-/** Imperative translation helper — this store lives outside React. */
 function t(key: Parameters<typeof translate>[1]): string {
   return translate(detectLocale(), key);
 }
@@ -45,48 +43,39 @@ export type AgentLogItem =
       result?: string;
     };
 
-/** In-memory state for one chat session, keyed by session id. */
 interface RuntimeSession {
-  /** Canonical conversation sent to `ai_chat` / persisted to disk. */
   history: AiChatMessage[];
-  /** Rendered log (richer than `history`: tool status, args, bubbles). */
+
   log: AgentLogItem[];
   pending: boolean;
-  /** Backend id of the in-flight chat turn, for mid-stream cancellation. */
+
   requestId: string | null;
-  /** Set by `stop`; the agent loop winds down at the next safe point. */
+
   stopRequested: boolean;
 }
 
 interface AiStoreState {
-  /** Newest-first, backed by the `ai_sessions` table. */
   sessions: AiSessionSummary[];
   sessionsLoaded: boolean;
   activeId: string | null;
   runtime: Record<string, RuntimeSession>;
   approvals: Map<string, (approved: boolean) => void>;
 
-  /** Load the session list once, on first mount of the panel. */
   loadSessions: () => Promise<void>;
-  /** Make a session active, hydrating its conversation from disk if needed. */
+
   openSession: (id: string) => Promise<void>;
-  /** Create a brand new, empty session and make it active. */
+
   newSession: () => Promise<string>;
   renameSession: (id: string, title: string) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
 
   send: (sessionId: string, prompt: string, model: string) => Promise<void>;
-  /** Abort the running turn: cancels the request and stops the agent loop. */
+
   stop: (sessionId: string) => void;
   approve: (toolLogId: string) => void;
   deny: (toolLogId: string) => void;
 }
 
-/**
- * Workspace snapshot appended to the system prompt on every turn, so the
- * model knows what it is working with before calling any tool: which
- * sessions are open, which one the user is looking at, and the UI language.
- */
 function buildContext(): string {
   const state = useTabsStore.getState();
   const sessions = terminalTabs(state.tabs);
@@ -108,7 +97,6 @@ function buildContext(): string {
   return lines.join("\n");
 }
 
-/** Reconstruct a renderable log from a persisted canonical history. */
 function buildLogFromHistory(messages: AiChatMessage[]): AgentLogItem[] {
   const log: AgentLogItem[] = [];
   const toolItemByCallId = new Map<
@@ -185,13 +173,10 @@ function prepareToolCall(call: AiToolCall): PreparedToolCall {
     };
   }
 
-  // Approval is for a concrete terminal. If the user switches or closes tabs
-  // before clicking Allow, the command will not silently retarget elsewhere.
   return { call: { ...call, arguments: { ...args, sessionId } } };
 }
 
 export const useAiStore = create<AiStoreState>((set, get) => {
-  /** Immutably patch one session's runtime slice. */
   const patch = (id: string, fn: (r: RuntimeSession) => RuntimeSession) => {
     set((s) => {
       const current = s.runtime[id];
@@ -200,7 +185,6 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     });
   };
 
-  /** Save the conversation to disk and fold the updated summary back in. */
   const persist = async (id: string, title: string | null) => {
     const history = get().runtime[id]?.history ?? [];
     try {
@@ -208,10 +192,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       set((s) => ({
         sessions: [summary, ...s.sessions.filter((x) => x.id !== id)],
       }));
-    } catch {
-      // Best-effort: the in-memory conversation still stands even if the
-      // write failed (e.g. transient disk error); it'll retry next turn.
-    }
+    } catch {}
   };
 
   const runToolCall = async (
@@ -280,7 +261,6 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     }));
   };
 
-  /** Append `text` to the streaming assistant bubble, creating it lazily. */
   const appendDelta = (sessionId: string, itemId: string, text: string) => {
     patch(sessionId, (r) => {
       const existing = r.log.find((i) => i.id === itemId);
@@ -307,16 +287,13 @@ export const useAiStore = create<AiStoreState>((set, get) => {
   const runLoop = async (sessionId: string, model: string) => {
     for (let step = 0; step < MAX_STEPS; step++) {
       const runtime = get().runtime[sessionId];
-      // Session was deleted out from under a still-running loop — stop
-      // quietly rather than throwing on the missing runtime slice.
+
       if (!runtime) return;
 
       const requestId = crypto.randomUUID();
       const streamItemId = crypto.randomUUID();
       patch(sessionId, (r) => ({ ...r, requestId }));
 
-      // Ignore any delta that straggles in after the turn has resolved —
-      // the returned result is authoritative and already rendered by then.
       let turnDone = false;
       let result;
       try {
@@ -330,10 +307,10 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       } catch (err) {
         turnDone = true;
         if (errorCode(err) !== "cancelled") throw err;
-        // Stopped mid-stream: keep whatever text already streamed, both on
-        // screen and in the canonical history, then wind down quietly.
-        const partial = get()
-          .runtime[sessionId]?.log.find((i) => i.id === streamItemId);
+
+        const partial = get().runtime[sessionId]?.log.find(
+          (i) => i.id === streamItemId,
+        );
         if (partial?.kind === "assistant" && partial.content) {
           patch(sessionId, (r) => ({
             ...r,
@@ -359,10 +336,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
             toolCalls: toolCalls.length ? toolCalls : undefined,
           },
         ],
-        // The final content is authoritative: replace the streamed bubble's
-        // text with it (they only differ in whitespace normalization), or
-        // add the bubble now if nothing streamed (e.g. tool-calls-only turn
-        // from a provider that still sent text at once).
+
         log: result.content
           ? r.log.some((i) => i.id === streamItemId)
             ? r.log.map((i) =>
@@ -384,8 +358,6 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       if (toolCalls.length === 0) return;
       for (const { call, preflightError } of preparedToolCalls) {
         if (stopped(sessionId)) {
-          // Keep the conversation protocol-valid: every requested call gets
-          // a result, even when the user aborted the run.
           patch(sessionId, (r) => ({
             ...r,
             history: [
@@ -556,9 +528,9 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       const runtime = get().runtime[sessionId];
       if (!runtime?.pending) return;
       patch(sessionId, (r) => ({ ...r, stopRequested: true }));
-      // Abort the in-flight request (it rejects with `cancelled`) …
+
       if (runtime.requestId) void ipc.ai.cancel(runtime.requestId);
-      // … and resolve any approval the loop is currently blocked on.
+
       const approvals = get().approvals;
       for (const resolve of approvals.values()) resolve(false);
       approvals.clear();
@@ -576,7 +548,6 @@ export const useAiStore = create<AiStoreState>((set, get) => {
   };
 });
 
-/** Resolve once the user clicks Allow/Deny on a pending tool-call card. */
 function requestApproval(
   get: () => AiStoreState,
   toolLogId: string,

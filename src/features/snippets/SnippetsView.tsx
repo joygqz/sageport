@@ -21,10 +21,6 @@ import { useTabsStore } from "@/workbench/tabs";
 import { useDeleteSnippet, useSnippets } from "./api";
 import { SnippetFormDialog } from "./SnippetFormDialog";
 
-/**
- * Snippets view: saved commands that run in the current terminal with one
- * click or a double-click on the row.
- */
 export function SnippetsView() {
   const { t } = useI18n();
   const { data: snippets = [] } = useSnippets();

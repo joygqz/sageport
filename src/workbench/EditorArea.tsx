@@ -30,11 +30,6 @@ const statusDot: Record<TerminalStatus, string> = {
   error: "bg-destructive",
 };
 
-/**
- * The main editor area: one tab strip over a content region. Terminal tabs
- * stay mounted while hidden so their scrollback and connection survive tab
- * switches; the settings tab is a full page, not a dialog.
- */
 export function EditorArea() {
   const { t } = useI18n();
   const tabs = useTabsStore((s) => s.tabs);
@@ -47,9 +42,6 @@ export function EditorArea() {
   const pendingCloseId = useTabsStore((s) => s.pendingCloseId);
   const clearPendingClose = useTabsStore((s) => s.clearPendingClose);
 
-  // Any close path (tab button, middle click, Cmd+W) on a dirty file tab
-  // parks its id in `pendingCloseId`; render the save / discard / cancel
-  // prompt straight from that state.
   const pendingTab = tabs.find(
     (tab): tab is FileTab => tab.id === pendingCloseId && tab.kind === "file",
   );
@@ -77,8 +69,6 @@ export function EditorArea() {
       }
     : null;
 
-  // Keep the active tab in view and hand focus to its terminal, so switching
-  // tabs (mouse or shortcut) lands keystrokes in the shell immediately.
   useEffect(() => {
     if (!activeId) return;
     stripRef.current
@@ -93,8 +83,7 @@ export function EditorArea() {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
       <div
         ref={stripRef}
-        // The strip scrolls with the wheel (any direction) instead of a
-        // scrollbar, which would eat into the fixed tab height.
+
         onWheel={(e) => {
           const el = stripRef.current;
           if (!el || el.scrollWidth <= el.clientWidth) return;
@@ -125,13 +114,7 @@ export function EditorArea() {
         {tabs.map((tab) => (
           <div
             key={tab.id}
-            // Inactive panes keep their layout (visibility, not display):
-            // hidden terminals stay fitted to their real size, so activating
-            // a tab never triggers a visible refit/flicker. visibility:hidden
-            // hides the canvas, but xterm's overlay scrollbar is a separately
-            // GPU-composited layer that can still repaint for a frame during a
-            // window resize — a phantom scrollbar flashing through from the
-            // hidden terminal. Drop it from the render tree while hidden.
+
             className={cn(
               "absolute inset-0",
               tab.id === activeId
@@ -182,7 +165,6 @@ function TabItem({
           : undefined
       }
       onAuxClick={(e) => {
-        // Middle click closes, like every tabbed editor.
         if (e.button === 1) onClose();
       }}
       className={cn(
@@ -192,7 +174,6 @@ function TabItem({
           : "bg-surface text-muted-foreground hover:text-foreground",
       )}
     >
-      {/* Active-tab indicator: a 1px accent line across the tab's top edge. */}
       {active && <span className="absolute inset-x-0 top-0 h-px bg-primary" />}
 
       {tab.kind === "terminal" ? (
@@ -229,7 +210,6 @@ function TabItem({
               : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100",
         )}
       >
-        {/* Unsaved indicator: a dot that turns into a close icon on hover. */}
         {dirty && (
           <span className="size-2 rounded-full bg-foreground group-hover/close:hidden" />
         )}
@@ -241,7 +221,6 @@ function TabItem({
   );
 }
 
-/** Shortcut hints shown when no tab is open, VSCode watermark style. */
 function Watermark() {
   const { t } = useI18n();
   const hints: { label: string; keys: string[] }[] = [
@@ -252,12 +231,7 @@ function Watermark() {
   ];
 
   return (
-    // `m-auto` instead of justify/items-center: when the area is smaller
-    // than the hints, auto margins collapse to zero and the content clips at
-    // one edge instead of spilling out past both.
     <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-      {/* One shared grid so the shortcut column starts at a common left
-          edge across rows, labels right-aligned against it — VSCode style. */}
       <div className="m-auto grid min-w-max grid-cols-[auto_auto] items-center gap-x-4 gap-y-2.5 p-3">
         {hints.map((hint) => (
           <Fragment key={hint.label}>

@@ -18,7 +18,6 @@ export interface PromptState {
   onConfirm: (value: string) => void;
 }
 
-/** A tiny single-input modal used for "new folder" and "rename". */
 export function PromptDialog({
   state,
   onClose,
@@ -29,7 +28,6 @@ export function PromptDialog({
   return (
     <Dialog open={!!state} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
-        {/* Mount fresh per open so the field initializes without an effect. */}
         {state && <PromptForm state={state} onClose={onClose} />}
       </DialogContent>
     </Dialog>

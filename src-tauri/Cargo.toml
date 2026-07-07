@@ -10,9 +10,7 @@ name = "Sageport"
 path = "src/main.rs"
 
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+# _lib suffix avoids a bin/lib name conflict on Windows (rust-lang/cargo#8519)
 name = "sageport_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -34,50 +32,34 @@ serde_json = "1"
 thiserror = "2"
 anyhow = "1"
 
-# Async runtime ("net" backs the OAuth loopback redirect listener)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "net"] }
 
-# Persistence (ids/timestamps stored as TEXT -> Rust String, so no
-# compile-time DATABASE_URL coupling and no chrono/uuid row mapping).
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4" }
 
-# Crypto (used for the portable encrypted sync/export vault)
 aes-gcm = "0.10"
 argon2 = "0.5"
 rand = "0.8"
 base64 = "0.22"
 
-# SSH (libssh2 bindings; vendored OpenSSL for portable builds)
 ssh2 = { version = "0.9", features = ["vendored-openssl"] }
 
-# Pure-Rust SSH key generation/parsing (Ed25519, RSA, ECDSA; OpenSSH format,
-# optionally passphrase-encrypted) for the key manager's generate/import flow.
 ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "ecdsa", "p256", "p384", "p521", "encryption", "std"] }
 
-# Archive + gzip for compressed folder transfers (pure-Rust, no extra C deps).
 tar = "0.4"
 flate2 = "1"
 
-# HTTP client for the Anthropic Messages API (rustls to avoid an OpenSSL link
-# conflict with ssh2's vendored OpenSSL).
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
-# Concurrency helpers
 parking_lot = "0.12"
 
-# Sync providers
-async-trait = "0.1"   # object-safe SyncProvider trait
-sha2 = "0.10"         # PKCE S256 code challenge
-url = "2"             # OAuth/WebDAV URL building
-quick-xml = "0.37"    # WebDAV PROPFIND response parsing
-rusty-s3 = "0.7"      # SigV4 presigning for S3-compatible storage
+async-trait = "0.1"
+sha2 = "0.10"
+url = "2"
+quick-xml = "0.37"
+rusty-s3 = "0.7"
 
-# Re-center the macOS traffic lights in the custom title bar at runtime
-# (public AppKit API via the same bindings tauri/tao already compile).
-# objc2-foundation/block2 back the NSNotificationCenter observer that
-# re-applies the inset synchronously inside AppKit's resize layout pass.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 block2 = "0.6"
@@ -99,12 +81,9 @@ objc2-foundation = { version = "0.3", default-features = false, features = [
 ] }
 
 [features]
-# this feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
+# required for production builds without a dev server, DO NOT REMOVE
 custom-protocol = ["tauri/custom-protocol"]
 
 [profile.release]
-# rustc's built-in debuginfo stripping leaves the Mach-O LINKEDIT string
-# table 4-byte aligned instead of 8-byte, which current macOS dyld rejects
-# as "mis-aligned LINKEDIT string pool" (hits the sqlx-macros proc-macro
-# dylib). Disabling strip avoids the buggy codepath; DO NOT REMOVE.
+# rustc debuginfo stripping mis-aligns the Mach-O LINKEDIT string pool, which macOS dyld rejects; DO NOT REMOVE
 strip = "none"

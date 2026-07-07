@@ -35,7 +35,7 @@ import { SetupView } from "./SetupView";
 
 export function SyncSection() {
   const { data: status } = useSyncStatus();
-  // Wait for the saved state so the setup/connected views don't flash.
+
   if (!status) return null;
 
   return (
@@ -337,10 +337,6 @@ function RestoreConfirmDialog({
   return <ConfirmDialog state={state} onClose={onOpenChange} />;
 }
 
-/**
- * Standalone one-shot backup: export/restore a single encrypted file with a
- * per-operation passphrase. Independent of the connected provider.
- */
 function FileBackupCard() {
   const { t } = useI18n();
   const fileExport = useSyncFileExport();
@@ -455,7 +451,6 @@ function FilePassphraseDialog({
   );
 }
 
-/** Lives inside DialogContent so its state resets when the dialog closes. */
 function FilePassphraseForm({
   onCancel,
   onConfirm,

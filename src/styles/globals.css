@@ -3,15 +3,8 @@
 @import "@fontsource-variable/inter/wght.css";
 @import "@fontsource-variable/jetbrains-mono/wght.css";
 
-/* `.dark` is toggled by the theme system for dark-appearance themes. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
- * Design tokens. The authoritative values live in src/themes/themes.ts and
- * are written onto :root by the theme provider at runtime; the values below
- * are the Dark Modern defaults so the first paint (before the bundle runs)
- * already matches the default theme.
- */
 :root {
   --background: #1f1f1f;
   --foreground: #cccccc;
@@ -43,12 +36,8 @@
   --terminal-background: #1f1f1f;
   --terminal-foreground: #cccccc;
 
-  /* Compact radius scale for a dense desktop UI. */
   --radius: 0.375rem;
 
-  /* Elevation for floating surfaces. The app is a flat, border-driven
-   * design; these exist only to separate overlays from what is behind
-   * them. Dark themes get a stronger lift via the .dark override. */
   --elevation-sm:
     0 1px 2px rgba(31, 35, 40, 0.06), 0 4px 10px rgba(31, 35, 40, 0.08);
   --elevation-md:
@@ -60,7 +49,6 @@
   --elevation-md: 0 2px 4px rgba(1, 4, 9, 0.4), 0 16px 36px rgba(1, 4, 9, 0.55);
 }
 
-/* Map semantic tokens onto Tailwind's theme so utilities resolve at runtime */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -109,7 +97,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Route Tailwind's shadow-sm/shadow-md through the theme-aware elevation. */
   --shadow-sm: var(--elevation-sm);
   --shadow-md: var(--elevation-md);
 
@@ -120,7 +107,6 @@
     "JetBrains Mono Variable", "SFMono-Regular", ui-monospace, "Menlo",
     monospace;
 
-  /* Single micro-type step for kbd, badges and section labels. */
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
 }
@@ -130,11 +116,6 @@
     border-color: var(--color-border);
   }
 
-  /*
-   * Every Tailwind size is rem-based, so scaling the root font-size scales
-   * the whole UI in lockstep. 93.75% (15px at a 16px OS default) brings
-   * text-sm to ~13.1px, in line with the terminal's fixed 13px canvas font.
-   */
   html {
     font-size: 93.75%;
   }
@@ -155,11 +136,6 @@
     overflow: hidden;
   }
 
-  /*
-   * Desktop-app text selection: chrome (buttons, labels, menus, headings)
-   * is not selectable, like a native app. Selection is re-enabled only for
-   * editable fields and content explicitly opted in with `select-text`.
-   */
   :root {
     -webkit-user-select: none;
     user-select: none;
@@ -176,12 +152,6 @@
     cursor: auto;
   }
 
-  /*
-   * Every interactive control shows a pointer, like the web (and VSCode's
-   * webview UI). The `:root` rule above resets the browser default to
-   * `default`, so this opt-in list is what makes clickability visible.
-   * Disabled controls fall back to the arrow.
-   */
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [role="menuitem"]:not([data-disabled]),
@@ -203,7 +173,6 @@
     );
   }
 
-  /* Thin, theme-aware scrollbars */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -227,8 +196,6 @@
   }
 }
 
-/* Scroll container whose scrollbar never takes up layout space (used by the
- * editor tab strip, which scrolls with the wheel instead). */
 @utility scrollbar-none {
   scrollbar-width: none;
   &::-webkit-scrollbar {
@@ -236,12 +203,6 @@
   }
 }
 
-/*
- * Syntax highlighting tokens for the file editor (see FileEditor.tsx: the
- * CodeMirror highlight style assigns classes only). Base values follow
- * VSCode Light Modern; the `.dark` overrides follow Dark Modern, so token
- * colors track the active theme's appearance.
- */
 .tok-keyword {
   color: #0000ff;
 }

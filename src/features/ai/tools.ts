@@ -3,12 +3,6 @@ import type { AiToolSpec } from "@/types/models";
 import { readTerminalContext } from "@/features/terminal/registry";
 import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 
-/**
- * Tools the agent can call. Read-only tools run automatically the moment the
- * model asks for them; `run_terminal_command` executes on a live remote
- * server, so callers must gate it behind an explicit user approval (see
- * `TOOLS_REQUIRING_APPROVAL`) before invoking `executeTool`.
- */
 export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "list_terminal_sessions",
@@ -71,19 +65,16 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
 
 export type AiToolName = (typeof AI_TOOL_SPECS)[number]["name"];
 
-/** Tools that act on a live remote server and must be user-approved first. */
 export const TOOLS_REQUIRING_APPROVAL: ReadonlySet<string> = new Set([
   "run_terminal_command",
 ]);
 
-/** Narrow a tool call's raw JSON arguments to a plain object. */
 export function normalizeArgs(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === "object" && !Array.isArray(raw)
     ? (raw as Record<string, unknown>)
     : {};
 }
 
-/** Resolve which terminal session a tool call should target. */
 export function resolveTerminalSessionId(requested?: string): string | null {
   const state = useTabsStore.getState();
   if (requested) {
@@ -104,7 +95,6 @@ function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-/** Run one tool call locally and return the text to feed back to the model. */
 export async function executeTool(
   name: string,
   args: Record<string, unknown>,
@@ -179,7 +169,6 @@ async function runCommand(args: Record<string, unknown>): Promise<string> {
   return after || "(the command produced no output)";
 }
 
-/** Poll the terminal buffer until it stops changing (or the timeout hits). */
 async function waitForSettledOutput(
   id: string,
   timeoutMs: number,

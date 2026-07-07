@@ -1,10 +1,3 @@
-//! WebDAV object store (Nextcloud, Synology, rclone serve, ...).
-//!
-//! The user points the config at a collection URL; backups are objects
-//! directly inside it. Listing is a depth-1 PROPFIND parsed
-//! namespace-agnostically (servers disagree wildly on prefixes), and the
-//! collection is created with MKCOL on demand.
-
 use async_trait::async_trait;
 use quick_xml::events::Event;
 use quick_xml::Reader;
@@ -17,9 +10,9 @@ use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
 
 pub struct WebdavStore {
     http: reqwest::Client,
-    /// Collection URL, normalized to end with `/` so joins stay inside it.
+
     base: Url,
-    /// Original user-supplied URL, echoed back into the config unchanged.
+
     raw_url: String,
     username: String,
     password: String,
@@ -58,9 +51,6 @@ impl WebdavStore {
             .map_err(|e| AppError::Invalid(format!("invalid backup name: {e}")))
     }
 
-    /// Create the collection if missing. 405 (exists) and 301 are fine; some
-    /// servers also want intermediate collections, which we don't attempt —
-    /// the parent must exist.
     async fn ensure_collection(&self) -> AppResult<()> {
         let resp = self
             .request(
@@ -186,9 +176,6 @@ impl ObjectStore for WebdavStore {
     }
 }
 
-/// Pull every `<*:href>` text out of a multistatus body and reduce it to a
-/// percent-decoded file basename. Namespace prefixes vary by server, so we
-/// match on local names only.
 fn parse_hrefs(xml: &str) -> AppResult<Vec<String>> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -215,7 +202,6 @@ fn parse_hrefs(xml: &str) -> AppResult<Vec<String>> {
 }
 
 fn percent_decode(s: &str) -> String {
-    // Our filenames are plain ASCII, but decode defensively anyway.
     let mut out = Vec::with_capacity(s.len());
     let bytes = s.as_bytes();
     let mut i = 0;

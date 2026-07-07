@@ -34,11 +34,6 @@ import { HardDrive, Server } from "lucide-react";
 import { Spinner } from "@/components/ui";
 import { useTabsStore, type FileTab } from "@/workbench/tabs";
 
-/**
- * Structural editor chrome. Colors reference the theme's CSS custom
- * properties (the editor shares the terminal's surface colors), so a theme
- * switch restyles a live editor without a rebuild.
- */
 const editorTheme = EditorView.theme({
   "&": {
     height: "100%",
@@ -53,8 +48,7 @@ const editorTheme = EditorView.theme({
     lineHeight: "1.5",
     overflow: "auto",
   },
-  // Match xterm 6's VSCode-style scrollbar (14px, flat, foreground at
-  // 20/40/50% opacity) instead of the app-wide pill-shaped scrollbar.
+
   ".cm-scroller::-webkit-scrollbar": {
     width: "14px",
     height: "14px",
@@ -82,8 +76,7 @@ const editorTheme = EditorView.theme({
   },
   ".cm-content": {
     padding: "0.5rem 0",
-    // CodeMirror's base theme hardcodes a black caret (it can't know the
-    // app theme's appearance); follow the text color instead.
+
     caretColor: "currentColor",
   },
   ".cm-line": { padding: "0 1rem" },
@@ -242,12 +235,6 @@ function clearSelectionArtifacts(view: EditorView) {
   }
 }
 
-/**
- * Dragging a native WebKit scrollbar can leak a text-selection gesture through
- * the overlay thumb into CodeMirror's contentDOM. That leaves CM with an active
- * mouse selection; the next editor click then selects a range and scrolls back
- * toward the old anchor. Shield only actual scrollbar drags.
- */
 const scrollbarDragGuard = ViewPlugin.fromClass(
   class {
     private draggingScrollbar = false;
@@ -370,10 +357,6 @@ const scrollbarDragGuard = ViewPlugin.fromClass(
   },
 );
 
-/**
- * Token classes only — the actual colors live in globals.css under `.tok-*`
- * (with `.dark` overrides), so highlighting follows the theme's appearance.
- */
 const highlightStyle = HighlightStyle.define([
   { tag: [t.controlKeyword, t.moduleKeyword], class: "tok-controlKeyword" },
   { tag: t.keyword, class: "tok-keyword" },
@@ -398,12 +381,6 @@ const highlightStyle = HighlightStyle.define([
   { tag: t.invalid, class: "tok-invalid" },
 ]);
 
-/**
- * An editor tab for small files opened from the files panel, local or
- * remote. VSCode conventions: Cmd/Ctrl+S saves in place (no save button;
- * unsaved changes show as the dot on the tab), and syntax highlighting is
- * picked by file name.
- */
 export function FileEditor({ tab }: { tab: FileTab }) {
   return (
     <div className="flex h-full flex-col bg-background">
@@ -435,11 +412,6 @@ export function FileEditor({ tab }: { tab: FileTab }) {
   );
 }
 
-/**
- * The CodeMirror host. The view is created once per tab (file tabs stay
- * mounted while hidden, so undo history and scroll position survive tab
- * switches); edits flow into the tabs store, and Cmd/Ctrl+S saves through it.
- */
 function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
 
@@ -489,8 +461,6 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
     });
     view.focus();
 
-    // Language support loads lazily (each grammar is its own chunk); the
-    // buffer stays plain text until (and unless) a grammar matches the name.
     let cancelled = false;
     const description = LanguageDescription.matchFilename(languages, title);
     if (description) {

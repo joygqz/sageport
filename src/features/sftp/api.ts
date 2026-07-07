@@ -4,9 +4,6 @@ import { ipc } from "@/lib/ipc";
 
 const historyKey = ["sftp", "transferHistory"] as const;
 
-/** Newest-first transfer history; only fetched while the dialog is open. Always
- * refetched on open (`staleTime: 0`) so a transfer that just finished shows up
- * immediately instead of using the global 30s cache. */
 export function useTransferHistory(enabled: boolean) {
   return useQuery({
     queryKey: historyKey,

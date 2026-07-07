@@ -1,13 +1,3 @@
-//! SSH key material: generation, inspection and file import.
-//!
-//! Built on the pure-Rust `ssh-key` crate, so key generation needs no
-//! external `ssh-keygen` binary and works identically on every platform. Key
-//! parsing here is deliberately best-effort: [`inspect`] only understands the
-//! OpenSSH private key format, but libssh2 (via the `ssh2` crate, used at
-//! connect time) accepts more formats than that. So an unparseable key is
-//! never rejected — it's just stored as opaque text without derived
-//! metadata, exactly like manually pasting a key always has been.
-
 use std::path::Path;
 
 use rand::rngs::OsRng;
@@ -18,21 +8,11 @@ use ssh_key::{Algorithm, EcdsaCurve, HashAlg, LineEnding, PrivateKey};
 use crate::domain::KeyAlgorithm;
 use crate::error::{AppError, AppResult};
 
-/// Public-key metadata derived from private key material.
 #[derive(Debug)]
 pub struct KeyInsight {
     pub public_key: String,
 }
 
-/// Best-effort inspection of key material pasted or imported by the user.
-///
-/// Returns `Ok(None)` when the text isn't an OpenSSH-formatted private key —
-/// callers should fall back to storing it verbatim. When the key *is*
-/// encrypted and a non-empty passphrase is supplied, the passphrase is
-/// verified by actually decrypting — so a typo is caught here instead of at
-/// connect time — and the decrypted key is used to read back the public key,
-/// since the comment lives inside the encrypted section (only the algorithm
-/// and key blob are readable from an encrypted key without its passphrase).
 pub fn inspect(private_key: &str, passphrase: Option<&str>) -> AppResult<Option<KeyInsight>> {
     let key = match PrivateKey::from_openssh(private_key.trim()) {
         Ok(key) => key,
@@ -57,7 +37,6 @@ pub fn inspect(private_key: &str, passphrase: Option<&str>) -> AppResult<Option<
     Ok(Some(KeyInsight { public_key }))
 }
 
-/// A freshly generated keypair, ready to persist.
 pub struct GeneratedKey {
     pub private_key: String,
     pub public_key: String,
@@ -65,9 +44,6 @@ pub struct GeneratedKey {
     pub algorithm: String,
 }
 
-/// Generate a new keypair in OpenSSH format, optionally encrypting the
-/// private key with `passphrase` (AES-256-CTR + bcrypt-pbkdf, matching
-/// `ssh-keygen`'s own defaults).
 pub fn generate(
     algorithm: KeyAlgorithm,
     passphrase: Option<&str>,
@@ -128,25 +104,17 @@ pub fn generate(
     })
 }
 
-/// Private key file content read from disk, plus whatever we can infer for
-/// prefilling and previewing the "import" form.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyFile {
     pub name: String,
     pub private_key: String,
     pub public_key: Option<String>,
-    /// `None` when the private key isn't in a format we can parse (still
-    /// importable — `key_repo` stores it as opaque text either way).
+
     pub fingerprint: Option<String>,
     pub algorithm: Option<String>,
 }
 
-/// Read a private key file the user picked via the native file dialog. If a
-/// sibling `<path>.pub` exists (the standard `ssh-keygen` layout), its
-/// contents are used as the public key; otherwise it's derived from the
-/// private key itself when possible. The public part (and so the fingerprint
-/// and algorithm) is readable without a passphrase even for an encrypted key.
 pub fn read_file(path: &str) -> AppResult<KeyFile> {
     let path = Path::new(path);
     let private_key = std::fs::read_to_string(path)?.trim().to_string();
@@ -214,20 +182,14 @@ mod tests {
         let generated =
             generate(KeyAlgorithm::Ed25519, Some("hunter2"), "test@sageport").expect("generate");
 
-        // Right passphrase: succeeds and still exposes the public key.
         let insight = inspect(&generated.private_key, Some("hunter2"))
             .expect("inspect with correct passphrase")
             .expect("should parse");
         assert_eq!(insight.public_key, generated.public_key);
 
-        // Wrong passphrase: rejected with a clear error, not silently accepted.
         let err = inspect(&generated.private_key, Some("wrong")).unwrap_err();
         assert!(matches!(err, AppError::Invalid(_)));
 
-        // No passphrase at all: the algorithm and key blob are still
-        // readable (they're outside the encrypted section), but the comment
-        // isn't — it lives inside the encrypted section along with the
-        // private scalar.
         let insight = inspect(&generated.private_key, None)
             .expect("inspect without passphrase")
             .expect("should still parse the public part");

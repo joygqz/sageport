@@ -4,7 +4,8 @@ import { cn, formatBytes } from "./utils";
 
 describe("cn", () => {
   it("merges conditional classes", () => {
-    expect(cn("a", false && "b", "c")).toBe("a c");
+    const hidden = [] as string[];
+    expect(cn("a", hidden.length > 0 && "b", "c")).toBe("a c");
   });
 
   it("dedupes conflicting tailwind utilities", () => {

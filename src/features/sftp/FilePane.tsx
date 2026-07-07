@@ -143,11 +143,9 @@ export function FilePane({ side }: { side: PaneSide }) {
         }
       }}
     >
-      {/* Tab bar */}
       <div
         ref={tabStripRef}
-        // The strip scrolls with the wheel (any direction) instead of a
-        // scrollbar, which would eat into the fixed tab height.
+
         onWheel={(e) => {
           const el = tabStripRef.current;
           if (!el || el.scrollWidth <= el.clientWidth) return;
@@ -224,7 +222,6 @@ export function FilePane({ side }: { side: PaneSide }) {
 
       {active ? (
         <>
-          {/* Path / actions toolbar */}
           <div className="flex h-8 shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-background px-1.5">
             <Tooltip content={t("sftp.up")}>
               <Button
@@ -316,19 +313,12 @@ export function FilePane({ side }: { side: PaneSide }) {
   );
 }
 
-/**
- * Editable address bar: shows the active tab's cwd and lets the user type a
- * path to jump to. Remounted via `key={cwd}` so the input re-syncs after every
- * navigation. Enter navigates; Escape reverts and blurs.
- */
 function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
   const { t } = useI18n();
   const navigate = useSftpStore((s) => s.navigate);
   const [value, setValue] = useState(tab.cwd);
   const ref = useRef<HTMLInputElement>(null);
 
-  // Scroll to the tail so the deepest part of a long path stays visible when
-  // the field is not focused (kept LTR so the caret behaves normally).
   const scrollToEnd = () => {
     const el = ref.current;
     if (el) el.scrollLeft = el.scrollWidth;

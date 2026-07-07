@@ -30,7 +30,6 @@ const ALGORITHMS: { value: SshKeyAlgorithm; labelKey: TKey }[] = [
   { value: "ecdsaP521", labelKey: "credentials.keys.algorithm.ecdsaP521" },
 ];
 
-/** Add an SSH key by generating a fresh pair or importing an existing one. */
 export function KeyFormDialog({
   open: isOpen,
   onClose,

@@ -11,9 +11,6 @@ fn clean_optional(value: &mut Option<String>) {
         .filter(|v| !v.is_empty());
 }
 
-/// Only one of `key_id` / `password` is meaningful for a given `auth_type`;
-/// clear whichever one doesn't apply so switching auth methods can't leave a
-/// stale secret or key reference behind.
 fn normalize(mut input: IdentityInput) -> AppResult<IdentityInput> {
     input.name = input.name.trim().to_string();
     input.username = input.username.trim().to_string();
@@ -119,7 +116,6 @@ pub async fn update(pool: &SqlitePool, id: &str, input: IdentityInput) -> AppRes
         return Err(AppError::NotFound(format!("identity {id}")));
     }
 
-    // Only touch the stored password when explicitly sent; empty clears it.
     if input.password.is_some() {
         sqlx::query("UPDATE identities SET password = ? WHERE id = ?")
             .bind(none_if_empty(input.password.as_deref()))

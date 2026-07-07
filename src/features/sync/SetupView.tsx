@@ -28,17 +28,12 @@ import type {
 import { useSyncConnect, useSyncOAuthStart } from "./api";
 import { SYNC_PROVIDERS, providerMeta } from "./providers";
 
-/** Progress of the browser authorization for the selected OAuth provider. */
 type OAuthPhase =
   | { step: "idle" }
   | { step: "device"; userCode: string; verificationUri: string }
   | { step: "browser" }
   | { step: "authorized"; account: string };
 
-/**
- * Disconnected state: pick one of the five providers, authorize or fill in
- * credentials, choose the vault passphrase, connect.
- */
 export function SetupView({ status }: { status: SyncStatus }) {
   const { t } = useI18n();
   const [kind, setKind] = useState<SyncProviderKind>("gist");
@@ -177,7 +172,6 @@ export function SetupView({ status }: { status: SyncStatus }) {
   );
 }
 
-/** Sign-in button plus the in-flight states of the browser authorization. */
 function OAuthPanel({
   kind,
   name,
@@ -218,7 +212,6 @@ function OAuthPanel({
     }
   };
 
-  // The pending `oauthStart` rejects with `cancelled` and resets the phase.
   const cancel = () => void ipc.sync.oauthCancel();
 
   const copyCode = async (code: string) => {
@@ -243,7 +236,11 @@ function OAuthPanel({
             className="size-8"
             onClick={() => void copyCode(phase.userCode)}
           >
-            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            {copied ? (
+              <Check className="size-3.5" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -301,7 +298,6 @@ function OAuthPanel({
   );
 }
 
-/** Credential fields (WebDAV / S3), the shared passphrase, and Connect. */
 function ConnectForm({
   kind,
   passphrase,

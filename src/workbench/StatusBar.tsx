@@ -21,11 +21,6 @@ const statusDot: Record<TerminalStatus, string> = {
   error: "bg-destructive",
 };
 
-/**
- * One-line status strip along the window's bottom edge. Every item is a
- * click target: the session jumps to its tab, transfers open the panel,
- * sync and updates open their settings section.
- */
 export function StatusBar() {
   const { t } = useI18n();
 
@@ -66,7 +61,6 @@ function StatusBarItem({
   );
 }
 
-/** The terminal session the workbench is currently targeting. */
 function SessionItem() {
   const { t } = useI18n();
   const tabs = useTabsStore((s) => s.tabs);

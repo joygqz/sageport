@@ -12,9 +12,6 @@ pub async fn keys_list(state: State<'_, AppState>) -> AppResult<Vec<SshKey>> {
     key_repo::list(&state.db).await
 }
 
-/// `keys_generate`'s response: the persisted row plus the fingerprint/
-/// algorithm the frontend shows as a one-time "here's what was created"
-/// confirmation (mirroring `ssh-keygen`'s own summary line).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneratedSshKey {
@@ -24,8 +21,6 @@ pub struct GeneratedSshKey {
     pub algorithm: String,
 }
 
-/// Generate a brand-new keypair and persist it in one step — there's nothing
-/// for the user to review beforehand, unlike import.
 #[tauri::command]
 pub async fn keys_generate(
     state: State<'_, AppState>,
@@ -49,9 +44,6 @@ pub async fn keys_generate(
     })
 }
 
-/// Read a private key file (and its sibling `.pub`, if any) the user picked
-/// via the native file dialog, for prefilling the "import" form. Doesn't
-/// persist anything — the caller still confirms via `keys_create`.
 #[tauri::command]
 pub async fn keys_import_file(path: String) -> AppResult<KeyFile> {
     sshkey::read_file(&path)

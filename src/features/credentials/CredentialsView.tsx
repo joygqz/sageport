@@ -36,11 +36,6 @@ import {
 import { IdentityFormDialog } from "./IdentityFormDialog";
 import { KeyFormDialog } from "./KeyFormDialog";
 
-/**
- * Credentials view: SSH keys and reusable identities in two collapsible
- * sections. Identities bundle a username with an authentication method so
- * many hosts can share one login.
- */
 export function CredentialsView() {
   const { t } = useI18n();
   const [keyFormOpen, setKeyFormOpen] = useState(false);
@@ -128,7 +123,6 @@ function Section({
   );
 }
 
-/** Short algorithm tag parsed from the OpenSSH public key line. */
 function algorithmTag(publicKey: string | null): string | null {
   const token = publicKey?.trim().split(/\s+/)[0];
   if (!token) return null;

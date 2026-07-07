@@ -1,19 +1,3 @@
-//! OAuth flows for the cloud sync providers — no manual token entry.
-//!
-//! * GitHub — device flow: the app shows a short user code, the user enters
-//!   it at github.com/login/device, and we poll for the grant. Needs only a
-//!   public client id (device flow enabled on the OAuth app), no secret.
-//! * Google / Microsoft — authorization-code flow for installed apps: we
-//!   bind a loopback listener, open the system browser, and catch the
-//!   redirect. PKCE (S256) protects the exchange; no confidential secret is
-//!   involved (Google issues a "desktop app" client secret but explicitly
-//!   documents it as non-confidential).
-//!
-//! Client ids are baked in at build time from `SAGEPORT_*` env vars — see
-//! `docs/sync-oauth-setup.md` for how to register the three apps. A provider
-//! whose id is missing is reported as unavailable to the UI instead of
-//! failing at runtime.
-
 use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -30,8 +14,7 @@ use crate::error::{AppError, AppResult};
 
 pub const GITHUB_CLIENT_ID: Option<&str> = option_env!("SAGEPORT_GITHUB_CLIENT_ID");
 pub const GOOGLE_CLIENT_ID: Option<&str> = option_env!("SAGEPORT_GOOGLE_CLIENT_ID");
-/// Google "desktop app" clients are issued a secret that is not treated as
-/// confidential, but the token endpoint still requires it.
+
 pub const GOOGLE_CLIENT_SECRET: Option<&str> = option_env!("SAGEPORT_GOOGLE_CLIENT_SECRET");
 pub const MS_CLIENT_ID: Option<&str> = option_env!("SAGEPORT_MS_CLIENT_ID");
 
@@ -44,19 +27,16 @@ const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const MS_AUTH_URL: &str = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
 const MS_TOKEN_URL: &str = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
-/// How long we wait for the user to finish in the browser.
 const LOOPBACK_TIMEOUT: Duration = Duration::from_secs(300);
 
-/// Refresh when the access token has less than this much life left.
 const REFRESH_LEEWAY_SECS: i64 = 60;
 
-/// Refreshable OAuth token set stored inside the provider config.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthTokens {
     pub access_token: String,
     pub refresh_token: String,
-    /// RFC3339 expiry of `access_token`.
+
     pub expires_at: String,
 }
 
@@ -79,7 +59,6 @@ impl OAuthTokens {
     }
 }
 
-/// Progress events streamed to the UI while a flow is in flight.
 #[derive(Debug, Clone, Serialize)]
 #[serde(
     tag = "type",
@@ -87,17 +66,14 @@ impl OAuthTokens {
     rename_all_fields = "camelCase"
 )]
 pub enum OAuthEvent {
-    /// GitHub device flow: show this code and link to the user.
     DeviceCode {
         user_code: String,
         verification_uri: String,
     },
-    /// Loopback flow: the browser has been opened, waiting for the redirect.
+
     Browser,
 }
 
-/// What a completed flow hands back: enough to build a provider config plus
-/// a human-readable account label for the UI.
 #[derive(Debug, Clone)]
 pub struct OAuthOutcome {
     pub credential: OAuthCredential,
@@ -106,7 +82,6 @@ pub struct OAuthOutcome {
 
 #[derive(Debug, Clone)]
 pub enum OAuthCredential {
-    /// GitHub device-flow tokens don't expire and need no refresh.
     GithubToken(String),
     Tokens(OAuthTokens),
 }
@@ -147,8 +122,6 @@ async fn post_form_json(url: &str, form: &[(&str, &str)]) -> AppResult<Value> {
     }
     Ok(body)
 }
-
-// --- GitHub device flow ---
 
 pub async fn github_device_flow(
     on_event: &tauri::ipc::Channel<OAuthEvent>,
@@ -242,8 +215,6 @@ async fn github_login(token: &str) -> AppResult<String> {
     json_str(&body, "login")
 }
 
-// --- Loopback authorization-code flow (Google & Microsoft) ---
-
 struct Pkce {
     verifier: String,
     challenge: String,
@@ -292,7 +263,6 @@ pub async fn google_flow(
         .append_pair("code_challenge", &pkce.challenge)
         .append_pair("code_challenge_method", "S256")
         .append_pair("access_type", "offline")
-        // Always re-consent so a refresh token is issued even on re-link.
         .append_pair("prompt", "consent")
         .append_pair("state", &state);
 
@@ -350,7 +320,7 @@ pub async fn microsoft_flow(
     let client_id = require(MS_CLIENT_ID, "Microsoft", "SAGEPORT_MS_CLIENT_ID")?;
 
     let listener = bind_loopback().await?;
-    // Entra ID special-cases http://localhost (any port) for desktop clients.
+
     let redirect_uri = format!("http://localhost:{}", listener_port(&listener)?);
     let pkce = pkce();
     let state = random_state();
@@ -415,8 +385,6 @@ async fn microsoft_account(access_token: &str) -> AppResult<String> {
         .ok_or_else(|| AppError::Other("no account name in Graph response".into()))
 }
 
-// --- Token refresh ---
-
 pub async fn refresh_google(tokens: &OAuthTokens) -> AppResult<OAuthTokens> {
     let client_id = require(GOOGLE_CLIENT_ID, "Google", "SAGEPORT_GOOGLE_CLIENT_ID")?;
     let client_secret = require(
@@ -436,7 +404,6 @@ pub async fn refresh_google(tokens: &OAuthTokens) -> AppResult<OAuthTokens> {
     .await?;
     Ok(OAuthTokens::from_grant(
         json_str(&resp, "access_token")?,
-        // Google normally keeps the original refresh token.
         resp["refresh_token"]
             .as_str()
             .unwrap_or(&tokens.refresh_token)
@@ -459,7 +426,6 @@ pub async fn refresh_microsoft(tokens: &OAuthTokens) -> AppResult<OAuthTokens> {
     .await?;
     Ok(OAuthTokens::from_grant(
         json_str(&resp, "access_token")?,
-        // Microsoft rotates refresh tokens; keep the new one when present.
         resp["refresh_token"]
             .as_str()
             .unwrap_or(&tokens.refresh_token)
@@ -467,8 +433,6 @@ pub async fn refresh_microsoft(tokens: &OAuthTokens) -> AppResult<OAuthTokens> {
         resp["expires_in"].as_i64().unwrap_or(3600),
     ))
 }
-
-// --- Loopback redirect plumbing ---
 
 async fn bind_loopback() -> AppResult<TcpListener> {
     TcpListener::bind(("127.0.0.1", 0))
@@ -483,10 +447,6 @@ fn listener_port(listener: &TcpListener) -> AppResult<u16> {
         .port())
 }
 
-/// Open `auth_url` in the system browser and wait for the provider to
-/// redirect back with `?code=...`. Verifies `state`, answers the browser
-/// with a small "you can close this tab" page, and enforces both a timeout
-/// and user cancellation.
 async fn run_loopback(
     app: &tauri::AppHandle,
     on_event: &tauri::ipc::Channel<OAuthEvent>,
@@ -513,7 +473,6 @@ async fn run_loopback(
         };
         let (mut stream, _) = accept.map_err(|e| AppError::Other(e.to_string()))?;
 
-        // Read just the request head; the redirect is a bare GET.
         let mut buf = vec![0u8; 8192];
         let n = stream.read(&mut buf).await.unwrap_or(0);
         let head = String::from_utf8_lossy(&buf[..n]);
@@ -522,8 +481,6 @@ async fn run_loopback(
             continue;
         };
 
-        // Stray requests (favicon, health checks) just get a 404 and we keep
-        // waiting for the real redirect.
         let url = match Url::parse(&format!("http://localhost{target}")) {
             Ok(u) => u,
             Err(_) => {

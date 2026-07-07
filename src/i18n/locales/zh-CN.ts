@@ -1,8 +1,5 @@
 import type { Dictionary } from "./en";
 
-/**
- * 简体中文词典。文案风格与英文一致，参考 GitHub 中文文案。
- */
 export const zhCN: Dictionary = {
   common: {
     add: "添加",

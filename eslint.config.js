@@ -20,8 +20,8 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // We don't use the React Compiler, so its compatibility lints (e.g. for
-      // react-hook-form's `watch()`) don't apply.
+
+      "no-empty": ["error", { allowEmptyCatch: true }],
       "react-hooks/incompatible-library": "off",
       "react-refresh/only-export-components": [
         "warn",

@@ -32,7 +32,6 @@ export function useGenerateSshKey() {
   });
 }
 
-/** Reads a key file (and sibling `.pub`) to prefill the import form; doesn't persist. */
 export function useImportSshKeyFile() {
   return useMutation({
     mutationFn: (path: string) => ipc.keys.importFile(path),

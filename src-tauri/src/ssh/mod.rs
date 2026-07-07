@@ -1,11 +1,3 @@
-//! SSH session manager built on libssh2 (`ssh2`).
-//!
-//! Each interactive session runs on its own OS thread: the thread owns the
-//! blocking `ssh2::Session`/`Channel`, pumps terminal output to the frontend as
-//! Tauri events, and applies input/resize/close commands received over a
-//! channel. This keeps all non-`Send` SSH state confined to one thread while
-//! exposing a simple async-free API to the rest of the app.
-
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::io::{self, Read, Write};
@@ -25,20 +17,12 @@ use crate::error::{AppError, AppResult};
 pub const EVENT_DATA: &str = "ssh://data";
 pub const EVENT_STATUS: &str = "ssh://status";
 
-/// How often to send an SSH keepalive probe on an otherwise idle session.
 pub(crate) const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
 
-/// Upper bound for the blocking connect/handshake/auth phase, so a dead
-/// network fails fast instead of hanging the session thread forever.
 pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// How many 32 KiB reads to drain per loop tick before yielding, so a burst
-/// of output (e.g. `cat` on a large file) still keeps the UI responsive.
 const MAX_READS_PER_TICK: usize = 16;
 
-/// Keep writes under libssh2's single SSH packet limit. More importantly, the
-/// exact same slice must be retried after EAGAIN, so we write one stable chunk
-/// at a time instead of repeatedly handing libssh2 a growing Vec.
 const MAX_WRITE_CHUNK: usize = 32_700;
 
 const LIBSSH2_EAGAIN: i32 = -37;
@@ -145,7 +129,7 @@ impl OutputQueue {
 struct DataEvent {
     id: String,
     attempt: u32,
-    /// Base64-encoded raw bytes (terminal output may be binary).
+
     data: String,
 }
 
@@ -154,12 +138,11 @@ struct DataEvent {
 struct StatusEvent {
     id: String,
     attempt: u32,
-    /// "connecting" | "connected" | "closed" | "error"
+
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
-    /// Machine-readable [`AppError::code`], set only for "error" — lets the
-    /// frontend show a localized message instead of the raw `message` above.
+
     #[serde(skip_serializing_if = "Option::is_none")]
     code: Option<String>,
 }
@@ -176,8 +159,6 @@ impl SessionManager {
         Self::default()
     }
 
-    /// Start a session on its own thread. Returns immediately; connection
-    /// progress is reported through `ssh://status` events.
     pub fn connect(&self, app: AppHandle, params: ConnectParams) -> AppResult<()> {
         let id = params.session_id.clone();
         let attempt = params.attempt;
@@ -189,11 +170,6 @@ impl SessionManager {
                 .get(&id)
                 .is_some_and(|handle| handle.attempt == attempt)
             {
-                // A live session already exists for this id+attempt (e.g.
-                // React StrictMode re-invoked `connect`). Ignore the duplicate:
-                // spawning a second thread would orphan the first, which then
-                // emits a spurious "closed" for the shared id and stomps the
-                // tab's status back to a disconnected state.
                 return Ok(());
             }
             sessions.insert(id.clone(), SessionHandle { tx, attempt })
@@ -209,10 +185,7 @@ impl SessionManager {
             .name(format!("ssh-{id}"))
             .spawn(move || {
                 run_session(app, params, rx);
-                // Drop our handle on exit so the map only ever holds live
-                // sessions. Only the thread that owns the current attempt may
-                // remove it; an older timed-out attempt can finish late after a
-                // reconnect has already installed a replacement handle.
+
                 let mut sessions = sessions.lock();
                 if sessions
                     .get(&thread_id)
@@ -289,7 +262,6 @@ fn emit_error_status(app: &AppHandle, id: &str, attempt: u32, err: &AppError) {
     );
 }
 
-/// Blocking session lifecycle, run on a dedicated thread.
 fn run_session(app: AppHandle, params: ConnectParams, rx: Receiver<SessionCommand>) {
     let id = params.session_id.clone();
     let attempt = params.attempt;
@@ -302,9 +274,6 @@ fn run_session(app: AppHandle, params: ConnectParams, rx: Receiver<SessionComman
     }
 }
 
-/// A broken link mid-session (reset, NAT drop, server kill) surfaces as an
-/// opaque libssh2 transport error ("transport read"); translate it into a
-/// message a user can act on.
 pub(crate) fn connection_lost(e: impl fmt::Display) -> AppError {
     AppError::Other(format!("connection lost: {e}"))
 }
@@ -340,8 +309,6 @@ pub(crate) fn connect_tcp(host: &str, port: u16) -> AppResult<TcpStream> {
     for addr in (host, port).to_socket_addrs()? {
         match TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT) {
             Ok(tcp) => {
-                // Interactive keystrokes and SFTP requests should not sit in
-                // Nagle's buffer.
                 let _ = tcp.set_nodelay(true);
                 return Ok(tcp);
             }
@@ -368,7 +335,7 @@ fn run_session_inner(
     let tcp = connect_tcp(&params.host, params.port)?;
     let mut session = ssh2::Session::new()?;
     session.set_tcp_stream(tcp);
-    // Bound the blocking connect phase (handshake + auth); 0 = no timeout.
+
     session.set_timeout(CONNECT_TIMEOUT.as_millis() as u32);
     session.handshake()?;
 
@@ -384,17 +351,8 @@ fn run_session_inner(
 
     emit_status(app, id, attempt, "connected");
 
-    // Ask libssh2 to keep the connection alive so idle sessions are not
-    // dropped by the server or an intervening NAT/firewall. `want_reply =
-    // false`: a probe the peer must answer adds traffic and, more
-    // importantly, interleaving its reply with pending channel writes has
-    // historically confused libssh2's non-blocking transport. The probe
-    // itself is enough to keep NAT/firewall state alive, and a dead TCP link
-    // still surfaces as a read/write error.
     session.set_keepalive(false, KEEPALIVE_INTERVAL.as_secs() as u32);
 
-    // Non-blocking I/O so the single event loop can interleave reads, writes,
-    // and control commands without ever blocking on any one of them.
     session.set_timeout(0);
     session.set_blocking(false);
 
@@ -405,8 +363,6 @@ fn run_session_inner(
     loop {
         let mut made_progress = false;
 
-        // Drain pending control commands first. Input is appended as immutable
-        // chunks so a libssh2 EAGAIN retry can reuse the exact same slice.
         loop {
             match rx.try_recv() {
                 Ok(SessionCommand::Input(data)) => {
@@ -425,8 +381,6 @@ fn run_session_inner(
             }
         }
 
-        // If the last write returned EAGAIN, libssh2 requires us to retry that
-        // exact same buffer before starting unrelated channel operations.
         if !output.is_retrying() {
             if let Some((cols, rows)) = pending_resize {
                 match channel.request_pty_size(cols, rows, None, None) {
@@ -435,15 +389,11 @@ fn run_session_inner(
                         made_progress = true;
                     }
                     Err(ref e) if is_ssh_would_block(e) => {}
-                    // A resize is advisory; a rejected resize should not tear
-                    // down an otherwise healthy shell.
+
                     Err(_) => pending_resize = None,
                 }
             }
 
-            // Drain remote output before writing. This gives libssh2 a chance to
-            // process window-adjust packets before channel_write performs its own
-            // incoming-flow drain.
             for _ in 0..MAX_READS_PER_TICK {
                 match channel.read(&mut read_buf) {
                     Ok(0) => break,
@@ -464,9 +414,6 @@ fn run_session_inner(
             }
         }
 
-        // Push queued input to the remote. WouldBlock means the send window or
-        // socket is not ready; the front chunk is kept untouched and retried
-        // verbatim on the next pass.
         while let Some(len) = output.current_len() {
             let result = channel.write(output.current_slice().expect("current write chunk"));
             match result {
@@ -487,14 +434,12 @@ fn run_session_inner(
             return Ok(());
         }
 
-        // Send keepalive only when channel operations are otherwise quiescent.
         if output.is_empty() && pending_resize.is_none() && Instant::now() >= next_keepalive {
             match session.keepalive_send() {
-                // Probe sent (or nothing to do): schedule the next one.
                 Ok(_) => next_keepalive = Instant::now() + KEEPALIVE_INTERVAL,
-                // EAGAIN: socket buffer full right now, retry next tick.
+
                 Err(ref e) if is_ssh_would_block(e) => {}
-                // Keepalive failing outright means the link is gone.
+
                 Err(e) => return Err(connection_lost(e)),
             }
         }
@@ -505,16 +450,7 @@ fn run_session_inner(
     }
 }
 
-/// libssh2 codes meaning "the server understood the request and rejected
-/// these credentials", as opposed to a network/protocol-level failure —
-/// distinguished so a wrong password/key surfaces as [`AppError::Auth`]
-/// rather than a raw libssh2 error string.
-const AUTH_REJECTED_CODES: [i32; 4] = [
-    -15, // LIBSSH2_ERROR_PASSWORD_EXPIRED
-    -18, // LIBSSH2_ERROR_AUTHENTICATION_FAILED (also PUBLICKEY_UNRECOGNIZED)
-    -19, // LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED
-    -48, // LIBSSH2_ERROR_KEYFILE_AUTH_FAILED
-];
+const AUTH_REJECTED_CODES: [i32; 4] = [-15, -18, -19, -48];
 
 fn map_auth_error(e: ssh2::Error) -> AppError {
     match e.code() {

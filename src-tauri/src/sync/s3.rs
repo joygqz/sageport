@@ -1,10 +1,3 @@
-//! S3-compatible object store (AWS S3, MinIO, Cloudflare R2, Backblaze B2,
-//! ...).
-//!
-//! Requests are presigned with SigV4 via `rusty-s3` and executed with the
-//! app's shared reqwest stack, so no AWS SDK is pulled in. Backups are
-//! objects under an optional key prefix.
-
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -16,7 +9,6 @@ use crate::error::{AppError, AppResult};
 
 use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
 
-/// Presigned URLs only need to outlive the single request they authorize.
 const SIGN_TTL: Duration = Duration::from_secs(300);
 
 pub struct S3Store {
@@ -52,7 +44,7 @@ impl S3Store {
         };
         let bucket = Bucket::new(endpoint_url, style, bucket_name.clone(), region.clone())
             .map_err(|e| AppError::Invalid(format!("invalid S3 bucket config: {e}")))?;
-        // Normalize the prefix into "folder/" form once so keys join cleanly.
+
         let prefix_norm = match prefix.trim().trim_matches('/') {
             "" => String::new(),
             p => format!("{p}/"),
@@ -175,7 +167,6 @@ fn net_err(e: reqwest::Error) -> AppError {
 }
 
 fn api_err(what: &str, status: reqwest::StatusCode, body: &str) -> AppError {
-    // S3 errors are XML; surface the <Message> when present.
     let detail = body
         .split("<Message>")
         .nth(1)

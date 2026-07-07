@@ -6,7 +6,6 @@ import type { AiProtocol } from "@/types/models";
 const configKey = ["ai", "config"] as const;
 const modelsKey = ["ai", "models"] as const;
 
-/** Supported wire formats and their conventional base URLs. */
 export const AI_PROTOCOLS: { value: AiProtocol; defaultBaseUrl: string }[] = [
   { value: "openai", defaultBaseUrl: "https://api.openai.com/v1" },
   { value: "anthropic", defaultBaseUrl: "https://api.anthropic.com" },
@@ -34,7 +33,6 @@ export function useSetAiConfig() {
   });
 }
 
-/** Live model list fetched from the provider; only runs once a key is set. */
 export function useAiModels(enabled: boolean) {
   return useQuery({
     queryKey: modelsKey,

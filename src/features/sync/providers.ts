@@ -7,11 +7,11 @@ import { GdriveIcon, GithubIcon, OnedriveIcon } from "./icons";
 
 export interface SyncProviderMeta {
   kind: SyncProviderKind;
-  /** Brand names are not translated. */
+
   name: string;
   taglineKey: TKey;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
-  /** OAuth providers authorize in the browser; the rest take credentials. */
+
   oauth: boolean;
 }
 

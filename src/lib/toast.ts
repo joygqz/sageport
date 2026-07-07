@@ -19,8 +19,14 @@ interface ToastState {
 
 const DURATION = 4500;
 
-/** Auto-dismiss timers, kept outside store state since they aren't serializable. */
-const timers = new Map<string, { timeoutId: ReturnType<typeof setTimeout>; remaining: number; startedAt: number }>();
+const timers = new Map<
+  string,
+  {
+    timeoutId: ReturnType<typeof setTimeout>;
+    remaining: number;
+    startedAt: number;
+  }
+>();
 
 function scheduleDismiss(id: string, ms: number) {
   const timeoutId = setTimeout(() => {
@@ -49,7 +55,10 @@ export const useToastStore = create<ToastState>((set) => ({
     const timer = timers.get(id);
     if (!timer) return;
     clearTimeout(timer.timeoutId);
-    timer.remaining = Math.max(timer.remaining - (Date.now() - timer.startedAt), 0);
+    timer.remaining = Math.max(
+      timer.remaining - (Date.now() - timer.startedAt),
+      0,
+    );
   },
   resume: (id) => {
     const timer = timers.get(id);
@@ -58,7 +67,6 @@ export const useToastStore = create<ToastState>((set) => ({
   },
 }));
 
-/** Imperative helper usable outside React (e.g. in mutation callbacks). */
 export const toast = {
   info: (title: string, description?: string) =>
     useToastStore.getState().push({ kind: "info", title, description }),
@@ -70,7 +78,6 @@ export const toast = {
     useToastStore.getState().push({ kind: "error", title, description }),
 };
 
-/** Normalize a thrown command error into a readable string. */
 export function errorMessage(err: unknown): string {
   if (err && typeof err === "object" && "message" in err) {
     return String((err as { message: unknown }).message);
@@ -78,11 +85,6 @@ export function errorMessage(err: unknown): string {
   return typeof err === "string" ? err : "Unexpected error";
 }
 
-/**
- * Machine-readable error code set by the backend (`AppError::code`), e.g.
- * "in_use" | "not_found" | "invalid". Lets callers show a localized,
- * human-friendly description instead of the raw English message.
- */
 export function errorCode(err: unknown): string | null {
   if (err && typeof err === "object" && "code" in err) {
     return String((err as { code: unknown }).code);

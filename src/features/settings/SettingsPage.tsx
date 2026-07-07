@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  Info,
-  Minus,
-  Palette,
-  Plus,
-  RefreshCw,
-  Sparkles,
-} from "lucide-react";
+import { Info, Minus, Palette, Plus, RefreshCw, Sparkles } from "lucide-react";
 
 import {
   Button,
@@ -45,11 +38,6 @@ const NAV: { id: SettingsSection; labelKey: TKey; icon: typeof Palette }[] = [
   { id: "about", labelKey: "settings.nav.about", icon: Info },
 ];
 
-/**
- * Settings as a full editor tab (not a dialog), with a section nav on the
- * left. The active section lives on the tab itself so deep links (e.g. the
- * assistant jumping to its provider setup) land on the right section.
- */
 export function SettingsPage({ section }: { section: SettingsSection }) {
   const { t } = useI18n();
   const setSection = useTabsStore((s) => s.setSettingsSection);
@@ -141,7 +129,6 @@ function AppearanceSection() {
   );
 }
 
-/** Whole-UI zoom stepper, mirroring the mod+= / mod+- / mod+0 shortcuts. */
 function ZoomField() {
   const { t } = useI18n();
   const level = useZoomStore((s) => s.level);
@@ -199,7 +186,6 @@ function ZoomField() {
   );
 }
 
-/** A small live swatch of the theme: chrome strip, editor area, terminal colors. */
 function ThemeCard({
   theme,
   active,
@@ -265,8 +251,7 @@ function ThemeCard({
 
 function AiSection() {
   const { data: config } = useAiConfig();
-  // Mount the form only once the saved config is available so its fields
-  // initialize from props with no setState-in-effect hydration.
+
   if (!config) return null;
   return <AiForm config={config} />;
 }

@@ -52,11 +52,6 @@ const HEALTH_REASON_KEYS = {
   unknown: "hosts.health.reason.unknown",
 } as const;
 
-/**
- * The host explorer: hosts grouped into collapsible sections, filterable,
- * with connect / SFTP / edit / delete on every row's context menu.
- * Double-click connects, mirroring how editors open files.
- */
 export function HostsView() {
   const { t } = useI18n();
   const { data: hosts = [], isLoading } = useHosts();
@@ -100,8 +95,6 @@ export function HostsView() {
     }
     const ordered = groups
       .map((g) => ({ id: g.id, name: g.name, hosts: byGroup.get(g.id) ?? [] }))
-      // While filtering, hide groups with no matches; otherwise show every
-      // group so even empty ones can be renamed or deleted in place.
       .filter((s) => !searching || s.hosts.length > 0);
     const ungrouped = byGroup.get(UNGROUPED) ?? [];
     if (ungrouped.length > 0) {

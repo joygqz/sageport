@@ -1,10 +1,3 @@
-/**
- * English dictionary, the single source of truth for translation keys.
- * Its shape defines the `Dictionary` type, so every other locale is checked
- * against it and missing or extra keys surface as type errors.
- *
- * Copy style follows GitHub: sentence case, plain complete sentences.
- */
 export const en = {
   common: {
     add: "Add",
@@ -575,10 +568,6 @@ export const en = {
 
 export type Dictionary = DeepString<typeof en>;
 
-/**
- * Relaxes the `as const` literal types above to plain `string` leaves so
- * other locales can supply different text with the exact same structure.
- */
 type DeepString<T> = {
   [K in keyof T]: T[K] extends string ? string : DeepString<T[K]>;
 };

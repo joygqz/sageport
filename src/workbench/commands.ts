@@ -7,18 +7,12 @@ import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
 
-/**
- * The command registry behind the command palette. Every entry is also
- * reachable through menus or shortcuts; the palette is an accelerator,
- * never the only path to a feature.
- */
-
 export interface WorkbenchCommand {
   id: string;
-  /** Category prefix, rendered as "Category: label" like VSCode. */
+
   categoryKey: TKey;
   label: string;
-  /** Display-only shortcut hint, e.g. ["mod", "N"]. */
+
   shortcut?: string[];
   run: () => void;
 }

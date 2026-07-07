@@ -1,10 +1,3 @@
-//! SFTP / filesystem commands.
-//!
-//! A `connection_id` of `None` targets the **local** filesystem (served inline
-//! with `std::fs`); `Some(id)` targets a **remote** connection managed by
-//! [`crate::sftp::SftpManager`]. Connections reuse a host's stored credentials
-//! via [`crate::commands::ssh::resolve_credentials`].
-
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -25,7 +18,6 @@ fn valid_port(port: i64) -> AppResult<u16> {
     Ok(port)
 }
 
-/// One end of a transfer, as sent from the frontend.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EndpointInput {
@@ -42,8 +34,6 @@ impl From<EndpointInput> for Endpoint {
     }
 }
 
-/// A completed or in-flight transfer, as persisted in `sftp_transfers` and
-/// sent to the frontend for the history view.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferHistoryEntry {
@@ -80,9 +70,6 @@ impl From<TransferRow> for TransferHistoryEntry {
     }
 }
 
-/// Open a remote SFTP connection for `host_id` under `connection_id`. Returns
-/// immediately; progress arrives via `sftp://status` events. Call `fs_home`
-/// once the connection reports "connected".
 #[tauri::command]
 pub async fn sftp_connect(
     app: AppHandle,
@@ -111,8 +98,6 @@ pub async fn sftp_disconnect(state: State<'_, AppState>, connection_id: String) 
     Ok(())
 }
 
-/// Resolve the starting directory: the local home dir, or the remote home
-/// (`realpath(".")`).
 #[tauri::command]
 pub async fn fs_home(
     app: AppHandle,
@@ -196,8 +181,6 @@ pub async fn fs_delete(
     }
 }
 
-/// Read a text file for the built-in editor. Refuses files larger than
-/// [`sftp::MAX_EDIT_BYTES`] and content that is not valid UTF-8.
 #[tauri::command]
 pub async fn fs_read_text(
     state: State<'_, AppState>,
@@ -219,7 +202,6 @@ pub async fn fs_read_text(
     String::from_utf8(bytes).map_err(|_| AppError::Invalid("file is not UTF-8 text".into()))
 }
 
-/// Overwrite a file with the editor's content.
 #[tauri::command]
 pub async fn fs_write_text(
     state: State<'_, AppState>,
@@ -238,13 +220,6 @@ pub async fn fs_write_text(
     }
 }
 
-/// Copy `source` into the directory `dest`. Runs on its own thread; progress is
-/// reported via `sftp://transfer` events keyed by `transfer_id`. When `compress`
-/// is set and `source` is a directory crossing the network, it is shipped as a
-/// single `tar.gz` and unpacked at the destination. A history row is recorded
-/// up front and finalized once the transfer settles, so it survives even if
-/// the app is closed mid-transfer (left as `"active"`). Cancel with
-/// [`fs_transfer_cancel`].
 #[tauri::command]
 pub async fn fs_transfer(
     app: AppHandle,
@@ -277,8 +252,6 @@ pub async fn fs_transfer(
     let spawn = std::thread::Builder::new()
         .name(format!("sftp-xfer-{transfer_id}"))
         .spawn(move || {
-            // `transfer` already emits a terminal done/error/cancelled event on
-            // its own; here we just persist the outcome to history.
             let outcome = sftp::transfer(
                 &app,
                 &mgr,
@@ -318,15 +291,12 @@ pub async fn fs_transfer(
     Ok(())
 }
 
-/// Request cancellation of an in-flight transfer. Best-effort: it stops
-/// between chunks/files rather than instantly.
 #[tauri::command]
 pub async fn fs_transfer_cancel(state: State<'_, AppState>, transfer_id: String) -> AppResult<()> {
     state.sftp.cancel_transfer(&transfer_id);
     Ok(())
 }
 
-/// Newest-first transfer history (capped at `limit`, default 200).
 #[tauri::command]
 pub async fn sftp_transfer_history_list(
     state: State<'_, AppState>,
@@ -336,19 +306,16 @@ pub async fn sftp_transfer_history_list(
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
-/// Remove a single transfer history entry.
 #[tauri::command]
 pub async fn sftp_transfer_history_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
     transfer_repo::delete(&state.db, &id).await
 }
 
-/// Clear all transfer history.
 #[tauri::command]
 pub async fn sftp_transfer_history_clear(state: State<'_, AppState>) -> AppResult<()> {
     transfer_repo::clear(&state.db).await
 }
 
-/// Run a remote SFTP operation off the async runtime (it blocks on the worker).
 async fn blocking<T, F>(mgr: Arc<SftpManager>, f: F) -> AppResult<T>
 where
     T: Send + 'static,
@@ -359,7 +326,6 @@ where
         .map_err(|e| AppError::Other(format!("task join error: {e}")))?
 }
 
-/// Run a blocking local-filesystem operation off the async runtime.
 async fn blocking_local<T, F>(f: F) -> AppResult<T>
 where
     T: Send + 'static,

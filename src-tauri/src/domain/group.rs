@@ -14,7 +14,6 @@ pub struct Group {
     pub revision: i64,
 }
 
-/// Payload for creating/updating a group from the frontend.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupInput {

@@ -14,31 +14,25 @@ import { ActivityBar } from "./ActivityBar";
 import { CommandPalette } from "./CommandPalette";
 import { EditorArea } from "./EditorArea";
 import { useKeybindings } from "./keybindings";
-import { auxLimits, panelLimits, sidebarLimits, useLayoutStore } from "./layout";
+import {
+  auxLimits,
+  panelLimits,
+  sidebarLimits,
+  useLayoutStore,
+} from "./layout";
 import { useOverlayStore } from "./overlays";
 import { SideBar } from "./SideBar";
 import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
 import { syncTrafficLights, useZoomStore, ZOOM_SYNC_KEY } from "./zoom";
 
-/**
- * The workbench: a fixed chrome of title bar, activity bar, side bar,
- * editor area, bottom panel, auxiliary bar and status bar, in the layout
- * language of a code editor. Regions are toggled and sized through the
- * layout store; everything inside them is feature code.
- */
 export function Workbench() {
   useKeybindings();
 
-  // SFTP events feed the store (and the status bar) even while the panel
-  // itself is hidden.
   useEffect(() => {
     bridgeSftpEvents();
   }, []);
 
-  // Panels keep their share of a shrinking window in check (VSCode-style):
-  // resizing the window or zooming the UI re-clamps every part so the editor
-  // never collapses (layout constraints scale with the zoom factor).
   useEffect(() => {
     const reclamp = () => useLayoutStore.getState().clampToViewport();
     reclamp();
@@ -50,32 +44,25 @@ export function Workbench() {
     };
   }, []);
 
-  // Re-apply the persisted UI zoom level to the document root on launch.
   useEffect(() => {
     useZoomStore.getState().init();
   }, []);
 
-  // Reconciles with a zoom level merged in from another device (on mount,
-  // and whenever a sync connect/push/restore invalidates queries), and pushes
-  // this device's own zoom changes back out so they ride along with sync.
   const zoomLevel = useZoomStore((s) => s.level);
-  const pushZoom = useSettingSync(ZOOM_SYNC_KEY, String(zoomLevel), (remote) => {
-    const level = Number(remote);
-    if (Number.isFinite(level)) useZoomStore.getState().setLevel(level);
-  });
+  const pushZoom = useSettingSync(
+    ZOOM_SYNC_KEY,
+    String(zoomLevel),
+    (remote) => {
+      const level = Number(remote);
+      if (Number.isFinite(level)) useZoomStore.getState().setLevel(level);
+    },
+  );
   useEffect(() => {
     return useZoomStore.subscribe((state, prev) => {
       if (state.level !== prev.level) pushZoom(String(state.level));
     });
   }, [pushZoom]);
 
-  // The native side keeps the traffic lights centered through window
-  // resizes and fullscreen transitions itself, synchronously inside
-  // AppKit's layout pass (see src-tauri/src/commands/window.rs) — an async
-  // webview round-trip would always land a frame late and jitter. From
-  // here they only need a re-sync when the target inset changes without a
-  // resize: zoom changes (handled in zoom.ts) and theme changes, where
-  // AppKit re-creates the buttons at their default spot.
   useEffect(() => {
     if (!IS_MACOS) return;
     let unlisten: (() => void) | undefined;
@@ -99,9 +86,6 @@ export function Workbench() {
         <ActivityBar />
 
         {layout.sidebarVisible && <SideBar width={layout.sidebarWidth} />}
-        {/* Kept mounted while the side bar is hidden (VSCode-style): the
-            sash rests on the activity bar's edge and dragging it from
-            width 0 pulls the side bar back open. */}
         <ResizeHandle
           axis="x"
           sashId="sidebar"
@@ -114,10 +98,6 @@ export function Workbench() {
           <EditorArea />
           {layout.panelVisible && (
             <>
-              {/* The corners where this sash meets the side sashes resize
-                  both panels in one diagonal drag (VSCode-style); each
-                  corner mirrors the linked sash's own props, including the
-                  sidebar's drag-open-from-hidden behavior. */}
               <ResizeHandle
                 axis="y"
                 reverse

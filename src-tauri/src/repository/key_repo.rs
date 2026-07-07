@@ -33,9 +33,6 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<SshKey> {
         .ok_or_else(|| AppError::NotFound(format!("key {id}")))
 }
 
-/// Fill in `public_key` from the private key when the caller didn't supply
-/// one — e.g. a manually pasted/imported OpenSSH key with no sibling `.pub`
-/// file. Leaves unparseable key material untouched.
 fn with_derived_public_key(mut input: SshKeyInput) -> AppResult<SshKeyInput> {
     if input.public_key.is_none() {
         if let Some(private_key) = input.private_key.as_deref() {
@@ -69,9 +66,6 @@ pub async fn create(pool: &SqlitePool, input: SshKeyInput) -> AppResult<SshKey> 
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResult<SshKey> {
-    // Re-derive the public key when a new private key is sent without one,
-    // same as `create` — otherwise re-uploading just the private key would
-    // leave a stale public key behind.
     let input = with_derived_public_key(normalize(input)?)?;
     let ts = now();
     let affected = sqlx::query(
@@ -88,8 +82,6 @@ pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResul
         return Err(AppError::NotFound(format!("key {id}")));
     }
 
-    // Only touch secret/derived material when explicitly sent (or derived
-    // above); an empty string clears it, `None` leaves it untouched.
     if input.public_key.is_some() {
         sqlx::query("UPDATE keys SET public_key = ? WHERE id = ?")
             .bind(none_if_empty(input.public_key.as_deref()))

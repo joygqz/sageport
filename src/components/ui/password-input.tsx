@@ -6,11 +6,6 @@ import { Input, type InputProps } from "./input";
 
 export type PasswordInputProps = Omit<InputProps, "type">;
 
-/**
- * Password field with a reveal toggle. Forwards the ref and all props to the
- * underlying {@link Input}, so it drops into react-hook-form's `register(...)`
- * spread or a controlled `value`/`onChange` pair unchanged.
- */
 export const PasswordInput = React.forwardRef<
   HTMLInputElement,
   PasswordInputProps

@@ -8,13 +8,10 @@ import pkg from "./package.json" with { type: "json" };
 
 const host = process.env.TAURI_DEV_HOST;
 
-// https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
 
   define: {
-    // Injected at build time so UI chrome (status bar, about page) can show
-    // the version without an async round-trip to the Tauri API.
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
 
@@ -24,11 +21,8 @@ export default defineConfig(async () => ({
     },
   },
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
+
   server: {
     port: 1420,
     strictPort: true,
@@ -41,7 +35,6 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
   },

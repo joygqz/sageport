@@ -1,7 +1,5 @@
 use serde::Serialize;
 
-/// Application-wide error type. Every Tauri command returns `AppResult<T>` so
-/// the frontend receives a structured, serializable error instead of a panic.
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("database error: {0}")]
@@ -13,10 +11,6 @@ pub enum AppError {
     #[error("ssh error: {0}")]
     Ssh(#[from] ssh2::Error),
 
-    /// The server reached out fine but rejected the credentials (wrong
-    /// password, unrecognized key, expired password, ...) — distinct from
-    /// [`AppError::Ssh`] so the frontend can show a friendly message instead
-    /// of a raw libssh2 error string.
     #[error("authentication failed: {0}")]
     Auth(String),
 
@@ -46,7 +40,6 @@ pub enum AppError {
 }
 
 impl AppError {
-    /// Short machine-readable code so the UI can branch on error kinds.
     pub fn code(&self) -> &'static str {
         match self {
             AppError::Database(_) | AppError::Migration(_) => "database",
@@ -64,7 +57,6 @@ impl AppError {
     }
 }
 
-/// Serialized shape delivered to the frontend: `{ code, message }`.
 impl Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

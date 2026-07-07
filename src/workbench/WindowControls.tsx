@@ -7,11 +7,6 @@ import { cn } from "@/lib/utils";
 
 const appWindow = getCurrentWindow();
 
-/**
- * Self-drawn minimize/maximize/close buttons for the `decorations: false`
- * window on Windows/Linux. macOS keeps its native inset traffic lights and
- * never renders this (see IS_MACOS in lib/platform.ts).
- */
 export function WindowControls() {
   const { t } = useI18n();
   const [maximized, setMaximized] = useState(false);

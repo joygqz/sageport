@@ -13,11 +13,6 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "snippets", icon: SquareTerminal, labelKey: "activityBar.snippets" },
 ];
 
-/**
- * The icon rail on the far left. Selecting an activity switches the side
- * bar's view; reselecting the current one collapses the side bar, exactly
- * like VSCode. The gear at the bottom opens the settings tab.
- */
 export function ActivityBar() {
   const { t } = useI18n();
   const activity = useLayoutStore((s) => s.activity);
@@ -46,7 +41,6 @@ export function ActivityBar() {
                     : "text-muted-foreground/75 hover:text-foreground",
                 )}
               >
-                {/* VSCode-style active indicator: a bar on the rail edge. */}
                 <span
                   className={cn(
                     "absolute inset-y-1.5 -left-1 w-[3px] bg-primary transition-opacity",

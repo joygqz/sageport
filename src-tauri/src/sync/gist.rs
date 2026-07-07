@@ -1,11 +1,3 @@
-//! GitHub Gist provider.
-//!
-//! The vault is a single file inside a **secret** gist; GitHub's native
-//! revision history doubles as the backup history, so unlike the other
-//! providers there is no timestamped-object layout and nothing to prune.
-//! The gist id is discovered from the account when unknown (fresh second
-//! device) and cached in the provider config.
-
 use std::collections::HashMap;
 
 use async_trait::async_trait;
@@ -76,8 +68,6 @@ impl GistProvider {
             .header("X-GitHub-Api-Version", API_VERSION)
     }
 
-    /// Resolve the vault gist id, discovering it from the account's gists
-    /// when not cached yet. `None` when no vault gist exists.
     async fn resolve_gist_id(&mut self) -> AppResult<Option<String>> {
         if self.gist_id.is_some() {
             return Ok(self.gist_id.clone());
@@ -91,8 +81,7 @@ impl GistProvider {
                 self.gist_id = Some(found.id.clone());
                 return Ok(self.gist_id.clone());
             }
-            // Full pages until the last; a cap keeps a gist-heavy account
-            // from spinning forever.
+
             if list.len() < 100 || page >= 20 {
                 return Ok(None);
             }
@@ -114,7 +103,6 @@ impl GistProvider {
             .get(FILENAME)
             .ok_or_else(|| AppError::NotFound(format!("gist has no {FILENAME} file")))?;
 
-        // GitHub inlines content up to ~1MB; beyond that fetch the raw blob.
         let content = if file.truncated {
             let raw = file
                 .raw_url
@@ -132,7 +120,6 @@ impl GistProvider {
         Ok(serde_json::from_str(&content)?)
     }
 
-    /// Create (id `None`) or update the vault gist; returns the gist id.
     async fn upload(
         &self,
         gist_id: Option<&str>,
@@ -157,7 +144,7 @@ impl GistProvider {
         let url = format!("{API}/gists/{gist_id}");
         let resp = self.send(self.request(Method::DELETE, &url)).await?;
         let status = resp.status();
-        // Already gone is fine.
+
         if status.is_success() || status.as_u16() == 404 {
             return Ok(());
         }
@@ -173,8 +160,7 @@ impl SyncProvider for GistProvider {
         };
         match self.fetch_envelope(&format!("{API}/gists/{id}")).await {
             Ok(envelope) => Ok(Some(envelope)),
-            // The cached id points at a deleted gist: forget it so the next
-            // push recreates the vault instead of failing forever.
+
             Err(AppError::NotFound(_)) => {
                 self.gist_id = None;
                 Ok(None)
@@ -194,7 +180,7 @@ impl SyncProvider for GistProvider {
         let Some(id) = self.resolve_gist_id().await? else {
             return Ok(Vec::new());
         };
-        // GitHub keeps at most ~100 revisions per gist — one page covers it.
+
         let url = format!("{API}/gists/{id}/commits?per_page=100");
         let resp = self.send(self.request(Method::GET, &url)).await?;
         let entries: Vec<CommitEntry> = read_json(resp).await?;
@@ -221,8 +207,6 @@ impl SyncProvider for GistProvider {
     }
 
     async fn clear(&mut self) -> AppResult<()> {
-        // Delete rather than patch: GitHub can't drop individual revisions,
-        // so clearing is the only way to remove old, undecryptable history.
         if let Some(id) = self.resolve_gist_id().await? {
             self.delete_gist(&id).await?;
         }
@@ -250,7 +234,6 @@ fn error_from(status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
     }
 }
 
-/// Read a GitHub API response, translating HTTP failures into friendly errors.
 async fn read_json<T: DeserializeOwned>(resp: Response) -> AppResult<T> {
     let status = resp.status();
     let bytes = resp

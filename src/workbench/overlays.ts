@@ -1,14 +1,8 @@
 import { create } from "zustand";
 
-/**
- * Modal surfaces that float over the workbench: entity forms and the
- * command palette. Exactly one can be open at a time.
- */
-
 export type Overlay =
   | { type: "host-form"; hostId: string | null }
   | { type: "group-form"; groupId: string | null }
-  /** `mode` mirrors VSCode quick open: plain text finds hosts, ">" runs commands. */
   | { type: "palette"; mode: "quick" | "commands" };
 
 interface OverlayState {

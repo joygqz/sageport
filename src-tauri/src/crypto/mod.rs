@@ -1,8 +1,3 @@
-//! Passphrase-based authenticated encryption for the portable vault used by
-//! sync/export. Argon2id derives a 256-bit key from the user's passphrase; the
-//! payload is sealed with AES-256-GCM. The envelope is self-describing so it
-//! can be decrypted on any device that has the passphrase.
-
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use argon2::Argon2;
@@ -18,7 +13,6 @@ const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 const KEY_LEN: usize = 32;
 
-/// Self-describing encrypted envelope (safe to write to disk / sync).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedEnvelope {
     pub version: u32,

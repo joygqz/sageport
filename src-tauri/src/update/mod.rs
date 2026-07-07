@@ -1,20 +1,3 @@
-//! App-update orchestration.
-//!
-//! Every "dialog" in this app (see [`crate::state`]) is a real OS window, and
-//! Settings in particular gets fully destroyed when closed and rebuilt from
-//! scratch when reopened. So update state cannot live in per-window frontend
-//! state without being lost the moment the user closes Settings mid-download.
-//! Instead this module is the single source of truth, held for the lifetime
-//! of the app process in [`crate::state::AppState`]. Every status change is
-//! broadcast to all windows (present or future) over [`EVENT`], and any
-//! window can pull the current snapshot on mount via the `update_status`
-//! command — so reopening Settings after a download finished shows "ready to
-//! restart" again instead of restarting the whole check from scratch.
-//!
-//! The outcome of each check is also persisted to the `settings` table
-//! (`update.*` keys) purely as a record — it is per-device and deliberately
-//! excluded from vault sync/backup (see `sync::EXCLUDED_SETTINGS_PREFIXES`).
-
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -26,16 +9,12 @@ use crate::domain::now;
 use crate::repository::settings_repo;
 use crate::state::AppState;
 
-/// Emitted to every window whenever the update status changes.
 pub const EVENT: &str = "sageport://update-status";
 
 const LAST_CHECKED_AT_KEY: &str = "update.last_checked_at";
 const LAST_KNOWN_VERSION_KEY: &str = "update.last_known_version";
 const LAST_KNOWN_BODY_KEY: &str = "update.last_known_body";
 
-/// Mirrors the lifecycle the Settings UI renders. Business-level failures
-/// (offline, bad signature, ...) are carried as `Error` data rather than a
-/// command `Err`, since they're an expected outcome, not a transport fault.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum UpdateStatus {
@@ -59,11 +38,9 @@ pub enum UpdateStatus {
     },
 }
 
-/// Process-lifetime update state, shared across every window.
 pub struct UpdateManager {
     status: Mutex<UpdateStatus>,
-    /// The update found by the last successful check, kept so `install` can
-    /// download it without re-checking.
+
     pending: Mutex<Option<Update>>,
 }
 
@@ -85,8 +62,6 @@ fn set_status(app: &AppHandle, mgr: &UpdateManager, status: UpdateStatus) {
     let _ = app.emit(EVENT, status);
 }
 
-/// Best-effort record of a check's outcome; failure to persist never fails
-/// the check itself.
 async fn persist_check(pool: &SqlitePool, update: Option<&Update>) {
     let _ = settings_repo::set(pool, LAST_CHECKED_AT_KEY, &now()).await;
     let (version, body) = match update {
@@ -97,9 +72,6 @@ async fn persist_check(pool: &SqlitePool, update: Option<&Update>) {
     let _ = settings_repo::set(pool, LAST_KNOWN_BODY_KEY, body).await;
 }
 
-/// Check the update endpoint, update shared state, persist the outcome, and
-/// notify every window. Safe to call repeatedly — any previously pending
-/// update is replaced.
 pub async fn check(app: &AppHandle) -> UpdateStatus {
     let state = app.state::<AppState>();
     set_status(app, &state.update, UpdateStatus::Checking);
@@ -133,8 +105,6 @@ pub async fn check(app: &AppHandle) -> UpdateStatus {
     status
 }
 
-/// Download and install whatever update the last [`check`] found, emitting
-/// live progress under [`EVENT`] as it goes.
 pub async fn install(app: &AppHandle) -> UpdateStatus {
     let state = app.state::<AppState>();
     let update = state.update.pending.lock().unwrap().clone();

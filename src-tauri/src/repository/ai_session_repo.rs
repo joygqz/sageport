@@ -1,7 +1,3 @@
-//! Data access for persisted AI chat sessions. `messages` is stored as a raw
-//! JSON string (an array of `ai::ChatMessage`); this layer never parses it —
-//! that's the command layer's job — it just moves the blob in and out.
-
 use sqlx::SqlitePool;
 
 use crate::domain::{new_id, now};
@@ -51,9 +47,6 @@ pub async fn create(pool: &SqlitePool) -> AppResult<AiSessionRow> {
     get(pool, &id).await
 }
 
-/// Overwrite a session's conversation (and, once the first turn lands, its
-/// auto-derived title). Always bumps `updated_at` so the history list reorders
-/// by most-recent activity.
 pub async fn save(
     pool: &SqlitePool,
     id: &str,
@@ -85,8 +78,6 @@ pub async fn save(
     get(pool, id).await
 }
 
-/// Rename only — doesn't touch `updated_at`, so a manual rename doesn't
-/// reorder the history list.
 pub async fn rename(pool: &SqlitePool, id: &str, title: &str) -> AppResult<AiSessionRow> {
     let affected = sqlx::query("UPDATE ai_sessions SET title = ? WHERE id = ?")
         .bind(title)

@@ -1,18 +1,3 @@
-//! Sync foundation.
-//!
-//! Everything the UI owns is serialized into a [`VaultSnapshot`], sealed with
-//! the user's passphrase ([`crate::crypto`]), and shipped as an opaque
-//! [`EncryptedEnvelope`]. Two consumers exist for that envelope:
-//!
-//! * a [`provider::SyncProvider`] — one of five remote backends (GitHub
-//!   Gist, Google Drive, OneDrive, WebDAV, S3-compatible), exactly one of
-//!   which is connected at a time;
-//! * the file helpers below — write/read the vault to a local path for the
-//!   standalone one-shot backup/restore feature.
-//!
-//! Importing always performs a last-write-wins merge keyed on `updated_at`,
-//! so every transport drives the exact same reconciliation path.
-
 mod gdrive;
 mod gist;
 pub mod oauth;
@@ -35,19 +20,8 @@ use crate::repository::settings_repo;
 
 const SNAPSHOT_VERSION: u32 = 4;
 
-/// Setting keys under these prefixes never travel in a vault snapshot — they
-/// are per-device, not user data:
-/// * `sync.` — the sync connection itself (token, gist id, passphrase,
-///   last-synced marker). Backing it up would let a restore on one device
-///   silently repoint another device's sync connection.
-/// * `update.` — cached update-check results (last checked time, last known
-///   version). Restoring these on another device would show that device
-///   stale or wrong update info for its own binary.
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["sync.", "update."];
 
-/// One row of the app's key/value settings (AI config, and anything else
-/// added later) carried by a vault snapshot, LWW-merged just like the entity
-/// tables.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingEntry {
@@ -56,11 +30,6 @@ pub struct SettingEntry {
     pub updated_at: String,
 }
 
-/// Full, device-independent snapshot of the user's data. Secrets travel inline
-/// on their rows (passwords, private keys, passphrases), so a snapshot is
-/// everything another device needs to make the hosts usable. Also carries
-/// every app setting except per-device state (see
-/// [`EXCLUDED_SETTINGS_PREFIXES`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultSnapshot {
@@ -76,12 +45,6 @@ pub struct VaultSnapshot {
 }
 
 impl VaultSnapshot {
-    /// Content fingerprint independent of `exported_at` (which changes on
-    /// every export even when nothing else did). Two snapshots with the same
-    /// fingerprint carry identical data — pushing one over the other would
-    /// only add a byte-different but semantically redundant backup revision.
-    /// `(id, revision)` is enough per entity table since every mutation bumps
-    /// `revision`; settings have no revision counter so `updated_at` stands in.
     pub fn content_fingerprint(&self) -> Vec<String> {
         let mut out = Vec::with_capacity(
             self.groups.len()
@@ -126,7 +89,6 @@ impl VaultSnapshot {
     }
 }
 
-/// Collect every row (including tombstones). Secrets are columns on the rows.
 pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     let groups = fetch_all::<Group>(pool, "groups").await?;
     let hosts = fetch_all::<Host>(pool, "hosts").await?;
@@ -155,7 +117,6 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     })
 }
 
-/// Last-write-wins merge of an incoming snapshot into the local database.
 pub async fn import_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
     validate_snapshot(snapshot)?;
     let mut tx = pool.begin().await?;
@@ -191,8 +152,6 @@ pub async fn export_encrypted(pool: &SqlitePool, passphrase: &str) -> AppResult<
     crypto::encrypt(&bytes, passphrase)
 }
 
-/// Decrypt an encrypted vault without importing it, so the caller can compare
-/// content fingerprints before deciding whether to merge or push.
 pub fn decrypt_snapshot(
     envelope: &EncryptedEnvelope,
     passphrase: &str,
@@ -203,9 +162,6 @@ pub fn decrypt_snapshot(
     Ok(snapshot)
 }
 
-/// Decrypt, merge, and hand back the remote snapshot so the caller can
-/// compare its [`VaultSnapshot::content_fingerprint`] against a fresh local
-/// export before deciding whether pushing again would be redundant.
 pub async fn import_encrypted(
     pool: &SqlitePool,
     envelope: &EncryptedEnvelope,
@@ -216,14 +172,6 @@ pub async fn import_encrypted(
     Ok(snapshot)
 }
 
-/// Point-in-time restore: unlike [`import_snapshot`], which only ever merges
-/// (last-write-wins) and can never delete or "go back" past what's already
-/// local, this replaces every row wholesale with the chosen backup. Used when
-/// the user explicitly picks an older gist revision to roll back to — the
-/// whole point is to override rows that look newer locally.
-///
-/// Children are cleared before parents so no FK ever dangles mid-restore, and
-/// parents are (re)inserted before children so every foreign key resolves.
 pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
     validate_snapshot(snapshot)?;
     let mut tx = pool.begin().await?;
@@ -240,13 +188,9 @@ pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> Ap
     sqlx::query("DELETE FROM snippets")
         .execute(&mut *tx)
         .await?;
-    // Never touch per-device state (sync connection, cached update info) —
-    // rolling back to an old backup must not repoint or disconnect sync, or
-    // clobber this device's own update-check cache.
+
     delete_settings_excluding_prefixes(&mut *tx, EXCLUDED_SETTINGS_PREFIXES).await?;
 
-    // The tables above are now empty, so every insert below always takes the
-    // plain-insert branch of the upsert (no row can conflict).
     for g in &snapshot.groups {
         merge_group(&mut *tx, g).await?;
     }
@@ -269,7 +213,6 @@ pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> Ap
     Ok(())
 }
 
-/// Decrypt `envelope` with `passphrase` and [`restore_snapshot`] it.
 pub async fn restore_encrypted(
     pool: &SqlitePool,
     envelope: &EncryptedEnvelope,
@@ -279,8 +222,6 @@ pub async fn restore_encrypted(
     restore_snapshot(pool, &snapshot).await
 }
 
-/// Write an encrypted envelope to a local path (pretty JSON, so it stays
-/// inspectable). Used by the manual file export/backup path.
 pub fn write_envelope_file(path: &Path, envelope: &EncryptedEnvelope) -> AppResult<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -289,7 +230,6 @@ pub fn write_envelope_file(path: &Path, envelope: &EncryptedEnvelope) -> AppResu
     Ok(())
 }
 
-/// Read an encrypted envelope previously written by [`write_envelope_file`].
 pub fn read_envelope_file(path: &Path) -> AppResult<EncryptedEnvelope> {
     let bytes = std::fs::read(path)?;
     Ok(serde_json::from_slice(&bytes)?)
@@ -309,12 +249,9 @@ async fn fetch_all<T>(pool: &SqlitePool, table: &str) -> AppResult<Vec<T>>
 where
     T: for<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> + Send + Unpin,
 {
-    // Table name is a fixed internal constant, never user input.
     let sql = format!("SELECT * FROM {table}");
     Ok(sqlx::query_as::<_, T>(&sql).fetch_all(pool).await?)
 }
-
-// --- Per-table LWW upserts (only overwrite when the incoming row is newer) ---
 
 async fn merge_group<'e, E>(executor: E, g: &Group) -> AppResult<()>
 where
@@ -420,9 +357,6 @@ async fn merge_setting<'e, E>(executor: E, entry: &SettingEntry) -> AppResult<()
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    // Defense in depth: even if a snapshot somehow carried a `sync.*` or
-    // `update.*` key (old export, hand-edited file, ...) never let it
-    // overwrite this device's own sync connection or update-check cache.
     if EXCLUDED_SETTINGS_PREFIXES
         .iter()
         .any(|prefix| entry.key.starts_with(prefix))

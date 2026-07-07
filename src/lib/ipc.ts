@@ -41,11 +41,6 @@ import type {
   UpdateStatus,
 } from "@/types/models";
 
-/**
- * Typed façade over the Tauri command/event boundary. Every backend command is
- * exposed here as a strongly-typed function so feature code never touches raw
- * `invoke` string names.
- */
 export const ipc = {
   groups: {
     list: () => invoke<Group[]>("groups_list"),
@@ -88,10 +83,10 @@ export const ipc = {
     update: (id: string, input: SshKeyInput) =>
       invoke<SshKey>("keys_update", { id, input }),
     remove: (id: string) => invoke<void>("keys_delete", { id }),
-    /** Generate a new keypair and persist it in one step. */
+
     generate: (input: SshKeyGenerateInput) =>
       invoke<GeneratedSshKey>("keys_generate", { input }),
-    /** Read a key file (and sibling `.pub`, if any) picked via the file dialog. */
+
     importFile: (path: string) => invoke<KeyFile>("keys_import_file", { path }),
   },
   snippets: {
@@ -128,7 +123,6 @@ export const ipc = {
       listen<SshStatusEvent>("ssh://status", (event) => handler(event.payload)),
   },
   sftp: {
-    /** `connectionId` of null/undefined targets the local filesystem. */
     connect: (connectionId: string, hostId: string) =>
       invoke<void>("sftp_connect", { connectionId, hostId }),
     disconnect: (connectionId: string) =>
@@ -171,12 +165,7 @@ export const ipc = {
   },
   sync: {
     status: () => invoke<SyncStatus>("sync_get_status"),
-    /**
-     * Run the OAuth flow for a provider. Progress (device code, browser
-     * opened) streams through `onEvent`; resolves with the account label
-     * once authorized. The credential itself stays in the backend — call
-     * `connect` afterwards to link the provider.
-     */
+
     oauthStart: (
       provider: SyncProviderKind,
       onEvent: (e: SyncOAuthEvent) => void,
@@ -188,10 +177,9 @@ export const ipc = {
         onEvent: channel,
       });
     },
-    /** Abort an in-flight OAuth flow; it rejects with the `cancelled` code. */
+
     oauthCancel: () => invoke<void>("sync_oauth_cancel"),
-    /** Link a provider; see `SyncConnectOutcome`. `settings` only applies to
-     * the credential-based providers (WebDAV, S3). */
+
     connect: (input: {
       provider: SyncProviderKind;
       settings?: SyncProviderSettings;
@@ -199,14 +187,14 @@ export const ipc = {
       force: boolean;
     }) => invoke<SyncConnectOutcome>("sync_connect", input),
     disconnect: () => invoke<void>("sync_disconnect"),
-    /** Merge the remote backup into local data, pushing only when content changed. */
+
     push: () => invoke<SyncPushOutcome>("sync_push"),
-    /** Newest-first backup history of the connected provider. */
+
     listVersions: () => invoke<SyncVersion[]>("sync_list_versions"),
-    /** Destructive: replaces local data with the chosen revision. */
+
     restoreVersion: (id: string) =>
       invoke<SyncRestoreOutcome>("sync_restore_version", { id }),
-    /** `passphrase` is entered manually each call and never persisted. */
+
     fileExport: (path: string, passphrase: string) =>
       invoke<void>("sync_file_export", { path, passphrase }),
     fileImport: (path: string, passphrase: string) =>
@@ -219,15 +207,10 @@ export const ipc = {
       protocol: AiProtocol;
       apiKey?: string;
     }) => invoke<void>("ai_set_config", { input }),
-    /** Fetch the provider's available model ids for the chat-window picker. */
+
     listModels: () => invoke<string[]>("ai_list_models"),
     setModel: (model: string) => invoke<void>("ai_set_model", { model }),
-    /**
-     * One agent turn: send the conversation so far, get the next one back.
-     * Assistant text streams through `onDelta` as it is generated; the
-     * complete turn (text + tool calls) resolves at the end. Pass a
-     * `requestId` to make the turn abortable via `cancel`.
-     */
+
     chat: (
       model: string,
       messages: AiChatMessage[],
@@ -249,17 +232,16 @@ export const ipc = {
         onDelta,
       });
     },
-    /** Abort an in-flight chat turn; it rejects with the `cancelled` code. */
+
     cancel: (requestId: string) =>
       invoke<void>("ai_chat_cancel", { requestId }),
     session: {
-      /** Newest-first list of saved chat sessions, for the history menu. */
       list: () => invoke<AiSessionSummary[]>("ai_session_list"),
-      /** Start a brand new, empty session. */
+
       create: () => invoke<AiSession>("ai_session_create"),
-      /** Load one session's full conversation. */
+
       get: (id: string) => invoke<AiSession>("ai_session_get", { id }),
-      /** Persist the conversation after a turn (title only on first turn). */
+
       save: (id: string, messages: AiChatMessage[], title: string | null) =>
         invoke<AiSessionSummary>("ai_session_save", { id, messages, title }),
       rename: (id: string, title: string) =>
@@ -268,17 +250,10 @@ export const ipc = {
     },
   },
   window: {
-    /**
-     * macOS only (no-op elsewhere): re-center the native traffic lights in
-     * a title bar of `height` logical px, left edge at `x`. The native side
-     * keeps re-applying the inset through window resizes itself; re-invoke
-     * only when the target inset changes (zoom / theme changes).
-     */
     setTrafficLightInset: (x: number, height: number) =>
       invoke<void>("window_set_traffic_light_inset", { x, height }),
   },
   update: {
-    /** Current status, to sync a freshly (re)mounted window immediately. */
     status: () => invoke<UpdateStatus>("update_status"),
     check: () => invoke<UpdateStatus>("update_check"),
     install: () => invoke<UpdateStatus>("update_install"),

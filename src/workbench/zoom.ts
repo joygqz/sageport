@@ -5,54 +5,32 @@ import { applyTerminalFontSize } from "@/features/terminal/registry";
 import { ipc } from "@/lib/ipc";
 import { IS_MACOS } from "@/lib/platform";
 
-/**
- * Whole-UI zoom, VSCode-style (mod+= / mod+- / mod+0). Every Tailwind size
- * in the app is rem-based, so scaling the root font-size scales the entire
- * workbench in lockstep. The terminal is the one px-based surface (xterm
- * renders to canvas), so its font size is derived from the same zoom level —
- * this keeps glyphs pixel-crisp at every zoom, unlike a webview-level zoom
- * which would just stretch the canvas.
- */
-
-/** Root font-size at zoom level 0 (see globals.css for the rationale). */
 const BASE_ROOT_FONT_PERCENT = 93.75;
-/** Terminal canvas font at zoom level 0. */
+
 const TERMINAL_FONT_BASE = 13;
-/** Each level is ±10%, VSCode's step. */
+
 const STEP = 0.1;
 export const ZOOM_LEVEL_MIN = -3;
 export const ZOOM_LEVEL_MAX = 5;
 
-/** Settings-table key the zoom level rides along with vault sync under. */
 export const ZOOM_SYNC_KEY = "appearance.zoomLevel";
 
 export function zoomFactor(level: number): number {
   return 1 + level * STEP;
 }
 
-/** Effective terminal font px for the current zoom level. */
 export function terminalFontSize(): number {
-  return Math.round(TERMINAL_FONT_BASE * zoomFactor(useZoomStore.getState().level));
+  return Math.round(
+    TERMINAL_FONT_BASE * zoomFactor(useZoomStore.getState().level),
+  );
 }
 
-/** Title bar height in rem — must match TitleBar's `h-9`. */
 const TITLE_BAR_REM = 2.25;
-/** Left inset of the macOS traffic lights at 100% zoom (system default). */
+
 const TRAFFIC_LIGHT_X = 13;
-/** Root font-size at 100% zoom: 16px × 93.75%. */
+
 const BASE_ROOT_FONT_PX = 15;
 
-/**
- * Keep the macOS traffic lights vertically centered in the title bar, which
- * grows and shrinks with the UI zoom. Both the height and the left inset
- * follow the live root font-size, so the lights track the zoom level like
- * every other title-bar element (their padding reservation in TitleBar is
- * rem-based too). This only declares the target inset — the native side
- * persists it and re-applies it itself through window resizes and
- * fullscreen transitions (see src-tauri/src/commands/window.rs), so it only
- * needs re-invoking when the inset changes: zoom changes (here) and theme
- * changes (Workbench).
- */
 export function syncTrafficLights() {
   if (!IS_MACOS) return;
   const rootFontPx = parseFloat(
@@ -81,10 +59,9 @@ interface ZoomState {
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
-  /** Set an absolute level (clamped) — used to apply a level merged in from
-   * another device via sync. */
+
   setLevel: (level: number) => void;
-  /** Re-apply the persisted level to the document, on workbench mount. */
+
   init: () => void;
 }
 

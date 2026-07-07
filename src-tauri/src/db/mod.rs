@@ -8,7 +8,6 @@ use crate::error::AppResult;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
-/// Open (creating if needed) the SQLite database at `path` and run migrations.
 pub async fn init(path: &Path) -> AppResult<SqlitePool> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;

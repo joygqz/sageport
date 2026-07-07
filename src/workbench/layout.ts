@@ -3,43 +3,19 @@ import { persist } from "zustand/middleware";
 
 import { useZoomStore, zoomFactor } from "./zoom";
 
-/**
- * Workbench layout state: which activity view the side bar shows, and the
- * visibility/size of each dockable region. Persisted so the window comes
- * back exactly as the user left it.
- *
- * Sizing follows VSCode's model: every part has a hard minimum (so its
- * content never deforms) and no fixed maximum — a part may grow until the
- * editor and the other parts are squeezed down to their own minimums. Sizes
- * re-clamp on window resize and zoom change instead of overflowing.
- *
- * The side bar, bottom panel and auxiliary bar also snap closed like VSCode's:
- * dragging their sash past the minimum pins the part at its minimum until
- * the pointer crosses half the minimum, at which point the part hides;
- * dragging back re-opens it (the drag listeners live on `window`, so the
- * gesture survives the sash unmounting).
- *
- * All constants are CSS px at zoom level 0. The UI zooms by scaling the root
- * font-size, so every constraint is multiplied by the same zoom factor
- * before use — a minimum then always guarantees the same amount of content,
- * not the same amount of screen.
- */
-
 export type Activity = "hosts" | "credentials" | "snippets";
 
 export const SIDEBAR_MIN = 150;
 export const PANEL_MIN = 100;
 export const AUX_MIN = 150;
 
-/** Fixed chrome that competes with the resizable parts for space. */
-const ACTIVITY_BAR_W = 45; // w-12 = 3rem
-const TITLE_BAR_H = 33.75; // h-9 = 2.25rem
-const STATUS_BAR_H = 22.5; // h-6 = 1.5rem
-/** The editor area keeps a small reserve so docked side regions cannot erase it. */
+const ACTIVITY_BAR_W = 45;
+const TITLE_BAR_H = 33.75;
+const STATUS_BAR_H = 22.5;
+
 const EDITOR_MIN_W = 70;
 const EDITOR_MIN_H = 70;
 
-/** Live zoom factor scaling every rem-based size in the app. */
 const uiScale = () => zoomFactor(useZoomStore.getState().level);
 
 const clamp = (value: number, min: number, max: number) =>
@@ -49,14 +25,13 @@ interface LayoutState {
   activity: Activity;
   sidebarVisible: boolean;
   sidebarWidth: number;
-  /** Bottom panel (file transfer). */
+
   panelVisible: boolean;
   panelHeight: number;
-  /** Right auxiliary bar (AI assistant). */
+
   auxVisible: boolean;
   auxWidth: number;
 
-  /** Select an activity; reselecting the current one toggles the side bar. */
   selectActivity: (activity: Activity) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (width: number) => void;
@@ -65,11 +40,10 @@ interface LayoutState {
   setPanelHeight: (height: number) => void;
   toggleAux: () => void;
   setAuxWidth: (width: number) => void;
-  /** Re-clamp every part to the current window; called on window resize. */
+
   clampToViewport: () => void;
 }
 
-/** Horizontal space the editor + the *other* horizontal part leave over. */
 function maxWidthFor(other: number): number {
   return Math.max(
     0,
@@ -82,21 +56,21 @@ export interface SashLimits {
   max: number;
 }
 
-/**
- * Live drag bounds per sash. Queried at gesture time (not baked into
- * renders) because they move with the window size, the zoom factor and the
- * sibling panels; the sashes use them to switch to VSCode's directional
- * at-limit cursors.
- */
 export function sidebarLimits(
   s: Pick<LayoutState, "auxVisible" | "auxWidth"> = useLayoutStore.getState(),
 ): SashLimits {
   const min = SIDEBAR_MIN * uiScale();
-  return { min, max: Math.max(min, maxWidthFor(s.auxVisible ? s.auxWidth : 0)) };
+  return {
+    min,
+    max: Math.max(min, maxWidthFor(s.auxVisible ? s.auxWidth : 0)),
+  };
 }
 
 export function auxLimits(
-  s: Pick<LayoutState, "sidebarVisible" | "sidebarWidth"> = useLayoutStore.getState(),
+  s: Pick<
+    LayoutState,
+    "sidebarVisible" | "sidebarWidth"
+  > = useLayoutStore.getState(),
 ): SashLimits {
   const min = AUX_MIN * uiScale();
   return {
@@ -113,12 +87,18 @@ export function panelLimits(): SashLimits {
   return { min, max: Math.max(min, roomMax) };
 }
 
-function clampSidebar(width: number, s: { auxVisible: boolean; auxWidth: number }) {
+function clampSidebar(
+  width: number,
+  s: { auxVisible: boolean; auxWidth: number },
+) {
   const { min, max } = sidebarLimits(s);
   return clamp(width, min, max);
 }
 
-function clampAux(width: number, s: { sidebarVisible: boolean; sidebarWidth: number }) {
+function clampAux(
+  width: number,
+  s: { sidebarVisible: boolean; sidebarWidth: number },
+) {
   const { min, max } = auxLimits(s);
   return clamp(width, min, max);
 }

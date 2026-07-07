@@ -10,11 +10,6 @@ import type { Host } from "@/types/models";
 import { useCommands, type WorkbenchCommand } from "./commands";
 import { useTabsStore } from "./tabs";
 
-/**
- * Quick open + command palette in one control, following the VSCode
- * convention: plain text finds hosts to connect to, a leading ">" lists
- * commands. Opened with mod+P / mod+shift+P.
- */
 export function CommandPalette({
   open,
   initialMode,
@@ -42,7 +37,6 @@ export function CommandPalette({
   );
 }
 
-/** Case-insensitive subsequence match, the classic quick-open filter. */
 function fuzzyMatch(query: string, text: string): boolean {
   const q = query.toLowerCase();
   const t = text.toLowerCase();
@@ -99,8 +93,6 @@ function PaletteBody({
       .map((host) => ({ type: "host", host }));
   }, [commandMode, query, commands, hosts, t]);
 
-  // Reset the highlight whenever the query changes (adjust-during-render
-  // pattern, avoids an extra effect pass).
   const [prevInput, setPrevInput] = useState(input);
   if (prevInput !== input) {
     setPrevInput(input);

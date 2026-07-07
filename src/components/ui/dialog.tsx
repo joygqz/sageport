@@ -47,7 +47,6 @@ function DialogOverlay({
   );
 }
 
-/** Viewport margin a dragged dialog can never cross. */
 const DRAG_MARGIN = 8;
 
 function DialogContent({
@@ -61,8 +60,7 @@ function DialogContent({
   ref?: React.Ref<React.ComponentRef<typeof DialogPrimitive.Content>>;
 }) {
   const contentRef = React.useRef<HTMLDivElement | null>(null);
-  // Offset from the centered position, applied via transform. State lives in
-  // the content (which unmounts on close), so every open starts centered.
+
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
 
   const setRefs = (node: HTMLDivElement | null) => {
@@ -71,16 +69,13 @@ function DialogContent({
     else if (ref) ref.current = node;
   };
 
-  /**
-   * Dragging the header/toolbar moves the dialog (native-window style),
-   * clamped so it always stays fully inside the viewport. Interactive
-   * elements inside the header keep their normal behavior.
-   */
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (
-      !target.closest('[data-slot="dialog-header"], [data-slot="dialog-toolbar"]') ||
+      !target.closest(
+        '[data-slot="dialog-header"], [data-slot="dialog-toolbar"]',
+      ) ||
       target.closest("button, input, textarea, select, a, [role='combobox']")
     ) {
       return;
@@ -90,7 +85,7 @@ function DialogContent({
     e.preventDefault();
 
     const rect = el.getBoundingClientRect();
-    // The handler is re-created each render, so `offset` is current here.
+
     const base = offset;
     const startX = e.clientX;
     const startY = e.clientY;
@@ -127,19 +122,11 @@ function DialogContent({
         ref={setRefs}
         data-slot="dialog-content"
         onPointerDown={onPointerDown}
-        // Centering + drag offset live on the CSS `translate` property, NOT
-        // `transform`: the enter/exit animations animate `transform`, and a
-        // keyframe would override an inline transform for their duration —
-        // the dialog would lose its centering while animating (appearing to
-        // shrink toward the bottom-right). `translate` composes with the
-        // animated transform instead, so the dialog stays put and the zoom
-        // scales around its own center.
+
         style={{
           translate: `calc(-50% + ${offset.x}px) calc(-50% + ${offset.y}px)`,
         }}
         className={cn(
-          // Height follows content; the viewport is the hard ceiling, with
-          // the overflow scrolling inside the dialog (VSCode-style).
           "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100vh-4rem)] w-full max-w-lg gap-4 overflow-y-auto",
           "rounded-lg border border-border bg-popover p-6 text-popover-foreground shadow-md",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
@@ -170,12 +157,6 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/**
- * A bordered title bar with an inline close button, for dialogs that render
- * their own chrome (`p-0` content) instead of relying on DialogContent's
- * close button — which is positioned against the whole content box and only
- * lines up with the default `p-6` header padding.
- */
 function DialogToolbar({
   className,
   children,

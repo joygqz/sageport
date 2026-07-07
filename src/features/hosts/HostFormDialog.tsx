@@ -100,10 +100,7 @@ function HostFormBody({
 
   useEffect(() => {
     if (!hostId) return;
-    // Wait for the identity/key lists too: the identityId/keyId <select>
-    // only renders their matching <option> once these arrive, and a native
-    // <select> silently falls back to the blank option if reset() assigns
-    // a value before that option exists.
+
     if (host && !identitiesLoading && !keysLoading) {
       reset({
         label: host.label,
@@ -147,8 +144,7 @@ function HostFormBody({
           username: values.username.trim() || null,
           authType: values.authType,
           keyId: values.authType === "key" ? values.keyId || null : null,
-          // Always send the field value for password auth so clearing it
-          // removes the stored secret; an empty string clears the column.
+
           password:
             values.authType === "password" ? values.password : undefined,
         };

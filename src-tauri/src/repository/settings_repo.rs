@@ -33,11 +33,6 @@ pub async fn all(pool: &SqlitePool) -> AppResult<Vec<(String, String)>> {
     Ok(rows)
 }
 
-/// Every setting row with its `updated_at`, excluding keys under any of
-/// `prefixes` (dot-separated, e.g. `"sync."`). Used by the vault
-/// backup/restore path to carry every app setting *except* per-device state
-/// (the sync connection itself, cached update-check results) — those must
-/// never round-trip through a backup.
 pub async fn all_excluding_prefixes(
     pool: &SqlitePool,
     prefixes: &[&str],

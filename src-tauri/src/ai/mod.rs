@@ -1,24 +1,3 @@
-//! Vendor-neutral, tool-calling AI agent for the terminal client.
-//!
-//! The assistant is not tied to any single provider: it speaks either the
-//! OpenAI-compatible (`/chat/completions`, `Bearer` auth) or the
-//! Anthropic-compatible (`/v1/messages`, `x-api-key` auth) wire format. A
-//! provider is described entirely by a base URL, an API key, and a [`Protocol`]
-//! selector, so any service implementing one of those two formats works.
-//!
-//! Both protocols expose a models-list endpoint (`/models`), which the UI calls
-//! to populate the chat-window model picker. Chat requests stream (SSE): text
-//! deltas are surfaced through a callback as they arrive, while the complete
-//! turn — including any tool calls — is accumulated and returned at the end.
-//!
-//! This module only speaks a *canonical*, provider-agnostic conversation
-//! format ([`ChatMessage`], [`ToolSpec`], [`ChatResult`]) and translates it to
-//! and from each wire format. It never executes tools itself — the frontend
-//! owns tool execution (terminal sessions live in the renderer's xterm
-//! buffers) and drives the agent loop: call [`chat`], run whatever tools come
-//! back in [`ChatResult::tool_calls`], append the results as `tool` messages,
-//! and call [`chat`] again until a final text reply comes back.
-
 mod anthropic;
 mod openai;
 
@@ -48,7 +27,6 @@ commands, and call out anything destructive or risky before doing it. Do not inv
 server-specific details you weren't given or shown by a tool. Keep replies concise. \
 Always reply in the user's own language.";
 
-/// One role in a canonical conversation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
@@ -58,7 +36,6 @@ pub enum Role {
     Tool,
 }
 
-/// A single tool invocation requested by the model.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolCall {
@@ -67,26 +44,20 @@ pub struct ToolCall {
     pub arguments: Value,
 }
 
-/// One turn of a canonical, provider-agnostic conversation. The frontend
-/// builds and stores a `Vec<ChatMessage>` (never including a `system` entry —
-/// [`chat`] always prepends [`SYSTEM_PROMPT`] itself) and grows it with the
-/// model's own turns and the results of whatever tools it called.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub role: Role,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
-    /// Present on an `assistant` message that requested tool calls.
+
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<ToolCall>,
-    /// Present on a `tool` message: which call this is the result of.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
 }
 
-/// Describes one callable tool, in JSON-Schema terms, so the model knows it
-/// exists and how to call it. The frontend owns the actual implementations.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolSpec {
@@ -95,8 +66,6 @@ pub struct ToolSpec {
     pub parameters: Value,
 }
 
-/// One model turn: either (or both) a text reply and a batch of tool calls to
-/// run before asking the model to continue.
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatResult {
@@ -106,16 +75,12 @@ pub struct ChatResult {
     pub tool_calls: Vec<ToolCall>,
 }
 
-/// Incremental event pushed to the frontend while a chat turn streams.
-/// Only assistant text streams; tool calls are delivered whole via the
-/// final [`ChatResult`] once their JSON arguments are complete.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum StreamEvent {
     Text { text: String },
 }
 
-/// Wire format spoken by the configured endpoint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
@@ -138,7 +103,6 @@ impl Protocol {
         }
     }
 
-    /// Conventional base URL when the user hasn't entered one.
     pub fn default_base_url(self) -> &'static str {
         match self {
             Protocol::Openai => "https://api.openai.com/v1",
@@ -147,7 +111,6 @@ impl Protocol {
     }
 }
 
-/// Resolved connection details for a single request.
 pub struct Endpoint<'a> {
     pub base_url: &'a str,
     pub api_key: &'a str,
@@ -169,7 +132,6 @@ impl Endpoint<'_> {
     }
 }
 
-/// Fetch the provider's available model ids, sorted alphabetically.
 pub async fn list_models(ep: &Endpoint<'_>) -> AppResult<Vec<String>> {
     let path = match ep.protocol {
         Protocol::Openai => "/models",
@@ -183,14 +145,6 @@ pub async fn list_models(ep: &Endpoint<'_>) -> AppResult<Vec<String>> {
     Ok(models)
 }
 
-/// Send a canonical conversation (plus the tools the model may call) and
-/// stream its next turn: `on_text` fires for each assistant text delta as it
-/// arrives, and the accumulated turn (text + tool calls) is returned whole.
-///
-/// [`SYSTEM_PROMPT`] is always prepended (with `context` — a snapshot of the
-/// user's workspace: open sessions, UI language, app version — appended to
-/// it), so `messages` should only ever contain `user`/`assistant`/`tool`
-/// entries.
 pub async fn chat(
     ep: &Endpoint<'_>,
     model: &str,
@@ -241,10 +195,6 @@ pub async fn chat(
         return Err(AppError::Other(message));
     }
 
-    // Both wire formats stream as server-sent events: newline-separated
-    // `data: <json>` lines (Anthropic adds `event:` lines we can ignore —
-    // each data payload restates its own `type`). Chunks can split a line
-    // anywhere, so buffer bytes and only process complete lines.
     let mut openai_acc = openai::StreamAccumulator::default();
     let mut anthropic_acc = anthropic::StreamAccumulator::default();
     let mut buf: Vec<u8> = Vec::new();
@@ -277,8 +227,6 @@ pub async fn chat(
     }
 }
 
-/// Drive a request to completion and surface provider error bodies. Both wire
-/// formats report failures as `{ "error": { "message": ... } }`.
 async fn send(req: reqwest::RequestBuilder) -> AppResult<Vec<u8>> {
     let response = req
         .send()

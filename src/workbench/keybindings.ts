@@ -6,11 +6,6 @@ import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
 import { useZoomStore } from "./zoom";
 
-/**
- * Global workbench shortcuts. All bindings require the platform modifier
- * (Cmd on macOS, Ctrl elsewhere) so plain keystrokes always reach the
- * focused terminal untouched.
- */
 export function useKeybindings() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -45,13 +40,11 @@ export function useKeybindings() {
       } else if (e.shiftKey && (key === "[" || key === "]")) {
         run(() => tabs.activateNext(key === "]" ? 1 : -1));
       } else if (key === "f" && !e.shiftKey) {
-        // Find in the active terminal, VSCode-style.
         const active = tabs.tabs.find((t) => t.id === tabs.activeId);
         if (active?.kind === "terminal") {
           run(() => useTerminalSearch.getState().open(active.id));
         }
       } else if (key === "=" || key === "+") {
-        // Whole-UI zoom, VSCode-style. "+" covers layouts/shift variants.
         run(() => useZoomStore.getState().zoomIn());
       } else if (key === "-" || key === "_") {
         run(() => useZoomStore.getState().zoomOut());

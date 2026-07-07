@@ -1,5 +1,3 @@
-//! Anthropic-compatible Messages wire format, including tool use.
-
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -7,7 +5,6 @@ use crate::error::{AppError, AppResult};
 
 use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec};
 
-/// Build a `POST /v1/messages` request body.
 pub(super) fn request_body(model: &str, messages: &[ChatMessage], tools: &[ToolSpec]) -> Value {
     let system = messages
         .iter()
@@ -79,10 +76,6 @@ fn message_to_json(m: &ChatMessage) -> Value {
     }
 }
 
-/// Anthropic expects every `tool_result` that answers one assistant turn's
-/// `tool_use` blocks to live in a single following `user` message. Our
-/// canonical messages carry one `tool` entry per call, so merge consecutive
-/// tool-result-only user messages back into one before sending.
 fn merge_tool_results(messages: &mut Vec<Value>) {
     let mut merged: Vec<Value> = Vec::with_capacity(messages.len());
     for msg in messages.drain(..) {
@@ -112,10 +105,6 @@ fn is_tool_result_message(v: &Value) -> bool {
             })
 }
 
-/// Accumulates a streamed Messages turn. Anthropic streams content as
-/// indexed blocks: `content_block_start` opens a text or tool_use block,
-/// `content_block_delta` grows it (`text_delta` / `input_json_delta`), and
-/// the final result is assembled once the stream ends.
 #[derive(Default)]
 pub(super) struct StreamAccumulator {
     blocks: Vec<Block>,
@@ -131,8 +120,6 @@ enum Block {
 }
 
 impl StreamAccumulator {
-    /// Consume one SSE `data:` payload, forwarding text deltas. A payload of
-    /// type `error` aborts the turn with the provider's message.
     pub(super) fn feed(&mut self, data: &str, on_text: &mut dyn FnMut(&str)) -> AppResult<()> {
         let Ok(event) = serde_json::from_str::<StreamPayload>(data) else {
             return Ok(());

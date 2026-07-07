@@ -77,10 +77,6 @@ pub async fn update(pool: &SqlitePool, id: &str, input: GroupInput) -> AppResult
     get(pool, id).await
 }
 
-/// Soft-delete (tombstone) so the change can propagate through sync. When
-/// `delete_hosts` is set, hosts in the group are tombstoned along with it;
-/// otherwise they are moved to ungrouped rather than left pointing at a
-/// deleted group.
 pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResult<()> {
     get(pool, id).await?;
     let ts = now();

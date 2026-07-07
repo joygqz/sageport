@@ -2,10 +2,6 @@ import type { ReactNode } from "react";
 
 import { ScrollArea } from "@/components/ui";
 
-/**
- * Shared scaffolding for side bar views: an uppercase title row with
- * view-level actions on the right, above a scrollable body.
- */
 export function SideBarView({
   title,
   actions,

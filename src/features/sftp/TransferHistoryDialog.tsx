@@ -83,8 +83,7 @@ export function TransferHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="flex max-h-[70vh] max-w-2xl flex-col gap-4"
-        // While the nested confirm dialog is up, its clicks and Escape land
-        // "outside" this content — don't let them dismiss the history too.
+
         onInteractOutside={(e) => {
           if (confirmState) e.preventDefault();
         }}

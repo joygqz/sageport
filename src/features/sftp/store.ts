@@ -11,22 +11,16 @@ import type {
   TransferEvent,
 } from "@/types/models";
 
-/** Imperative translation helper — this store lives outside React. */
 function t(key: Parameters<typeof translate>[1]): string {
   return translate(detectLocale(), key);
 }
 
-// Both the initial connect (rejected synchronously, e.g. a misconfigured
-// host) and the background connection thread (reported via "error" status
-// events, e.g. a rejected password) can fail with the same error codes — map
-// both through one place so they read the same way.
 function describeConnectError(code?: string | null, message?: string) {
   if (code === "invalid") return t("sftp.credentialsMissing");
   if (code === "auth") return t("sftp.authFailed");
   return message;
 }
 
-/** Editor size cap, mirrored from the backend's `MAX_EDIT_BYTES`. */
 export const MAX_EDIT_BYTES = 2 * 1024 * 1024;
 
 export type PaneSide = "left" | "right";
@@ -36,7 +30,7 @@ export type TabStatus = SftpStatusKind | "idle";
 export interface SftpTab {
   id: string;
   kind: TabKind;
-  /** Backend connection id for remote tabs; `null` for the local filesystem. */
+
   connectionId: string | null;
   hostId?: string;
   title: string;
@@ -54,12 +48,11 @@ interface PaneState {
 }
 
 interface SftpState {
-  /** Left pane width as a fraction of the panel (0-1). */
   ratio: number;
   panes: Record<PaneSide, PaneState>;
-  /** In-flight transfers, keyed by id; finished ones drop out immediately. */
+
   transfers: Record<string, TransferEvent>;
-  /** Whether dotfiles are listed; off by default. */
+
   showHidden: boolean;
 
   setRatio: (r: number) => void;
@@ -74,22 +67,17 @@ interface SftpState {
   refresh: (side: PaneSide, tabId: string) => Promise<void>;
   setSelected: (side: PaneSide, tabId: string, selected: string[]) => void;
 
-  /** Apply an `sftp://status` event to the matching remote tab. */
   applyStatus: (
     connectionId: string,
     status: SftpStatusKind,
     message?: string,
     code?: string,
   ) => void;
-  /** Apply an `sftp://transfer` progress event. */
+
   applyTransfer: (e: TransferEvent) => void;
-  /** Request cancellation of an in-flight transfer. */
+
   cancelTransfer: (transferId: string) => void;
 
-  /**
-   * Copy entries (or the tab's current selection) to the opposite pane.
-   * With `compress`, directories ship as a single tar.gz archive.
-   */
   transfer: (
     fromSide: PaneSide,
     entries?: FileEntry[],
@@ -100,7 +88,6 @@ interface SftpState {
 const otherSide = (side: PaneSide): PaneSide =>
   side === "left" ? "right" : "left";
 
-/** Parent directory of an OS-or-posix path (keeps trailing root). */
 export function parentPath(path: string): string {
   const trimmed = path.replace(/[/\\]+$/, "");
   const idx = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
@@ -108,7 +95,6 @@ export function parentPath(path: string): string {
   return trimmed.slice(0, idx);
 }
 
-/** Join a directory with a child name using the directory's separator. */
 export function joinPath(dir: string, name: string): string {
   const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
   return dir.endsWith(sep) ? `${dir}${name}` : `${dir}${sep}${name}`;
@@ -116,12 +102,6 @@ export function joinPath(dir: string, name: string): string {
 
 const emptyPane = (): PaneState => ({ tabs: [], activeTabId: null });
 
-/**
- * Subscribe the store to the backend's SFTP events for the whole app
- * lifetime. Called once from the workbench root so status and transfer
- * progress are never missed while the panel is hidden (the status bar shows
- * transfer activity even then).
- */
 let eventsBridged = false;
 export function bridgeSftpEvents(): void {
   if (eventsBridged) return;
@@ -134,7 +114,6 @@ export function bridgeSftpEvents(): void {
 }
 
 export const useSftpStore = create<SftpState>((set, get) => {
-  // Mutate one tab in place and return the new panes object.
   const patchTab = (
     side: PaneSide,
     tabId: string,
@@ -157,7 +136,6 @@ export const useSftpStore = create<SftpState>((set, get) => {
       };
     });
 
-  // Find a tab across either pane by its connection id.
   const findByConnection = (connectionId: string) => {
     const { panes } = get();
     for (const side of ["left", "right"] as PaneSide[]) {
@@ -197,8 +175,6 @@ export const useSftpStore = create<SftpState>((set, get) => {
     transfers: {},
     showHidden: false,
 
-    // The px-based pane minimum is enforced at the drag site (SftpPanel),
-    // where the container width is known; this only guards the invariant.
     setRatio: (r) => set({ ratio: Math.max(0, Math.min(r, 1)) }),
 
     toggleHidden: () => set((s) => ({ showHidden: !s.showHidden })),
@@ -297,9 +273,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
       const found = findByConnection(connectionId);
       if (!found) return;
       const { side, tab } = found;
-      // On first connect, keep the tab in "connecting" while the remote home
-      // directory resolves and the initial listing loads, so the status dot
-      // flips to connected together with the entries — not before them.
+
       if (status === "connected" && !tab.cwd) {
         void (async () => {
           let error: string | undefined;
@@ -309,8 +283,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
           } catch (err) {
             error = errorMessage(err);
           }
-          // A "closed"/"error" event may have landed while loading; don't
-          // overwrite a terminal status with "connected".
+
           const current = get().panes[side].tabs.find((x) => x.id === tab.id);
           if (!current || current.status !== "connecting") return;
           patchTab(side, tab.id, {
@@ -323,9 +296,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
       }
       patchTab(side, tab.id, {
         status,
-        // The initial connect leaves `loading: true` (set by addRemoteTab)
-        // until entries load; "error" is terminal here and never reaches
-        // that point, so nothing else would clear the spinner.
+
         ...(status === "error" ? { loading: false } : null),
         error:
           status === "error" ? describeConnectError(code, message) : message,
@@ -337,8 +308,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
         set((s) => ({ transfers: { ...s.transfers, [e.transferId]: e } }));
         return;
       }
-      // Terminal: drop the strip entry right away. Failures surface as a
-      // toast; everything is recorded in the history dialog either way.
+
       set((s) => {
         const rest = { ...s.transfers };
         delete rest[e.transferId];
@@ -347,7 +317,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
       if (e.status === "error") {
         toast.error(t("sftp.transferFailed"), e.message);
       }
-      // Refresh both panes so the destination reflects the new file.
+
       void get().refresh("left", get().panes.left.activeTabId ?? "");
       void get().refresh("right", get().panes.right.activeTabId ?? "");
     },

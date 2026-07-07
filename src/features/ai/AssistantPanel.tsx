@@ -47,14 +47,8 @@ import { useAiConfig, useAiModels, useSetAiModel } from "./api";
 import { useAiStore, type AgentLogItem } from "./store";
 import { ToolActivity } from "./ToolActivity";
 
-/** Stable reference so an inactive/unloaded session doesn't churn effect deps. */
 const EMPTY_LOG: AgentLogItem[] = [];
 
-/**
- * The AI assistant, docked as the right auxiliary bar. It chats over the
- * configured provider and can inspect terminal sessions through tools;
- * anything that executes on a server first asks for approval inline.
- */
 export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
   const { data: config } = useAiConfig();
@@ -97,12 +91,10 @@ export function AssistantPanel({ width }: { width: number }) {
     if (configured) void loadSessions();
   }, [configured, loadSessions]);
 
-  // The saved model plus every model the provider reports, de-duplicated.
   const models = [
     ...new Set([config?.model, ...(fetchedModels ?? [])].filter(Boolean)),
   ] as string[];
-  // The in-session pick wins; otherwise the saved model, then the first
-  // one the provider reports.
+
   const model = modelOverride ?? config?.model ?? models[0] ?? "";
 
   const changeModel = (next: string) => {
@@ -356,7 +348,6 @@ function RenameSessionDialog({
   return (
     <Dialog open={!!session} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
-        {/* Mount fresh per open so the field initializes without an effect. */}
         {session && (
           <RenameSessionForm
             session={session}
@@ -454,7 +445,6 @@ function Bubble({
   );
 }
 
-/** Flattens a react-markdown/hast node subtree back into its source text. */
 function nodeText(node: unknown): string {
   if (!node || typeof node !== "object") return "";
   if ("value" in node && typeof node.value === "string") return node.value;

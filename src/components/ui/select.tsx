@@ -5,10 +5,6 @@ import { cn } from "@/lib/utils";
 
 export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement>;
 
-/**
- * Lightweight native <select> styled to match the design system. For complex
- * cases (search, custom rendering) prefer a Radix-based combobox later.
- */
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, ...props }, ref) => {
     return (

@@ -1,12 +1,3 @@
-//! SFTP connection manager built on libssh2 (`ssh2`).
-//!
-//! Each remote connection runs on its own OS thread that owns the blocking
-//! `ssh2::Session`/`ssh2::Sftp`, mirroring the model used for interactive shells
-//! in [`crate::ssh`]. Commands are sent over a channel and each carries a
-//! one-shot reply sender, so the rest of the app talks to SFTP through a simple
-//! synchronous request/response API while all non-`Send` state stays on one
-//! thread. Transfers stream in chunks and emit progress as Tauri events.
-
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -29,19 +20,10 @@ use crate::ssh::{
 pub const EVENT_STATUS: &str = "sftp://status";
 pub const EVENT_TRANSFER: &str = "sftp://transfer";
 
-/// Chunk size used when streaming file contents to/from a remote host.
 const CHUNK_SIZE: usize = 64 * 1024;
 
-/// Bound on each blocking libssh2 call after the session is up. A connection
-/// that dies silently (sleep/wake, NAT timeout) would otherwise leave the
-/// worker — and every UI request behind it — hanging in a read forever; with
-/// a bound, the call fails, maps to "connection lost", and the tab shows an
-/// error instead. Applies per call (one 64 KiB chunk, one dirent, …), so slow
-/// but progressing transfers are unaffected.
 const OP_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Parameters needed to open a remote SFTP connection. Resolved by the command
-/// layer from a host's stored credentials.
 pub struct SftpConnectParams {
     pub connection_id: String,
     pub host: String,
@@ -50,18 +32,17 @@ pub struct SftpConnectParams {
     pub auth: AuthMethod,
 }
 
-/// A single directory entry, in a frontend-friendly shape.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileEntry {
     pub name: String,
     pub path: String,
-    /// "file" | "dir" | "symlink"
+
     pub kind: String,
     pub size: u64,
-    /// Unix seconds, when known.
+
     pub modified: Option<i64>,
-    /// Unix permission bits, when known.
+
     pub permissions: Option<u32>,
     pub is_symlink: bool,
 }
@@ -70,20 +51,15 @@ pub struct FileEntry {
 #[serde(rename_all = "camelCase")]
 struct StatusEvent {
     connection_id: String,
-    /// "connecting" | "connected" | "closed" | "error"
+
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
-    /// Machine-readable [`AppError::code`], set only for "error" — lets the
-    /// frontend show a localized message instead of the raw `message` above.
+
     #[serde(skip_serializing_if = "Option::is_none")]
     code: Option<String>,
 }
 
-/// Progress for an in-flight transfer. `total`/`transferred` are byte counts;
-/// `status` is "active" | "done" | "error" | "cancelled". `phase` is set for
-/// compressed transfers ("compressing" | "transferring" | "extracting") and
-/// `None` for a plain byte-for-byte copy.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferEvent {
@@ -98,18 +74,14 @@ pub struct TransferEvent {
     pub message: Option<String>,
 }
 
-/// Final result of a [`transfer`] call, used by the command layer to persist
-/// history once the transfer settles.
 pub struct TransferOutcome {
     pub transferred: u64,
     pub total: u64,
-    /// "done" | "error" | "cancelled"
+
     pub status: &'static str,
     pub message: Option<String>,
 }
 
-/// Requests handled on a connection's worker thread. Each carries a one-shot
-/// reply channel for its result.
 enum SftpRequest {
     List(String, Sender<AppResult<Vec<FileEntry>>>),
     Realpath(String, Sender<AppResult<String>>),
@@ -120,29 +92,28 @@ enum SftpRequest {
         is_dir: bool,
         reply: Sender<AppResult<()>>,
     },
-    /// Read a remote file into a local path, emitting progress under `base`.
+
     Download {
         remote: String,
         local: PathBuf,
         progress: ProgressCtx,
         reply: Sender<AppResult<()>>,
     },
-    /// Write a local file to a remote path, emitting progress under `base`.
+
     Upload {
         local: PathBuf,
         remote: String,
         progress: ProgressCtx,
         reply: Sender<AppResult<()>>,
     },
-    /// Run a shell command over an exec channel; returns its stdout (used to
-    /// drive `tar`/`rm` for compressed transfers).
+
     Exec {
         command: String,
         reply: Sender<AppResult<String>>,
     },
-    /// Read a whole remote file (capped at [`MAX_EDIT_BYTES`]) for the editor.
+
     ReadFile(String, Sender<AppResult<Vec<u8>>>),
-    /// Overwrite a remote file with the given bytes (editor save).
+
     WriteFile {
         path: String,
         data: Vec<u8>,
@@ -151,38 +122,32 @@ enum SftpRequest {
     Close,
 }
 
-/// Cap for files opened in the built-in text editor.
 pub const MAX_EDIT_BYTES: u64 = 2 * 1024 * 1024;
 
-/// Error returned when a file exceeds [`MAX_EDIT_BYTES`].
 pub fn edit_too_large_error() -> AppError {
     AppError::Invalid("file is too large to edit (2 MB max)".into())
 }
 
-/// Per-file progress context so a worker can emit byte-accurate events while a
-/// larger (possibly recursive) transfer accumulates totals.
 #[derive(Clone)]
 struct ProgressCtx {
     transfer_id: String,
-    /// Bytes already counted before this file (for multi-file transfers).
+
     base: u64,
-    /// Total bytes across the whole transfer.
+
     total: u64,
     label: String,
-    /// When true, do not emit per-chunk progress (used for the upload half of a
-    /// remote→remote bridge so bytes are counted only once).
+
     silent: bool,
-    /// Phase label for compressed transfers; `None` for a plain copy.
+
     phase: Option<String>,
-    /// Flipped by [`SftpManager::cancel_transfer`]; checked between chunks/files
-    /// so an in-flight transfer can stop promptly.
+
     cancel: Arc<AtomicBool>,
 }
 
 #[derive(Default)]
 pub struct SftpManager {
     conns: Arc<Mutex<HashMap<String, Sender<SftpRequest>>>>,
-    /// Cancellation flags for in-flight transfers, keyed by `transfer_id`.
+
     cancel_flags: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
@@ -191,7 +156,6 @@ impl SftpManager {
         Self::default()
     }
 
-    /// Register a fresh cancellation flag for a transfer about to start.
     pub fn register_transfer(&self, transfer_id: &str) -> Arc<AtomicBool> {
         let flag = Arc::new(AtomicBool::new(false));
         self.cancel_flags
@@ -200,22 +164,16 @@ impl SftpManager {
         flag
     }
 
-    /// Request cancellation of an in-flight transfer. Best-effort: the worker
-    /// notices between chunks (or, for compressed transfers, between phases),
-    /// so a remote `tar` command already running cannot be interrupted mid-way.
     pub fn cancel_transfer(&self, transfer_id: &str) {
         if let Some(flag) = self.cancel_flags.lock().get(transfer_id) {
             flag.store(true, Ordering::SeqCst);
         }
     }
 
-    /// Drop a transfer's cancellation flag once it has settled.
     pub fn unregister_transfer(&self, transfer_id: &str) {
         self.cancel_flags.lock().remove(transfer_id);
     }
 
-    /// Open a remote connection on its own thread. Returns immediately; progress
-    /// is reported via `sftp://status` events.
     pub fn connect(&self, app: AppHandle, params: SftpConnectParams) -> AppResult<()> {
         let (tx, rx) = mpsc::channel::<SftpRequest>();
         let id = params.connection_id.clone();
@@ -325,7 +283,6 @@ impl SftpManager {
         })
     }
 
-    /// Send a request to a connection's worker and block for its reply.
     fn request<T>(
         &self,
         id: &str,
@@ -423,8 +380,6 @@ fn map_stream_error(e: io::Error, remote: bool) -> AppError {
     }
 }
 
-/// Worker thread entry point: establish the session, then serve requests until
-/// closed or the channel disconnects.
 fn run_connection(app: AppHandle, params: SftpConnectParams, rx: Receiver<SftpRequest>) {
     let id = params.connection_id.clone();
     emit_status(&app, &id, "connecting");
@@ -515,9 +470,6 @@ fn run_connection(app: AppHandle, params: SftpConnectParams, rx: Receiver<SftpRe
                 upload(&app, &sftp, &local, &remote, &progress),
             ),
             SftpRequest::Exec { command, reply } => {
-                // Remote `tar`/`rm` for compressed transfers can legitimately
-                // stay quiet far longer than OP_TIMEOUT while still making
-                // progress, so exec runs unbounded.
                 session.set_timeout(0);
                 let result = exec_command(&session, &command);
                 session.set_timeout(OP_TIMEOUT.as_millis() as u32);
@@ -556,8 +508,6 @@ fn open_sftp(params: &SftpConnectParams) -> AppResult<(ssh2::Session, ssh2::Sftp
     Ok((session, sftp))
 }
 
-/// Run `command` on an exec channel, returning its stdout. A non-zero exit
-/// status maps to an error carrying the command's stderr.
 fn exec_command(session: &ssh2::Session, command: &str) -> AppResult<String> {
     let mut channel = session.channel_session().map_err(map_ssh_error)?;
     channel.exec(command).map_err(map_ssh_error)?;
@@ -586,19 +536,17 @@ fn exec_command(session: &ssh2::Session, command: &str) -> AppResult<String> {
     Ok(stdout)
 }
 
-/// Remove a remote path. Directories are emptied recursively first, since SFTP's
-/// `rmdir` only succeeds on an empty directory (mirroring local `remove_dir_all`).
 fn remove_path(sftp: &ssh2::Sftp, path: &Path, is_dir: bool) -> AppResult<()> {
     if !is_dir {
         return sftp.unlink(path).map_err(map_ssh_error);
     }
     for (child, stat) in sftp.readdir(path).map_err(map_ssh_error)? {
         let name = child.file_name().and_then(|n| n.to_str());
-        // `readdir` does not include "." / ".."; guard anyway.
+
         if matches!(name, Some(".") | Some("..")) {
             continue;
         }
-        // Never recurse into a symlink to a directory: unlink the link itself.
+
         let is_symlink = stat.perm.map(|p| p & 0o170000 == 0o120000).unwrap_or(false);
         let child_is_dir = stat.is_dir() && !is_symlink;
         remove_path(sftp, &child, child_is_dir)?;
@@ -699,7 +647,6 @@ fn upload(
     )
 }
 
-/// Copy `reader` → `writer` in chunks, emitting `sftp://transfer` progress.
 fn stream(
     app: &AppHandle,
     reader: &mut impl Read,
@@ -753,8 +700,6 @@ fn emit_transfer(
     );
 }
 
-/// Low-level transfer-event emitter with every field spelled out, so the
-/// compressed-transfer phases (which have no [`ProgressCtx`]) can report too.
 #[allow(clippy::too_many_arguments)]
 fn emit_xfer(
     app: &AppHandle,
@@ -780,9 +725,6 @@ fn emit_xfer(
     );
 }
 
-// --- Local filesystem helpers (no SSH; run on the command's blocking task) ---
-
-/// List a local directory into the same [`FileEntry`] shape used for remote.
 pub fn local_list(path: &str) -> AppResult<Vec<FileEntry>> {
     let mut entries = Vec::new();
     for entry in fs::read_dir(path)? {
@@ -826,7 +768,6 @@ pub fn local_list(path: &str) -> AppResult<Vec<FileEntry>> {
     Ok(entries)
 }
 
-/// Directories first, then case-insensitive name order.
 fn sort_entries(entries: &mut [FileEntry]) {
     entries.sort_by(|a, b| {
         let a_dir = a.kind == "dir";
@@ -837,17 +778,11 @@ fn sort_entries(entries: &mut [FileEntry]) {
     });
 }
 
-// --- Transfer orchestration (called from the command layer) ---
-
-/// One end of a transfer: a local path (`connection_id == None`) or a path on a
-/// remote connection.
 pub struct Endpoint {
     pub connection_id: Option<String>,
     pub path: String,
 }
 
-/// Compute the total byte size of a transfer source (recursing into dirs) so
-/// the UI can show an accurate progress denominator.
 fn source_size(mgr: &SftpManager, ep: &Endpoint) -> AppResult<u64> {
     match &ep.connection_id {
         None => local_size(Path::new(&ep.path)),
@@ -880,7 +815,6 @@ fn remote_size(mgr: &SftpManager, id: &str, path: &str) -> AppResult<u64> {
     Ok(total)
 }
 
-/// Join a remote/posix-style directory with a child name.
 fn join_remote(dir: &str, name: &str) -> String {
     if dir.ends_with('/') {
         format!("{dir}{name}")
@@ -889,17 +823,6 @@ fn join_remote(dir: &str, name: &str) -> String {
     }
 }
 
-/// Transfer `source` into directory `dest_dir`, preserving the source's base
-/// name. Handles file or directory (recursive) sources across any combination
-/// of local/remote endpoints, emitting progress under `transfer_id`.
-///
-/// When `compress` is set and the source is a directory crossing the network,
-/// the tree is bundled into a single `tar.gz`, sent as one file, and unpacked
-/// at the destination — far faster than per-file SFTP round-trips for many
-/// small files. See [`transfer_compressed`].
-///
-/// `cancel` is checked between chunks/files; when set, the transfer stops and
-/// reports a `"cancelled"` outcome instead of `"error"`.
 pub fn transfer(
     app: &AppHandle,
     mgr: &SftpManager,
@@ -909,8 +832,6 @@ pub fn transfer(
     compress: bool,
     cancel: Arc<AtomicBool>,
 ) -> TransferOutcome {
-    // Compression only pays off for a directory that actually crosses the
-    // network; a local→local copy gains nothing from archiving.
     let crosses_network = source.connection_id.is_some() || dest_dir.connection_id.is_some();
     let name = base_name(&source.path);
     if let Err(e) = validate_transfer_target(mgr, source, dest_dir, &name) {
@@ -992,8 +913,6 @@ fn progress_at(p: &ProgressCtx, label: &str) -> ProgressCtx {
     }
 }
 
-/// Recursively transfer one node (file or dir) named `name` into `dest_dir`.
-/// `done` accumulates transferred bytes across the whole operation.
 fn transfer_node(
     app: &AppHandle,
     mgr: &SftpManager,
@@ -1009,7 +928,6 @@ fn transfer_node(
     let dest_path = dest_join(dest_dir, name);
 
     if is_dir(mgr, source)? {
-        // Create the destination directory, then copy children.
         make_dir(mgr, dest_dir, name)?;
         let dest_child = Endpoint {
             connection_id: dest_dir.connection_id.clone(),
@@ -1040,8 +958,6 @@ fn transfer_node(
     }
 }
 
-/// Copy a single file between any combination of local/remote endpoints,
-/// emitting progress that resumes from the accumulated `done` byte count.
 fn copy_file(
     app: &AppHandle,
     mgr: &SftpManager,
@@ -1059,13 +975,12 @@ fn copy_file(
     };
 
     match (&source.connection_id, &dest.connection_id) {
-        // local → local
         (None, None) => {
             let mut reader = fs::File::open(&source.path)?;
             let mut writer = fs::File::create(&dest.path)?;
             stream(app, &mut reader, false, &mut writer, false, &file_progress)?;
         }
-        // local → remote (worker uploads and emits progress)
+
         (None, Some(dest_id)) => {
             mgr.upload(
                 dest_id,
@@ -1074,7 +989,7 @@ fn copy_file(
                 file_progress,
             )?;
         }
-        // remote → local (worker downloads and emits progress)
+
         (Some(src_id), None) => {
             mgr.download(
                 src_id,
@@ -1083,8 +998,7 @@ fn copy_file(
                 file_progress,
             )?;
         }
-        // remote → remote: bridge through a local temp file. The download half
-        // emits progress; the upload half is silent so bytes count once.
+
         (Some(src_id), Some(dest_id)) => {
             let tmp =
                 std::env::temp_dir().join(format!("sageport-{}-{}", uuid::Uuid::new_v4(), label));
@@ -1102,8 +1016,6 @@ fn copy_file(
     *done += size;
     Ok(())
 }
-
-// --- small endpoint helpers ---
 
 fn validate_transfer_target(
     mgr: &SftpManager,
@@ -1214,7 +1126,6 @@ fn remote_is_child_path(parent: &str, child: &str) -> bool {
         .is_some_and(|rest| rest.starts_with('/'))
 }
 
-/// Size of a single file at `ep` (0 if it cannot be determined).
 fn file_size(mgr: &SftpManager, ep: &Endpoint) -> AppResult<u64> {
     match &ep.connection_id {
         None => Ok(fs::symlink_metadata(&ep.path)?.len()),
@@ -1235,7 +1146,6 @@ fn is_dir(mgr: &SftpManager, ep: &Endpoint) -> AppResult<bool> {
     match &ep.connection_id {
         None => Ok(fs::symlink_metadata(&ep.path)?.is_dir()),
         Some(id) => {
-            // Determine via parent listing.
             let name = base_name(&ep.path);
             let parent = parent_remote(&ep.path);
             for e in mgr.list(id, &parent)? {
@@ -1263,7 +1173,6 @@ fn make_dir(mgr: &SftpManager, dest_dir: &Endpoint, name: &str) -> AppResult<()>
             Ok(())
         }
         Some(id) => {
-            // Ignore "already exists" by checking first.
             if mgr.list(id, &path).is_ok() {
                 return Ok(());
             }
@@ -1300,17 +1209,10 @@ fn parent_remote(path: &str) -> String {
     }
 }
 
-// --- Compressed (tar.gz) directory transfers ---
-
 const PHASE_COMPRESS: &str = "compressing";
 const PHASE_TRANSFER: &str = "transferring";
 const PHASE_EXTRACT: &str = "extracting";
 
-/// Bundle the directory at `source` into a single `tar.gz`, ship it as one file,
-/// and unpack it into `dest_dir`. Emits the same `sftp://transfer` events as a
-/// plain copy, but tagged with a `phase` so the UI can show compress/transfer/
-/// extract progress. The archive is rooted at the source's base name, so it
-/// expands to `dest_dir/<name>/…`, matching plain-copy semantics.
 fn transfer_compressed(
     app: &AppHandle,
     mgr: &SftpManager,
@@ -1378,7 +1280,7 @@ fn transfer_compressed(
             &dest_dir.path,
             cancel,
         ),
-        // local→local is filtered out by the caller; nothing to compress.
+
         (None, None) => Ok(0),
     };
 
@@ -1413,7 +1315,6 @@ fn transfer_compressed(
     }
 }
 
-/// Build the local→remote `ProgressCtx` for the single-archive transfer phase.
 fn xfer_progress(
     transfer_id: &str,
     label: &str,
@@ -1562,8 +1463,7 @@ fn compressed_remote_to_remote(
         if cancel.load(Ordering::Relaxed) {
             return Err(AppError::Cancelled);
         }
-        // Bridge the archive through a local temp file: the download half shows
-        // progress, the upload half is silent so bytes count once.
+
         let size = remote_file_size(mgr, src_id, &src_archive)?;
         mgr.download(
             src_id,
@@ -1606,8 +1506,6 @@ fn compressed_remote_to_remote(
     res
 }
 
-/// Create a gzip-compressed tar of `src_dir`, rooted at the directory's own
-/// name so it unpacks as `<dest>/<name>/…`.
 fn create_local_archive(src_dir: &Path, archive: &Path) -> AppResult<()> {
     let name = src_dir
         .file_name()
@@ -1629,8 +1527,6 @@ fn extract_local_archive(archive: &Path, dest_dir: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// Byte size of a remote file via a portable `wc -c` (avoids `stat`'s differing
-/// GNU/BSD flags). Returns 0 if it cannot be parsed.
 fn remote_file_size(mgr: &SftpManager, id: &str, path: &str) -> AppResult<u64> {
     let out = mgr.exec(id, &format!("wc -c < {}", sh_quote(path)))?;
     Ok(out.trim().parse().unwrap_or(0))
@@ -1640,19 +1536,14 @@ fn local_temp_archive() -> PathBuf {
     std::env::temp_dir().join(format!("sageport-{}.tar.gz", uuid::Uuid::new_v4()))
 }
 
-/// A remote scratch archive under `/tmp` (writable on essentially every Unix
-/// host, regardless of the source/destination directory's permissions).
 fn remote_temp_archive() -> String {
     format!("/tmp/sageport-{}.tar.gz", uuid::Uuid::new_v4())
 }
 
-/// A hidden archive basename to drop inside the destination directory itself
-/// (guaranteed writable, since we are extracting there).
 fn remote_archive_name() -> String {
     format!(".sageport-{}.tar.gz", uuid::Uuid::new_v4())
 }
 
-/// Single-quote a string for safe interpolation into a `/bin/sh` command.
 fn sh_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }

@@ -117,7 +117,6 @@ export function FileList({
     );
   }
 
-  // Dotfiles stay out of sight unless the panel-level toggle is on.
   const entries = showHidden
     ? tab.entries
     : tab.entries.filter((e) => !e.name.startsWith("."));

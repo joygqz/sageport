@@ -1,15 +1,3 @@
-//! The transport abstraction every sync backend implements.
-//!
-//! A provider stores opaque [`EncryptedEnvelope`]s and keeps a linear version
-//! history of them. Exactly one provider is active at a time; switching means
-//! disconnecting and connecting the new one from scratch.
-//!
-//! Except for GitHub Gist (which rides the gist's native revision history),
-//! every backend is a plain object store: it only implements [`ObjectStore`]
-//! (list/get/put/delete), and the shared [`Versioned`] wrapper turns that
-//! into the full [`SyncProvider`] contract — timestamped object names,
-//! newest-first ordering, and pruning down to [`KEEP_VERSIONS`].
-
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
@@ -24,16 +12,12 @@ use super::onedrive::OnedriveStore;
 use super::s3::S3Store;
 use super::webdav::WebdavStore;
 
-/// How many backup revisions the object-store providers keep before pruning
-/// the oldest on push. Gist history is capped by GitHub itself.
 pub const KEEP_VERSIONS: usize = 10;
 
 const FILE_PREFIX: &str = "sageport-vault-";
 const FILE_SUFFIX: &str = ".json";
 const NAME_TIME_FORMAT: &str = "%Y%m%dT%H%M%S%3fZ";
 
-/// The five supported remote backends. (Local file backup is a separate
-/// one-shot export/import feature, not a connected provider.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ProviderKind {
@@ -51,8 +35,6 @@ impl ProviderKind {
     }
 }
 
-/// Full (secret-bearing) configuration of the active provider, persisted as
-/// one JSON blob in the settings table. Never serialized to the frontend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
     tag = "kind",
@@ -100,8 +82,6 @@ impl ProviderConfig {
         }
     }
 
-    /// Non-secret one-liner shown next to the account in the UI (bucket,
-    /// server host, folder path, linked gist id, ...).
     pub fn detail(&self) -> Option<String> {
         match self {
             ProviderConfig::Gist { gist_id, .. } => gist_id.clone(),
@@ -114,78 +94,50 @@ impl ProviderConfig {
     }
 }
 
-/// One historical backup revision, uniform across providers.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncVersion {
-    /// Provider-scoped opaque id (gist revision sha, Drive file id, object
-    /// name, ...). Feed back into `pull_version`.
     pub id: String,
-    /// RFC3339 creation time.
+
     pub created_at: String,
     pub size_bytes: Option<u64>,
 }
 
-/// A connected sync backend. All methods take `&mut self` because providers
-/// mutate their own config while working (OAuth token refresh, gist id
-/// discovery); callers persist [`Self::config`] after each operation.
 #[async_trait]
 pub trait SyncProvider: Send {
-    /// The latest backup, or `None` when the target holds none yet. A stale
-    /// pointer to a remote that has since been deleted must also yield
-    /// `None`, not an error, so the next push can recreate it.
     async fn pull_latest(&mut self) -> AppResult<Option<EncryptedEnvelope>>;
 
-    /// Store a new backup revision (pruning old history where applicable).
     async fn push(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()>;
 
-    /// Backup history, newest first.
     async fn list_versions(&mut self) -> AppResult<Vec<SyncVersion>>;
 
-    /// Fetch one specific revision from `list_versions`.
     async fn pull_version(&mut self, id: &str) -> AppResult<EncryptedEnvelope>;
 
-    /// Destroy the entire remote history without creating a new backup. Used
-    /// by force-connect so only a later explicit `sync_push` writes data.
     async fn clear(&mut self) -> AppResult<()>;
 
-    /// Current config snapshot for persistence (may differ from the config
-    /// the provider was built with — refreshed tokens, discovered ids).
     fn config(&self) -> ProviderConfig;
 }
 
-/// One backup object as an [`ObjectStore`] backend reports it.
 pub struct RemoteObject {
-    /// Store-scoped handle for get/delete (Drive file id, object key name...).
     pub id: String,
-    /// The [`version_filename`] the object was stored under.
+
     pub name: String,
     pub size: Option<u64>,
 }
 
-/// Minimal contract for object-store backends (Drive, OneDrive, WebDAV, S3).
-/// Implementations only move bytes; all versioning semantics live in
-/// [`Versioned`].
 #[async_trait]
 pub trait ObjectStore: Send {
-    /// Every object in the backup location, in any order; [`Versioned`]
-    /// filters foreign names and sorts.
     async fn list(&mut self) -> AppResult<Vec<RemoteObject>>;
     async fn get(&mut self, id: &str) -> AppResult<Vec<u8>>;
     async fn put(&mut self, name: &str, body: String) -> AppResult<()>;
-    /// Deleting an object that is already gone must succeed.
+
     async fn delete(&mut self, id: &str) -> AppResult<()>;
     fn config(&self) -> ProviderConfig;
 }
 
-/// Adapter turning any [`ObjectStore`] into a [`SyncProvider`]: one
-/// timestamped object per push, newest-first listing by embedded timestamp,
-/// history pruned to [`KEEP_VERSIONS`].
 pub struct Versioned<S>(pub S);
 
 impl<S: ObjectStore> Versioned<S> {
-    /// Vault objects, newest first (names embed the creation time and sort
-    /// lexicographically in chronological order).
     async fn objects(&mut self) -> AppResult<Vec<RemoteObject>> {
         let mut objects: Vec<RemoteObject> = self
             .0
@@ -214,7 +166,6 @@ impl<S: ObjectStore> SyncProvider for Versioned<S> {
     }
 
     async fn push(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
-        // Pretty JSON so a backup stays inspectable on the remote.
         let body = serde_json::to_string_pretty(envelope)?;
         self.0.put(&version_filename(), body).await?;
         for stale in self.objects().await?.into_iter().skip(KEEP_VERSIONS) {
@@ -254,7 +205,6 @@ impl<S: ObjectStore> SyncProvider for Versioned<S> {
     }
 }
 
-/// Instantiate the provider for a stored config.
 pub fn make_provider(config: ProviderConfig) -> AppResult<Box<dyn SyncProvider>> {
     Ok(match config {
         ProviderConfig::Gist { token, gist_id } => Box::new(GistProvider::new(token, gist_id)),
@@ -279,10 +229,6 @@ pub fn make_provider(config: ProviderConfig) -> AppResult<Box<dyn SyncProvider>>
     })
 }
 
-// --- Shared timestamped-object naming ---
-
-/// Fresh object name for a push, e.g. `sageport-vault-20260704T093000123Z.json`.
-/// Millisecond precision keeps names unique and lexicographically time-ordered.
 pub fn version_filename() -> String {
     format!(
         "{FILE_PREFIX}{}{FILE_SUFFIX}",
@@ -294,7 +240,6 @@ pub fn is_vault_filename(name: &str) -> bool {
     name.starts_with(FILE_PREFIX) && name.ends_with(FILE_SUFFIX)
 }
 
-/// Recover the RFC3339 creation time embedded in a [`version_filename`].
 pub fn version_time_from_name(name: &str) -> Option<String> {
     let ts = name.strip_prefix(FILE_PREFIX)?.strip_suffix(FILE_SUFFIX)?;
     let naive = NaiveDateTime::parse_from_str(ts, NAME_TIME_FORMAT).ok()?;
@@ -314,7 +259,7 @@ mod tests {
         assert!(is_vault_filename(&name));
         let rfc3339 = version_time_from_name(&name).expect("name embeds a parseable timestamp");
         assert!(rfc3339.ends_with('Z'));
-        // Lexicographic name order must match chronological order.
+
         let earlier = "sageport-vault-20200101T000000000Z.json";
         assert!(earlier < name.as_str());
         assert!(version_time_from_name(earlier).unwrap() < rfc3339);

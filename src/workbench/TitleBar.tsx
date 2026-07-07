@@ -9,12 +9,6 @@ import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { WindowControls } from "./WindowControls";
 
-/**
- * Draggable window title bar. The center hosts the command center (quick
- * open trigger); the right edge holds layout toggles and, on platforms
- * without native decorations, the window controls plus a VSCode-style app
- * logo on the left (macOS has the traffic lights there instead).
- */
 export function TitleBar() {
   const { t } = useI18n();
   const openPalette = useOverlayStore((s) => s.openPalette);
@@ -24,28 +18,15 @@ export function TitleBar() {
   const toggleAux = useLayoutStore((s) => s.toggleAux);
 
   return (
-    // ~34px, the height VSCode's title bar uses with the command center.
-    // Sized in rem (h-9) so the whole bar scales with the UI zoom, exactly
-    // like VSCode. The native macOS traffic lights are re-centered to this
-    // bar's live height at runtime: syncTrafficLights in workbench/zoom.ts
-    // declares the inset on zoom/theme changes, and the native side keeps
-    // re-applying it through window resizes (see
-    // src-tauri/src/commands/window.rs). If h-9 ever changes, update
-    // TITLE_BAR_REM in zoom.ts to match.
     <header
       data-tauri-drag-region
       className={cn(
         "grid h-9 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center border-b border-border bg-surface",
-        // rem-based so the reserved traffic-light space scales with zoom,
-        // in step with the lights' own scaled inset (see zoom.ts).
+
         IS_MACOS ? "pl-[5.35rem]" : "pl-2",
       )}
     >
       <div data-tauri-drag-region className="flex h-full items-center">
-        {/* App logo, VSCode-style: 16px CSS (size-4, rem-based so it zooms
-            with the UI), generated from the master icon by `pnpm icon`.
-            pointer-events-none keeps mousedown on the drag-region div so
-            dragging and double-click-to-maximize still work over it. */}
         {!IS_MACOS && (
           <img
             src={appLogo}
@@ -69,9 +50,6 @@ export function TitleBar() {
         data-tauri-drag-region
         className="flex h-full items-center justify-end"
       >
-        {/* Same metrics as the panel-header action rows below (size-6
-            buttons, gap-0.5, right padding pr-2), so this column of icons
-            lines up with the AI panel's actions on the same right edge. */}
         <div
           className={cn(
             "flex items-center gap-0.5 pl-1.5",
@@ -83,18 +61,22 @@ export function TitleBar() {
             active={panelVisible}
             onClick={togglePanel}
           >
-            {panelVisible
-              ? <PanelBottomFilled className="size-4" />
-              : <PanelBottom className="size-4" />}
+            {panelVisible ? (
+              <PanelBottomFilled className="size-4" />
+            ) : (
+              <PanelBottom className="size-4" />
+            )}
           </LayoutToggle>
           <LayoutToggle
             label={t("titleBar.toggleAssistant")}
             active={auxVisible}
             onClick={toggleAux}
           >
-            {auxVisible
-              ? <PanelRightFilled className="size-4" />
-              : <PanelRight className="size-4" />}
+            {auxVisible ? (
+              <PanelRightFilled className="size-4" />
+            ) : (
+              <PanelRight className="size-4" />
+            )}
           </LayoutToggle>
         </div>
         {!IS_MACOS && <WindowControls />}
@@ -127,9 +109,6 @@ function LayoutToggle({
   );
 }
 
-// Filled counterparts of lucide's PanelBottom / PanelRight (same 24px
-// grid and stroke metrics). Visibility is conveyed VSCode-style: filled
-// section = open, outline = closed.
 function PanelBottomFilled({ className }: { className?: string }) {
   return (
     <svg
