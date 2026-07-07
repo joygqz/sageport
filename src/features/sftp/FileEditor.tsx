@@ -5,24 +5,28 @@ import {
   history,
   historyKeymap,
   indentLess,
-  insertTab,
+  indentMore,
 } from "@codemirror/commands";
 import {
   bracketMatching,
   HighlightStyle,
+  indentUnit,
   LanguageDescription,
   syntaxHighlighting,
 } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, type StateCommand } from "@codemirror/state";
 import {
+  Decoration,
+  type DecorationSet,
   EditorView,
   highlightActiveLine,
   highlightActiveLineGutter,
-  highlightWhitespace,
   keymap,
   lineNumbers,
+  MatchDecorator,
   ViewPlugin,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { HardDrive, Server } from "lucide-react";
@@ -105,23 +109,85 @@ const editorTheme = EditorView.theme({
   },
   ".cm-highlightSpace": {
     backgroundImage:
-      "radial-gradient(circle at center, color-mix(in srgb, currentColor 35%, transparent) 1px, transparent 1.2px)",
+      "radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--color-terminal-foreground) 38%, transparent) 1px, transparent 1.2px)",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
   },
   ".cm-highlightTab": {
     position: "relative",
+    backgroundImage: "none",
   },
   ".cm-highlightTab::after": {
     content: '"→"',
     position: "absolute",
     inset: "0 auto 0 0.15em",
-    color: "color-mix(in srgb, currentColor 35%, transparent)",
+    color:
+      "color-mix(in srgb, var(--color-terminal-foreground) 38%, transparent)",
     pointerEvents: "none",
   },
 });
 
 const SCROLLBAR_HIT_SIZE = 18;
+const INDENT_SIZE = 2;
+const INDENT_UNIT = " ".repeat(INDENT_SIZE);
+
+const visibleSpace = Decoration.mark({ class: "cm-highlightSpace" });
+const visibleTab = Decoration.mark({ class: "cm-highlightTab" });
+
+const boundaryWhitespaceMatcher = new MatchDecorator({
+  regexp: /[\t ]+/g,
+  decorate(add, from, _to, match) {
+    const text = match[0];
+    const isBoundary =
+      match.index === 0 || match.index + text.length === match.input.length;
+    const isInteriorWhitespace = text.includes("\t") || text.length > 1;
+
+    if (!isBoundary && !isInteriorWhitespace) return;
+
+    for (let index = 0; index < text.length; index += 1) {
+      add(
+        from + index,
+        from + index + 1,
+        text[index] === "\t" ? visibleTab : visibleSpace,
+      );
+    }
+  },
+  boundary: /\S/,
+});
+
+const boundaryWhitespace = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = boundaryWhitespaceMatcher.createDeco(view);
+    }
+
+    update(update: ViewUpdate) {
+      this.decorations = boundaryWhitespaceMatcher.updateDeco(
+        update,
+        this.decorations,
+      );
+    }
+  },
+  {
+    decorations: (value) => value.decorations,
+  },
+);
+
+const insertSoftTab: StateCommand = ({ state, dispatch }) => {
+  if (state.selection.ranges.some((range) => !range.empty)) {
+    return indentMore({ state, dispatch });
+  }
+
+  dispatch(
+    state.update(state.replaceSelection(INDENT_UNIT), {
+      scrollIntoView: true,
+      userEvent: "input",
+    }),
+  );
+  return true;
+};
 
 type InternalMouseSelection = { destroy: () => void };
 type InternalInputState = {
@@ -391,7 +457,9 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
           highlightActiveLine(),
           history(),
           bracketMatching(),
-          highlightWhitespace(),
+          boundaryWhitespace,
+          indentUnit.of(INDENT_UNIT),
+          EditorState.tabSize.of(INDENT_SIZE),
           language.of([]),
           syntaxHighlighting(highlightStyle),
           keymap.of([
@@ -402,7 +470,7 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
                 return true;
               },
             },
-            { key: "Tab", run: insertTab, shift: indentLess },
+            { key: "Tab", run: insertSoftTab, shift: indentLess },
             ...defaultKeymap,
             ...historyKeymap,
           ]),
