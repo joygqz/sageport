@@ -20,6 +20,8 @@ import { SideBarView } from "@/workbench/SideBarView";
 import { useTabsStore } from "@/workbench/tabs";
 import { useDeleteSnippet, useSnippets } from "./api";
 import { SnippetFormDialog } from "./SnippetFormDialog";
+import { SnippetRunDialog } from "./SnippetRunDialog";
+import { parseVariables } from "./variables";
 
 export function SnippetsView() {
   const { t } = useI18n();
@@ -32,12 +34,21 @@ export function SnippetsView() {
     snippet: null,
   });
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [runSnippet, setRunSnippet] = useState<Snippet | null>(null);
 
-  const run = (snippet: Snippet) => {
-    if (sendToTerminal(snippet.command)) {
+  const send = (command: string) => {
+    if (sendToTerminal(command)) {
       toast.success(t("snippets.sent"));
     } else {
       toast.error(t("snippets.noTerminal"));
+    }
+  };
+
+  const run = (snippet: Snippet) => {
+    if (parseVariables(snippet.command).length > 0) {
+      setRunSnippet(snippet);
+    } else {
+      send(snippet.command);
     }
   };
 
@@ -144,6 +155,11 @@ export function SnippetsView() {
       <ConfirmDialog
         state={confirmState}
         onClose={() => setConfirmState(null)}
+      />
+      <SnippetRunDialog
+        snippet={runSnippet}
+        onClose={() => setRunSnippet(null)}
+        onRun={send}
       />
     </SideBarView>
   );
