@@ -1,6 +1,6 @@
 [package]
 name = "sageport"
-version = "0.4.2"
+version = "0.4.3"
 description = "Sageport — an ops-focused SSH client with an AI assistant"
 authors = ["JoyGqz"]
 edition = "2021"
