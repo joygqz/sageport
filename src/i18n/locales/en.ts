@@ -54,8 +54,7 @@ export const en = {
     unsupported: "Statistics are not available for this system",
     empty: {
       title: "No active sessions",
-      description:
-        "Connect to a host to see live CPU, memory, and disk usage.",
+      description: "Connect to a host to see live CPU, memory, and disk usage.",
     },
   },
 
@@ -503,7 +502,13 @@ export const en = {
     empty: {
       title: "Ask the assistant",
       description:
-        "It can read your terminal sessions and suggest commands. Anything it runs on a server needs your approval first.",
+        "It can connect to your hosts, read terminals, and run commands to get ops work done. Every command it runs on a server needs your approval first.",
+    },
+    suggestion: {
+      health: "Check CPU, memory, and disk usage on my server",
+      logs: "Scan the recent system logs for errors",
+      services:
+        "Show which services are running and which ports they listen on",
     },
     newChat: "New chat",
     history: "Chat history",
@@ -517,7 +522,7 @@ export const en = {
     working: "Working",
     stop: "Stop generating",
     stepLimitReached:
-      "Step limit reached. Rephrase or split the request and try again.",
+      'Reached the step limit for one run. Say "continue" to keep going.',
     inputPlaceholder: "Ask about your servers",
     commandLabel: "Command",
     error: "Assistant error",
@@ -527,6 +532,8 @@ export const en = {
     modelLabel: "Model",
     modelLoading: "Loading models",
     tool: {
+      listHosts: "List hosts",
+      connectHost: "Connect to host",
       listTerminalSessions: "List terminal sessions",
       readTerminalOutput: "Read terminal output",
       runTerminalCommand: "Run terminal command",

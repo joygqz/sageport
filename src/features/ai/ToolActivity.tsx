@@ -6,6 +6,8 @@ import {
   Eye,
   ListTree,
   Loader2,
+  Plug,
+  Server,
   ShieldAlert,
   Terminal as TerminalIcon,
   X,
@@ -18,12 +20,16 @@ import type { AgentLogItem, ToolStatus } from "./store";
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
 
 const TOOL_ICON: Record<string, typeof TerminalIcon> = {
+  list_hosts: Server,
+  connect_host: Plug,
   list_terminal_sessions: ListTree,
   read_terminal_output: Eye,
   run_terminal_command: TerminalIcon,
 };
 
 const TOOL_LABEL_KEY: Record<string, TKey> = {
+  list_hosts: "ai.tool.listHosts",
+  connect_host: "ai.tool.connectHost",
   list_terminal_sessions: "ai.tool.listTerminalSessions",
   read_terminal_output: "ai.tool.readTerminalOutput",
   run_terminal_command: "ai.tool.runTerminalCommand",

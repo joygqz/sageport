@@ -492,7 +492,12 @@ export const zhCN: Dictionary = {
     empty: {
       title: "向助手提问",
       description:
-        "助手可以读取终端会话并给出命令建议，任何在服务器上执行的操作都需要你先确认。",
+        "助手可以自己连接你的主机、读取终端并执行命令来完成运维任务，任何在服务器上执行的命令都需要你先确认。",
+    },
+    suggestion: {
+      health: "检查服务器的 CPU、内存和磁盘使用情况",
+      logs: "分析最近的系统日志，找出报错和异常",
+      services: "看看有哪些服务在运行、监听了哪些端口",
     },
     newChat: "新对话",
     history: "对话历史",
@@ -505,7 +510,7 @@ export const zhCN: Dictionary = {
     },
     working: "处理中",
     stop: "停止生成",
-    stepLimitReached: "已达到步骤上限，请换个说法或拆分请求后重试。",
+    stepLimitReached: "已达到单次运行的步骤上限，回复「继续」可以接着执行。",
     inputPlaceholder: "询问服务器相关问题",
     commandLabel: "命令",
     error: "助手出错",
@@ -515,6 +520,8 @@ export const zhCN: Dictionary = {
     modelLabel: "模型",
     modelLoading: "正在加载模型",
     tool: {
+      listHosts: "列出主机",
+      connectHost: "连接主机",
       listTerminalSessions: "列出终端会话",
       readTerminalOutput: "读取终端输出",
       runTerminalCommand: "运行终端命令",

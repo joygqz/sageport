@@ -49,6 +49,12 @@ import { ToolActivity } from "./ToolActivity";
 
 const EMPTY_LOG: AgentLogItem[] = [];
 
+const SUGGESTION_KEYS = [
+  "ai.suggestion.health",
+  "ai.suggestion.logs",
+  "ai.suggestion.services",
+] as const;
+
 export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
   const { data: config } = useAiConfig();
@@ -108,12 +114,17 @@ export function AssistantPanel({ width }: { width: number }) {
     );
   }, [log, pending]);
 
-  const submit = async () => {
-    const prompt = input.trim();
+  const sendPrompt = async (prompt: string) => {
     if (!prompt || pending || !model) return;
-    setInput("");
     const sessionId = activeId ?? (await newSession());
     void send(sessionId, prompt, model);
+  };
+
+  const submit = async () => {
+    const prompt = input.trim();
+    if (!prompt) return;
+    setInput("");
+    await sendPrompt(prompt);
   };
 
   const activeTitle = sessions.find((s) => s.id === activeId)?.title;
@@ -240,12 +251,26 @@ export function AssistantPanel({ width }: { width: number }) {
           <div ref={scrollRef} className="flex-1 overflow-y-auto">
             <div className="flex flex-col gap-3 p-3">
               {log.length === 0 ? (
-                <EmptyState
-                  className="mt-10"
-                  icon={Sparkles}
-                  title={t("ai.empty.title")}
-                  description={t("ai.empty.description")}
-                />
+                <div className="mt-10 flex flex-col gap-4">
+                  <EmptyState
+                    icon={Sparkles}
+                    title={t("ai.empty.title")}
+                    description={t("ai.empty.description")}
+                  />
+                  <div className="flex flex-col gap-1.5 px-2">
+                    {SUGGESTION_KEYS.map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        disabled={pending || !model}
+                        onClick={() => void sendPrompt(t(key))}
+                        className="rounded-md border border-input px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      >
+                        {t(key)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 log.map((item) => (
                   <LogEntry
