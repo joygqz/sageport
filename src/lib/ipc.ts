@@ -26,6 +26,8 @@ import type {
   PortForwardInput,
   ForwardStatusEvent,
   SftpStatusEvent,
+  SftpBookmark,
+  SftpBookmarkInput,
   Snippet,
   SnippetInput,
   SshConfigHost,
@@ -263,6 +265,12 @@ export const ipc = {
         invoke<AiSessionSummary>("ai_session_rename", { id, title }),
       remove: (id: string) => invoke<void>("ai_session_delete", { id }),
     },
+  },
+  bookmarks: {
+    list: () => invoke<SftpBookmark[]>("bookmarks_list"),
+    create: (input: SftpBookmarkInput) =>
+      invoke<SftpBookmark>("bookmarks_create", { input }),
+    remove: (id: string) => invoke<void>("bookmarks_delete", { id }),
   },
   forwards: {
     list: () => invoke<PortForward[]>("forwards_list"),

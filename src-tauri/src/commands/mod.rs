@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod bookmarks;
 pub mod forwards;
 pub mod groups;
 pub mod hosts;

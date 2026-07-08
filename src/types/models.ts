@@ -34,6 +34,24 @@ export interface Host {
   revision: number;
 }
 
+export interface SftpBookmark {
+  id: string;
+  hostId: string | null;
+  label: string;
+  path: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  revision: number;
+}
+
+export interface SftpBookmarkInput {
+  hostId?: string | null;
+  label: string;
+  path: string;
+}
+
 export type ForwardKind = "local" | "dynamic";
 
 export interface PortForward {

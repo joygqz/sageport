@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Executor, Sqlite, SqlitePool};
 
 use crate::crypto::{self, EncryptedEnvelope};
-use crate::domain::{now, Group, Host, Identity, PortForward, Snippet, SshKey};
+use crate::domain::{now, Group, Host, Identity, PortForward, SftpBookmark, Snippet, SshKey};
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 
-const SNAPSHOT_VERSION: u32 = 6;
+const SNAPSHOT_VERSION: u32 = 7;
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["sync.", "update."];
 
@@ -44,6 +44,8 @@ pub struct VaultSnapshot {
     pub settings: Vec<SettingEntry>,
     #[serde(default)]
     pub port_forwards: Vec<PortForward>,
+    #[serde(default)]
+    pub sftp_bookmarks: Vec<SftpBookmark>,
 }
 
 impl VaultSnapshot {
@@ -55,7 +57,8 @@ impl VaultSnapshot {
                 + self.keys.len()
                 + self.snippets.len()
                 + self.settings.len()
-                + self.port_forwards.len(),
+                + self.port_forwards.len()
+                + self.sftp_bookmarks.len(),
         );
         out.extend(
             self.groups
@@ -92,6 +95,11 @@ impl VaultSnapshot {
                 .iter()
                 .map(|f| format!("f:{}:{}", f.id, f.revision)),
         );
+        out.extend(
+            self.sftp_bookmarks
+                .iter()
+                .map(|b| format!("b:{}:{}", b.id, b.revision)),
+        );
         out.sort_unstable();
         out
     }
@@ -104,6 +112,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     let keys = fetch_all::<SshKey>(pool, "keys").await?;
     let snippets = fetch_all::<Snippet>(pool, "snippets").await?;
     let port_forwards = fetch_all::<PortForward>(pool, "port_forwards").await?;
+    let sftp_bookmarks = fetch_all::<SftpBookmark>(pool, "sftp_bookmarks").await?;
     let settings = settings_repo::all_excluding_prefixes(pool, EXCLUDED_SETTINGS_PREFIXES)
         .await?
         .into_iter()
@@ -124,6 +133,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
         snippets,
         settings,
         port_forwards,
+        sftp_bookmarks,
     })
 }
 
@@ -151,6 +161,9 @@ pub async fn import_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> App
     }
     for f in &snapshot.port_forwards {
         merge_forward(&mut *tx, f).await?;
+    }
+    for b in &snapshot.sftp_bookmarks {
+        merge_bookmark(&mut *tx, b).await?;
     }
     for entry in &snapshot.settings {
         merge_setting(&mut *tx, entry).await?;
@@ -192,6 +205,9 @@ pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> Ap
         .execute(&mut *tx)
         .await?;
 
+    sqlx::query("DELETE FROM sftp_bookmarks")
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM port_forwards")
         .execute(&mut *tx)
         .await?;
@@ -224,6 +240,9 @@ pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> Ap
     }
     for f in &snapshot.port_forwards {
         merge_forward(&mut *tx, f).await?;
+    }
+    for b in &snapshot.sftp_bookmarks {
+        merge_bookmark(&mut *tx, b).await?;
     }
     for entry in &snapshot.settings {
         merge_setting(&mut *tx, entry).await?;
@@ -324,6 +343,26 @@ where
     )
     .bind(&k.id).bind(&k.name).bind(&k.public_key).bind(&k.private_key).bind(&k.passphrase)
     .bind(&k.created_at).bind(&k.updated_at).bind(&k.deleted_at).bind(k.revision)
+    .execute(executor).await?;
+    Ok(())
+}
+
+async fn merge_bookmark<'e, E>(executor: E, b: &SftpBookmark) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO sftp_bookmarks
+           (id, host_id, label, path, sort_order, created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           host_id = excluded.host_id, label = excluded.label, path = excluded.path,
+           sort_order = excluded.sort_order,
+           updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, revision = excluded.revision
+         WHERE excluded.updated_at > sftp_bookmarks.updated_at",
+    )
+    .bind(&b.id).bind(&b.host_id).bind(&b.label).bind(&b.path).bind(b.sort_order)
+    .bind(&b.created_at).bind(&b.updated_at).bind(&b.deleted_at).bind(b.revision)
     .execute(executor).await?;
     Ok(())
 }

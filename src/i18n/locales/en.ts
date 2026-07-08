@@ -406,6 +406,11 @@ export const en = {
     transferError: "Failed to start transfer",
     transferFailed: "Transfer failed",
     toggleHidden: "Show hidden files",
+    bookmarks: {
+      title: "Bookmarks",
+      add: "Bookmark this folder",
+      error: "Failed to save bookmark",
+    },
     permissions: {
       action: "Permissions",
       title: "Permissions for {name}",

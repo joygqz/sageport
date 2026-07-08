@@ -399,6 +399,11 @@ export const zhCN: Dictionary = {
     transferError: "启动传输失败",
     transferFailed: "传输失败",
     toggleHidden: "显示隐藏文件",
+    bookmarks: {
+      title: "收藏",
+      add: "收藏此目录",
+      error: "保存收藏失败",
+    },
     permissions: {
       action: "权限",
       title: "{name} 的权限",

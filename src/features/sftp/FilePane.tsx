@@ -30,6 +30,7 @@ import type { FileEntry } from "@/types/models";
 import { useHosts } from "@/features/hosts/api";
 import { dragState } from "./dnd";
 import { FileList } from "./FileList";
+import { BookmarkMenu } from "./BookmarkMenu";
 import { PermissionsDialog } from "./PermissionsDialog";
 import { PromptDialog, type PromptState } from "./PromptDialog";
 import {
@@ -263,6 +264,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 <FolderPlus className="size-3.5" />
               </Button>
             </Tooltip>
+            <BookmarkMenu side={side} tab={active} />
             <PathBar key={active.cwd} side={side} tab={active} />
           </div>
 
