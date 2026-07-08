@@ -5098,7 +5098,7 @@ dependencies = [
  "parking_lot",
  "portable-pty",
  "quick-xml 0.37.5",
- "rand 0.8.6",
+ "rand 0.10.2",
  "reqwest 0.12.28",
  "russh",
  "russh-sftp",
