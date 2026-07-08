@@ -59,7 +59,7 @@ async-trait = "0.1"
 sha2 = "0.10"
 url = "2"
 quick-xml = "0.37"
-rusty-s3 = "0.7"
+rusty-s3 = "0.10"
 portable-pty = "0.9.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
