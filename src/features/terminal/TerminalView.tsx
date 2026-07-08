@@ -14,6 +14,7 @@ import { errorCode, errorMessage } from "@/lib/toast";
 import { useTheme } from "@/themes/useTheme";
 import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 import { terminalFontSize } from "@/workbench/zoom";
+import { createAutocomplete } from "./autocomplete/controller";
 import { useBroadcastStore } from "./broadcast";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
 import { registerTerminal, unregisterTerminal } from "./registry";
@@ -92,6 +93,12 @@ export function TerminalView({
     termRef.current = term;
     registerTerminal(sessionId, { term, fit, search });
 
+    const autocomplete = createAutocomplete({
+      hostId,
+      send: (data) => void ipc.ssh.send(sessionId, data).catch(() => {}),
+    });
+    autocomplete.attach(term);
+
     let disposed = false;
     let inputReady = false;
     let pendingInput = "";
@@ -136,6 +143,7 @@ export function TerminalView({
     const dataSub = term.onData((data) => {
       pendingInput += data;
       flushInput();
+      autocomplete.handleData(data);
       if (useBroadcastStore.getState().enabled) {
         for (const other of terminalTabs(useTabsStore.getState().tabs)) {
           if (other.id !== sessionId && other.status === "connected") {
@@ -261,6 +269,7 @@ export function TerminalView({
       unlisteners.forEach((un) => un());
       unregisterTerminal(sessionId);
       stopMonitor(sessionId);
+      autocomplete.dispose();
       term.dispose();
       termRef.current = null;
     };

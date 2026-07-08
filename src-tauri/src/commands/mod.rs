@@ -3,6 +3,7 @@ pub mod batch;
 pub mod bookmarks;
 pub mod forwards;
 pub mod groups;
+pub mod history;
 pub mod hosts;
 pub mod identities;
 pub mod keys;

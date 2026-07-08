@@ -281,6 +281,13 @@ export const ipc = {
       remove: (id: string) => invoke<void>("ai_session_delete", { id }),
     },
   },
+  history: {
+    add: (hostId: string | null, command: string) =>
+      invoke<void>("history_add", { hostId, command }),
+    search: (hostId: string | null, prefix: string, limit?: number) =>
+      invoke<string[]>("history_search", { hostId, prefix, limit }),
+    clear: () => invoke<void>("history_clear"),
+  },
   monitor: {
     start: (sessionId: string) => invoke<void>("monitor_start", { sessionId }),
     stop: (sessionId: string) => invoke<void>("monitor_stop", { sessionId }),
