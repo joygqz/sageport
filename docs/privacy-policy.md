@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Effective date: 2026-07-04
+Effective date: 2026-07-08
 
 Sageport is a local-first desktop SSH workbench. This policy explains what data the application handles while running, where that data lives, and where it goes if you turn on optional features that transmit data off your device.
 
@@ -18,8 +18,9 @@ The following is kept only in the local database and is never sent to the develo
 - Host addresses, groups, and notes
 - Credentials and keys (including private keys and passwords), stored encrypted in the database
 - Terminal scrollback content and session state
-- SFTP transfer history
-- Command snippets
+- SFTP transfer history and path bookmarks
+- Command snippets and port-forwarding rules
+- Command history used for terminal autocomplete
 - AI assistant conversation history
 - Interface preferences (locale, theme, zoom level, etc.)
 
@@ -36,7 +37,7 @@ Sync is disabled by default and must be turned on explicitly in Settings. Once e
 - You choose one sync provider: GitHub Gist, Google Drive, or Microsoft OneDrive (via OAuth authorization), or WebDAV / S3 (using credentials you supply).
 - Before anything is uploaded, it is encrypted on your device: a key is derived from your passphrase using Argon2id, and the payload is sealed with AES-256-GCM. Only the resulting ciphertext is sent to the chosen provider — your passphrase itself is never transmitted or stored anywhere.
 - Only you hold the passphrase; the developer cannot access it and cannot recover it for you. **If you lose the passphrase, previously synced data cannot be decrypted or recovered.**
-- Synced data includes hosts, credentials, keys, snippets, and interface preferences (locale, theme, zoom). It does not include AI conversation history or device-local sync/update settings.
+- Synced data includes hosts, credentials, keys, snippets, port-forwarding rules, SFTP bookmarks, and interface preferences (locale, theme, zoom). It does not include AI conversation history, command history, transfer history, or device-local sync/update settings.
 - When you connect via OAuth to GitHub, Google, or Microsoft, the authorization flow is handled by that platform, and how it processes your account information is governed by that platform's own privacy policy.
 - You can disconnect sync or switch providers at any time. Disconnecting does not automatically delete encrypted data already stored with the provider — remove it directly through that provider's own service if needed.
 
@@ -64,7 +65,3 @@ Updates to this policy will appear as changes to this file in the source reposit
 ## 9. Contact
 
 If you have questions about this policy, reach the developer via [GitHub Issues](https://github.com/joygqz/sageport/issues).
-
----
-
-[Home](index.html) · [Terms of Service](terms-of-service.md) · [GPL-3.0](https://github.com/joygqz/sageport/blob/main/LICENSE)
