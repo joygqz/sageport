@@ -31,6 +31,7 @@ export function TerminalEditor({
         sessionId={tab.id}
         target={tab.target}
         hostId={tab.hostId}
+        adhoc={tab.adhoc}
         attempt={tab.attempt}
       />
       {searchOpen && active && <SearchBar sessionId={tab.id} />}

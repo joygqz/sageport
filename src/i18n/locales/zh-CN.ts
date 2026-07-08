@@ -86,10 +86,11 @@ export const zhCN: Dictionary = {
   },
 
   palette: {
-    quickPlaceholder: "按名称、地址或用户名搜索主机",
+    quickPlaceholder: "搜索主机，或输入 user@host 直接连接",
     commandsPlaceholder: "搜索命令",
     noHosts: "没有匹配的主机",
     noCommands: "没有匹配的命令",
+    quickConnect: "连接到",
   },
 
   commands: {

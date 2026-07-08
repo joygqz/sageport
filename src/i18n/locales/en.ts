@@ -84,10 +84,11 @@ export const en = {
   },
 
   palette: {
-    quickPlaceholder: "Search hosts by name, address, or username",
+    quickPlaceholder: "Search hosts, or type user@host to connect",
     commandsPlaceholder: "Search commands",
     noHosts: "No matching hosts",
     noCommands: "No matching commands",
+    quickConnect: "Connect to",
   },
 
   commands: {

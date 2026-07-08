@@ -49,6 +49,39 @@ pub async fn ssh_connect(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn ssh_connect_adhoc(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+    attempt: u32,
+    host: String,
+    port: i64,
+    username: String,
+    cols: u32,
+    rows: u32,
+) -> AppResult<()> {
+    let hop = Hop {
+        host,
+        port: valid_port(port)?,
+        username,
+        auth: AuthMethod::Agent,
+    };
+    let params = ConnectParams {
+        session_id,
+        attempt,
+        hops: vec![hop],
+        cols,
+        rows,
+        startup_command: None,
+    };
+    state
+        .ssh
+        .connect(app, state.host_key_prompts.clone(), params);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn ssh_send(
     state: State<'_, AppState>,
     session_id: String,

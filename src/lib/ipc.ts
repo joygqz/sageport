@@ -140,6 +140,15 @@ export const ipc = {
       cols: number;
       rows: number;
     }) => invoke<void>("ssh_connect", params),
+    connectAdhoc: (params: {
+      sessionId: string;
+      attempt: number;
+      host: string;
+      port: number;
+      username: string;
+      cols: number;
+      rows: number;
+    }) => invoke<void>("ssh_connect_adhoc", params),
     send: (sessionId: string, data: string) =>
       invoke<void>("ssh_send", { sessionId, data }),
     resize: (sessionId: string, cols: number, rows: number) =>

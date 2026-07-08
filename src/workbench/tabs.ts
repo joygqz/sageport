@@ -13,7 +13,13 @@ function t(key: Parameters<typeof translate>[1]): string {
 
 export type TerminalStatus = SshStatusKind | "idle";
 
-export type TerminalTarget = "ssh" | "local";
+export type TerminalTarget = "ssh" | "local" | "ssh-adhoc";
+
+export interface AdhocTarget {
+  host: string;
+  port: number;
+  username: string;
+}
 
 export type SettingsSection = "appearance" | "ai" | "sync" | "about";
 
@@ -23,6 +29,7 @@ export interface TerminalTab {
   id: string;
   target: TerminalTarget;
   hostId: string;
+  adhoc?: AdhocTarget;
   title: string;
   status: TerminalStatus;
   error?: string;
@@ -69,6 +76,8 @@ interface TabsState {
   openTerminal: (host: Pick<Host, "id" | "label">) => string;
 
   openLocalTerminal: () => string;
+
+  openAdhocTerminal: (target: AdhocTarget) => string;
 
   openFile: (file: {
     connectionId: string | null;
@@ -183,6 +192,26 @@ export const useTabsStore = create<TabsState>((set, get) => {
           count === 0
             ? t("terminal.local.title")
             : `${t("terminal.local.title")} ${count + 1}`,
+        status: "idle",
+        attempt: 0,
+      };
+      set((s) => ({
+        tabs: [...s.tabs, tab],
+        activeId: id,
+        lastTerminalId: id,
+      }));
+      return id;
+    },
+
+    openAdhocTerminal: (target) => {
+      const id = crypto.randomUUID();
+      const tab: TerminalTab = {
+        kind: "terminal",
+        id,
+        target: "ssh-adhoc",
+        hostId: "",
+        adhoc: target,
+        title: `${target.username}@${target.host}`,
         status: "idle",
         attempt: 0,
       };

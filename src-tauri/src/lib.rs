@@ -78,6 +78,7 @@ pub fn run() {
             commands::settings::settings_set,
             commands::settings::settings_all,
             commands::ssh::ssh_connect,
+            commands::ssh::ssh_connect_adhoc,
             commands::ssh::ssh_send,
             commands::ssh::ssh_resize,
             commands::ssh::ssh_disconnect,

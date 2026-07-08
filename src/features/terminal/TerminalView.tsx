@@ -15,6 +15,7 @@ import { useTheme } from "@/themes/useTheme";
 import {
   terminalTabs,
   useTabsStore,
+  type AdhocTarget,
   type TerminalTarget,
 } from "@/workbench/tabs";
 import { terminalFontSize } from "@/workbench/zoom";
@@ -22,7 +23,11 @@ import { createAutocomplete } from "./autocomplete/controller";
 import { useBroadcastStore } from "./broadcast";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
 import { registerTerminal, unregisterTerminal } from "./registry";
-import { localTransport, sshTransport } from "./transport";
+import {
+  localTransport,
+  sshAdhocTransport,
+  sshTransport,
+} from "./transport";
 import { xtermTheme } from "./xterm-theme";
 
 const CONNECT_WATCHDOG_MS = 45_000;
@@ -39,11 +44,13 @@ export function TerminalView({
   sessionId,
   target,
   hostId,
+  adhoc,
   attempt,
 }: {
   sessionId: string;
   target: TerminalTarget;
   hostId: string;
+  adhoc?: AdhocTarget;
   attempt: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,11 +70,14 @@ export function TerminalView({
   }, [theme]);
 
   useEffect(() => {
-    const isSsh = target === "ssh";
-    const transport = isSsh
-      ? sshTransport(sessionId, hostId, attempt)
-      : localTransport(sessionId);
-    if (isSsh) bridgeMonitorEvents();
+    const isLocal = target === "local";
+    const isSshLike = !isLocal;
+    const transport = isLocal
+      ? localTransport(sessionId)
+      : target === "ssh-adhoc" && adhoc
+        ? sshAdhocTransport(sessionId, attempt, adhoc)
+        : sshTransport(sessionId, hostId, attempt);
+    if (isSshLike) bridgeMonitorEvents();
 
     const term = new XTerm({
       fontFamily:
@@ -98,12 +108,13 @@ export function TerminalView({
     termRef.current = term;
     registerTerminal(sessionId, { term, fit, search });
 
-    const autocomplete = isSsh
-      ? createAutocomplete({
-          hostId,
-          send: (data) => void transport.send(data).catch(() => {}),
-        })
-      : null;
+    const autocomplete =
+      target === "ssh"
+        ? createAutocomplete({
+            hostId,
+            send: (data) => void transport.send(data).catch(() => {}),
+          })
+        : null;
     autocomplete?.attach(term);
 
     let disposed = false;
@@ -151,10 +162,10 @@ export function TerminalView({
       pendingInput += data;
       flushInput();
       autocomplete?.handleData(data);
-      if (isSsh && useBroadcastStore.getState().enabled) {
+      if (isSshLike && useBroadcastStore.getState().enabled) {
         for (const other of terminalTabs(useTabsStore.getState().tabs)) {
           if (
-            other.target === "ssh" &&
+            other.target !== "local" &&
             other.id !== sessionId &&
             other.status === "connected"
           ) {
@@ -172,7 +183,7 @@ export function TerminalView({
         transport.onStatus((e) => {
           if (disposed || connectTimedOut) return;
           if (e.status !== "connecting") settleConnect();
-          if (isSsh) {
+          if (isSshLike) {
             if (e.status === "connected") startMonitor(sessionId);
             else if (e.status === "closed" || e.status === "error")
               stopMonitor(sessionId);
@@ -262,7 +273,7 @@ export function TerminalView({
       dataSub.dispose();
       unlisteners.forEach((un) => un());
       unregisterTerminal(sessionId);
-      if (isSsh) stopMonitor(sessionId);
+      if (isSshLike) stopMonitor(sessionId);
       autocomplete?.dispose();
       term.dispose();
       termRef.current = null;

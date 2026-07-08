@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ChevronRight, Server } from "lucide-react";
+import { ChevronRight, Plug, Server } from "lucide-react";
 
 import { Kbd } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
+import { parseQuickConnect } from "@/features/terminal/quick-connect";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { Host } from "@/types/models";
 import { useCommands, type WorkbenchCommand } from "./commands";
-import { useTabsStore } from "./tabs";
+import { useTabsStore, type AdhocTarget } from "./tabs";
 
 export function CommandPalette({
   open,
@@ -49,7 +50,9 @@ function fuzzyMatch(query: string, text: string): boolean {
 }
 
 type PaletteItem =
-  { type: "host"; host: Host } | { type: "command"; command: WorkbenchCommand };
+  | { type: "host"; host: Host }
+  | { type: "command"; command: WorkbenchCommand }
+  | { type: "adhoc"; target: AdhocTarget };
 
 function PaletteBody({
   initialMode,
@@ -66,6 +69,7 @@ function PaletteBody({
   const { data: hosts = [] } = useHosts();
   const commands = useCommands();
   const openTerminal = useTabsStore((s) => s.openTerminal);
+  const openAdhocTerminal = useTabsStore((s) => s.openAdhocTerminal);
 
   const commandMode = input.startsWith(">");
   const query = commandMode ? input.slice(1).trim() : input.trim();
@@ -83,7 +87,7 @@ function PaletteBody({
     const sorted = [...hosts].sort((a, b) =>
       (b.lastUsedAt ?? "").localeCompare(a.lastUsedAt ?? ""),
     );
-    return sorted
+    const matches: PaletteItem[] = sorted
       .filter(
         (h) =>
           fuzzyMatch(query, h.label) ||
@@ -91,6 +95,9 @@ function PaletteBody({
           fuzzyMatch(query, h.username ?? ""),
       )
       .map((host) => ({ type: "host", host }));
+    const adhoc = parseQuickConnect(query);
+    if (adhoc) matches.unshift({ type: "adhoc", target: adhoc });
+    return matches;
   }, [commandMode, query, commands, hosts, t]);
 
   const [prevInput, setPrevInput] = useState(input);
@@ -108,6 +115,7 @@ function PaletteBody({
   const run = (item: PaletteItem) => {
     onClose();
     if (item.type === "host") openTerminal(item.host);
+    else if (item.type === "adhoc") openAdhocTerminal(item.target);
     else item.command.run();
   };
 
@@ -151,7 +159,13 @@ function PaletteBody({
         ) : (
           items.map((item, i) => (
             <PaletteRow
-              key={item.type === "host" ? item.host.id : item.command.id}
+              key={
+                item.type === "host"
+                  ? item.host.id
+                  : item.type === "adhoc"
+                    ? "adhoc"
+                    : item.command.id
+              }
               item={item}
               highlighted={i === index}
               onHover={() => setIndex(i)}
@@ -201,6 +215,15 @@ function PaletteRow({
           >
             {item.host.username ? `${item.host.username}@` : ""}
             {item.host.address}
+          </span>
+        </>
+      ) : item.type === "adhoc" ? (
+        <>
+          <Plug className="size-4 shrink-0 opacity-70" />
+          <span className="min-w-0 flex-1 truncate">
+            <span className="font-medium">{t("palette.quickConnect")} </span>
+            {item.target.username}@{item.target.host}
+            {item.target.port === 22 ? "" : `:${item.target.port}`}
           </span>
         </>
       ) : (

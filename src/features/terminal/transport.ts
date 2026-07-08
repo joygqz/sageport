@@ -25,14 +25,13 @@ function decodeBase64(b64: string): Uint8Array {
   return bytes;
 }
 
-export function sshTransport(
+function sshLikeTransport(
   sessionId: string,
-  hostId: string,
   attempt: number,
+  connect: (dims: { cols: number; rows: number }) => Promise<void>,
 ): TerminalTransport {
   return {
-    connect: ({ cols, rows }) =>
-      ipc.ssh.connect({ sessionId, attempt, hostId, cols, rows }),
+    connect,
     send: (data) => ipc.ssh.send(sessionId, data),
     resize: (cols, rows) => ipc.ssh.resize(sessionId, cols, rows),
     disconnect: () => ipc.ssh.disconnect(sessionId),
@@ -47,6 +46,26 @@ export function sshTransport(
           handler({ status: e.status, message: e.message, code: e.code });
       }),
   };
+}
+
+export function sshTransport(
+  sessionId: string,
+  hostId: string,
+  attempt: number,
+): TerminalTransport {
+  return sshLikeTransport(sessionId, attempt, ({ cols, rows }) =>
+    ipc.ssh.connect({ sessionId, attempt, hostId, cols, rows }),
+  );
+}
+
+export function sshAdhocTransport(
+  sessionId: string,
+  attempt: number,
+  target: { host: string; port: number; username: string },
+): TerminalTransport {
+  return sshLikeTransport(sessionId, attempt, ({ cols, rows }) =>
+    ipc.ssh.connectAdhoc({ sessionId, attempt, ...target, cols, rows }),
+  );
 }
 
 export function localTransport(sessionId: string): TerminalTransport {
