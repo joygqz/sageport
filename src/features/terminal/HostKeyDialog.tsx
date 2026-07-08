@@ -18,12 +18,21 @@ export function HostKeyDialog() {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     void ipc.ssh
-      .onHostKey((event) => setQueue((q) => [...q, event]))
+      .onHostKey((event) =>
+        setQueue((q) =>
+          q.some((e) => e.promptId === event.promptId) ? q : [...q, event],
+        ),
+      )
       .then((un) => {
-        unlisten = un;
+        if (disposed) un();
+        else unlisten = un;
       });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 
   const current = queue[0];
@@ -31,7 +40,7 @@ export function HostKeyDialog() {
   const respond = (decision: HostKeyDecision) => {
     if (!current) return;
     void ipc.ssh.respondHostKey(current.promptId, decision).catch(() => {});
-    setQueue((q) => q.slice(1));
+    setQueue((q) => q.filter((e) => e.promptId !== current.promptId));
   };
 
   const changed = current?.status === "changed";
