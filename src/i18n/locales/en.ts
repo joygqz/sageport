@@ -528,6 +528,10 @@ export const en = {
       zoomIn: "Zoom in",
       zoomOut: "Zoom out",
       zoomReset: "Reset",
+      terminalFont: "Terminal font",
+      terminalFontHint:
+        "Choose the font used in terminals. Nerd Font options enable icon glyphs for tools like lazygit, neovim, and btm. Requires the font to be installed on your system.",
+      customFontFamily: "Custom font family",
     },
     ai: {
       title: "AI provider",

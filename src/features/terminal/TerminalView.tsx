@@ -19,6 +19,7 @@ import {
   type TerminalTarget,
 } from "@/workbench/tabs";
 import { terminalFontSize } from "@/workbench/zoom";
+import { useFontStore, resolveFontFamily } from "./font-store";
 import { createAutocomplete } from "./autocomplete/controller";
 import { useBroadcastStore } from "./broadcast";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
@@ -79,9 +80,12 @@ export function TerminalView({
         : sshTransport(sessionId, hostId, attempt);
     if (isSshLike) bridgeMonitorEvents();
 
+    const fontFamily = resolveFontFamily(
+      useFontStore.getState().preset,
+      useFontStore.getState().customFamily,
+    );
     const term = new XTerm({
-      fontFamily:
-        '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace',
+      fontFamily,
       fontSize: terminalFontSize(),
       lineHeight: 1.25,
       allowProposedApi: true,

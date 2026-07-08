@@ -21,6 +21,11 @@ import {
   ZOOM_LEVEL_MAX,
   ZOOM_LEVEL_MIN,
 } from "@/workbench/zoom";
+import {
+  useFontStore,
+  PRESET_FONTS,
+  type PresetFontId,
+} from "@/features/terminal/font-store";
 import type { AiConfig, AiProtocol } from "@/types/models";
 import {
   AI_PROTOCOLS,
@@ -125,6 +130,46 @@ function AppearanceSection() {
       </Field>
 
       <ZoomField />
+
+      <TerminalFontField />
+    </div>
+  );
+}
+
+function TerminalFontField() {
+  const { t } = useI18n();
+  const preset = useFontStore((s) => s.preset);
+  const customFamily = useFontStore((s) => s.customFamily);
+  const setPreset = useFontStore((s) => s.setPreset);
+  const setCustomFamily = useFontStore((s) => s.setCustomFamily);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Field
+        label={t("settings.appearance.terminalFont")}
+        hint={t("settings.appearance.terminalFontHint")}
+      >
+        <Select
+          value={preset}
+          onChange={(e) => setPreset(e.target.value as PresetFontId)}
+        >
+          {PRESET_FONTS.map((font) => (
+            <option key={font.id} value={font.id}>
+              {font.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      {preset === "custom" && (
+        <Field label={t("settings.appearance.customFontFamily")}>
+          <Input
+            value={customFamily}
+            onChange={(e) => setCustomFamily(e.target.value)}
+            placeholder='"MyNerdFont", "JetBrains Mono Variable", monospace'
+          />
+        </Field>
+      )}
     </div>
   );
 }

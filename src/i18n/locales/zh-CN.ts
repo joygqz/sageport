@@ -518,6 +518,10 @@ export const zhCN: Dictionary = {
       zoomIn: "放大",
       zoomOut: "缩小",
       zoomReset: "重置",
+      terminalFont: "终端字体",
+      terminalFontHint:
+        "选择终端中使用的字体。Nerd Font 选项支持 lazygit、neovim、btm 等工具的图标字形。需要系统已安装对应字体。",
+      customFontFamily: "自定义字体名称",
     },
     ai: {
       title: "AI 服务商",

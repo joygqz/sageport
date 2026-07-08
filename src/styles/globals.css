@@ -3,6 +3,39 @@
 @import "@fontsource-variable/inter/wght.css";
 @import "@fontsource-variable/jetbrains-mono/wght.css";
 
+/*
+ * Nerd Font — 如果需要捆绑 Nerd Font 字体文件，取消注释以下 @font-face 规则，
+ * 并将 .woff2 文件放入 public/fonts/ 目录。
+ *
+ * 从 https://www.nerdfonts.com/font-downloads 下载对应字体：
+ * - JetBrainsMono Nerd Font → 放入 public/fonts/JetBrainsMono/
+ * - CascadiaCode Nerd Font  → 放入 public/fonts/CascadiaCode/
+ * - FiraCode Nerd Font       → 放入 public/fonts/FiraCode/
+ *
+ * 示例（JetBrainsMono Nerd Font）：
+ * @font-face {
+ *   font-family: "JetBrainsMono Nerd Font";
+ *   src: url("/fonts/JetBrainsMono/JetBrainsMonoNerdFont-Regular.woff2") format("woff2");
+ *   font-weight: 400;
+ *   font-style: normal;
+ *   font-display: swap;
+ * }
+ * @font-face {
+ *   font-family: "JetBrainsMono Nerd Font";
+ *   src: url("/fonts/JetBrainsMono/JetBrainsMonoNerdFont-Bold.woff2") format("woff2");
+ *   font-weight: 700;
+ *   font-style: normal;
+ *   font-display: swap;
+ * }
+ * @font-face {
+ *   font-family: "JetBrainsMono Nerd Font";
+ *   src: url("/fonts/JetBrainsMono/JetBrainsMonoNerdFont-Italic.woff2") format("woff2");
+ *   font-weight: 400;
+ *   font-style: italic;
+ *   font-display: swap;
+ * }
+ */
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
