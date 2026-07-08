@@ -34,6 +34,21 @@ export interface Host {
   revision: number;
 }
 
+export interface HostStats {
+  cpuLoad: number;
+  cpuCount: number;
+  memUsed: number;
+  memTotal: number;
+  diskUsed: number;
+  diskTotal: number;
+}
+
+export interface MonitorStatsEvent {
+  sessionId: string;
+  stats?: HostStats;
+  unsupported: boolean;
+}
+
 export interface SftpBookmark {
   id: string;
   hostId: string | null;

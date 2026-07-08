@@ -93,6 +93,8 @@ pub fn run() {
             commands::bookmarks::bookmarks_list,
             commands::bookmarks::bookmarks_create,
             commands::bookmarks::bookmarks_delete,
+            commands::monitor::monitor_start,
+            commands::monitor::monitor_stop,
             commands::sftp::fs_connect,
             commands::sftp::fs_disconnect,
             commands::sftp::fs_home,

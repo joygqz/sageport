@@ -5,6 +5,7 @@ pub mod exec;
 pub mod forward;
 pub mod handler;
 pub mod known_hosts;
+pub mod monitor;
 pub mod session;
 
 use std::collections::HashMap;

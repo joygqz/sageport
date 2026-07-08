@@ -9,9 +9,11 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-use super::connect::establish;
+use super::connect::{establish, SshConnection};
 use super::{ConnectParams, HostKeyPrompts, EVENT_DATA, EVENT_STATUS, TERM};
 use crate::error::{AppError, AppResult};
+
+type ConnectionMap = Arc<Mutex<HashMap<String, Arc<SshConnection>>>>;
 
 enum SessionCommand {
     Input(Vec<u8>),
@@ -47,11 +49,16 @@ struct StatusEvent {
 #[derive(Default)]
 pub struct SessionManager {
     sessions: Arc<Mutex<HashMap<String, SessionEntry>>>,
+    connections: ConnectionMap,
 }
 
 impl SessionManager {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn connection(&self, id: &str) -> Option<Arc<SshConnection>> {
+        self.connections.lock().get(id).cloned()
     }
 
     pub fn connect(&self, app: AppHandle, prompts: HostKeyPrompts, params: ConnectParams) {
@@ -74,8 +81,10 @@ impl SessionManager {
         }
 
         let sessions = self.sessions.clone();
+        let connections = self.connections.clone();
         tokio::spawn(async move {
-            run_session(app, prompts, params, rx).await;
+            run_session(app, prompts, params, rx, connections.clone()).await;
+            connections.lock().remove(&id);
             let mut sessions = sessions.lock();
             if sessions
                 .get(&id)
@@ -131,12 +140,13 @@ async fn run_session(
     prompts: HostKeyPrompts,
     params: ConnectParams,
     rx: UnboundedReceiver<SessionCommand>,
+    connections: ConnectionMap,
 ) {
     let id = params.session_id.clone();
     let attempt = params.attempt;
     emit_status(&app, &id, attempt, "connecting", None);
 
-    match run_session_inner(&app, &prompts, &params, rx).await {
+    match run_session_inner(&app, &prompts, &params, rx, &connections).await {
         Ok(()) => emit_status(&app, &id, attempt, "closed", None),
         Err(e) => emit_status(&app, &id, attempt, "error", Some(&e)),
     }
@@ -147,17 +157,19 @@ async fn run_session_inner(
     prompts: &HostKeyPrompts,
     params: &ConnectParams,
     mut rx: UnboundedReceiver<SessionCommand>,
+    connections: &ConnectionMap,
 ) -> AppResult<()> {
     let id = &params.session_id;
     let attempt = params.attempt;
 
-    let conn = establish(app, prompts, id, &params.hops).await?;
+    let conn = Arc::new(establish(app, prompts, id, &params.hops).await?);
     let mut channel = conn.handle.channel_open_session().await?;
     channel
         .request_pty(false, TERM, params.cols, params.rows, 0, 0, &[])
         .await?;
     channel.request_shell(true).await?;
 
+    connections.lock().insert(id.clone(), conn.clone());
     emit_status(app, id, attempt, "connected", None);
 
     if let Some(command) = &params.startup_command {
@@ -192,6 +204,7 @@ async fn run_session_inner(
         }
     }
 
+    connections.lock().remove(id);
     drop(conn);
     Ok(())
 }

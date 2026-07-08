@@ -127,6 +127,7 @@ export const zhCN: Dictionary = {
     updateReady: "重启以更新",
     broadcast: "正在广播输入",
     broadcastHint: "输入会发送到每个已连接的终端。点击停止。",
+    monitorHint: "当前主机的 CPU 负载、内存与磁盘占用",
   },
 
   terminal: {

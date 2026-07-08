@@ -1,8 +1,18 @@
-import { ArrowUpCircle, Cloud, CloudOff, FolderSync, Radio } from "lucide-react";
+import {
+  ArrowUpCircle,
+  Cloud,
+  CloudOff,
+  Cpu,
+  FolderSync,
+  HardDrive,
+  MemoryStick,
+  Radio,
+} from "lucide-react";
 
 import { useI18n } from "@/i18n";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import { useBroadcastStore } from "@/features/terminal/broadcast";
+import { useMonitorStore } from "@/features/terminal/monitor";
 import { useSyncStatus } from "@/features/sync/api";
 import { useSftpStore } from "@/features/sftp/store";
 import { useUpdateStatus } from "@/features/updates/api";
@@ -29,6 +39,7 @@ export function StatusBar() {
     <footer className="flex h-6 shrink-0 items-center justify-between border-t border-border bg-surface px-1 text-2xs text-muted-foreground">
       <div className="flex h-full items-center">
         <SessionItem />
+        <MonitorItem />
         <BroadcastItem />
         <TransfersItem />
       </div>
@@ -82,6 +93,51 @@ function SessionItem() {
       <span className="max-w-48 truncate">{session.title}</span>
       <span>{t(`terminal.status.${session.status}`)}</span>
     </StatusBarItem>
+  );
+}
+
+function MonitorItem() {
+  const { t } = useI18n();
+  const tabs = useTabsStore((s) => s.tabs);
+  const activeId = useTabsStore((s) => s.activeId);
+  const lastTerminalId = useTabsStore((s) => s.lastTerminalId);
+  const bySession = useMonitorStore((s) => s.bySession);
+
+  const id = targetTerminalId({ tabs, activeId, lastTerminalId });
+  if (!id) return null;
+  const entry = bySession[id];
+  if (!entry?.stats) return null;
+
+  const { cpuLoad, cpuCount, memUsed, memTotal, diskUsed, diskTotal } =
+    entry.stats;
+  const cpuPct = Math.round((cpuLoad / Math.max(cpuCount, 1)) * 100);
+  const memPct = memTotal > 0 ? Math.round((memUsed / memTotal) * 100) : 0;
+  const diskPct = diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : 0;
+
+  return (
+    <div
+      className="flex h-full items-center gap-3 px-2 tabular-nums"
+      title={t("statusBar.monitorHint")}
+    >
+      <span className="flex items-center gap-1">
+        <Cpu className="size-3" />
+        {cpuPct}%
+      </span>
+      <span
+        className="flex items-center gap-1"
+        title={`${formatBytes(memUsed)} / ${formatBytes(memTotal)}`}
+      >
+        <MemoryStick className="size-3" />
+        {memPct}%
+      </span>
+      <span
+        className="flex items-center gap-1"
+        title={`${formatBytes(diskUsed)} / ${formatBytes(diskTotal)}`}
+      >
+        <HardDrive className="size-3" />
+        {diskPct}%
+      </span>
+    </div>
   );
 }
 

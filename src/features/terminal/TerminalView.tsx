@@ -15,6 +15,7 @@ import { useTheme } from "@/themes/useTheme";
 import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 import { terminalFontSize } from "@/workbench/zoom";
 import { useBroadcastStore } from "./broadcast";
+import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
 import { registerTerminal, unregisterTerminal } from "./registry";
 import { xtermTheme } from "./xterm-theme";
 
@@ -61,6 +62,7 @@ export function TerminalView({
   }, [theme]);
 
   useEffect(() => {
+    bridgeMonitorEvents();
     const term = new XTerm({
       fontFamily:
         '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace',
@@ -163,6 +165,9 @@ export function TerminalView({
             !connectTimedOut
           ) {
             if (e.status !== "connecting") settleConnect();
+            if (e.status === "connected") startMonitor(sessionId);
+            else if (e.status === "closed" || e.status === "error")
+              stopMonitor(sessionId);
             setStatus(
               sessionId,
               e.status,
@@ -255,6 +260,7 @@ export function TerminalView({
       dataSub.dispose();
       unlisteners.forEach((un) => un());
       unregisterTerminal(sessionId);
+      stopMonitor(sessionId);
       term.dispose();
       termRef.current = null;
     };

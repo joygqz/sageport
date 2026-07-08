@@ -126,6 +126,7 @@ export const en = {
     updateReady: "Restart to update",
     broadcast: "Broadcasting input",
     broadcastHint: "Typing is sent to every connected terminal. Click to stop.",
+    monitorHint: "CPU load, memory, and disk usage on the active host",
   },
 
   terminal: {

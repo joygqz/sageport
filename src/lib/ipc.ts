@@ -22,6 +22,7 @@ import type {
   Identity,
   IdentityInput,
   KeyFile,
+  MonitorStatsEvent,
   PortForward,
   PortForwardInput,
   ForwardStatusEvent,
@@ -265,6 +266,14 @@ export const ipc = {
         invoke<AiSessionSummary>("ai_session_rename", { id, title }),
       remove: (id: string) => invoke<void>("ai_session_delete", { id }),
     },
+  },
+  monitor: {
+    start: (sessionId: string) => invoke<void>("monitor_start", { sessionId }),
+    stop: (sessionId: string) => invoke<void>("monitor_stop", { sessionId }),
+    onStats: (handler: (e: MonitorStatsEvent) => void): Promise<UnlistenFn> =>
+      listen<MonitorStatsEvent>("monitor://stats", (event) =>
+        handler(event.payload),
+      ),
   },
   bookmarks: {
     list: () => invoke<SftpBookmark[]>("bookmarks_list"),
