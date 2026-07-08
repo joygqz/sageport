@@ -22,17 +22,19 @@ Sageport consolidates the tools of routine server operations — terminal, file 
 
 ## Features
 
-**Terminal** — GPU-accelerated rendering via xterm.js with WebGL. Tabbed concurrent sessions that persist in the background without reflow, protocol-level keepalives with one-click reconnect, scrollback search (<kbd>⌘</kbd> <kbd>F</kbd>), clickable links, and full Unicode support.
+**Terminal** — GPU-accelerated rendering via xterm.js with WebGL, built on a pure-Rust SSH stack (russh). Tabbed concurrent sessions that persist in the background without reflow, keepalives with one-click reconnect, scrollback search (<kbd>⌘</kbd> <kbd>F</kbd>), clickable links, and full Unicode support. Inline autocomplete suggests commands from your history as you type, input can be broadcast to every connected session at once, and a status-bar monitor shows live CPU, memory, and disk usage for the active host.
 
-**Hosts & credentials** — Hosts organized into collapsible groups with live connection indicators. Credentials are decoupled from hosts, so one identity can be reused across servers. The built-in key manager generates and imports Ed25519, RSA, and ECDSA keys in OpenSSH format, with optional passphrase protection.
+**Hosts & credentials** — Hosts organized into collapsible groups with live connection indicators, jump-host (ProxyJump) chains, per-host startup commands, and one-click import from your existing `~/.ssh/config`. Connections verify host keys on first use and support the system SSH agent. Credentials are decoupled from hosts, so one identity can be reused across servers. The built-in key manager generates and imports Ed25519, RSA, and ECDSA keys in OpenSSH format, with optional passphrase protection.
 
-**File transfer** — Dual-pane browser where each pane can show the local filesystem or an SFTP connection. Drag-and-drop transfer in both directions, in-transit archiving for directories with many small files, and a complete transfer history.
+**File transfer** — Dual-pane browser where each pane can show the local filesystem or an SFTP connection. Drag-and-drop transfer in both directions, in-transit archiving for directories with many small files, a permissions editor, path bookmarks, and a complete transfer history.
 
-**Snippets** — Frequently used commands, sent to the active terminal with a single click.
+**Port forwarding** — Local (`-L`) and dynamic SOCKS (`-D`) tunnels with start/stop control, live status, and optional auto-start on launch — routed over jump-host chains when configured.
+
+**Snippets** — Frequently used commands with `{{variable}}` placeholders, sent to the active terminal or run across many hosts at once with per-host results.
 
 **AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model. The assistant can list open sessions, read terminal output, and propose commands — every remote command requires explicit confirmation before it runs. Conversations are stored locally.
 
-**Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials — encrypted end to end with a passphrase-derived key. Only ciphertext ever leaves the device. Syncs hosts, credentials, snippets, and interface preferences (locale, theme, zoom). Automatic last-write-wins conflict resolution, revision history with restore, and encrypted export/import for offline backups.
+**Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials — encrypted end to end with a passphrase-derived key. Only ciphertext ever leaves the device. Syncs hosts, credentials, snippets, port forwards, bookmarks, and interface preferences (locale, theme, zoom). Automatic last-write-wins conflict resolution, revision history with restore, and encrypted export/import for offline backups.
 
 **Interface** — Six full themes (terminal palette included), English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘</kbd> <kbd>P</kbd> / <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd>), and automatic updates.
 
@@ -93,7 +95,7 @@ src/
 src-tauri/src/
   commands/     Thin Tauri command handlers
   repository/   SQLite persistence per entity
-  ssh/ sftp/    Session and transfer engines
+  ssh/ sftp/    russh session, SFTP, forwarding, and monitoring engines
   sync/ crypto/ Vault snapshot, provider clients (Gist, Drive, OneDrive,
                 WebDAV, S3), OAuth, Argon2id + AES-256-GCM
   ai/           Anthropic and OpenAI-compatible chat clients

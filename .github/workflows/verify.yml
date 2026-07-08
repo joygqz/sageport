@@ -26,6 +26,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Conventions
+        run: pnpm check:conventions
+
       - name: Typecheck
         run: pnpm typecheck
 

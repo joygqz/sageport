@@ -13,6 +13,7 @@
     "release": "bumpp",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:conventions": "node scripts/check-conventions.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
