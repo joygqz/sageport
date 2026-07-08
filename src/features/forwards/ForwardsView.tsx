@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Circle, Network, Play, Plus, Square } from "lucide-react";
 
+import { useHostKeyStore } from "@/features/terminal/host-key";
+
 import {
   Button,
   ConfirmDialog,
@@ -47,6 +49,7 @@ export function ForwardsView() {
   const toggle = (forward: PortForward) => {
     if (isActive(forward.id)) {
       void ipc.forwards.stop(forward.id).catch(() => {});
+      useHostKeyStore.getState().rejectSession(forward.id);
     } else {
       void ipc.forwards.start(forward.id).catch((err) => {
         toast.error(t("forwards.startError"), errorMessage(err));
@@ -114,10 +117,16 @@ export function ForwardsView() {
           forwards.map((forward) => {
             const active = isActive(forward.id);
             const errored = runtime[forward.id]?.status === "error";
+            const statusMessage = errored
+              ? runtime[forward.id]?.message
+              : undefined;
             return (
               <ContextMenu key={forward.id}>
                 <ContextMenuTrigger asChild>
-                  <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-list-hover">
+                  <div
+                    className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-list-hover"
+                    title={statusMessage}
+                  >
                     <Circle
                       className={cn(
                         "size-2 shrink-0 fill-current",

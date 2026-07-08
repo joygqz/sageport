@@ -66,7 +66,7 @@ export const zhCN: Dictionary = {
     },
     delete: {
       title: "删除转发",
-      description: "将删除 {name}，且无法撤销。",
+      description: "将永久删除 {name}，此操作无法撤销。",
       error: "删除转发失败",
     },
     form: {
@@ -141,8 +141,8 @@ export const zhCN: Dictionary = {
       "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
     authFailed:
       "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
-    connectTimedOut:
-      "连接未能及时完成，请检查网络、防火墙、SSH 服务或服务器登录策略。",
+    connectTimedOut: "连接超时，请检查网络、防火墙或服务器上的 SSH 服务。",
+    hostKeyRejected: "已取消连接：未信任该主机的密钥。",
     closed: "会话已结束",
     reconnect: "重新连接",
     local: {
@@ -265,9 +265,10 @@ export const zhCN: Dictionary = {
   hostKey: {
     unknownTitle: "验证主机密钥",
     changedTitle: "主机密钥已变更",
-    unknownDescription: "你是首次连接 {host}。信任之前，请先核对其指纹。",
+    unknownDescription:
+      "首次连接 {host}，尚未记录其主机密钥。请核对下方指纹，确认服务器身份后再信任。",
     changedDescription:
-      "{host} 的主机密钥与记录不符。这可能是服务器重装所致，但也可能意味着中间人攻击。",
+      "{host} 的主机密钥与本机记录不一致。这可能是服务器重装所致，也可能存在中间人攻击，请核对指纹后再继续。",
     keyType: "密钥类型",
     fingerprint: "指纹",
     reject: "取消",
@@ -442,6 +443,7 @@ export const zhCN: Dictionary = {
       "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
     authFailed:
       "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
+    hostKeyRejected: "已取消连接：未信任该主机的密钥。",
     cancelTransfer: "取消传输",
     history: {
       title: "传输历史",

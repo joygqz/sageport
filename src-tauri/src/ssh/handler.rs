@@ -9,7 +9,7 @@ use tokio::sync::oneshot;
 use super::known_hosts::{self, KnownHostStatus};
 use super::{HostKeyDecision, HostKeyPrompts, EVENT_HOST_KEY};
 
-const HOST_KEY_TIMEOUT: Duration = Duration::from_secs(120);
+const HOST_KEY_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]

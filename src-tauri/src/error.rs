@@ -46,6 +46,7 @@ impl AppError {
     pub fn code(&self) -> &'static str {
         match self {
             AppError::Database(_) | AppError::Migration(_) => "database",
+            AppError::Ssh(russh::Error::UnknownKey) => "host_key",
             AppError::Ssh(_) => "ssh",
             AppError::Sftp(_) => "sftp",
             AppError::Auth(_) => "auth",

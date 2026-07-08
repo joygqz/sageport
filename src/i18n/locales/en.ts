@@ -64,7 +64,7 @@ export const en = {
     },
     delete: {
       title: "Delete forward",
-      description: "This removes {name} and cannot be undone.",
+      description: "This permanently deletes {name} and cannot be undone.",
       error: "Failed to delete forward",
     },
     form: {
@@ -141,7 +141,9 @@ export const en = {
     authFailed:
       "The server rejected these credentials. Check the username, password, or key for this host.",
     connectTimedOut:
-      "The connection did not finish in time. Check the network, firewall, SSH service, or server login policy.",
+      "The connection timed out. Check your network, firewall, and the SSH service on the server.",
+    hostKeyRejected:
+      "Connection cancelled because the host key was not trusted.",
     closed: "Session ended",
     reconnect: "Reconnect",
     local: {
@@ -268,9 +270,9 @@ export const en = {
     unknownTitle: "Verify host key",
     changedTitle: "Host key changed",
     unknownDescription:
-      "You are connecting to {host} for the first time. Confirm its fingerprint before you trust it.",
+      "This is your first connection to {host}. Verify the fingerprint below to confirm the server's identity before trusting it.",
     changedDescription:
-      "The host key for {host} does not match the one on record. This can happen after a server rebuild, but it can also signal a man-in-the-middle attack.",
+      "The host key for {host} does not match the one on record. This can happen after a server rebuild, but it can also indicate a man-in-the-middle attack. Verify the fingerprint before continuing.",
     keyType: "Key type",
     fingerprint: "Fingerprint",
     reject: "Cancel",
@@ -449,6 +451,8 @@ export const en = {
       "This host is missing sign-in credentials. Add a username and password, or link a saved identity, in host settings.",
     authFailed:
       "The server rejected these credentials. Check the username, password, or key for this host.",
+    hostKeyRejected:
+      "Connection cancelled because the host key was not trusted.",
     cancelTransfer: "Cancel transfer",
     history: {
       title: "Transfer history",

@@ -21,6 +21,7 @@ import {
 import { terminalFontSize } from "@/workbench/zoom";
 import { createAutocomplete } from "./autocomplete/controller";
 import { useBroadcastStore } from "./broadcast";
+import { hasHostKeyPrompt, useHostKeyStore } from "./host-key";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
 import { registerTerminal, unregisterTerminal } from "./registry";
 import {
@@ -62,6 +63,7 @@ export function TerminalView({
   const describeConnectError = (code?: string | null, message?: string) => {
     if (code === "invalid") return t("terminal.credentialsMissing");
     if (code === "auth") return t("terminal.authFailed");
+    if (code === "host_key") return t("terminal.hostKeyRejected");
     return message;
   };
 
@@ -131,6 +133,18 @@ export function TerminalView({
       connectWatchdog = undefined;
     };
 
+    const armConnectWatchdog = () => {
+      clearConnectWatchdog();
+      if (isSshLike && hasHostKeyPrompt(sessionId)) return;
+      connectWatchdog = setTimeout(() => {
+        if (disposed || connectSettled) return;
+        connectTimedOut = true;
+        pendingInput = "";
+        setStatus(sessionId, "error", t("terminal.connectTimedOut"));
+        void transport.disconnect().catch(() => {});
+      }, CONNECT_WATCHDOG_MS);
+    };
+
     const settleConnect = () => {
       connectSettled = true;
       clearConnectWatchdog();
@@ -185,8 +199,10 @@ export function TerminalView({
           if (e.status !== "connecting") settleConnect();
           if (isSshLike) {
             if (e.status === "connected") startMonitor(sessionId);
-            else if (e.status === "closed" || e.status === "error")
+            else if (e.status === "closed" || e.status === "error") {
               stopMonitor(sessionId);
+              useHostKeyStore.getState().rejectSession(sessionId);
+            }
           }
           setStatus(
             sessionId,
@@ -206,13 +222,20 @@ export function TerminalView({
       unlisteners.push(unData, unStatus);
 
       setStatus(sessionId, "connecting");
-      connectWatchdog = setTimeout(() => {
-        if (disposed || connectSettled) return;
-        connectTimedOut = true;
-        pendingInput = "";
-        setStatus(sessionId, "error", t("terminal.connectTimedOut"));
-        void transport.disconnect().catch(() => {});
-      }, CONNECT_WATCHDOG_MS);
+      if (isSshLike) {
+        let prompted = hasHostKeyPrompt(sessionId);
+        unlisteners.push(
+          useHostKeyStore.subscribe((s) => {
+            const pending = s.queue.some((e) => e.sessionId === sessionId);
+            if (pending === prompted) return;
+            prompted = pending;
+            if (disposed || connectSettled || connectTimedOut) return;
+            if (pending) clearConnectWatchdog();
+            else armConnectWatchdog();
+          }),
+        );
+      }
+      armConnectWatchdog();
       try {
         await transport.connect({ cols: term.cols, rows: term.rows });
         inputReady = true;
@@ -268,6 +291,7 @@ export function TerminalView({
       disposed = true;
       pendingInput = "";
       clearConnectWatchdog();
+      if (isSshLike) useHostKeyStore.getState().rejectSession(sessionId);
       clearTimeout(colsTimer);
       observer.disconnect();
       dataSub.dispose();

@@ -97,6 +97,12 @@ function PaletteBody({
       .map((host) => ({ type: "host", host }));
     const adhoc = parseQuickConnect(query);
     if (adhoc) matches.unshift({ type: "adhoc", target: adhoc });
+    const quickActions = ["terminal.newLocal", "host.new"];
+    for (const id of quickActions) {
+      const command = commands.find((c) => c.id === id);
+      if (command && fuzzyMatch(query, command.label))
+        matches.push({ type: "command", command });
+    }
     return matches;
   }, [commandMode, query, commands, hosts, t]);
 

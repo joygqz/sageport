@@ -162,7 +162,10 @@ async fn run_session_inner(
     let id = &params.session_id;
     let attempt = params.attempt;
 
-    let conn = Arc::new(establish(app, prompts, id, &params.hops).await?);
+    let conn = tokio::select! {
+        result = establish(app, prompts, id, &params.hops) => Arc::new(result?),
+        _ = wait_close(&mut rx) => return Ok(()),
+    };
     let mut channel = conn.handle.channel_open_session().await?;
     channel
         .request_pty(false, TERM, params.cols, params.rows, 0, 0, &[])
@@ -207,6 +210,15 @@ async fn run_session_inner(
     connections.lock().remove(id);
     drop(conn);
     Ok(())
+}
+
+async fn wait_close(rx: &mut UnboundedReceiver<SessionCommand>) {
+    loop {
+        match rx.recv().await {
+            Some(SessionCommand::Close) | None => return,
+            Some(_) => {}
+        }
+    }
 }
 
 fn emit_data(app: &AppHandle, id: &str, attempt: u32, data: &[u8]) {
