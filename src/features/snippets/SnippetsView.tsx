@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Pencil, Play, Plus, SquareTerminal, Trash2 } from "lucide-react";
+import {
+  Pencil,
+  Play,
+  Plus,
+  Server,
+  SquareTerminal,
+  Trash2,
+} from "lucide-react";
 
 import {
   Button,
@@ -19,6 +26,7 @@ import type { Snippet } from "@/types/models";
 import { SideBarView } from "@/workbench/SideBarView";
 import { useTabsStore } from "@/workbench/tabs";
 import { useDeleteSnippet, useSnippets } from "./api";
+import { BatchRunDialog } from "./BatchRunDialog";
 import { SnippetFormDialog } from "./SnippetFormDialog";
 import { SnippetRunDialog } from "./SnippetRunDialog";
 import { parseVariables } from "./variables";
@@ -35,6 +43,7 @@ export function SnippetsView() {
   });
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [runSnippet, setRunSnippet] = useState<Snippet | null>(null);
+  const [batch, setBatch] = useState<Snippet | null>(null);
 
   const send = (command: string) => {
     if (sendToTerminal(command)) {
@@ -129,6 +138,9 @@ export function SnippetsView() {
                 <ContextMenuItem onSelect={() => run(snippet)}>
                   <Play /> {t("snippets.run")}
                 </ContextMenuItem>
+                <ContextMenuItem onSelect={() => setBatch(snippet)}>
+                  <Server /> {t("snippets.batch.action")}
+                </ContextMenuItem>
                 <ContextMenuItem
                   onSelect={() => setForm({ open: true, snippet })}
                 >
@@ -160,6 +172,11 @@ export function SnippetsView() {
         snippet={runSnippet}
         onClose={() => setRunSnippet(null)}
         onRun={send}
+      />
+      <BatchRunDialog
+        open={batch !== null}
+        initialCommand={batch?.command ?? ""}
+        onClose={() => setBatch(null)}
       />
     </SideBarView>
   );

@@ -347,6 +347,15 @@ export const zhCN: Dictionary = {
   snippets: {
     viewTitle: "命令片段",
     new: "新建片段",
+    batch: {
+      action: "在多台主机运行…",
+      title: "在多台主机运行",
+      command: "命令",
+      hosts: "主机",
+      noHosts: "没有可用主机",
+      run: "运行 {count} 台",
+      error: "批量运行失败",
+    },
     newTitle: "新建片段",
     editTitle: "编辑片段",
     name: "名称",

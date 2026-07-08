@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod batch;
 pub mod bookmarks;
 pub mod forwards;
 pub mod groups;

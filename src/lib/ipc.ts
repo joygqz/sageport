@@ -9,6 +9,7 @@ import type {
   AiSession,
   AiSessionSummary,
   AiToolSpec,
+  BatchExecEvent,
   FileEntry,
   FsEndpoint,
   GeneratedSshKey,
@@ -66,6 +67,19 @@ export const ipc = {
     update: (id: string, input: HostInput) =>
       invoke<Host>("hosts_update", { id, input }),
     remove: (id: string) => invoke<void>("hosts_delete", { id }),
+    runCommand: (
+      hostIds: string[],
+      command: string,
+      onEvent: (e: BatchExecEvent) => void,
+    ) => {
+      const channel = new Channel<BatchExecEvent>();
+      channel.onmessage = onEvent;
+      return invoke<void>("hosts_run_command", {
+        hostIds,
+        command,
+        onEvent: channel,
+      });
+    },
     importPreview: () =>
       invoke<SshConfigHost[]>("ssh_config_import_preview"),
     importApply: (hosts: SshConfigHost[]) =>

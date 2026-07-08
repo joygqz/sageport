@@ -95,6 +95,7 @@ pub fn run() {
             commands::bookmarks::bookmarks_delete,
             commands::monitor::monitor_start,
             commands::monitor::monitor_stop,
+            commands::batch::hosts_run_command,
             commands::sftp::fs_connect,
             commands::sftp::fs_disconnect,
             commands::sftp::fs_home,

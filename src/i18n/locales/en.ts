@@ -353,6 +353,15 @@ export const en = {
   snippets: {
     viewTitle: "Snippets",
     new: "New snippet",
+    batch: {
+      action: "Run on hosts…",
+      title: "Run on multiple hosts",
+      command: "Command",
+      hosts: "Hosts",
+      noHosts: "No hosts available",
+      run: "Run on {count}",
+      error: "Batch run failed",
+    },
     newTitle: "New snippet",
     editTitle: "Edit snippet",
     name: "Name",

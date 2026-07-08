@@ -34,6 +34,16 @@ export interface Host {
   revision: number;
 }
 
+export type BatchExecStatus = "running" | "done" | "error";
+
+export interface BatchExecEvent {
+  hostId: string;
+  status: BatchExecStatus;
+  output?: string;
+  exitCode?: number;
+  message?: string;
+}
+
 export interface HostStats {
   cpuLoad: number;
   cpuCount: number;
