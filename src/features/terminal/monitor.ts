@@ -8,6 +8,26 @@ interface MonitorEntry {
   unsupported: boolean;
 }
 
+export interface StatsPercents {
+  cpu: number;
+  mem: number;
+  disk: number;
+}
+
+export function statsPercents(stats: HostStats): StatsPercents {
+  return {
+    cpu: Math.round((stats.cpuLoad / Math.max(stats.cpuCount, 1)) * 100),
+    mem:
+      stats.memTotal > 0
+        ? Math.round((stats.memUsed / stats.memTotal) * 100)
+        : 0,
+    disk:
+      stats.diskTotal > 0
+        ? Math.round((stats.diskUsed / stats.diskTotal) * 100)
+        : 0,
+  };
+}
+
 interface MonitorState {
   bySession: Record<string, MonitorEntry>;
   set: (sessionId: string, entry: MonitorEntry) => void;

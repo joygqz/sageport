@@ -12,7 +12,7 @@ import {
 import { useI18n } from "@/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 import { useBroadcastStore } from "@/features/terminal/broadcast";
-import { useMonitorStore } from "@/features/terminal/monitor";
+import { statsPercents, useMonitorStore } from "@/features/terminal/monitor";
 import { useSyncStatus } from "@/features/sync/api";
 import { useSftpStore } from "@/features/sftp/store";
 import { useUpdateStatus } from "@/features/updates/api";
@@ -108,11 +108,10 @@ function MonitorItem() {
   const entry = bySession[id];
   if (!entry?.stats) return null;
 
-  const { cpuLoad, cpuCount, memUsed, memTotal, diskUsed, diskTotal } =
-    entry.stats;
-  const cpuPct = Math.round((cpuLoad / Math.max(cpuCount, 1)) * 100);
-  const memPct = memTotal > 0 ? Math.round((memUsed / memTotal) * 100) : 0;
-  const diskPct = diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : 0;
+  const { memUsed, memTotal, diskUsed, diskTotal } = entry.stats;
+  const { cpu: cpuPct, mem: memPct, disk: diskPct } = statsPercents(
+    entry.stats,
+  );
 
   return (
     <div

@@ -37,7 +37,27 @@ export const zhCN: Dictionary = {
     credentials: "凭据",
     snippets: "命令片段",
     forwards: "端口转发",
+    monitor: "监控",
     settings: "设置",
+  },
+
+  monitor: {
+    viewTitle: "监控",
+    cpu: "CPU",
+    memory: "内存",
+    disk: "磁盘",
+    cpuDetail: "平均负载 {load}，共 {count} 核",
+    network: "网络",
+    uptime: "已运行 {value}",
+    uptimeDh: "{d} 天 {h} 小时",
+    uptimeHm: "{h} 小时 {m} 分钟",
+    uptimeM: "{m} 分钟",
+    collecting: "正在采集统计信息…",
+    unsupported: "该系统暂不支持统计信息",
+    empty: {
+      title: "暂无活动会话",
+      description: "连接主机后可实时查看 CPU、内存和磁盘占用。",
+    },
   },
 
   forwards: {

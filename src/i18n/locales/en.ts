@@ -35,7 +35,28 @@ export const en = {
     credentials: "Credentials",
     snippets: "Snippets",
     forwards: "Port forwarding",
+    monitor: "Monitor",
     settings: "Settings",
+  },
+
+  monitor: {
+    viewTitle: "Monitor",
+    cpu: "CPU",
+    memory: "Memory",
+    disk: "Disk",
+    cpuDetail: "Load average {load} across {count} cores",
+    network: "Network",
+    uptime: "Up {value}",
+    uptimeDh: "{d}d {h}h",
+    uptimeHm: "{h}h {m}m",
+    uptimeM: "{m}m",
+    collecting: "Collecting statistics…",
+    unsupported: "Statistics are not available for this system",
+    empty: {
+      title: "No active sessions",
+      description:
+        "Connect to a host to see live CPU, memory, and disk usage.",
+    },
   },
 
   forwards: {
