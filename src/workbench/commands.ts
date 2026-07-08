@@ -41,6 +41,13 @@ export function useCommands(): WorkbenchCommand[] {
         run: () => overlays().openGroupForm(),
       },
       {
+        id: "terminal.newLocal",
+        categoryKey: "commands.category.terminal",
+        label: t("commands.terminal.newLocal"),
+        shortcut: ["mod", "shift", "T"],
+        run: () => tabs().openLocalTerminal(),
+      },
+      {
         id: "view.toggleSidebar",
         categoryKey: "commands.category.view",
         label: t("commands.view.toggleSidebar"),

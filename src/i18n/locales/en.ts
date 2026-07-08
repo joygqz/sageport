@@ -79,6 +79,7 @@ export const en = {
     quickConnect: "Connect to a host",
     commands: "Show all commands",
     newHost: "New host",
+    newLocal: "New local terminal",
     settings: "Open settings",
   },
 
@@ -92,12 +93,14 @@ export const en = {
   commands: {
     category: {
       hosts: "Hosts",
+      terminal: "Terminal",
       view: "View",
       preferences: "Preferences",
       theme: "Theme",
     },
     host: { new: "New host" },
     group: { new: "New group" },
+    terminal: { newLocal: "New local terminal" },
     view: {
       toggleSidebar: "Toggle side bar",
       togglePanel: "Toggle files panel",
@@ -140,6 +143,10 @@ export const en = {
       "The connection did not finish in time. Check the network, firewall, SSH service, or server login policy.",
     closed: "Session ended",
     reconnect: "Reconnect",
+    local: {
+      title: "Local",
+      new: "New local terminal",
+    },
     status: {
       idle: "Idle",
       connecting: "Connecting",

@@ -356,6 +356,16 @@ export interface SshDataEvent {
   data: string;
 }
 
+export interface PtyDataEvent {
+  id: string;
+  data: string;
+}
+
+export interface PtyExitEvent {
+  id: string;
+  code: number;
+}
+
 export type HostKeyStatus = "unknown" | "changed";
 export type HostKeyDecision = "reject" | "once" | "remember";
 

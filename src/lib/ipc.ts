@@ -25,6 +25,8 @@ import type {
   KeyFile,
   MonitorStatsEvent,
   PortForward,
+  PtyDataEvent,
+  PtyExitEvent,
   PortForwardInput,
   ForwardStatusEvent,
   SftpStatusEvent,
@@ -152,6 +154,19 @@ export const ipc = {
       listen<SshStatusEvent>("ssh://status", (event) => handler(event.payload)),
     onHostKey: (handler: (e: HostKeyEvent) => void): Promise<UnlistenFn> =>
       listen<HostKeyEvent>("ssh://host-key", (event) => handler(event.payload)),
+  },
+  pty: {
+    open: (params: { sessionId: string; cols: number; rows: number }) =>
+      invoke<void>("pty_open", params),
+    write: (sessionId: string, data: string) =>
+      invoke<void>("pty_write", { sessionId, data }),
+    resize: (sessionId: string, cols: number, rows: number) =>
+      invoke<void>("pty_resize", { sessionId, cols, rows }),
+    close: (sessionId: string) => invoke<void>("pty_close", { sessionId }),
+    onData: (handler: (e: PtyDataEvent) => void): Promise<UnlistenFn> =>
+      listen<PtyDataEvent>("pty://data", (event) => handler(event.payload)),
+    onExit: (handler: (e: PtyExitEvent) => void): Promise<UnlistenFn> =>
+      listen<PtyExitEvent>("pty://exit", (event) => handler(event.payload)),
   },
   sftp: {
     connect: (connectionId: string, hostId: string) =>

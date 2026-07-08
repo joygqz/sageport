@@ -4,6 +4,7 @@ mod crypto;
 mod db;
 mod domain;
 mod error;
+mod pty;
 mod repository;
 mod sftp;
 mod ssh;
@@ -95,6 +96,10 @@ pub fn run() {
             commands::bookmarks::bookmarks_delete,
             commands::monitor::monitor_start,
             commands::monitor::monitor_stop,
+            commands::pty::pty_open,
+            commands::pty::pty_write,
+            commands::pty::pty_resize,
+            commands::pty::pty_close,
             commands::batch::hosts_run_command,
             commands::history::history_add,
             commands::history::history_search,

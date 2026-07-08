@@ -5,6 +5,7 @@ use parking_lot::Mutex;
 use sqlx::SqlitePool;
 use tokio::sync::oneshot;
 
+use crate::pty::PtyManager;
 use crate::sftp::SftpManager;
 use crate::ssh::forward::ForwardManager;
 use crate::ssh::monitor::MonitorManager;
@@ -23,6 +24,8 @@ pub struct AppState {
     pub ssh: Arc<SessionManager>,
 
     pub sftp: Arc<SftpManager>,
+
+    pub pty: PtyManager,
 
     pub forwards: ForwardManager,
 
@@ -43,6 +46,7 @@ impl AppState {
             db,
             ssh: Arc::new(SessionManager::new()),
             sftp: Arc::new(SftpManager::new()),
+            pty: PtyManager::new(),
             forwards: ForwardManager::new(),
             monitor: MonitorManager::new(),
             host_key_prompts: new_host_key_prompts(),

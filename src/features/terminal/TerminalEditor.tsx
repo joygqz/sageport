@@ -29,6 +29,7 @@ export function TerminalEditor({
     <div className="relative h-full w-full bg-terminal-background pl-1">
       <TerminalView
         sessionId={tab.id}
+        target={tab.target}
         hostId={tab.hostId}
         attempt={tab.attempt}
       />

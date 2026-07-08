@@ -81,6 +81,7 @@ export const zhCN: Dictionary = {
     quickConnect: "连接主机",
     commands: "显示所有命令",
     newHost: "新建主机",
+    newLocal: "新建本地终端",
     settings: "打开设置",
   },
 
@@ -94,12 +95,14 @@ export const zhCN: Dictionary = {
   commands: {
     category: {
       hosts: "主机",
+      terminal: "终端",
       view: "视图",
       preferences: "偏好设置",
       theme: "主题",
     },
     host: { new: "新建主机" },
     group: { new: "新建分组" },
+    terminal: { newLocal: "新建本地终端" },
     view: {
       toggleSidebar: "显示或隐藏侧边栏",
       togglePanel: "显示或隐藏文件管理面板",
@@ -141,6 +144,10 @@ export const zhCN: Dictionary = {
       "连接未能及时完成，请检查网络、防火墙、SSH 服务或服务器登录策略。",
     closed: "会话已结束",
     reconnect: "重新连接",
+    local: {
+      title: "本地",
+      new: "新建本地终端",
+    },
     status: {
       idle: "空闲",
       connecting: "连接中",

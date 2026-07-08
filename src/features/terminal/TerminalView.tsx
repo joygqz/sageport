@@ -12,20 +12,18 @@ import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { errorCode, errorMessage } from "@/lib/toast";
 import { useTheme } from "@/themes/useTheme";
-import { terminalTabs, useTabsStore } from "@/workbench/tabs";
+import {
+  terminalTabs,
+  useTabsStore,
+  type TerminalTarget,
+} from "@/workbench/tabs";
 import { terminalFontSize } from "@/workbench/zoom";
 import { createAutocomplete } from "./autocomplete/controller";
 import { useBroadcastStore } from "./broadcast";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
 import { registerTerminal, unregisterTerminal } from "./registry";
+import { localTransport, sshTransport } from "./transport";
 import { xtermTheme } from "./xterm-theme";
-
-function decodeBase64(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
 
 const CONNECT_WATCHDOG_MS = 45_000;
 
@@ -39,10 +37,12 @@ function attachWebgl(term: XTerm) {
 
 export function TerminalView({
   sessionId,
+  target,
   hostId,
   attempt,
 }: {
   sessionId: string;
+  target: TerminalTarget;
   hostId: string;
   attempt: number;
 }) {
@@ -63,7 +63,12 @@ export function TerminalView({
   }, [theme]);
 
   useEffect(() => {
-    bridgeMonitorEvents();
+    const isSsh = target === "ssh";
+    const transport = isSsh
+      ? sshTransport(sessionId, hostId, attempt)
+      : localTransport(sessionId);
+    if (isSsh) bridgeMonitorEvents();
+
     const term = new XTerm({
       fontFamily:
         '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace',
@@ -93,11 +98,13 @@ export function TerminalView({
     termRef.current = term;
     registerTerminal(sessionId, { term, fit, search });
 
-    const autocomplete = createAutocomplete({
-      hostId,
-      send: (data) => void ipc.ssh.send(sessionId, data).catch(() => {}),
-    });
-    autocomplete.attach(term);
+    const autocomplete = isSsh
+      ? createAutocomplete({
+          hostId,
+          send: (data) => void transport.send(data).catch(() => {}),
+        })
+      : null;
+    autocomplete?.attach(term);
 
     let disposed = false;
     let inputReady = false;
@@ -131,8 +138,8 @@ export function TerminalView({
       const data = pendingInput;
       pendingInput = "";
       sendingInput = true;
-      void ipc.ssh
-        .send(sessionId, data)
+      void transport
+        .send(data)
         .catch(() => {})
         .finally(() => {
           sendingInput = false;
@@ -143,10 +150,14 @@ export function TerminalView({
     const dataSub = term.onData((data) => {
       pendingInput += data;
       flushInput();
-      autocomplete.handleData(data);
-      if (useBroadcastStore.getState().enabled) {
+      autocomplete?.handleData(data);
+      if (isSsh && useBroadcastStore.getState().enabled) {
         for (const other of terminalTabs(useTabsStore.getState().tabs)) {
-          if (other.id !== sessionId && other.status === "connected") {
+          if (
+            other.target === "ssh" &&
+            other.id !== sessionId &&
+            other.status === "connected"
+          ) {
             void ipc.ssh.send(other.id, data).catch(() => {});
           }
         }
@@ -155,35 +166,24 @@ export function TerminalView({
 
     void (async () => {
       const [unData, unStatus] = await Promise.all([
-        ipc.ssh.onData((e) => {
-          if (
-            e.id === sessionId &&
-            e.attempt === attempt &&
-            !disposed &&
-            !connectTimedOut
-          ) {
-            term.write(decodeBase64(e.data));
-          }
+        transport.onData((bytes) => {
+          if (!disposed && !connectTimedOut) term.write(bytes);
         }),
-        ipc.ssh.onStatus((e) => {
-          if (
-            e.id === sessionId &&
-            e.attempt === attempt &&
-            !disposed &&
-            !connectTimedOut
-          ) {
-            if (e.status !== "connecting") settleConnect();
+        transport.onStatus((e) => {
+          if (disposed || connectTimedOut) return;
+          if (e.status !== "connecting") settleConnect();
+          if (isSsh) {
             if (e.status === "connected") startMonitor(sessionId);
             else if (e.status === "closed" || e.status === "error")
               stopMonitor(sessionId);
-            setStatus(
-              sessionId,
-              e.status,
-              e.status === "error"
-                ? describeConnectError(e.code, e.message)
-                : e.message,
-            );
           }
+          setStatus(
+            sessionId,
+            e.status,
+            e.status === "error"
+              ? describeConnectError(e.code, e.message)
+              : e.message,
+          );
         }),
       ]);
 
@@ -200,16 +200,10 @@ export function TerminalView({
         connectTimedOut = true;
         pendingInput = "";
         setStatus(sessionId, "error", t("terminal.connectTimedOut"));
-        void ipc.ssh.disconnect(sessionId).catch(() => {});
+        void transport.disconnect().catch(() => {});
       }, CONNECT_WATCHDOG_MS);
       try {
-        await ipc.ssh.connect({
-          sessionId,
-          attempt,
-          hostId,
-          cols: term.cols,
-          rows: term.rows,
-        });
+        await transport.connect({ cols: term.cols, rows: term.rows });
         inputReady = true;
         flushInput();
       } catch (err) {
@@ -232,7 +226,7 @@ export function TerminalView({
     const applyResize = (cols: number, rows: number) => {
       if (cols === term.cols && rows === term.rows) return;
       term.resize(cols, rows);
-      void ipc.ssh.resize(sessionId, term.cols, term.rows).catch(() => {});
+      void transport.resize(term.cols, term.rows).catch(() => {});
     };
 
     const observer = new ResizeObserver(() => {
@@ -268,13 +262,13 @@ export function TerminalView({
       dataSub.dispose();
       unlisteners.forEach((un) => un());
       unregisterTerminal(sessionId);
-      stopMonitor(sessionId);
-      autocomplete.dispose();
+      if (isSsh) stopMonitor(sessionId);
+      autocomplete?.dispose();
       term.dispose();
       termRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, hostId, attempt]);
+  }, [sessionId, target, hostId, attempt]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

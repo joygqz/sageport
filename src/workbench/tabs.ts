@@ -13,12 +13,15 @@ function t(key: Parameters<typeof translate>[1]): string {
 
 export type TerminalStatus = SshStatusKind | "idle";
 
+export type TerminalTarget = "ssh" | "local";
+
 export type SettingsSection = "appearance" | "ai" | "sync" | "about";
 
 export interface TerminalTab {
   kind: "terminal";
 
   id: string;
+  target: TerminalTarget;
   hostId: string;
   title: string;
   status: TerminalStatus;
@@ -64,6 +67,8 @@ interface TabsState {
   lastTerminalId: string | null;
 
   openTerminal: (host: Pick<Host, "id" | "label">) => string;
+
+  openLocalTerminal: () => string;
 
   openFile: (file: {
     connectionId: string | null;
@@ -150,8 +155,34 @@ export const useTabsStore = create<TabsState>((set, get) => {
       const tab: TerminalTab = {
         kind: "terminal",
         id,
+        target: "ssh",
         hostId: host.id,
         title: host.label,
+        status: "idle",
+        attempt: 0,
+      };
+      set((s) => ({
+        tabs: [...s.tabs, tab],
+        activeId: id,
+        lastTerminalId: id,
+      }));
+      return id;
+    },
+
+    openLocalTerminal: () => {
+      const id = crypto.randomUUID();
+      const count = terminalTabs(get().tabs).filter(
+        (t) => t.target === "local",
+      ).length;
+      const tab: TerminalTab = {
+        kind: "terminal",
+        id,
+        target: "local",
+        hostId: "",
+        title:
+          count === 0
+            ? t("terminal.local.title")
+            : `${t("terminal.local.title")} ${count + 1}`,
         status: "idle",
         attempt: 0,
       };
@@ -246,7 +277,9 @@ export const useTabsStore = create<TabsState>((set, get) => {
         return;
       }
       if (tab && isTerminal(tab)) {
-        void ipc.ssh.disconnect(id).catch(() => {});
+        if (tab.target === "local")
+          void ipc.pty.close(id).catch(() => {});
+        else void ipc.ssh.disconnect(id).catch(() => {});
         const search = useTerminalSearch.getState();
         if (search.openFor === id) search.close();
       }
@@ -316,7 +349,10 @@ export const useTabsStore = create<TabsState>((set, get) => {
     sendToTerminal: (command) => {
       const id = targetTerminalId(get());
       if (!id) return false;
-      void ipc.ssh.send(id, command + "\n").catch(() => {});
+      const tab = get().tabs.find((t): t is TerminalTab => t.id === id);
+      const data = command + "\n";
+      if (tab?.target === "local") void ipc.pty.write(id, data).catch(() => {});
+      else void ipc.ssh.send(id, data).catch(() => {});
       get().setActive(id);
       return true;
     },

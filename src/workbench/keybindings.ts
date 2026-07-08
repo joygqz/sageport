@@ -32,6 +32,8 @@ export function useKeybindings() {
         run(() => layout.toggleSidebar());
       } else if (key === "b" && e.shiftKey) {
         run(() => useBroadcastStore.getState().toggle());
+      } else if (key === "t" && e.shiftKey) {
+        run(() => tabs.openLocalTerminal());
       } else if (key === "j" && !e.shiftKey) {
         run(() => layout.togglePanel());
       } else if (key === "l" && !e.shiftKey) {

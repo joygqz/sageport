@@ -151,19 +151,23 @@ function TabItem({
 }) {
   const { t } = useI18n();
   const openTerminal = useTabsStore((s) => s.openTerminal);
+  const openLocalTerminal = useTabsStore((s) => s.openLocalTerminal);
 
   const title = tab.kind === "settings" ? t("settings.title") : tab.title;
   const dirty = tab.kind === "file" && isFileDirty(tab);
+
+  const reopen =
+    tab.kind === "terminal"
+      ? tab.target === "local"
+        ? () => openLocalTerminal()
+        : () => openTerminal({ id: tab.hostId, label: tab.title })
+      : undefined;
 
   return (
     <div
       data-tab-id={tab.id}
       onClick={onSelect}
-      onDoubleClick={
-        tab.kind === "terminal"
-          ? () => openTerminal({ id: tab.hostId, label: tab.title })
-          : undefined
-      }
+      onDoubleClick={reopen}
       onAuxClick={(e) => {
         if (e.button === 1) onClose();
       }}
@@ -227,6 +231,7 @@ function Watermark() {
     { label: t("watermark.quickConnect"), keys: ["mod", "P"] },
     { label: t("watermark.commands"), keys: ["mod", "shift", "P"] },
     { label: t("watermark.newHost"), keys: ["mod", "N"] },
+    { label: t("watermark.newLocal"), keys: ["mod", "shift", "T"] },
     { label: t("watermark.settings"), keys: ["mod", ","] },
   ];
 
