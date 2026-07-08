@@ -24,6 +24,13 @@ export const buttonVariants = cva(
         icon: "size-9",
       },
     },
+    compoundVariants: [
+      {
+        variant: "ghost",
+        size: "icon",
+        class: "text-muted-foreground",
+      },
+    ],
     defaultVariants: {
       variant: "primary",
       size: "md",

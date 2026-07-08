@@ -8,7 +8,6 @@ import {
   DialogToolbar,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { cn } from "@/lib/utils";
 import type { HostKeyDecision } from "@/types/models";
 import { listenHostKeyEvents, useHostKeyStore } from "./host-key";
 
@@ -54,42 +53,35 @@ export function HostKeyDialog() {
               {changed ? t("hostKey.changedTitle") : t("hostKey.unknownTitle")}
             </DialogToolbar>
             <div className="flex flex-col gap-4 p-5">
-              <div className="flex items-start gap-2.5">
-                <div
-                  className={cn(
-                    "mt-0.5 shrink-0",
-                    changed ? "text-destructive" : "text-muted-foreground",
-                  )}
-                >
-                  {changed ? (
-                    <ShieldAlert className="size-4" />
-                  ) : (
-                    <ShieldQuestion className="size-4" />
-                  )}
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {t(
-                    changed
-                      ? "hostKey.changedDescription"
-                      : "hostKey.unknownDescription",
-                    { host: `${current.host}:${current.port}` },
-                  )}
-                </p>
-              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {changed ? (
+                  <ShieldAlert className="float-left mr-2 mt-[3px] size-4 text-destructive" />
+                ) : (
+                  <ShieldQuestion className="float-left mr-2 mt-[3px] size-4 text-muted-foreground" />
+                )}
+                {t(
+                  changed
+                    ? "hostKey.changedDescription"
+                    : "hostKey.unknownDescription",
+                  { host: `${current.host}:${current.port}` },
+                )}
+              </p>
 
-              <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-1.5 rounded-md border border-input bg-surface p-3 text-xs">
-                <dt className="whitespace-nowrap text-muted-foreground">
-                  {t("hostKey.keyType")}
-                </dt>
-                <dd className="select-text text-right font-mono">
-                  {current.keyType}
-                </dd>
-                <dt className="whitespace-nowrap text-muted-foreground">
-                  {t("hostKey.fingerprint")}
-                </dt>
-                <dd className="select-text break-all text-right font-mono">
-                  {current.fingerprint}
-                </dd>
+              <dl className="flex flex-col gap-2 rounded-md border border-input bg-surface p-3 text-xs">
+                <div className="flex flex-col gap-1">
+                  <dt className="text-muted-foreground">
+                    {t("hostKey.keyType")}
+                  </dt>
+                  <dd className="select-text font-mono">{current.keyType}</dd>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <dt className="text-muted-foreground">
+                    {t("hostKey.fingerprint")}
+                  </dt>
+                  <dd className="select-text break-all font-mono">
+                    {current.fingerprint}
+                  </dd>
+                </div>
               </dl>
 
               <div className="flex justify-end gap-2">
