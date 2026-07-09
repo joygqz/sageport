@@ -64,7 +64,7 @@ export function SnippetsView() {
   const requestDelete = (snippet: Snippet) => {
     setConfirmState({
       title: t("snippets.delete.title"),
-      description: t("snippets.delete.description", { name: snippet.name }),
+      description: t("common.deleteConfirm", { name: snippet.name }),
       cancelLabel: t("common.cancel"),
       actions: [
         {

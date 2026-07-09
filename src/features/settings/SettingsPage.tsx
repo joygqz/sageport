@@ -330,7 +330,7 @@ function AiForm({ config }: { config: AiConfig }) {
         >
           {AI_PROTOCOLS.map((p) => (
             <option key={p.value} value={p.value}>
-              {t(`settings.ai.protocol_${p.value}`)}
+              {t(`settings.ai.protocol.${p.value}`)}
             </option>
           ))}
         </Select>
