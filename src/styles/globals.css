@@ -308,17 +308,4 @@
     container-type: inline-size;
     min-width: 36rem;
   }
-
-  .settings-layout {
-    display: flex;
-    height: 100%;
-    min-height: 0;
-    min-width: 0;
-  }
-
-  .settings-layout .settings-nav {
-    width: 28cqw;
-    min-width: 7rem;
-    max-width: 11rem;
-  }
 }

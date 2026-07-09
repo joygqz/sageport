@@ -7,6 +7,7 @@ import {
   Input,
   Kbd,
   ScrollArea,
+  SegmentedControl,
   Select,
   Tooltip,
 } from "@/components/ui";
@@ -43,39 +44,34 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
   const setSection = useTabsStore((s) => s.setSettingsSection);
 
   return (
-    <div className="settings-page h-full bg-background">
-      <div className="settings-layout">
-        <nav className="settings-nav flex shrink-0 flex-col gap-0.5 border-r border-border p-2">
-          {NAV.map((item) => {
+    <div className="settings-page flex h-full flex-col bg-background">
+      <div className="shrink-0 border-b border-border p-3">
+        <SegmentedControl
+          value={section}
+          onChange={setSection}
+          options={NAV.map((item) => {
             const Icon = item.icon;
-            const active = section === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setSection(item.id)}
-                className={cn(
-                  "settings-nav-button flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
-                  active
-                    ? "bg-list-active text-list-active-foreground"
-                    : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-                <span className="truncate">{t(item.labelKey)}</span>
-              </button>
-            );
+            return {
+              value: item.id,
+              label: (
+                <span className="flex items-center justify-center gap-2">
+                  <Icon className="size-4 shrink-0" />
+                  <span className="truncate">{t(item.labelKey)}</span>
+                </span>
+              ),
+            };
           })}
-        </nav>
-
-        <ScrollArea className="min-h-0 min-w-0 flex-1">
-          <div className="settings-content flex min-w-0 max-w-2xl flex-col gap-6 p-6">
-            {section === "appearance" && <AppearanceSection />}
-            {section === "ai" && <AiSection />}
-            {section === "sync" && <SyncSection />}
-            {section === "about" && <AboutSection />}
-          </div>
-        </ScrollArea>
+        />
       </div>
+
+      <ScrollArea className="min-h-0 min-w-0 flex-1">
+        <div className="settings-content flex min-w-0 max-w-2xl flex-col gap-6 p-6">
+          {section === "appearance" && <AppearanceSection />}
+          {section === "ai" && <AiSection />}
+          {section === "sync" && <SyncSection />}
+          {section === "about" && <AboutSection />}
+        </div>
+      </ScrollArea>
     </div>
   );
 }
