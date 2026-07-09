@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -222,7 +222,7 @@ struct Pkce {
 
 fn pkce() -> Pkce {
     let mut raw = [0u8; 48];
-    rand::rngs::OsRng.fill_bytes(&mut raw);
+    rand::rng().fill_bytes(&mut raw);
     let verifier = URL_SAFE_NO_PAD.encode(raw);
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
     Pkce {
@@ -233,7 +233,7 @@ fn pkce() -> Pkce {
 
 fn random_state() -> String {
     let mut raw = [0u8; 24];
-    rand::rngs::OsRng.fill_bytes(&mut raw);
+    rand::rng().fill_bytes(&mut raw);
     URL_SAFE_NO_PAD.encode(raw)
 }
 

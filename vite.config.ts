@@ -42,26 +42,11 @@ export default defineConfig(async () => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          xterm: [
-            "@xterm/xterm",
-            "@xterm/addon-clipboard",
-            "@xterm/addon-fit",
-            "@xterm/addon-search",
-            "@xterm/addon-unicode11",
-            "@xterm/addon-web-links",
-            "@xterm/addon-webgl",
-          ],
-          markdown: ["react-markdown", "remark-gfm"],
-          "radix-ui": [
-            "@radix-ui/react-context-menu",
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-label",
-            "@radix-ui/react-scroll-area",
-            "@radix-ui/react-slot",
-            "@radix-ui/react-switch",
-            "@radix-ui/react-tooltip",
+        advancedChunks: {
+          groups: [
+            { name: "xterm", test: /node_modules\/@xterm\// },
+            { name: "markdown", test: /node_modules\/(react-markdown|remark-gfm)\// },
+            { name: "radix-ui", test: /node_modules\/@radix-ui\// },
           ],
         },
       },
