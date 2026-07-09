@@ -45,34 +45,37 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
   const setSection = useTabsStore((s) => s.setSettingsSection);
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="shrink-0 border-b border-border p-3">
-        <SegmentedControl
-          value={section}
-          onChange={setSection}
-          options={NAV.map((item) => {
-            const Icon = item.icon;
-            return {
-              value: item.id,
-              label: (
-                <span className="flex items-center justify-center gap-2">
-                  <Icon className="size-4 shrink-0" />
-                  <span className="truncate">{t(item.labelKey)}</span>
-                </span>
-              ),
-            };
-          })}
-        />
-      </div>
-
-      <ScrollArea className="min-h-0 min-w-0 flex-1">
-        <div className="flex w-full min-w-0 flex-col gap-6 p-6">
-          {section === "appearance" && <AppearanceSection />}
-          {section === "ai" && <AiSection />}
-          {section === "sync" && <SyncSection />}
-          {section === "about" && <AboutSection />}
+    <div className="settings-page h-full overflow-x-auto overflow-y-hidden bg-background">
+      <div className="flex h-full min-w-xl flex-col">
+        <div className="shrink-0 border-b border-border p-3">
+          <SegmentedControl
+            className="max-w-2xl"
+            value={section}
+            onChange={setSection}
+            options={NAV.map((item) => {
+              const Icon = item.icon;
+              return {
+                value: item.id,
+                label: (
+                  <span className="flex items-center justify-center gap-2">
+                    <Icon className="size-4 shrink-0" />
+                    <span className="truncate">{t(item.labelKey)}</span>
+                  </span>
+                ),
+              };
+            })}
+          />
         </div>
-      </ScrollArea>
+
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="settings-content flex w-full max-w-2xl flex-col gap-6 p-6">
+            {section === "appearance" && <AppearanceSection />}
+            {section === "ai" && <AiSection />}
+            {section === "sync" && <SyncSection />}
+            {section === "about" && <AboutSection />}
+          </div>
+        </ScrollArea>
+      </div>
     </div>
   );
 }
