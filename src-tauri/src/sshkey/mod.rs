@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use serde::Serialize;
-use ssh_key::rand_core::OsRng;
 use ssh_key::private::RsaKeypair;
+use ssh_key::rand_core::OsRng;
 use ssh_key::{Algorithm, EcdsaCurve, HashAlg, LineEnding, PrivateKey};
 
 use crate::domain::KeyAlgorithm;
