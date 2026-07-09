@@ -520,6 +520,7 @@ export const zhCN: Dictionary = {
     modelLabel: "模型",
     modelLoading: "正在加载模型",
     tool: {
+      askUser: "请求你选择",
       listHosts: "列出主机",
       connectHost: "连接主机",
       listTerminalSessions: "列出终端会话",

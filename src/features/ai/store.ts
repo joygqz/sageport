@@ -12,10 +12,13 @@ import type {
 import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 import {
   AI_TOOL_SPECS,
+  askUserOptions,
+  askUserQuestion,
   executeTool,
   noTerminalSessionError,
   normalizeArgs,
   resolveTerminalTab,
+  selectionResult,
   sessionNotConnectedError,
   TOOLS_REQUIRING_APPROVAL,
 } from "./tools";
@@ -43,7 +46,12 @@ function t(key: Parameters<typeof translate>[1]): string {
 }
 
 export type ToolStatus =
-  "awaiting-approval" | "running" | "done" | "denied" | "error";
+  | "awaiting-approval"
+  | "awaiting-input"
+  | "running"
+  | "done"
+  | "denied"
+  | "error";
 
 export type AgentLogItem =
   | { id: string; kind: "user"; content: string }
@@ -78,6 +86,10 @@ interface AiStoreState {
     string,
     { sessionId: string; resolve: (approved: boolean) => void }
   >;
+  answers: Map<
+    string,
+    { sessionId: string; resolve: (option: string | null) => void }
+  >;
 
   loadSessions: () => Promise<void>;
 
@@ -92,6 +104,7 @@ interface AiStoreState {
   stop: (sessionId: string) => void;
   approve: (toolLogId: string) => void;
   deny: (toolLogId: string) => void;
+  answer: (toolLogId: string, option: string) => void;
 }
 
 function buildContext(): string {
@@ -228,11 +241,17 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     const args = normalizeArgs(call.arguments);
     const logId = crypto.randomUUID();
     const needsApproval = TOOLS_REQUIRING_APPROVAL.has(call.name);
+    const isQuestion =
+      call.name === "ask_user" &&
+      Boolean(askUserQuestion(args)) &&
+      askUserOptions(args).length >= 2;
     const initialStatus: ToolStatus = preflightError
       ? "error"
-      : needsApproval
-        ? "awaiting-approval"
-        : "running";
+      : isQuestion
+        ? "awaiting-input"
+        : needsApproval
+          ? "awaiting-approval"
+          : "running";
 
     patch(sessionId, (r) => ({
       ...r,
@@ -263,6 +282,21 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     let resultText: string;
     if (preflightError) {
       resultText = preflightError;
+    } else if (call.name === "ask_user") {
+      if (!isQuestion) {
+        resultText =
+          "Error: ask_user needs a question and 2-6 non-empty string options.";
+        setToolStatus("error", resultText);
+      } else {
+        const option = await requestAnswer(get, sessionId, logId);
+        if (option === null) {
+          resultText = STOPPED_RESULT;
+          setToolStatus("denied", resultText);
+        } else {
+          resultText = selectionResult(option);
+          setToolStatus("done", resultText);
+        }
+      }
     } else if (
       needsApproval &&
       !(await requestApproval(get, sessionId, logId))
@@ -422,6 +456,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     activeId: null,
     runtime: {},
     approvals: new Map(),
+    answers: new Map(),
 
     loadSessions: async () => {
       if (get().sessionsLoaded) return;
@@ -565,6 +600,13 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         entry.resolve(false);
         approvals.delete(logId);
       }
+
+      const answers = get().answers;
+      for (const [logId, entry] of answers) {
+        if (entry.sessionId !== sessionId) continue;
+        entry.resolve(null);
+        answers.delete(logId);
+      }
     },
 
     approve: (toolLogId) => {
@@ -576,6 +618,11 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       get().approvals.get(toolLogId)?.resolve(false);
       get().approvals.delete(toolLogId);
     },
+
+    answer: (toolLogId, option) => {
+      get().answers.get(toolLogId)?.resolve(option);
+      get().answers.delete(toolLogId);
+    },
   };
 });
 
@@ -586,5 +633,15 @@ function requestApproval(
 ): Promise<boolean> {
   return new Promise((resolve) => {
     get().approvals.set(toolLogId, { sessionId, resolve });
+  });
+}
+
+function requestAnswer(
+  get: () => AiStoreState,
+  sessionId: string,
+  toolLogId: string,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    get().answers.set(toolLogId, { sessionId, resolve });
   });
 }

@@ -45,7 +45,8 @@ import { useLayoutStore } from "@/workbench/layout";
 import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
 import { useAiStore, type AgentLogItem } from "./store";
-import { ToolActivity } from "./ToolActivity";
+import { askUserOptions, askUserQuestion } from "./tools";
+import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
 const EMPTY_LOG: AgentLogItem[] = [];
 
@@ -78,11 +79,14 @@ export function AssistantPanel({ width }: { width: number }) {
   const stop = useAiStore((s) => s.stop);
   const approve = useAiStore((s) => s.approve);
   const deny = useAiStore((s) => s.deny);
+  const answer = useAiStore((s) => s.answer);
 
   const log = runtime?.log ?? EMPTY_LOG;
   const pending = runtime?.pending ?? false;
-  const awaitingApproval = log.some(
-    (item) => item.kind === "tool" && item.status === "awaiting-approval",
+  const awaitingUser = log.some(
+    (item) =>
+      item.kind === "tool" &&
+      (item.status === "awaiting-approval" || item.status === "awaiting-input"),
   );
 
   const [input, setInput] = useState("");
@@ -278,10 +282,11 @@ export function AssistantPanel({ width }: { width: number }) {
                     item={item}
                     onApprove={approve}
                     onDeny={deny}
+                    onAnswer={answer}
                   />
                 ))
               )}
-              {pending && !awaitingApproval && (
+              {pending && !awaitingUser && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <LoaderCircle className="size-4 animate-spin text-primary" />
                   {t("ai.working")}
@@ -431,12 +436,21 @@ function LogEntry({
   item,
   onApprove,
   onDeny,
+  onAnswer,
 }: {
   item: AgentLogItem;
   onApprove: (id: string) => void;
   onDeny: (id: string) => void;
+  onAnswer: (id: string, option: string) => void;
 }) {
   if (item.kind === "tool") {
+    if (
+      item.name === "ask_user" &&
+      askUserQuestion(item.args) &&
+      askUserOptions(item.args).length >= 2
+    ) {
+      return <QuestionPrompt item={item} onAnswer={onAnswer} />;
+    }
     return <ToolActivity item={item} onApprove={onApprove} onDeny={onDeny} />;
   }
   return <Bubble role={item.kind} content={item.content} />;

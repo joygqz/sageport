@@ -37,6 +37,30 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
     },
   },
   {
+    name: "ask_user",
+    description:
+      "Ask the user to pick one of a few options, shown as clickable buttons in the chat. Use this whenever you would otherwise ask 'which one?' in plain text — e.g. which server to check, which of several fixes to apply. Keep options short (a few words each) and write them in the user's language. Do not use it for yes/no confirmation of a command; run_terminal_command already asks for approval.",
+    parameters: {
+      type: "object",
+      properties: {
+        question: {
+          type: "string",
+          description: "The question to show above the options.",
+        },
+        options: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 2,
+          maxItems: 6,
+          description:
+            "2-6 short, mutually exclusive choices. Include a broader option like 'Both' or 'All of them' when it makes sense.",
+        },
+      },
+      required: ["question", "options"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "list_terminal_sessions",
     description:
       "List the terminal sessions (tabs) currently open, with their id, host title, connection status, and whether each is the one the user is currently looking at. Call this first if you don't already know which session id to use.",
@@ -107,6 +131,23 @@ export function normalizeArgs(raw: unknown): Record<string, unknown> {
     : {};
 }
 
+export function askUserOptions(args: Record<string, unknown>): string[] {
+  if (!Array.isArray(args.options)) return [];
+  return args.options
+    .filter((o): o is string => typeof o === "string")
+    .map((o) => o.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+export function askUserQuestion(args: Record<string, unknown>): string {
+  return typeof args.question === "string" ? args.question.trim() : "";
+}
+
+export function selectionResult(option: string): string {
+  return `The user selected: ${option}`;
+}
+
 export function resolveTerminalTab(requested?: string): TerminalTab | null {
   const state = useTabsStore.getState();
   const sessions = terminalTabs(state.tabs);
@@ -146,6 +187,8 @@ export async function executeTool(
       return readOutput(args);
     case "run_terminal_command":
       return runCommand(args);
+    case "ask_user":
+      return "Error: ask_user is handled by the chat UI and should not reach the executor.";
     default:
       return `Error: unknown tool "${name}".`;
   }

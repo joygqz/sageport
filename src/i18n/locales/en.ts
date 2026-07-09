@@ -532,6 +532,7 @@ export const en = {
     modelLabel: "Model",
     modelLoading: "Loading models",
     tool: {
+      askUser: "Ask for your choice",
       listHosts: "List hosts",
       connectHost: "Connect to host",
       listTerminalSessions: "List terminal sessions",
