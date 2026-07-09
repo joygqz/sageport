@@ -14,7 +14,7 @@ const MODEL_SETTING: &str = "ai.model";
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfig {
-    pub has_api_key: bool,
+    pub api_key: String,
     pub base_url: String,
     pub protocol: Protocol,
     pub model: String,
@@ -45,16 +45,16 @@ async fn stored_base_url(state: &AppState, protocol: Protocol) -> AppResult<Stri
 
 #[tauri::command]
 pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
-    let has_api_key = settings_repo::get(&state.db, API_KEY_SETTING)
+    let api_key = settings_repo::get(&state.db, API_KEY_SETTING)
         .await?
-        .is_some_and(|v| !v.is_empty());
+        .unwrap_or_default();
     let protocol = stored_protocol(&state).await?;
     let base_url = stored_base_url(&state, protocol).await?;
     let model = settings_repo::get(&state.db, MODEL_SETTING)
         .await?
         .unwrap_or_default();
     Ok(AiConfig {
-        has_api_key,
+        api_key,
         base_url,
         protocol,
         model,
@@ -68,9 +68,12 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
     }
     settings_repo::set(&state.db, BASE_URL_SETTING, input.base_url.trim()).await?;
     settings_repo::set(&state.db, PROTOCOL_SETTING, input.protocol.as_str()).await?;
-    if let Some(key) = input.api_key.filter(|k| !k.is_empty()) {
-        settings_repo::set(&state.db, API_KEY_SETTING, &key).await?;
-    }
+    settings_repo::set(
+        &state.db,
+        API_KEY_SETTING,
+        input.api_key.as_deref().unwrap_or_default().trim(),
+    )
+    .await?;
     Ok(())
 }
 

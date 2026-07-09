@@ -260,7 +260,7 @@ export const ipc = {
     setConfig: (input: {
       baseUrl: string;
       protocol: AiProtocol;
-      apiKey?: string;
+      apiKey: string;
     }) => invoke<void>("ai_set_config", { input }),
 
     listModels: () => invoke<string[]>("ai_list_models"),

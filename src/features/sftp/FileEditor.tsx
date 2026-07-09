@@ -33,6 +33,7 @@ import { HardDrive, Server } from "lucide-react";
 
 import { Spinner } from "@/components/ui";
 import { useTabsStore, type FileTab } from "@/workbench/tabs";
+import { registerFileEditor, unregisterFileEditor } from "./editor-registry";
 
 const editorTheme = EditorView.theme({
   "&": {
@@ -459,7 +460,8 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
       }),
       parent: hostRef.current!,
     });
-    view.focus();
+    registerFileEditor(tabId, view);
+    if (useTabsStore.getState().activeId === tabId) view.focus();
 
     let cancelled = false;
     const description = LanguageDescription.matchFilename(languages, title);
@@ -473,6 +475,7 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
 
     return () => {
       cancelled = true;
+      unregisterFileEditor(tabId);
       view.destroy();
     };
   }, [tabId, title]);

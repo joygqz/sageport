@@ -10,6 +10,7 @@ import {
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { SettingsPage } from "@/features/settings/SettingsPage";
+import { focusFileEditor } from "@/features/sftp/editor-registry";
 import { FileEditor } from "@/features/sftp/FileEditor";
 import { TerminalEditor } from "@/features/terminal/TerminalEditor";
 import { focusTerminal } from "@/features/terminal/registry";
@@ -75,6 +76,7 @@ export function EditorArea() {
       ?.querySelector(`[data-tab-id="${CSS.escape(activeId)}"]`)
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
     focusTerminal(activeId);
+    focusFileEditor(activeId);
   }, [activeId]);
 
   if (tabs.length === 0) return <Watermark />;

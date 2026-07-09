@@ -302,10 +302,3 @@
 .dark .tok-heading {
   color: #569cd6;
 }
-
-@layer components {
-  .settings-page {
-    container-type: inline-size;
-    min-width: 36rem;
-  }
-}

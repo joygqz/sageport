@@ -60,7 +60,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
   const { data: config } = useAiConfig();
   const setModel = useSetAiModel();
-  const configured = Boolean(config?.hasApiKey);
+  const configured = Boolean(config?.apiKey);
   const { data: fetchedModels } = useAiModels(configured);
   const toggleAux = useLayoutStore((s) => s.toggleAux);
   const openSettings = useTabsStore((s) => s.openSettings);

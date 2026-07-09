@@ -13,6 +13,7 @@ import {
   Field,
   Input,
   PasswordInput,
+  SectionHeader,
   Spinner,
   Switch,
 } from "@/components/ui";
@@ -81,16 +82,12 @@ export function SetupView({ status }: { status: SyncStatus }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">
-          {t("settings.sync.title")}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.sync.description")}
-        </p>
-      </div>
+      <SectionHeader
+        title={t("settings.sync.title")}
+        description={t("settings.sync.description")}
+      />
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-2">
         {SYNC_PROVIDERS.map((p) => {
           const Icon = p.icon;
           const active = p.kind === kind;

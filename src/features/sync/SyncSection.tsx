@@ -13,6 +13,7 @@ import {
   DialogTitle,
   EmptyState,
   PasswordInput,
+  SectionHeader,
   Separator,
   Spinner,
   Tooltip,
@@ -116,14 +117,10 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">
-          {t("settings.sync.title")}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.sync.connected.hint")}
-        </p>
-      </div>
+      <SectionHeader
+        title={t("settings.sync.title")}
+        description={t("settings.sync.connected.hint")}
+      />
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-input bg-surface px-4 py-3">
         <Icon className="size-6 shrink-0 text-foreground" />
@@ -184,71 +181,54 @@ function VersionsCard() {
     refetch,
   } = useSyncVersions(true);
   const [target, setTarget] = useState<SyncVersion | null>(null);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
-  const showLoading = isLoading || manualRefreshing;
-  const visibleVersions = manualRefreshing ? undefined : versions;
-
-  const doRefresh = async () => {
-    setManualRefreshing(true);
-    try {
-      await refetch();
-    } finally {
-      setManualRefreshing(false);
-    }
-  };
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <div className="flex items-center gap-1.5">
-          <h3 className="text-sm font-medium text-foreground">
-            {t("settings.sync.versions.title")}
-          </h3>
+      <SectionHeader
+        title={t("settings.sync.versions.title")}
+        description={t("settings.sync.versions.description")}
+        actions={
           <Tooltip content={t("settings.sync.versions.refreshButton")}>
             <Button
               size="icon"
               variant="ghost"
               className="size-6"
-              onClick={() => void doRefresh()}
-              disabled={isFetching || manualRefreshing}
+              onClick={() => void refetch()}
+              disabled={isFetching}
               aria-label={t("settings.sync.versions.refreshButton")}
             >
               <RefreshCw
-                className={showLoading ? "size-3.5 animate-spin" : "size-3.5"}
+                className={
+                  isFetching && !isLoading
+                    ? "size-3.5 animate-spin"
+                    : "size-3.5"
+                }
               />
             </Button>
           </Tooltip>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.sync.versions.description")}
-        </p>
-      </div>
+        }
+      />
 
-      {showLoading && (
+      {isLoading && (
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
           <Spinner />
           <span>{t("settings.sync.versions.loading")}</span>
         </div>
       )}
 
-      {!showLoading && isError && (
+      {!isLoading && isError && (
         <p className="text-sm text-destructive">
           {t("settings.sync.versions.loadError")}
         </p>
       )}
 
-      {!showLoading &&
-        !isError &&
-        (!visibleVersions || visibleVersions.length === 0) && (
-          <EmptyState
-            icon={History}
-            title={t("settings.sync.versions.empty")}
-          />
-        )}
+      {!isLoading && !isError && (!versions || versions.length === 0) && (
+        <EmptyState icon={History} title={t("settings.sync.versions.empty")} />
+      )}
 
-      {!!visibleVersions?.length && (
+      {!!versions?.length && (
         <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-input">
-          {visibleVersions.map((v, idx) => (
+          {versions.map((v, idx) => (
             <li
               key={v.id}
               className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"
@@ -395,14 +375,10 @@ function FileBackupCard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">
-          {t("settings.sync.file.title")}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.sync.file.description")}
-        </p>
-      </div>
+      <SectionHeader
+        title={t("settings.sync.file.title")}
+        description={t("settings.sync.file.description")}
+      />
 
       <div className="flex flex-wrap gap-2">
         <Button

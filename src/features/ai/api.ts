@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
-import type { AiProtocol } from "@/types/models";
+import type { AiConfig, AiProtocol } from "@/types/models";
 
 const configKey = ["ai", "config"] as const;
 const modelsKey = ["ai", "models"] as const;
@@ -26,8 +26,15 @@ export function useSetAiConfig() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ipc.ai.setConfig,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: configKey });
+    onSuccess: (_, input) => {
+      qc.setQueryData<AiConfig>(configKey, (prev) =>
+        prev
+          ? {
+              ...input,
+              model: prev.protocol === input.protocol ? prev.model : "",
+            }
+          : prev,
+      );
       qc.invalidateQueries({ queryKey: modelsKey });
     },
   });
