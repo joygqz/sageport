@@ -5,24 +5,33 @@ use crate::error::{AppError, AppResult};
 
 use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec};
 
-pub(super) fn request_body(model: &str, messages: &[ChatMessage], tools: &[ToolSpec]) -> Value {
-    let system = messages
-        .iter()
-        .find(|m| m.role == Role::System)
-        .and_then(|m| m.content.clone())
-        .unwrap_or_default();
-
-    let mut out: Vec<Value> = messages
-        .iter()
-        .filter(|m| m.role != Role::System)
-        .map(message_to_json)
-        .collect();
+pub(super) fn request_body(
+    model: &str,
+    system: &str,
+    context: Option<&str>,
+    messages: &[ChatMessage],
+    tools: &[ToolSpec],
+) -> Value {
+    let mut out: Vec<Value> = messages.iter().map(message_to_json).collect();
     merge_tool_results(&mut out);
+    mark_cache_breakpoint(&mut out);
+
+    let mut system_blocks = vec![json!({
+        "type": "text",
+        "text": system,
+        "cache_control": { "type": "ephemeral" },
+    })];
+    if let Some(ctx) = context {
+        system_blocks.push(json!({
+            "type": "text",
+            "text": format!("# Current workspace context\n{ctx}"),
+        }));
+    }
 
     let mut body = json!({
         "model": model,
         "max_tokens": super::MAX_TOKENS,
-        "system": system,
+        "system": system_blocks,
         "messages": out,
     });
     if !tools.is_empty() {
@@ -91,6 +100,27 @@ fn merge_tool_results(messages: &mut Vec<Value>) {
         merged.push(msg);
     }
     *messages = merged;
+}
+
+fn mark_cache_breakpoint(messages: &mut [Value]) {
+    let Some(last) = messages.last_mut() else {
+        return;
+    };
+    let content = &mut last["content"];
+    if let Some(text) = content.as_str() {
+        if text.is_empty() {
+            return;
+        }
+        *content = json!([{
+            "type": "text",
+            "text": text,
+            "cache_control": { "type": "ephemeral" },
+        }]);
+    } else if let Some(blocks) = content.as_array_mut() {
+        if let Some(block) = blocks.last_mut() {
+            block["cache_control"] = json!({ "type": "ephemeral" });
+        }
+    }
 }
 
 fn is_tool_result_message(v: &Value) -> bool {

@@ -35,7 +35,27 @@ export const en = {
     credentials: "Credentials",
     snippets: "Snippets",
     forwards: "Port forwarding",
+    monitor: "Monitor",
     settings: "Settings",
+  },
+
+  monitor: {
+    viewTitle: "Monitor",
+    cpu: "CPU",
+    memory: "Memory",
+    disk: "Disk",
+    cpuDetail: "Load average {load} across {count} cores",
+    network: "Network",
+    uptime: "Up {value}",
+    uptimeDh: "{d}d {h}h",
+    uptimeHm: "{h}h {m}m",
+    uptimeM: "{m}m",
+    collecting: "Collecting statistics…",
+    unsupported: "Statistics are not available for this system",
+    empty: {
+      title: "No active sessions",
+      description: "Connect to a host to see live CPU, memory, and disk usage.",
+    },
   },
 
   forwards: {
@@ -64,7 +84,7 @@ export const en = {
     },
     delete: {
       title: "Delete forward",
-      description: "This removes {name} and cannot be undone.",
+      description: "This permanently deletes {name} and cannot be undone.",
       error: "Failed to delete forward",
     },
     form: {
@@ -141,7 +161,9 @@ export const en = {
     authFailed:
       "The server rejected these credentials. Check the username, password, or key for this host.",
     connectTimedOut:
-      "The connection did not finish in time. Check the network, firewall, SSH service, or server login policy.",
+      "The connection timed out. Check your network, firewall, and the SSH service on the server.",
+    hostKeyRejected:
+      "Connection cancelled because the host key was not trusted.",
     closed: "Session ended",
     reconnect: "Reconnect",
     local: {
@@ -268,9 +290,9 @@ export const en = {
     unknownTitle: "Verify host key",
     changedTitle: "Host key changed",
     unknownDescription:
-      "You are connecting to {host} for the first time. Confirm its fingerprint before you trust it.",
+      "This is your first connection to {host}. Verify the fingerprint below to confirm the server's identity before trusting it.",
     changedDescription:
-      "The host key for {host} does not match the one on record. This can happen after a server rebuild, but it can also signal a man-in-the-middle attack.",
+      "The host key for {host} does not match the one on record. This can happen after a server rebuild, but it can also indicate a man-in-the-middle attack. Verify the fingerprint before continuing.",
     keyType: "Key type",
     fingerprint: "Fingerprint",
     reject: "Cancel",
@@ -449,6 +471,8 @@ export const en = {
       "This host is missing sign-in credentials. Add a username and password, or link a saved identity, in host settings.",
     authFailed:
       "The server rejected these credentials. Check the username, password, or key for this host.",
+    hostKeyRejected:
+      "Connection cancelled because the host key was not trusted.",
     cancelTransfer: "Cancel transfer",
     history: {
       title: "Transfer history",
@@ -478,7 +502,13 @@ export const en = {
     empty: {
       title: "Ask the assistant",
       description:
-        "It can read your terminal sessions and suggest commands. Anything it runs on a server needs your approval first.",
+        "It can connect to your hosts, read terminals, and run commands to get ops work done. Every command it runs on a server needs your approval first.",
+    },
+    suggestion: {
+      health: "Check CPU, memory, and disk usage on my server",
+      logs: "Scan the recent system logs for errors",
+      services:
+        "Show which services are running and which ports they listen on",
     },
     newChat: "New chat",
     history: "Chat history",
@@ -492,7 +522,7 @@ export const en = {
     working: "Working",
     stop: "Stop generating",
     stepLimitReached:
-      "Step limit reached. Rephrase or split the request and try again.",
+      'Reached the step limit for one run. Say "continue" to keep going.',
     inputPlaceholder: "Ask about your servers",
     commandLabel: "Command",
     error: "Assistant error",
@@ -502,6 +532,9 @@ export const en = {
     modelLabel: "Model",
     modelLoading: "Loading models",
     tool: {
+      askUser: "Ask for your choice",
+      listHosts: "List hosts",
+      connectHost: "Connect to host",
       listTerminalSessions: "List terminal sessions",
       readTerminalOutput: "Read terminal output",
       runTerminalCommand: "Run terminal command",

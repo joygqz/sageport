@@ -6,6 +6,9 @@ import {
   Eye,
   ListTree,
   Loader2,
+  MessageCircleQuestion,
+  Plug,
+  Server,
   ShieldAlert,
   Terminal as TerminalIcon,
   X,
@@ -13,17 +16,25 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { useI18n, type TKey } from "@/i18n";
+import { cn } from "@/lib/utils";
 import type { AgentLogItem, ToolStatus } from "./store";
+import { askUserOptions, askUserQuestion, selectionResult } from "./tools";
 
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
 
 const TOOL_ICON: Record<string, typeof TerminalIcon> = {
+  ask_user: MessageCircleQuestion,
+  list_hosts: Server,
+  connect_host: Plug,
   list_terminal_sessions: ListTree,
   read_terminal_output: Eye,
   run_terminal_command: TerminalIcon,
 };
 
 const TOOL_LABEL_KEY: Record<string, TKey> = {
+  ask_user: "ai.tool.askUser",
+  list_hosts: "ai.tool.listHosts",
+  connect_host: "ai.tool.connectHost",
   list_terminal_sessions: "ai.tool.listTerminalSessions",
   read_terminal_output: "ai.tool.readTerminalOutput",
   run_terminal_command: "ai.tool.runTerminalCommand",
@@ -102,6 +113,50 @@ export function ToolActivity({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+export function QuestionPrompt({
+  item,
+  onAnswer,
+}: {
+  item: ToolLogItem;
+  onAnswer: (id: string, option: string) => void;
+}) {
+  const question = askUserQuestion(item.args);
+  const options = askUserOptions(item.args);
+  const awaiting = item.status === "awaiting-input";
+  const selected = options.find((o) => item.result === selectionResult(o));
+
+  return (
+    <div className="space-y-1.5 rounded-md border border-input bg-surface p-2.5">
+      <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
+        {question}
+      </p>
+      <div className="flex flex-col gap-1.5">
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            disabled={!awaiting}
+            onClick={() => onAnswer(item.id, option)}
+            className={cn(
+              "flex items-center gap-2 rounded-md border px-3 py-1.5 text-left text-xs transition-colors",
+              awaiting
+                ? "border-input text-foreground hover:border-ring hover:bg-accent"
+                : option === selected
+                  ? "border-primary/50 bg-accent/60 text-foreground"
+                  : "border-input text-muted-foreground opacity-60",
+            )}
+          >
+            <span className="min-w-0 flex-1 break-words">{option}</span>
+            {option === selected && (
+              <Check className="size-3.5 shrink-0 text-success" />
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

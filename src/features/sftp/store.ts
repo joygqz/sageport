@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { useHostKeyStore } from "@/features/terminal/host-key";
 import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
@@ -18,6 +19,7 @@ function t(key: Parameters<typeof translate>[1]): string {
 function describeConnectError(code?: string | null, message?: string) {
   if (code === "invalid") return t("sftp.credentialsMissing");
   if (code === "auth") return t("sftp.authFailed");
+  if (code === "host_key") return t("sftp.hostKeyRejected");
   return message;
 }
 
@@ -241,6 +243,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
       const tab = pane.tabs.find((t) => t.id === tabId);
       if (tab?.kind === "remote" && tab.connectionId) {
         void ipc.sftp.disconnect(tab.connectionId).catch(() => {});
+        useHostKeyStore.getState().rejectSession(tab.connectionId);
       }
       set((s) => {
         const tabs = s.panes[side].tabs.filter((t) => t.id !== tabId);
@@ -270,6 +273,8 @@ export const useSftpStore = create<SftpState>((set, get) => {
     setSelected: (side, tabId, selected) => patchTab(side, tabId, { selected }),
 
     applyStatus: (connectionId, status, message, code) => {
+      if (status === "error" || status === "closed")
+        useHostKeyStore.getState().rejectSession(connectionId);
       const found = findByConnection(connectionId);
       if (!found) return;
       const { side, tab } = found;

@@ -1,4 +1,5 @@
 import {
+  Gauge,
   KeyRound,
   Network,
   Server,
@@ -18,6 +19,7 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "credentials", icon: KeyRound, labelKey: "activityBar.credentials" },
   { id: "snippets", icon: SquareTerminal, labelKey: "activityBar.snippets" },
   { id: "forwards", icon: Network, labelKey: "activityBar.forwards" },
+  { id: "monitor", icon: Gauge, labelKey: "activityBar.monitor" },
 ];
 
 export function ActivityBar() {

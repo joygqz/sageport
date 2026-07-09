@@ -16,7 +16,9 @@ const POLL_INTERVAL: Duration = Duration::from_secs(5);
 const UNSUPPORTED_BACKOFF: Duration = Duration::from_secs(30);
 
 const STATS_COMMAND: &str = "cat /proc/loadavg 2>/dev/null; echo ---; \
-free -b 2>/dev/null; echo ---; df -kP / 2>/dev/null; echo ---; nproc 2>/dev/null";
+free -b 2>/dev/null; echo ---; df -kP / 2>/dev/null; echo ---; nproc 2>/dev/null; echo ---; \
+cat /proc/uptime 2>/dev/null; echo ---; cat /etc/os-release 2>/dev/null; echo ---; \
+cat /proc/net/dev 2>/dev/null";
 
 #[derive(Debug, PartialEq, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +29,26 @@ pub struct HostStats {
     pub mem_total: u64,
     pub disk_used: u64,
     pub disk_total: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub os: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uptime_secs: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_rx_rate: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_tx_rate: Option<u64>,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct NetTotals {
+    pub rx: u64,
+    pub tx: u64,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Sample {
+    pub stats: HostStats,
+    pub net: Option<NetTotals>,
 }
 
 #[derive(Serialize, Clone)]
@@ -38,7 +60,49 @@ struct StatsEvent {
     unsupported: bool,
 }
 
-pub fn parse_stats(output: &str) -> Option<HostStats> {
+fn parse_uptime(section: &str) -> Option<u64> {
+    let secs: f64 = section.split_whitespace().next()?.parse().ok()?;
+    Some(secs as u64)
+}
+
+fn parse_os_release(section: &str) -> Option<String> {
+    let line = section.lines().find(|l| l.starts_with("PRETTY_NAME="))?;
+    let value = line.trim_start_matches("PRETTY_NAME=").trim();
+    let value = value.trim_matches('"');
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
+fn parse_net_dev(section: &str) -> Option<NetTotals> {
+    let mut rx = 0u64;
+    let mut tx = 0u64;
+    let mut seen = false;
+    for line in section.lines() {
+        let Some((iface, rest)) = line.split_once(':') else {
+            continue;
+        };
+        if iface.trim() == "lo" {
+            continue;
+        }
+        let cols: Vec<&str> = rest.split_whitespace().collect();
+        if cols.len() < 9 {
+            continue;
+        }
+        rx += cols[0].parse::<u64>().ok()?;
+        tx += cols[8].parse::<u64>().ok()?;
+        seen = true;
+    }
+    if seen {
+        Some(NetTotals { rx, tx })
+    } else {
+        None
+    }
+}
+
+pub fn parse_stats(output: &str) -> Option<Sample> {
     let sections: Vec<&str> = output.split("---").collect();
     if sections.len() < 4 {
         return None;
@@ -74,13 +138,20 @@ pub fn parse_stats(output: &str) -> Option<HostStats> {
 
     let cpu_count: u32 = sections[3].trim().parse().unwrap_or(1).max(1);
 
-    Some(HostStats {
-        cpu_load,
-        cpu_count,
-        mem_used,
-        mem_total,
-        disk_used,
-        disk_total,
+    Some(Sample {
+        stats: HostStats {
+            cpu_load,
+            cpu_count,
+            mem_used,
+            mem_total,
+            disk_used,
+            disk_total,
+            os: sections.get(5).and_then(|s| parse_os_release(s)),
+            uptime_secs: sections.get(4).and_then(|s| parse_uptime(s)),
+            net_rx_rate: None,
+            net_tx_rate: None,
+        },
+        net: sections.get(6).and_then(|s| parse_net_dev(s)),
     })
 }
 
@@ -123,6 +194,7 @@ async fn run_monitor(
     session_id: String,
     mut shutdown: watch::Receiver<bool>,
 ) {
+    let mut prev_net: Option<(std::time::Instant, NetTotals)> = None;
     loop {
         let Some(conn) = sessions.connection(&session_id) else {
             break;
@@ -130,11 +202,23 @@ async fn run_monitor(
 
         let interval = match exec_capture(&conn.handle, STATS_COMMAND).await {
             Ok(output) => match parse_stats(&output.stdout) {
-                Some(stats) => {
-                    emit(&app, &session_id, Some(stats));
+                Some(mut sample) => {
+                    let now = std::time::Instant::now();
+                    if let (Some(net), Some((then, prev))) = (sample.net, prev_net) {
+                        let secs = now.duration_since(then).as_secs_f64();
+                        if secs > 0.0 && net.rx >= prev.rx && net.tx >= prev.tx {
+                            sample.stats.net_rx_rate =
+                                Some(((net.rx - prev.rx) as f64 / secs) as u64);
+                            sample.stats.net_tx_rate =
+                                Some(((net.tx - prev.tx) as f64 / secs) as u64);
+                        }
+                    }
+                    prev_net = sample.net.map(|net| (now, net));
+                    emit(&app, &session_id, Some(sample.stats));
                     POLL_INTERVAL
                 }
                 None => {
+                    prev_net = None;
                     emit(&app, &session_id, None);
                     UNSUPPORTED_BACKOFF
                 }
@@ -177,13 +261,52 @@ Filesystem     1024-blocks      Used Available Capacity Mounted on\n\
 /dev/disk1s1     500000000 200000000 300000000      40% /\n\
 ---\n\
 8\n";
-        let stats = parse_stats(output).expect("parsed");
+        let sample = parse_stats(output).expect("parsed");
+        let stats = sample.stats;
         assert_eq!(stats.cpu_load, 0.52);
         assert_eq!(stats.cpu_count, 8);
         assert_eq!(stats.mem_total, 16000000000);
         assert_eq!(stats.mem_used, 8000000000);
         assert_eq!(stats.disk_total, 500000000 * 1024);
         assert_eq!(stats.disk_used, 200000000 * 1024);
+        assert_eq!(stats.os, None);
+        assert_eq!(stats.uptime_secs, None);
+        assert_eq!(sample.net, None);
+    }
+
+    #[test]
+    fn parses_extended_stats() {
+        let output = "0.52 0.48 0.44 1/234 5678\n\
+---\n\
+              total        used        free\n\
+Mem:    16000000000  8000000000  4000000000\n\
+---\n\
+Filesystem     1024-blocks      Used Available Capacity Mounted on\n\
+/dev/disk1s1     500000000 200000000 300000000      40% /\n\
+---\n\
+8\n\
+---\n\
+123456.78 987654.32\n\
+---\n\
+NAME=\"Ubuntu\"\n\
+PRETTY_NAME=\"Ubuntu 22.04.4 LTS\"\n\
+VERSION_ID=\"22.04\"\n\
+---\n\
+Inter-|   Receive                                                |  Transmit\n\
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n\
+    lo: 9000000    1000    0    0    0     0          0         0  9000000    1000    0    0    0     0       0          0\n\
+  eth0: 5000000    4000    0    0    0     0          0         0  3000000    2000    0    0    0     0       0          0\n\
+  eth1: 1000000    2000    0    0    0     0          0         0   500000    1000    0    0    0     0       0          0\n";
+        let sample = parse_stats(output).expect("parsed");
+        assert_eq!(sample.stats.uptime_secs, Some(123456));
+        assert_eq!(sample.stats.os.as_deref(), Some("Ubuntu 22.04.4 LTS"));
+        assert_eq!(
+            sample.net,
+            Some(NetTotals {
+                rx: 6000000,
+                tx: 3500000
+            })
+        );
     }
 
     #[test]

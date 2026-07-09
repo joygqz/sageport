@@ -51,6 +51,10 @@ export interface HostStats {
   memTotal: number;
   diskUsed: number;
   diskTotal: number;
+  os?: string;
+  uptimeSecs?: number;
+  netRxRate?: number;
+  netTxRate?: number;
 }
 
 export interface MonitorStatsEvent {

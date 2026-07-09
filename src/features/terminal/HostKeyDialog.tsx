@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ShieldAlert, ShieldQuestion } from "lucide-react";
 
 import {
@@ -8,27 +8,21 @@ import {
   DialogToolbar,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { ipc } from "@/lib/ipc";
-import { cn } from "@/lib/utils";
-import type { HostKeyDecision, HostKeyEvent } from "@/types/models";
+import type { HostKeyDecision } from "@/types/models";
+import { listenHostKeyEvents, useHostKeyStore } from "./host-key";
 
 export function HostKeyDialog() {
   const { t } = useI18n();
-  const [queue, setQueue] = useState<HostKeyEvent[]>([]);
+  const queue = useHostKeyStore((s) => s.queue);
+  const respondTo = useHostKeyStore((s) => s.respond);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let disposed = false;
-    void ipc.ssh
-      .onHostKey((event) =>
-        setQueue((q) =>
-          q.some((e) => e.promptId === event.promptId) ? q : [...q, event],
-        ),
-      )
-      .then((un) => {
-        if (disposed) un();
-        else unlisten = un;
-      });
+    void listenHostKeyEvents().then((un) => {
+      if (disposed) un();
+      else unlisten = un;
+    });
     return () => {
       disposed = true;
       unlisten?.();
@@ -39,8 +33,7 @@ export function HostKeyDialog() {
 
   const respond = (decision: HostKeyDecision) => {
     if (!current) return;
-    void ipc.ssh.respondHostKey(current.promptId, decision).catch(() => {});
-    setQueue((q) => q.filter((e) => e.promptId !== current.promptId));
+    respondTo(current.promptId, decision);
   };
 
   const changed = current?.status === "changed";
@@ -60,41 +53,32 @@ export function HostKeyDialog() {
               {changed ? t("hostKey.changedTitle") : t("hostKey.unknownTitle")}
             </DialogToolbar>
             <div className="flex flex-col gap-4 p-5">
-              <div className="flex gap-3">
-                <div
-                  className={cn(
-                    "mt-0.5 shrink-0",
-                    changed ? "text-destructive" : "text-muted-foreground",
-                  )}
-                >
-                  {changed ? (
-                    <ShieldAlert className="size-5" />
-                  ) : (
-                    <ShieldQuestion className="size-5" />
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {t(
-                    changed
-                      ? "hostKey.changedDescription"
-                      : "hostKey.unknownDescription",
-                    { host: `${current.host}:${current.port}` },
-                  )}
-                </p>
-              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {changed ? (
+                  <ShieldAlert className="float-left mr-2 mt-[3px] size-4 text-destructive" />
+                ) : (
+                  <ShieldQuestion className="float-left mr-2 mt-[3px] size-4 text-muted-foreground" />
+                )}
+                {t(
+                  changed
+                    ? "hostKey.changedDescription"
+                    : "hostKey.unknownDescription",
+                  { host: `${current.host}:${current.port}` },
+                )}
+              </p>
 
-              <dl className="rounded-md border border-input bg-surface p-3 text-xs">
-                <div className="flex justify-between gap-4 py-0.5">
+              <dl className="flex flex-col gap-2 rounded-md border border-input bg-surface p-3 text-xs">
+                <div className="flex flex-col gap-1">
                   <dt className="text-muted-foreground">
                     {t("hostKey.keyType")}
                   </dt>
-                  <dd className="font-mono">{current.keyType}</dd>
+                  <dd className="select-text font-mono">{current.keyType}</dd>
                 </div>
-                <div className="flex justify-between gap-4 py-0.5">
-                  <dt className="shrink-0 text-muted-foreground">
+                <div className="flex flex-col gap-1">
+                  <dt className="text-muted-foreground">
                     {t("hostKey.fingerprint")}
                   </dt>
-                  <dd className="break-all text-right font-mono">
+                  <dd className="select-text break-all font-mono">
                     {current.fingerprint}
                   </dd>
                 </div>

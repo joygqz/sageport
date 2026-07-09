@@ -15,10 +15,8 @@ use sqlx::{Executor, Sqlite, SqlitePool};
 
 use crate::crypto::{self, EncryptedEnvelope};
 use crate::domain::{now, Group, Host, Identity, PortForward, SftpBookmark, Snippet, SshKey};
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::repository::settings_repo;
-
-const SNAPSHOT_VERSION: u32 = 7;
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["sync.", "update."];
 
@@ -33,12 +31,16 @@ pub struct SettingEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultSnapshot {
-    pub version: u32,
     pub exported_at: String,
+    #[serde(default)]
     pub groups: Vec<Group>,
+    #[serde(default)]
     pub hosts: Vec<Host>,
+    #[serde(default)]
     pub identities: Vec<Identity>,
+    #[serde(default)]
     pub keys: Vec<SshKey>,
+    #[serde(default)]
     pub snippets: Vec<Snippet>,
     #[serde(default)]
     pub settings: Vec<SettingEntry>,
@@ -124,7 +126,6 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
         .collect();
 
     Ok(VaultSnapshot {
-        version: SNAPSHOT_VERSION,
         exported_at: now(),
         groups,
         hosts,
@@ -138,7 +139,6 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
 }
 
 pub async fn import_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
-    validate_snapshot(snapshot)?;
     let mut tx = pool.begin().await?;
     sqlx::query("PRAGMA defer_foreign_keys = ON")
         .execute(&mut *tx)
@@ -183,9 +183,7 @@ pub fn decrypt_snapshot(
     passphrase: &str,
 ) -> AppResult<VaultSnapshot> {
     let bytes = crypto::decrypt(envelope, passphrase)?;
-    let snapshot: VaultSnapshot = serde_json::from_slice(&bytes)?;
-    validate_snapshot(&snapshot)?;
-    Ok(snapshot)
+    Ok(serde_json::from_slice(&bytes)?)
 }
 
 pub async fn import_encrypted(
@@ -199,7 +197,6 @@ pub async fn import_encrypted(
 }
 
 pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
-    validate_snapshot(snapshot)?;
     let mut tx = pool.begin().await?;
     sqlx::query("PRAGMA defer_foreign_keys = ON")
         .execute(&mut *tx)
@@ -271,16 +268,6 @@ pub fn write_envelope_file(path: &Path, envelope: &EncryptedEnvelope) -> AppResu
 pub fn read_envelope_file(path: &Path) -> AppResult<EncryptedEnvelope> {
     let bytes = std::fs::read(path)?;
     Ok(serde_json::from_slice(&bytes)?)
-}
-
-fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
-    if snapshot.version != SNAPSHOT_VERSION {
-        return Err(AppError::Invalid(format!(
-            "unsupported vault version {}",
-            snapshot.version
-        )));
-    }
-    Ok(())
 }
 
 async fn fetch_all<T>(pool: &SqlitePool, table: &str) -> AppResult<Vec<T>>

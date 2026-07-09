@@ -93,10 +93,16 @@ async fn run_forward(
 ) {
     emit(&app, &spec.id, "starting", None);
 
-    let conn = match establish(&app, &prompts, &spec.id, &spec.hops).await {
-        Ok(conn) => Arc::new(conn),
-        Err(e) => {
-            emit(&app, &spec.id, "error", Some(e.to_string()));
+    let conn = tokio::select! {
+        result = establish(&app, &prompts, &spec.id, &spec.hops) => match result {
+            Ok(conn) => Arc::new(conn),
+            Err(e) => {
+                emit(&app, &spec.id, "error", Some(e.to_string()));
+                return;
+            }
+        },
+        _ = shutdown.changed() => {
+            emit(&app, &spec.id, "stopped", None);
             return;
         }
     };

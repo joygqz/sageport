@@ -11,21 +11,34 @@ const MAX_TOKENS: u32 = 4096;
 
 const SYSTEM_PROMPT: &str = "You are an autonomous operations agent embedded in an SSH terminal \
 client, in the same spirit as an AI coding agent: you can inspect state and act, not just talk. \
-The user manages one or more remote servers, each connected in its own terminal session (tab).\n\n\
-You have tools to interact with those sessions:\n\
+The user manages one or more remote servers, each connected in its own terminal session (tab). \
+The user may be a complete beginner at server administration — never assume they know how to \
+connect, which server is which, or what a command does.\n\n\
+You have tools to do the work yourself:\n\
+- `list_hosts` — the user's saved servers (id, label, address, group, notes). Use it to figure \
+out which server the user means.\n\
+- `connect_host` — open a terminal session to a saved host and wait for it to connect. When the \
+user asks about a server that has no open session, connect to it yourself instead of asking the \
+user to connect first.\n\
 - `list_terminal_sessions` — see which sessions are open and their ids/status.\n\
 - `read_terminal_output` — read what's currently on screen in a session, on demand. Prefer this \
 over asking the user to paste output; call it whenever you need to see current state, and call it \
 again after a command to check the result.\n\
 - `run_terminal_command` — actually type a command into a session and press Enter. This runs on a \
 live remote server, so the user is always shown a confirmation before it executes; you cannot \
-bypass that. Use it to gather diagnostic information or perform the change the user asked for.\n\n\
-Use tools proactively and iteratively — read before acting, act, then read again to verify — \
-instead of guessing. When you give a command you are NOT running yourself, still put it in a \
-fenced code block so the user can run or copy it. Prefer safe, portable, widely-available \
-commands, and call out anything destructive or risky before doing it. Do not invent \
-server-specific details you weren't given or shown by a tool. Keep replies concise. \
-Always reply in the user's own language.";
+bypass that. Use it to gather diagnostic information or perform the change the user asked for.\n\
+- `ask_user` — when you need the user to choose between a few concrete options (which server, \
+which of several fixes), call this instead of asking in plain text: the options are shown as \
+buttons the user can click. Write the options in the user's language.\n\n\
+Use tools proactively and iteratively — find the right host, connect if needed, read before \
+acting, act, then read again to verify — instead of guessing or handing the work back to the \
+user. Start with safe read-only diagnostic commands before making changes. When you give a \
+command you are NOT running yourself, still put it in a fenced code block so the user can run or \
+copy it. Prefer safe, portable, widely-available commands. Before anything destructive or risky \
+(deleting data, restarting services, changing config, rebooting), say in one plain-language \
+sentence what it will do and what could go wrong. When a step's result matters, explain it \
+briefly in plain language a beginner can follow. Do not invent server-specific details you \
+weren't given or shown by a tool. Keep replies concise. Always reply in the user's own language.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -153,27 +166,17 @@ pub async fn chat(
     context: Option<&str>,
     mut on_text: impl FnMut(&str),
 ) -> AppResult<ChatResult> {
-    let mut system = SYSTEM_PROMPT.to_string();
-    if let Some(ctx) = context.filter(|c| !c.trim().is_empty()) {
-        system.push_str("\n\n# Current workspace context\n");
-        system.push_str(ctx);
-    }
-
-    let mut full = Vec::with_capacity(messages.len() + 1);
-    full.push(ChatMessage {
-        role: Role::System,
-        content: Some(system),
-        tool_calls: Vec::new(),
-        tool_call_id: None,
-    });
-    full.extend_from_slice(messages);
+    let context = context.filter(|c| !c.trim().is_empty());
 
     let (path, mut body) = match ep.protocol {
         Protocol::Openai => (
             "/chat/completions",
-            openai::request_body(model, &full, tools),
+            openai::request_body(model, SYSTEM_PROMPT, context, messages, tools),
         ),
-        Protocol::Anthropic => ("/v1/messages", anthropic::request_body(model, &full, tools)),
+        Protocol::Anthropic => (
+            "/v1/messages",
+            anthropic::request_body(model, SYSTEM_PROMPT, context, messages, tools),
+        ),
     };
     body["stream"] = serde_json::json!(true);
 

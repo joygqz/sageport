@@ -37,7 +37,27 @@ export const zhCN: Dictionary = {
     credentials: "凭据",
     snippets: "命令片段",
     forwards: "端口转发",
+    monitor: "监控",
     settings: "设置",
+  },
+
+  monitor: {
+    viewTitle: "监控",
+    cpu: "CPU",
+    memory: "内存",
+    disk: "磁盘",
+    cpuDetail: "平均负载 {load}，共 {count} 核",
+    network: "网络",
+    uptime: "已运行 {value}",
+    uptimeDh: "{d} 天 {h} 小时",
+    uptimeHm: "{h} 小时 {m} 分钟",
+    uptimeM: "{m} 分钟",
+    collecting: "正在采集统计信息…",
+    unsupported: "该系统暂不支持统计信息",
+    empty: {
+      title: "暂无活动会话",
+      description: "连接主机后可实时查看 CPU、内存和磁盘占用。",
+    },
   },
 
   forwards: {
@@ -66,7 +86,7 @@ export const zhCN: Dictionary = {
     },
     delete: {
       title: "删除转发",
-      description: "将删除 {name}，且无法撤销。",
+      description: "将永久删除 {name}，此操作无法撤销。",
       error: "删除转发失败",
     },
     form: {
@@ -141,8 +161,8 @@ export const zhCN: Dictionary = {
       "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
     authFailed:
       "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
-    connectTimedOut:
-      "连接未能及时完成，请检查网络、防火墙、SSH 服务或服务器登录策略。",
+    connectTimedOut: "连接超时，请检查网络、防火墙或服务器上的 SSH 服务。",
+    hostKeyRejected: "已取消连接：未信任该主机的密钥。",
     closed: "会话已结束",
     reconnect: "重新连接",
     local: {
@@ -265,9 +285,10 @@ export const zhCN: Dictionary = {
   hostKey: {
     unknownTitle: "验证主机密钥",
     changedTitle: "主机密钥已变更",
-    unknownDescription: "你是首次连接 {host}。信任之前，请先核对其指纹。",
+    unknownDescription:
+      "首次连接 {host}，尚未记录其主机密钥。请核对下方指纹，确认服务器身份后再信任。",
     changedDescription:
-      "{host} 的主机密钥与记录不符。这可能是服务器重装所致，但也可能意味着中间人攻击。",
+      "{host} 的主机密钥与本机记录不一致。这可能是服务器重装所致，也可能存在中间人攻击，请核对指纹后再继续。",
     keyType: "密钥类型",
     fingerprint: "指纹",
     reject: "取消",
@@ -442,6 +463,7 @@ export const zhCN: Dictionary = {
       "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
     authFailed:
       "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
+    hostKeyRejected: "已取消连接：未信任该主机的密钥。",
     cancelTransfer: "取消传输",
     history: {
       title: "传输历史",
@@ -470,7 +492,12 @@ export const zhCN: Dictionary = {
     empty: {
       title: "向助手提问",
       description:
-        "助手可以读取终端会话并给出命令建议，任何在服务器上执行的操作都需要你先确认。",
+        "助手可以自己连接你的主机、读取终端并执行命令来完成运维任务，任何在服务器上执行的命令都需要你先确认。",
+    },
+    suggestion: {
+      health: "检查服务器的 CPU、内存和磁盘使用情况",
+      logs: "分析最近的系统日志，找出报错和异常",
+      services: "看看有哪些服务在运行、监听了哪些端口",
     },
     newChat: "新对话",
     history: "对话历史",
@@ -483,7 +510,7 @@ export const zhCN: Dictionary = {
     },
     working: "处理中",
     stop: "停止生成",
-    stepLimitReached: "已达到步骤上限，请换个说法或拆分请求后重试。",
+    stepLimitReached: "已达到单次运行的步骤上限，回复「继续」可以接着执行。",
     inputPlaceholder: "询问服务器相关问题",
     commandLabel: "命令",
     error: "助手出错",
@@ -493,6 +520,9 @@ export const zhCN: Dictionary = {
     modelLabel: "模型",
     modelLoading: "正在加载模型",
     tool: {
+      askUser: "请求你选择",
+      listHosts: "列出主机",
+      connectHost: "连接主机",
       listTerminalSessions: "列出终端会话",
       readTerminalOutput: "读取终端输出",
       runTerminalCommand: "运行终端命令",

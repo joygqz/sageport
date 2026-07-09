@@ -22,17 +22,19 @@ Sageport consolidates the tools of routine server operations — terminal, file 
 
 ## Features
 
-**Terminal** — GPU-accelerated rendering via xterm.js with WebGL, built on a pure-Rust SSH stack (russh). Tabbed concurrent sessions that persist in the background without reflow, keepalives with one-click reconnect, scrollback search (<kbd>⌘</kbd> <kbd>F</kbd>), clickable links, and full Unicode support. Inline autocomplete suggests commands from your history as you type, input can be broadcast to every connected session at once, and a status-bar monitor shows live CPU, memory, and disk usage for the active host.
+**Terminal** — GPU-accelerated rendering via xterm.js with WebGL, built on a pure-Rust SSH stack (russh). Tabbed concurrent sessions that persist in the background without reflow, keepalives with one-click reconnect, scrollback search (<kbd>⌘</kbd> <kbd>F</kbd>), clickable links, and full Unicode support. Inline autocomplete suggests commands from your history as you type, and input can be broadcast to every connected session at once. Local shell tabs run alongside SSH sessions, and typing `user@host` in the command palette connects immediately — no saved host required.
 
 **Hosts & credentials** — Hosts organized into collapsible groups with live connection indicators, jump-host (ProxyJump) chains, per-host startup commands, and one-click import from your existing `~/.ssh/config`. Connections verify host keys on first use and support the system SSH agent. Credentials are decoupled from hosts, so one identity can be reused across servers. The built-in key manager generates and imports Ed25519, RSA, and ECDSA keys in OpenSSH format, with optional passphrase protection.
 
-**File transfer** — Dual-pane browser where each pane can show the local filesystem or an SFTP connection. Drag-and-drop transfer in both directions, in-transit archiving for directories with many small files, a permissions editor, path bookmarks, and a complete transfer history.
+**File transfer & editing** — Dual-pane browser where each pane can show the local filesystem or an SFTP connection. Drag-and-drop transfer in both directions, in-transit archiving for directories with many small files, a permissions editor, path bookmarks, and a complete transfer history. Text files open in an editor tab with syntax highlighting and save straight back over SFTP.
+
+**Monitoring** — A dedicated sidebar shows live CPU, memory, disk, and network statistics for connected hosts, with a compact summary for the active host in the status bar.
 
 **Port forwarding** — Local (`-L`) and dynamic SOCKS (`-D`) tunnels with start/stop control, live status, and optional auto-start on launch — routed over jump-host chains when configured.
 
 **Snippets** — Frequently used commands with `{{variable}}` placeholders, sent to the active terminal or run across many hosts at once with per-host results.
 
-**AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model. The assistant can list open sessions, read terminal output, and propose commands — every remote command requires explicit confirmation before it runs. Conversations are stored locally.
+**AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model, with prompt caching to cut token costs. The assistant works with your workbench through tools: it can list saved hosts, open connections, inspect terminal output, and propose commands — every remote command requires explicit confirmation before it runs, and when a decision is ambiguous it asks you to pick from options instead of guessing. Conversations are stored locally.
 
 **Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials — encrypted end to end with a passphrase-derived key. Only ciphertext ever leaves the device. Syncs hosts, credentials, snippets, port forwards, bookmarks, and interface preferences (locale, theme, zoom). Automatic last-write-wins conflict resolution, revision history with restore, and encrypted export/import for offline backups.
 
@@ -52,7 +54,7 @@ The application updates itself; the status bar indicates when a new version is a
 
 ## Quick start
 
-1. **Add a host** — <kbd>⌘</kbd> <kbd>N</kbd>, then enter the address and choose password or key authentication.
+1. **Add a host** — <kbd>⌘</kbd> <kbd>N</kbd>, then enter the address and choose password or key authentication — or just type `user@host` in the command palette to connect right away.
 2. **Connect** — <kbd>⌘</kbd> <kbd>P</kbd>, type the host name, press Enter.
 3. **Transfer files** — <kbd>⌘</kbd> <kbd>J</kbd> opens the dual-pane file panel.
 4. **AI assistant** (optional) — set an API key under *Settings → AI*, then <kbd>⌘</kbd> <kbd>L</kbd> to chat.
@@ -77,7 +79,7 @@ pnpm tauri dev      # run in development mode
 pnpm tauri build    # build installers
 ```
 
-Additional scripts: `pnpm lint`, `pnpm typecheck`, `pnpm format`.
+Additional scripts: `pnpm lint`, `pnpm typecheck`, `pnpm format`, `pnpm test`.
 
 ### Project layout
 
@@ -86,7 +88,7 @@ src/
   workbench/    Shell: activity bar, side bar, editor tabs, panel,
                 status bar, command palette, keybindings
   features/     One folder per domain: hosts, terminal, sftp, snippets,
-                credentials, ai, sync, settings, updates
+                credentials, forwards, monitor, ai, sync, settings, updates
   themes/       Theme definitions applied as CSS variables and shared with xterm
   components/   Reusable UI primitives
   lib/ipc.ts    Typed facade over all Tauri commands and events
@@ -96,6 +98,7 @@ src-tauri/src/
   commands/     Thin Tauri command handlers
   repository/   SQLite persistence per entity
   ssh/ sftp/    russh session, SFTP, forwarding, and monitoring engines
+  pty/          Local shell sessions via portable-pty
   sync/ crypto/ Vault snapshot, provider clients (Gist, Drive, OneDrive,
                 WebDAV, S3), OAuth, Argon2id + AES-256-GCM
   ai/           Anthropic and OpenAI-compatible chat clients
