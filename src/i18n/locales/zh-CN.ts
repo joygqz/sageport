@@ -541,6 +541,8 @@ export const zhCN: Dictionary = {
       themeTitle: "主题",
       themeDescription:
         "选择 Sageport 的外观。每套主题都会应用到整个界面，包括终端。",
+      darkThemes: "深色主题",
+      lightThemes: "浅色主题",
       language: "语言",
       languageHint: "设置应用的显示语言。",
       zoom: "缩放",
@@ -552,17 +554,14 @@ export const zhCN: Dictionary = {
     ai: {
       title: "AI 服务商",
       description:
-        "使用你自己的 API 密钥，支持 Anthropic 和任意 OpenAI 兼容接口。",
+        "使用你自己的 API 密钥，支持 Anthropic 和任意 OpenAI 兼容接口。修改会自动保存。",
       protocolLabel: "接口格式",
       protocol_openai: "OpenAI 兼容",
       protocol_anthropic: "Anthropic 兼容",
       baseUrlLabel: "接口地址",
       baseUrlHint: "OpenAI 兼容接口的地址通常以 /v1 结尾。",
       apiKeyLabel: "API 密钥",
-      apiKeyHint: "仅存储在本设备上。",
-      apiKeyHintSaved: "已保存密钥，输入新密钥可替换。",
-      apiKeyPlaceholderSaved: "••••••••",
-      saved: "配置已保存",
+      apiKeyHint: "仅在启用同步时随加密备份离开本设备。",
       saveError: "保存配置失败",
     },
     sync: {

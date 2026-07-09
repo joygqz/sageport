@@ -553,6 +553,8 @@ export const en = {
       themeTitle: "Theme",
       themeDescription:
         "Choose how Sageport looks. Each theme styles the whole interface, including the terminal.",
+      darkThemes: "Dark themes",
+      lightThemes: "Light themes",
       language: "Language",
       languageHint: "Sets the display language of the app.",
       zoom: "Zoom",
@@ -565,17 +567,15 @@ export const en = {
     ai: {
       title: "AI provider",
       description:
-        "Bring your own API key. Works with Anthropic and any OpenAI compatible endpoint.",
+        "Bring your own API key. Works with Anthropic and any OpenAI compatible endpoint. Changes are saved automatically.",
       protocolLabel: "API format",
       protocol_openai: "OpenAI compatible",
       protocol_anthropic: "Anthropic compatible",
       baseUrlLabel: "Base URL",
       baseUrlHint: "OpenAI compatible endpoints usually end with /v1.",
       apiKeyLabel: "API key",
-      apiKeyHint: "Stored on this device only.",
-      apiKeyHintSaved: "A key is saved. Enter a new one to replace it.",
-      apiKeyPlaceholderSaved: "••••••••",
-      saved: "Configuration saved",
+      apiKeyHint:
+        "Leaves this device only inside encrypted backups when sync is enabled.",
       saveError: "Failed to save configuration",
     },
     sync: {

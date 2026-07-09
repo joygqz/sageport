@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Info, Minus, Palette, Plus, RefreshCw, Sparkles } from "lucide-react";
 
 import {
@@ -7,6 +7,7 @@ import {
   Input,
   Kbd,
   ScrollArea,
+  SectionHeader,
   SegmentedControl,
   Select,
   Tooltip,
@@ -44,7 +45,7 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
   const setSection = useTabsStore((s) => s.setSettingsSection);
 
   return (
-    <div className="settings-page flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-background">
       <div className="shrink-0 border-b border-border p-3">
         <SegmentedControl
           value={section}
@@ -65,7 +66,7 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
       </div>
 
       <ScrollArea className="min-h-0 min-w-0 flex-1">
-        <div className="settings-content flex min-w-0 max-w-2xl flex-col gap-6 p-6">
+        <div className="flex w-full min-w-0 flex-col gap-6 p-6">
           {section === "appearance" && <AppearanceSection />}
           {section === "ai" && <AiSection />}
           {section === "sync" && <SyncSection />}
@@ -80,27 +81,41 @@ function AppearanceSection() {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">
-          {t("settings.appearance.themeTitle")}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.appearance.themeDescription")}
-        </p>
-      </div>
+  const groups = [
+    {
+      labelKey: "settings.appearance.darkThemes" as TKey,
+      themes: THEMES.filter((candidate) => candidate.appearance === "dark"),
+    },
+    {
+      labelKey: "settings.appearance.lightThemes" as TKey,
+      themes: THEMES.filter((candidate) => candidate.appearance === "light"),
+    },
+  ];
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-3">
-        {THEMES.map((candidate) => (
-          <ThemeCard
-            key={candidate.id}
-            theme={candidate}
-            active={candidate.id === theme.id}
-            onSelect={() => setTheme(candidate.id)}
-          />
-        ))}
-      </div>
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionHeader
+        title={t("settings.appearance.themeTitle")}
+        description={t("settings.appearance.themeDescription")}
+      />
+
+      {groups.map((group) => (
+        <div key={group.labelKey} className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {t(group.labelKey)}
+          </p>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-3">
+            {group.themes.map((candidate) => (
+              <ThemeCard
+                key={candidate.id}
+                theme={candidate}
+                active={candidate.id === theme.id}
+                onSelect={() => setTheme(candidate.id)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
 
       <Field
         label={t("settings.appearance.language")}
@@ -257,37 +272,53 @@ function AiForm({ config }: { config: AiConfig }) {
   const setConfig = useSetAiConfig();
   const [protocol, setProtocol] = useState<AiProtocol>(config.protocol);
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, setApiKey] = useState(config.apiKey);
+  const mutate = setConfig.mutate;
+  const skipSave = useRef(true);
+  const pendingSave = useRef<{
+    baseUrl: string;
+    protocol: AiProtocol;
+    apiKey: string;
+  } | null>(null);
 
   const changeProtocol = (next: AiProtocol) => {
     setProtocol(next);
     setBaseUrl(defaultBaseUrl(next));
   };
 
-  const save = async () => {
-    try {
-      await setConfig.mutateAsync({
-        baseUrl,
-        protocol,
-        apiKey: apiKey || undefined,
-      });
-      setApiKey("");
-      toast.success(t("settings.ai.saved"));
-    } catch (err) {
-      toast.error(t("settings.ai.saveError"), errorMessage(err));
+  useEffect(() => {
+    if (skipSave.current) {
+      skipSave.current = false;
+      return;
     }
-  };
+    pendingSave.current = { baseUrl, protocol, apiKey };
+    const timer = setTimeout(() => {
+      pendingSave.current = null;
+      mutate(
+        { baseUrl, protocol, apiKey },
+        {
+          onError: (err) =>
+            toast.error(t("settings.ai.saveError"), errorMessage(err)),
+        },
+      );
+    }, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [protocol, baseUrl, apiKey]);
+
+  useEffect(
+    () => () => {
+      if (pendingSave.current) mutate(pendingSave.current);
+    },
+    [mutate],
+  );
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">
-          {t("settings.ai.title")}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.ai.description")}
-        </p>
-      </div>
+      <SectionHeader
+        title={t("settings.ai.title")}
+        description={t("settings.ai.description")}
+      />
 
       <Field label={t("settings.ai.protocolLabel")}>
         <Select
@@ -317,31 +348,16 @@ function AiForm({ config }: { config: AiConfig }) {
 
       <Field
         label={t("settings.ai.apiKeyLabel")}
-        hint={
-          config.hasApiKey
-            ? t("settings.ai.apiKeyHintSaved")
-            : t("settings.ai.apiKeyHint")
-        }
+        hint={t("settings.ai.apiKeyHint")}
       >
         <Input
-          type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder={
-            config.hasApiKey ? t("settings.ai.apiKeyPlaceholderSaved") : "sk-…"
-          }
+          placeholder="sk-…"
           autoComplete="off"
+          spellCheck={false}
         />
       </Field>
-
-      <Button
-        className="self-start"
-        onClick={save}
-        disabled={!baseUrl || (!apiKey && !config.hasApiKey)}
-        loading={setConfig.isPending}
-      >
-        {t("common.save")}
-      </Button>
     </div>
   );
 }

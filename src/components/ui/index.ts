@@ -18,6 +18,7 @@ export * from "./badge";
 export * from "./spinner";
 export * from "./kbd";
 export * from "./empty-state";
+export * from "./section-header";
 export * from "./segmented-control";
 export * from "./select";
 export * from "./resize-handle";
