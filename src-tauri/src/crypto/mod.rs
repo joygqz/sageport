@@ -8,18 +8,24 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 
-const VERSION: u32 = 1;
+const KDF_ARGON2ID: &str = "argon2id";
+const CIPHER_AES256_GCM: &str = "aes-256-gcm";
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 const KEY_LEN: usize = 32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedEnvelope {
-    pub version: u32,
     pub kdf: String,
+    #[serde(default = "default_cipher")]
+    pub cipher: String,
     pub salt: String,
     pub nonce: String,
     pub ciphertext: String,
+}
+
+fn default_cipher() -> String {
+    CIPHER_AES256_GCM.to_string()
 }
 
 fn derive_key(passphrase: &str, salt: &[u8]) -> AppResult<[u8; KEY_LEN]> {
@@ -43,8 +49,8 @@ pub fn encrypt(plaintext: &[u8], passphrase: &str) -> AppResult<EncryptedEnvelop
         .map_err(|e| AppError::Crypto(e.to_string()))?;
 
     Ok(EncryptedEnvelope {
-        version: VERSION,
-        kdf: "argon2id".to_string(),
+        kdf: KDF_ARGON2ID.to_string(),
+        cipher: CIPHER_AES256_GCM.to_string(),
         salt: STANDARD.encode(salt),
         nonce: STANDARD.encode(nonce_bytes),
         ciphertext: STANDARD.encode(ciphertext),
@@ -52,10 +58,16 @@ pub fn encrypt(plaintext: &[u8], passphrase: &str) -> AppResult<EncryptedEnvelop
 }
 
 pub fn decrypt(envelope: &EncryptedEnvelope, passphrase: &str) -> AppResult<Vec<u8>> {
-    if envelope.version != VERSION {
+    if envelope.kdf != KDF_ARGON2ID {
         return Err(AppError::Crypto(format!(
-            "unsupported vault version {}",
-            envelope.version
+            "unsupported kdf {}",
+            envelope.kdf
+        )));
+    }
+    if envelope.cipher != CIPHER_AES256_GCM {
+        return Err(AppError::Crypto(format!(
+            "unsupported cipher {}",
+            envelope.cipher
         )));
     }
     let salt = STANDARD
@@ -73,4 +85,32 @@ pub fn decrypt(envelope: &EncryptedEnvelope, passphrase: &str) -> AppResult<Vec<
     cipher
         .decrypt(Nonce::from_slice(&nonce_bytes), ciphertext.as_ref())
         .map_err(|_| AppError::Crypto("decryption failed (wrong passphrase?)".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encrypt_decrypt_roundtrip() {
+        let envelope = encrypt(b"vault data", "passphrase").unwrap();
+        assert_eq!(decrypt(&envelope, "passphrase").unwrap(), b"vault data");
+    }
+
+    #[test]
+    fn legacy_envelope_with_version_and_no_cipher_decrypts() {
+        let envelope = encrypt(b"vault data", "passphrase").unwrap();
+        let mut json: serde_json::Value = serde_json::to_value(&envelope).unwrap();
+        json.as_object_mut().unwrap().remove("cipher");
+        json["version"] = serde_json::json!(1);
+        let legacy: EncryptedEnvelope = serde_json::from_value(json).unwrap();
+        assert_eq!(decrypt(&legacy, "passphrase").unwrap(), b"vault data");
+    }
+
+    #[test]
+    fn unknown_config_is_rejected() {
+        let mut envelope = encrypt(b"vault data", "passphrase").unwrap();
+        envelope.cipher = "xchacha20-poly1305".into();
+        assert!(decrypt(&envelope, "passphrase").is_err());
+    }
 }
