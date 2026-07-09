@@ -109,9 +109,11 @@ function MonitorItem() {
   if (!entry?.stats) return null;
 
   const { memUsed, memTotal, diskUsed, diskTotal } = entry.stats;
-  const { cpu: cpuPct, mem: memPct, disk: diskPct } = statsPercents(
-    entry.stats,
-  );
+  const {
+    cpu: cpuPct,
+    mem: memPct,
+    disk: diskPct,
+  } = statsPercents(entry.stats);
 
   return (
     <div

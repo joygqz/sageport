@@ -1,12 +1,7 @@
 import { useEffect } from "react";
 import { ShieldAlert, ShieldQuestion } from "lucide-react";
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogToolbar,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogToolbar } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import type { HostKeyDecision } from "@/types/models";
 import { listenHostKeyEvents, useHostKeyStore } from "./host-key";

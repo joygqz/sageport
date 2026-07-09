@@ -89,7 +89,9 @@ function ImportBody({ onClose }: { onClose: () => void }) {
   if (entries.length === 0) {
     return (
       <div className="flex flex-col gap-4 p-5">
-        <p className="text-sm text-muted-foreground">{t("hosts.import.empty")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t("hosts.import.empty")}
+        </p>
         <div className="flex justify-end">
           <Button variant="ghost" onClick={onClose}>
             {t("common.cancel")}
@@ -129,7 +131,10 @@ function ImportBody({ onClose }: { onClose: () => void }) {
                 on && "bg-list-hover",
               )}
             >
-              <Switch checked={on} onCheckedChange={() => toggle(entry.alias)} />
+              <Switch
+                checked={on}
+                onCheckedChange={() => toggle(entry.alias)}
+              />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
                   <span className="truncate font-medium">{entry.alias}</span>

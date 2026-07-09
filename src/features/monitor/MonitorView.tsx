@@ -141,9 +141,7 @@ function HostCard({
     sessions.find((session) => session.id === activeId) ??
     sessions.find((session) => session.status === "connected") ??
     sessions[0];
-  const connected = sessions.some(
-    (session) => session.status === "connected",
-  );
+  const connected = sessions.some((session) => session.status === "connected");
 
   const address = hostAddress(primary, host);
   const stats = connected ? entry?.stats : undefined;

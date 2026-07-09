@@ -21,9 +21,7 @@ export function SnippetRunDialog({
       width="w-[480px]"
       title={snippet?.name ?? ""}
     >
-      {snippet && (
-        <RunBody snippet={snippet} onClose={onClose} onRun={onRun} />
-      )}
+      {snippet && <RunBody snippet={snippet} onClose={onClose} onRun={onRun} />}
     </FormDialog>
   );
 }
@@ -61,7 +59,10 @@ function RunBody({
             value={values[variable.name] ?? ""}
             placeholder={variable.defaultValue}
             onChange={(e) =>
-              setValues((prev) => ({ ...prev, [variable.name]: e.target.value }))
+              setValues((prev) => ({
+                ...prev,
+                [variable.name]: e.target.value,
+              }))
             }
           />
         </Field>
