@@ -52,7 +52,7 @@ export function ActivityBar() {
               >
                 <span
                   className={cn(
-                    "absolute inset-y-1.5 -left-1 w-[3px] bg-primary transition-opacity",
+                    "absolute inset-y-1.5 -left-1 w-[3px] bg-foreground transition-opacity",
                     active ? "opacity-100" : "opacity-0",
                   )}
                 />
