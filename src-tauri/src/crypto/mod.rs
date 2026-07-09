@@ -3,7 +3,7 @@ use aes_gcm::{Aes256Gcm, Key, Nonce};
 use argon2::Argon2;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
-use rand::{rngs::OsRng, RngCore};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
@@ -39,13 +39,14 @@ fn derive_key(passphrase: &str, salt: &[u8]) -> AppResult<[u8; KEY_LEN]> {
 pub fn encrypt(plaintext: &[u8], passphrase: &str) -> AppResult<EncryptedEnvelope> {
     let mut salt = [0u8; SALT_LEN];
     let mut nonce_bytes = [0u8; NONCE_LEN];
-    OsRng.fill_bytes(&mut salt);
-    OsRng.fill_bytes(&mut nonce_bytes);
+    let mut rng = rand::rng();
+    rng.fill_bytes(&mut salt);
+    rng.fill_bytes(&mut nonce_bytes);
 
     let key = derive_key(passphrase, &salt)?;
-    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
+    let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(key));
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce_bytes), plaintext)
+        .encrypt(&Nonce::from(nonce_bytes), plaintext)
         .map_err(|e| AppError::Crypto(e.to_string()))?;
 
     Ok(EncryptedEnvelope {
@@ -81,9 +82,11 @@ pub fn decrypt(envelope: &EncryptedEnvelope, passphrase: &str) -> AppResult<Vec<
         .map_err(|e| AppError::Crypto(e.to_string()))?;
 
     let key = derive_key(passphrase, &salt)?;
-    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
+    let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(key));
+    let nonce = Nonce::try_from(nonce_bytes.as_slice())
+        .map_err(|_| AppError::Crypto("invalid nonce length".into()))?;
     cipher
-        .decrypt(Nonce::from_slice(&nonce_bytes), ciphertext.as_ref())
+        .decrypt(&nonce, ciphertext.as_ref())
         .map_err(|_| AppError::Crypto("decryption failed (wrong passphrase?)".into()))
 }
 

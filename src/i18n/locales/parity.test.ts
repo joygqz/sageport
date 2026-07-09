@@ -5,8 +5,8 @@ import { zhCN } from "./zh-CN";
 
 function leafPaths(value: unknown, prefix = ""): string[] {
   if (value !== null && typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>).flatMap(([key, v]) =>
-      leafPaths(v, prefix ? `${prefix}.${key}` : key),
+    return Object.entries(value as Record<string, unknown>).flatMap(
+      ([key, v]) => leafPaths(v, prefix ? `${prefix}.${key}` : key),
     );
   }
   return [prefix];

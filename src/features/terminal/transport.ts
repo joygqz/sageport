@@ -15,7 +15,9 @@ export interface TerminalTransport {
   resize(cols: number, rows: number): Promise<void>;
   disconnect(): Promise<void>;
   onData(handler: (bytes: Uint8Array) => void): Promise<UnlistenFn>;
-  onStatus(handler: (update: TerminalStatusUpdate) => void): Promise<UnlistenFn>;
+  onStatus(
+    handler: (update: TerminalStatusUpdate) => void,
+  ): Promise<UnlistenFn>;
 }
 
 function decodeBase64(b64: string): Uint8Array {

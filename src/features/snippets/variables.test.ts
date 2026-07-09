@@ -29,9 +29,9 @@ describe("parseVariables", () => {
 
 describe("substitute", () => {
   it("replaces variables with provided values", () => {
-    expect(substitute("scp {{file}} {{host}}:/tmp", { file: "a.txt", host: "web" })).toBe(
-      "scp a.txt web:/tmp",
-    );
+    expect(
+      substitute("scp {{file}} {{host}}:/tmp", { file: "a.txt", host: "web" }),
+    ).toBe("scp a.txt web:/tmp");
   });
 
   it("falls back to defaults when a value is missing or empty", () => {

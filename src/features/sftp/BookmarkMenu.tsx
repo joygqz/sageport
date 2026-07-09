@@ -36,7 +36,9 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
     if (!tab.cwd) return;
     void createBookmark
       .mutateAsync({ hostId, label: baseName(tab.cwd), path: tab.cwd })
-      .catch((err) => toast.error(t("sftp.bookmarks.error"), errorMessage(err)));
+      .catch((err) =>
+        toast.error(t("sftp.bookmarks.error"), errorMessage(err)),
+      );
   };
 
   return (
@@ -51,8 +53,14 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
           </Button>
         </DropdownMenuTrigger>
       </Tooltip>
-      <DropdownMenuContent align="start" className="max-h-80 min-w-52 overflow-auto">
-        <DropdownMenuItem onSelect={addCurrent} disabled={!tab.cwd || !!current}>
+      <DropdownMenuContent
+        align="start"
+        className="max-h-80 min-w-52 overflow-auto"
+      >
+        <DropdownMenuItem
+          onSelect={addCurrent}
+          disabled={!tab.cwd || !!current}
+        >
           <BookmarkPlus /> {t("sftp.bookmarks.add")}
         </DropdownMenuItem>
         {scoped.length > 0 && <DropdownMenuSeparator />}

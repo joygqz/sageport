@@ -275,7 +275,9 @@ where
     T: for<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> + Send + Unpin,
 {
     let sql = format!("SELECT * FROM {table}");
-    Ok(sqlx::query_as::<_, T>(&sql).fetch_all(pool).await?)
+    Ok(sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(sql))
+        .fetch_all(pool)
+        .await?)
 }
 
 async fn merge_group<'e, E>(executor: E, g: &Group) -> AppResult<()>
@@ -466,7 +468,7 @@ where
         .collect::<Vec<_>>()
         .join(" AND ");
     let sql = format!("DELETE FROM settings WHERE {clause}");
-    let mut query = sqlx::query(&sql);
+    let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
     for prefix in prefixes {
         query = query.bind(format!("{prefix}%"));
     }

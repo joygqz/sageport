@@ -73,17 +73,21 @@ function BatchBody({
     setResults({});
     const hostIds = [...selected];
     try {
-      await ipc.hosts.runCommand(hostIds, command.trim(), (e: BatchExecEvent) => {
-        setResults((prev) => ({
-          ...prev,
-          [e.hostId]: {
-            status: e.status,
-            output: e.output,
-            exitCode: e.exitCode,
-            message: e.message,
-          },
-        }));
-      });
+      await ipc.hosts.runCommand(
+        hostIds,
+        command.trim(),
+        (e: BatchExecEvent) => {
+          setResults((prev) => ({
+            ...prev,
+            [e.hostId]: {
+              status: e.status,
+              output: e.output,
+              exitCode: e.exitCode,
+              message: e.message,
+            },
+          }));
+        },
+      );
     } catch (err) {
       toast.error(t("snippets.batch.error"), errorMessage(err));
     } finally {
