@@ -121,7 +121,7 @@ export function FilePane({ side }: { side: PaneSide }) {
   const confirmDelete = (tab: SftpTab, entry: FileEntry) => {
     setConfirmState({
       title: t("common.delete"),
-      description: t("sftp.deleteConfirm", { name: entry.name }),
+      description: t("common.deleteConfirm", { name: entry.name }),
       cancelLabel: t("common.cancel"),
       actions: [
         {

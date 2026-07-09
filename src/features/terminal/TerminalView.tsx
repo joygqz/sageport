@@ -57,9 +57,9 @@ export function TerminalView({
   const setStatus = useTabsStore((s) => s.setTerminalStatus);
 
   const describeConnectError = (code?: string | null, message?: string) => {
-    if (code === "invalid") return t("terminal.credentialsMissing");
-    if (code === "auth") return t("terminal.authFailed");
-    if (code === "host_key") return t("terminal.hostKeyRejected");
+    if (code === "invalid") return t("ssh.credentialsMissing");
+    if (code === "auth") return t("ssh.authFailed");
+    if (code === "host_key") return t("ssh.hostKeyRejected");
     return message;
   };
 
@@ -136,7 +136,7 @@ export function TerminalView({
         if (disposed || connectSettled) return;
         connectTimedOut = true;
         pendingInput = "";
-        setStatus(sessionId, "error", t("terminal.connectTimedOut"));
+        setStatus(sessionId, "error", t("ssh.connectTimedOut"));
         void transport.disconnect().catch(() => {});
       }, CONNECT_WATCHDOG_MS);
     };

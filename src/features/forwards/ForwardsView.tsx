@@ -60,7 +60,7 @@ export function ForwardsView() {
   const requestDelete = (forward: PortForward) => {
     setConfirmState({
       title: t("forwards.delete.title"),
-      description: t("forwards.delete.description", { name: forward.label }),
+      description: t("common.deleteConfirm", { name: forward.label }),
       cancelLabel: t("common.cancel"),
       actions: [
         {

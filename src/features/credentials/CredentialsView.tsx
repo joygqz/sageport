@@ -141,7 +141,7 @@ function KeyList({
   const requestDelete = (key: SshKey) => {
     setConfirmState({
       title: t("credentials.keys.delete.title"),
-      description: t("credentials.keys.delete.description", { name: key.name }),
+      description: t("common.deleteConfirm", { name: key.name }),
       cancelLabel: t("common.cancel"),
       actions: [
         {
@@ -252,9 +252,7 @@ function IdentityList({
   const requestDelete = (identity: Identity) => {
     setConfirmState({
       title: t("credentials.identities.delete.title"),
-      description: t("credentials.identities.delete.description", {
-        name: identity.name,
-      }),
+      description: t("common.deleteConfirm", { name: identity.name }),
       cancelLabel: t("common.cancel"),
       actions: [
         {

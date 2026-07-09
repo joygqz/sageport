@@ -17,9 +17,9 @@ function t(key: Parameters<typeof translate>[1]): string {
 }
 
 function describeConnectError(code?: string | null, message?: string) {
-  if (code === "invalid") return t("sftp.credentialsMissing");
-  if (code === "auth") return t("sftp.authFailed");
-  if (code === "host_key") return t("sftp.hostKeyRejected");
+  if (code === "invalid") return t("ssh.credentialsMissing");
+  if (code === "auth") return t("ssh.authFailed");
+  if (code === "host_key") return t("ssh.hostKeyRejected");
   return message;
 }
 

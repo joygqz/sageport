@@ -136,8 +136,8 @@ export function AssistantPanel({ width }: { width: number }) {
   const confirmDeleteSession = (session: AiSessionSummary) => {
     setConfirmState({
       title: t("ai.deleteSession.title"),
-      description: t("ai.deleteSession.description", {
-        title: session.title || t("ai.untitledChat"),
+      description: t("common.deleteConfirm", {
+        name: session.title || t("ai.untitledChat"),
       }),
       cancelLabel: t("common.cancel"),
       actions: [

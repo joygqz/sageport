@@ -113,7 +113,7 @@ export function HostsView() {
   const requestDeleteHost = (host: Host) => {
     setConfirmState({
       title: t("hosts.deleteHost.title"),
-      description: t("hosts.deleteHost.description", { label: host.label }),
+      description: t("common.deleteConfirm", { name: host.label }),
       cancelLabel: t("common.cancel"),
       actions: [
         {
@@ -148,7 +148,7 @@ export function HostsView() {
             name: section.name,
             count: section.hosts.length,
           })
-        : t("hosts.deleteGroup.description", { name: section.name }),
+        : t("common.deleteConfirm", { name: section.name }),
       cancelLabel: t("common.cancel"),
       actions: hasHosts
         ? [

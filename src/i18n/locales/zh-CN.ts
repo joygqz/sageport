@@ -12,11 +12,21 @@ export const zhCN: Dictionary = {
     rename: "重命名",
     save: "保存",
     saveChanges: "保存更改",
+    deleteConfirm: "将永久删除 {name}，此操作无法撤销。",
     auth: {
       password: "密码",
       key: "SSH 密钥",
       agent: "SSH 代理",
     },
+  },
+
+  ssh: {
+    credentialsMissing:
+      "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
+    authFailed:
+      "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
+    connectTimedOut: "连接超时，请检查网络、防火墙或服务器上的 SSH 服务。",
+    hostKeyRejected: "已取消连接：未信任该主机的密钥。",
   },
 
   windowControls: {
@@ -28,7 +38,7 @@ export const zhCN: Dictionary = {
 
   titleBar: {
     commandCenter: "搜索主机",
-    togglePanel: "显示或隐藏文件管理面板",
+    togglePanel: "显示或隐藏文件面板",
     toggleAssistant: "显示或隐藏 AI 助手",
   },
 
@@ -53,7 +63,7 @@ export const zhCN: Dictionary = {
     uptimeHm: "{h} 小时 {m} 分钟",
     uptimeM: "{m} 分钟",
     collecting: "正在采集统计信息…",
-    unsupported: "该系统暂不支持统计信息",
+    unsupported: "该系统暂不支持统计信息。",
     empty: {
       title: "暂无活动会话",
       description: "连接主机后可实时查看 CPU、内存和磁盘占用。",
@@ -82,11 +92,10 @@ export const zhCN: Dictionary = {
     },
     empty: {
       title: "暂无转发",
-      description: "通过 SSH 把本地端口隧道到远程服务。",
+      description: "通过 SSH 将本地端口转发到远程服务。",
     },
     delete: {
       title: "删除转发",
-      description: "将永久删除 {name}，此操作无法撤销。",
       error: "删除转发失败",
     },
     form: {
@@ -126,7 +135,7 @@ export const zhCN: Dictionary = {
     terminal: { newLocal: "新建本地终端" },
     view: {
       toggleSidebar: "显示或隐藏侧边栏",
-      togglePanel: "显示或隐藏文件管理面板",
+      togglePanel: "显示或隐藏文件面板",
       toggleAssistant: "显示或隐藏 AI 助手",
     },
     tab: { close: "关闭标签页" },
@@ -136,7 +145,7 @@ export const zhCN: Dictionary = {
   editor: {
     newSession: "新建会话",
     closeTab: "关闭标签页",
-    unsavedTitle: "是否保存更改？",
+    unsavedTitle: "未保存的更改",
     unsavedDescription: "{name} 有未保存的更改，不保存将丢失这些更改。",
     discard: "不保存",
   },
@@ -155,14 +164,8 @@ export const zhCN: Dictionary = {
   },
 
   terminal: {
-    connecting: "正在连接 {host}",
+    connecting: "正在连接 {host}…",
     connectFailed: "连接失败",
-    credentialsMissing:
-      "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
-    authFailed:
-      "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
-    connectTimedOut: "连接超时，请检查网络、防火墙或服务器上的 SSH 服务。",
-    hostKeyRejected: "已取消连接：未信任该主机的密钥。",
     closed: "会话已结束",
     reconnect: "重新连接",
     local: {
@@ -233,12 +236,10 @@ export const zhCN: Dictionary = {
     },
     deleteHost: {
       title: "删除主机",
-      description: "将永久删除 {label}，此操作无法撤销。",
       error: "删除主机失败",
     },
     deleteGroup: {
       title: "删除分组",
-      description: "将永久删除 {name}，此操作无法撤销。",
       withHostsDescription: "{name} 中包含 {count} 台主机，请选择处理方式。",
       keepHosts: "仅删除分组",
       withHosts: "删除分组及主机",
@@ -343,7 +344,6 @@ export const zhCN: Dictionary = {
       addError: "保存密钥失败",
       delete: {
         title: "删除密钥",
-        description: "将永久删除 {name}，此操作无法撤销。",
         error: "删除密钥失败",
         inUse: "该密钥仍被主机或身份使用，请先为它们改用其他凭据再删除。",
       },
@@ -366,7 +366,6 @@ export const zhCN: Dictionary = {
       saveError: "保存身份失败",
       delete: {
         title: "删除身份",
-        description: "将永久删除 {name}，此操作无法撤销。",
         error: "删除身份失败",
         inUse: "该身份仍被主机使用，请先为这些主机改用其他凭据再删除。",
       },
@@ -382,7 +381,7 @@ export const zhCN: Dictionary = {
       command: "命令",
       hosts: "主机",
       noHosts: "没有可用主机",
-      run: "运行 {count} 台",
+      run: "在 {count} 台主机运行",
       error: "批量运行失败",
     },
     newTitle: "新建片段",
@@ -401,7 +400,6 @@ export const zhCN: Dictionary = {
     saveError: "保存片段失败",
     delete: {
       title: "删除片段",
-      description: "将永久删除 {name}，此操作无法撤销。",
       error: "删除片段失败",
     },
     run: "在终端中运行",
@@ -410,7 +408,7 @@ export const zhCN: Dictionary = {
   },
 
   sftp: {
-    panelTitle: "文件管理",
+    panelTitle: "文件",
     hidePanel: "隐藏面板",
     local: "本地",
     newTab: "新建标签页",
@@ -431,7 +429,6 @@ export const zhCN: Dictionary = {
     },
     emptyDir: "此文件夹为空",
     noTabTitle: "未打开任何位置",
-    deleteConfirm: "将永久删除 {name}，此操作无法撤销。",
     mkdirError: "创建文件夹失败",
     renameError: "重命名失败",
     deleteError: "删除失败",
@@ -440,7 +437,7 @@ export const zhCN: Dictionary = {
     toggleHidden: "显示隐藏文件",
     bookmarks: {
       title: "收藏",
-      add: "收藏此目录",
+      add: "收藏此文件夹",
       error: "保存收藏失败",
     },
     permissions: {
@@ -449,8 +446,8 @@ export const zhCN: Dictionary = {
       owner: "所有者",
       group: "群组",
       others: "其他",
-      read: "读",
-      write: "写",
+      read: "读取",
+      write: "写入",
       execute: "执行",
       octal: "八进制",
       error: "修改权限失败",
@@ -459,11 +456,6 @@ export const zhCN: Dictionary = {
       tooLarge: "文件过大，暂不支持编辑（上限 2 MB）",
       saveError: "保存文件失败",
     },
-    credentialsMissing:
-      "该主机缺少登录凭据，请在主机设置中填写用户名和密码，或关联一个已保存的身份。",
-    authFailed:
-      "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
-    hostKeyRejected: "已取消连接：未信任该主机的密钥。",
     cancelTransfer: "取消传输",
     history: {
       title: "传输历史",
@@ -492,7 +484,7 @@ export const zhCN: Dictionary = {
     empty: {
       title: "向助手提问",
       description:
-        "助手可以自己连接你的主机、读取终端并执行命令来完成运维任务，任何在服务器上执行的命令都需要你先确认。",
+        "助手可以连接你的主机、读取终端并执行命令来完成运维任务。任何在服务器上执行的命令都需要你先批准。",
     },
     suggestion: {
       health: "检查服务器的 CPU、内存和磁盘使用情况",
@@ -506,11 +498,10 @@ export const zhCN: Dictionary = {
     renameSession: "重命名对话",
     deleteSession: {
       title: "删除对话",
-      description: "将永久删除 {title}，此操作无法撤销。",
     },
-    working: "处理中",
+    working: "处理中…",
     stop: "停止生成",
-    stepLimitReached: "已达到单次运行的步骤上限，回复「继续」可以接着执行。",
+    stepLimitReached: "已达到单次运行的步骤上限，回复“继续”可以接着执行。",
     inputPlaceholder: "询问服务器相关问题",
     commandLabel: "命令",
     error: "助手出错",
@@ -518,7 +509,7 @@ export const zhCN: Dictionary = {
     approve: "允许",
     deny: "拒绝",
     modelLabel: "模型",
-    modelLoading: "正在加载模型",
+    modelLoading: "正在加载模型…",
     tool: {
       askUser: "请求你选择",
       listHosts: "列出主机",
@@ -549,25 +540,27 @@ export const zhCN: Dictionary = {
       zoomHint: "缩放整个界面，包括终端。快捷键：",
       zoomIn: "放大",
       zoomOut: "缩小",
-      zoomReset: "重置",
+      zoomReset: "重置缩放",
     },
     ai: {
       title: "AI 服务商",
       description:
-        "使用你自己的 API 密钥，支持 Anthropic 和任意 OpenAI 兼容接口。修改会自动保存。",
+        "使用你自己的 API 密钥，支持 Anthropic 和任意 OpenAI 兼容接口。更改会自动保存。",
       protocolLabel: "接口格式",
-      protocol_openai: "OpenAI 兼容",
-      protocol_anthropic: "Anthropic 兼容",
+      protocol: {
+        openai: "OpenAI 兼容",
+        anthropic: "Anthropic 兼容",
+      },
       baseUrlLabel: "接口地址",
       baseUrlHint: "OpenAI 兼容接口的地址通常以 /v1 结尾。",
       apiKeyLabel: "API 密钥",
-      apiKeyHint: "仅在启用同步时随加密备份离开本设备。",
+      apiKeyHint: "不会离开本设备；仅在启用同步时包含在加密备份中。",
       saveError: "保存配置失败",
     },
     sync: {
       title: "同步",
       description:
-        "将主机、密钥、代码片段和设置备份到你选择的存储。数据在离开本设备前先用口令进行端到端加密。切换存储需先断开连接。",
+        "将主机、密钥、命令片段和设置备份到你选择的存储。所有数据在离开本设备前都会先用口令进行端到端加密。切换存储需先断开连接。",
       corruptRemoteBackup:
         "从已连接存储获取的备份数据似乎已损坏，或来自不兼容的应用版本。",
       provider: {
@@ -610,7 +603,7 @@ export const zhCN: Dictionary = {
         connectError: "连接失败",
         mismatchTitle: "口令不匹配",
         mismatchDescription:
-          "此口令无法解密已有备份。请输入原口令，或清空远端备份历史，准备好后再手动点击立即备份。",
+          "此口令无法解密已有备份。请输入原口令，或清空远端备份历史，准备好后再手动备份。",
         mismatchCancelButton: "重新输入",
         mismatchForceButton: "清空远端历史",
       },
@@ -621,8 +614,8 @@ export const zhCN: Dictionary = {
         neverSynced: "从未同步",
         pushButton: "立即备份",
         pushedTitle: "备份完成",
-        unchangedTitle: "已是最新备份",
-        unchangedDescription: "当前数据与最新备份一致，未新增备份记录。",
+        unchangedTitle: "已是最新",
+        unchangedDescription: "当前数据与最新备份一致，未上传新备份。",
         pushFailed: "备份失败",
         pushWrongPassphrase:
           "已连接的备份无法再用本设备的口令解密，可能已在其他设备上被重新加密。请断开连接后使用正确的口令重新连接。",
@@ -636,13 +629,13 @@ export const zhCN: Dictionary = {
       versions: {
         title: "备份历史",
         description: "恢复会用所选备份替换全部本地数据，此操作无法撤销。",
-        loading: "正在加载备份历史",
+        loading: "正在加载备份历史…",
         loadError: "加载备份历史失败",
         empty: "暂无备份",
         latestBadge: "最新",
         refreshButton: "刷新",
         restoreButton: "恢复",
-        restoreConfirmTitle: "恢复此备份",
+        restoreConfirmTitle: "恢复备份",
         restoreConfirmDescription:
           "全部本地数据将被所选备份替换，此后产生的更改会丢失且无法找回。",
         restoreConfirmButton: "恢复并覆盖",
@@ -657,8 +650,8 @@ export const zhCN: Dictionary = {
         title: "文件备份",
         description:
           "导出单个加密备份文件或从文件恢复，与所连接的存储互相独立。每次操作都需输入口令，口令不会被保存。",
-        exportButton: "导出到文件",
-        importButton: "从文件恢复",
+        exportButton: "导出到文件…",
+        importButton: "从文件恢复…",
         exportDialogTitle: "导出加密备份",
         importDialogTitle: "恢复加密备份",
         vaultFilterName: "Sageport 备份",
@@ -678,12 +671,12 @@ export const zhCN: Dictionary = {
       version: "版本 {version}",
       update: {
         check: "检查更新",
-        checking: "正在检查更新",
+        checking: "正在检查更新…",
         upToDate: "Sageport 已是最新版本。",
         available: "发现新版本 {version}。",
         install: "下载并安装",
-        downloading: "下载中",
-        downloadingProgress: "下载中 {percent}%",
+        downloading: "正在下载…",
+        downloadingProgress: "正在下载 {percent}%",
         ready: "新版本 {version} 已就绪。",
         readyBadge: "就绪",
         restart: "重启以更新",
