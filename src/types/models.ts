@@ -110,11 +110,7 @@ export interface PortForwardInput {
   autoStart?: boolean;
 }
 
-export type ForwardStatusKind =
-  | "starting"
-  | "active"
-  | "error"
-  | "stopped";
+export type ForwardStatusKind = "starting" | "active" | "error" | "stopped";
 
 export interface ForwardStatusEvent {
   forwardId: string;

@@ -43,7 +43,7 @@ pub async fn all_excluding_prefixes(
         .collect::<Vec<_>>()
         .join(" AND ");
     let sql = format!("SELECT key, value, updated_at FROM settings WHERE {clause} ORDER BY key");
-    let mut query = sqlx::query_as(&sql);
+    let mut query = sqlx::query_as(sqlx::AssertSqlSafe(sql));
     for prefix in prefixes {
         query = query.bind(format!("{prefix}%"));
     }

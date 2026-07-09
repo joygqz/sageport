@@ -82,8 +82,7 @@ export const ipc = {
         onEvent: channel,
       });
     },
-    importPreview: () =>
-      invoke<SshConfigHost[]>("ssh_config_import_preview"),
+    importPreview: () => invoke<SshConfigHost[]>("ssh_config_import_preview"),
     importApply: (hosts: SshConfigHost[]) =>
       invoke<number>("ssh_config_import_apply", { hosts }),
     checkHealth: (
@@ -350,6 +349,8 @@ export const ipc = {
     check: () => invoke<UpdateStatus>("update_check"),
     install: () => invoke<UpdateStatus>("update_install"),
     onStatus: (handler: (e: UpdateStatus) => void): Promise<UnlistenFn> =>
-      listen<UpdateStatus>("update://status", (event) => handler(event.payload)),
+      listen<UpdateStatus>("update://status", (event) =>
+        handler(event.payload),
+      ),
   },
 };

@@ -34,32 +34,32 @@ anyhow = "1"
 
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "net"] }
 
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4" }
 
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 argon2 = "0.5"
-rand = "0.8"
+rand = "0.10"
 base64 = "0.22"
 
 russh = "0.62.2"
 russh-sftp = "2.3.0"
 
-ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "ecdsa", "p256", "p384", "p521", "encryption", "std"] }
+ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "ecdsa", "p256", "p384", "p521", "encryption", "std", "getrandom"] }
 
 tar = "0.4"
 flate2 = "1"
 
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "form", "rustls"] }
 
 parking_lot = "0.12"
 
 async-trait = "0.1"
 sha2 = "0.10"
 url = "2"
-quick-xml = "0.37"
-rusty-s3 = "0.7"
+quick-xml = "0.41"
+rusty-s3 = "0.10"
 portable-pty = "0.9.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]

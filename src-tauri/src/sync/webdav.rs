@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use quick_xml::escape::resolve_predefined_entity;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use reqwest::{Method, StatusCode};
@@ -180,17 +181,36 @@ fn parse_hrefs(xml: &str) -> AppResult<Vec<String>> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
     let mut names = Vec::new();
-    let mut in_href = false;
+    let mut href: Option<String> = None;
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"href" => in_href = true,
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"href" => in_href = false,
-            Ok(Event::Text(t)) if in_href => {
-                let href = t.unescape().map_err(xml_err)?.into_owned();
-                let basename = href.trim_end_matches('/').rsplit('/').next().unwrap_or("");
-                let decoded = percent_decode(basename);
-                if !decoded.is_empty() {
-                    names.push(decoded);
+            Ok(Event::Start(e)) if e.local_name().as_ref() == b"href" => {
+                href = Some(String::new());
+            }
+            Ok(Event::End(e)) if e.local_name().as_ref() == b"href" => {
+                if let Some(href) = href.take() {
+                    let basename = href.trim_end_matches('/').rsplit('/').next().unwrap_or("");
+                    let decoded = percent_decode(basename);
+                    if !decoded.is_empty() {
+                        names.push(decoded);
+                    }
+                }
+            }
+            Ok(Event::Text(t)) => {
+                if let Some(href) = href.as_mut() {
+                    href.push_str(&t.decode().map_err(xml_err)?);
+                }
+            }
+            Ok(Event::GeneralRef(r)) => {
+                if let Some(href) = href.as_mut() {
+                    if let Some(ch) = r.resolve_char_ref().map_err(xml_err)? {
+                        href.push(ch);
+                    } else {
+                        let name = r.decode().map_err(xml_err)?;
+                        let resolved = resolve_predefined_entity(&name)
+                            .ok_or_else(|| xml_err(format!("unknown entity &{name};")))?;
+                        href.push_str(resolved);
+                    }
                 }
             }
             Ok(Event::Eof) => break,
