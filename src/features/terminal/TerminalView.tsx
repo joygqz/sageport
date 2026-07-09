@@ -18,17 +18,14 @@ import {
   type AdhocTarget,
   type TerminalTarget,
 } from "@/workbench/tabs";
+import { useFontStore } from "@/workbench/fonts";
 import { terminalFontSize } from "@/workbench/zoom";
 import { createAutocomplete } from "./autocomplete/controller";
 import { useBroadcastStore } from "./broadcast";
 import { hasHostKeyPrompt, useHostKeyStore } from "./host-key";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
 import { registerTerminal, unregisterTerminal } from "./registry";
-import {
-  localTransport,
-  sshAdhocTransport,
-  sshTransport,
-} from "./transport";
+import { localTransport, sshAdhocTransport, sshTransport } from "./transport";
 import { xtermTheme } from "./xterm-theme";
 
 const CONNECT_WATCHDOG_MS = 45_000;
@@ -82,8 +79,7 @@ export function TerminalView({
     if (isSshLike) bridgeMonitorEvents();
 
     const term = new XTerm({
-      fontFamily:
-        '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace',
+      fontFamily: useFontStore.getState().fontFamily,
       fontSize: terminalFontSize(),
       lineHeight: 1.25,
       allowProposedApi: true,

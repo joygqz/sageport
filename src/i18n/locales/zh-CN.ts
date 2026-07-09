@@ -548,6 +548,9 @@ export const zhCN: Dictionary = {
       zoomIn: "放大",
       zoomOut: "缩小",
       zoomReset: "重置",
+      font: "字体",
+      fontHint: "应用于终端和文件编辑器。以逗号分隔，使用第一个可用的字体。",
+      fontReset: "重置",
     },
     ai: {
       title: "AI 服务商",

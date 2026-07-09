@@ -21,6 +21,7 @@ import {
   sidebarLimits,
   useLayoutStore,
 } from "./layout";
+import { FONT_FAMILY_SYNC_KEY, useFontStore } from "./fonts";
 import { useOverlayStore } from "./overlays";
 import { SideBar } from "./SideBar";
 import { StatusBar } from "./StatusBar";
@@ -47,6 +48,7 @@ export function Workbench() {
 
   useEffect(() => {
     useZoomStore.getState().init();
+    useFontStore.getState().init();
   }, []);
 
   const zoomLevel = useZoomStore((s) => s.level);
@@ -63,6 +65,18 @@ export function Workbench() {
       if (state.level !== prev.level) pushZoom(String(state.level));
     });
   }, [pushZoom]);
+
+  const fontFamily = useFontStore((s) => s.fontFamily);
+  const pushFontFamily = useSettingSync(
+    FONT_FAMILY_SYNC_KEY,
+    fontFamily,
+    (remote) => useFontStore.getState().setFontFamily(remote),
+  );
+  useEffect(() => {
+    return useFontStore.subscribe((state, prev) => {
+      if (state.fontFamily !== prev.fontFamily) pushFontFamily(state.fontFamily);
+    });
+  }, [pushFontFamily]);
 
   useEffect(() => {
     if (!IS_MACOS) return;

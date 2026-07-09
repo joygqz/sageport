@@ -561,6 +561,10 @@ export const en = {
       zoomIn: "Zoom in",
       zoomOut: "Zoom out",
       zoomReset: "Reset",
+      font: "Font",
+      fontHint:
+        "Applies to the terminal and file editor. Comma separated; the first available font is used.",
+      fontReset: "Reset",
     },
     ai: {
       title: "AI provider",

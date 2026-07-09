@@ -16,6 +16,7 @@ import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { THEMES, useTheme, type ThemeDefinition } from "@/themes";
 import { useTabsStore, type SettingsSection } from "@/workbench/tabs";
+import { FONT_FAMILY_DEFAULT, useFontStore } from "@/workbench/fonts";
 import {
   useZoomStore,
   zoomFactor,
@@ -102,6 +103,9 @@ function AppearanceSection() {
         ))}
       </div>
 
+      <FontField />
+      <ZoomField />
+
       <Field
         label={t("settings.appearance.language")}
         hint={t("settings.appearance.languageHint")}
@@ -119,9 +123,57 @@ function AppearanceSection() {
           ))}
         </Select>
       </Field>
-
-      <ZoomField />
     </div>
+  );
+}
+
+function FontField() {
+  const { t } = useI18n();
+  const family = useFontStore((s) => s.fontFamily);
+  const setFamily = useFontStore((s) => s.setFontFamily);
+  const reset = useFontStore((s) => s.resetFontFamily);
+
+  return (
+    <Field
+      label={t("settings.appearance.font")}
+      hint={t("settings.appearance.fontHint")}
+    >
+      <div className="flex items-center gap-1.5">
+        <FontInput key={family} initial={family} onCommit={setFamily} />
+        {family !== FONT_FAMILY_DEFAULT && (
+          <Button size="sm" variant="ghost" onClick={reset}>
+            {t("settings.appearance.fontReset")}
+          </Button>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+function FontInput({
+  initial,
+  onCommit,
+}: {
+  initial: string;
+  onCommit: (family: string) => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+
+  return (
+    <Input
+      className="flex-1"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => onCommit(draft)}
+      placeholder={FONT_FAMILY_DEFAULT}
+      spellCheck={false}
+      autoComplete="off"
+      style={{
+        fontFamily: [draft.trim(), FONT_FAMILY_DEFAULT]
+          .filter(Boolean)
+          .join(", "),
+      }}
+    />
   );
 }
 

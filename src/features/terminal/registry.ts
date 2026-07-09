@@ -36,6 +36,15 @@ export function applyTerminalFontSize(size: number) {
   }
 }
 
+export function applyTerminalFontFamily(family: string) {
+  for (const { term, fit } of registry.values()) {
+    term.options.fontFamily = family;
+    try {
+      fit.fit();
+    } catch {}
+  }
+}
+
 export function readTerminalContext(
   id: string | null,
   maxLines = 60,
