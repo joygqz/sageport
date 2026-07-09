@@ -5,13 +5,27 @@ use crate::error::{AppError, AppResult};
 
 use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec};
 
-pub(super) fn request_body(model: &str, messages: &[ChatMessage], tools: &[ToolSpec]) -> Value {
-    let messages: Vec<Value> = messages.iter().map(message_to_json).collect();
+pub(super) fn request_body(
+    model: &str,
+    system: &str,
+    context: Option<&str>,
+    messages: &[ChatMessage],
+    tools: &[ToolSpec],
+) -> Value {
+    let mut out = Vec::with_capacity(messages.len() + 2);
+    out.push(json!({ "role": "system", "content": system }));
+    if let Some(ctx) = context {
+        out.push(json!({
+            "role": "system",
+            "content": format!("# Current workspace context\n{ctx}"),
+        }));
+    }
+    out.extend(messages.iter().map(message_to_json));
 
     let mut body = json!({
         "model": model,
         "max_tokens": super::MAX_TOKENS,
-        "messages": messages,
+        "messages": out,
     });
     if !tools.is_empty() {
         let defs: Vec<Value> = tools

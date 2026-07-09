@@ -163,27 +163,17 @@ pub async fn chat(
     context: Option<&str>,
     mut on_text: impl FnMut(&str),
 ) -> AppResult<ChatResult> {
-    let mut system = SYSTEM_PROMPT.to_string();
-    if let Some(ctx) = context.filter(|c| !c.trim().is_empty()) {
-        system.push_str("\n\n# Current workspace context\n");
-        system.push_str(ctx);
-    }
-
-    let mut full = Vec::with_capacity(messages.len() + 1);
-    full.push(ChatMessage {
-        role: Role::System,
-        content: Some(system),
-        tool_calls: Vec::new(),
-        tool_call_id: None,
-    });
-    full.extend_from_slice(messages);
+    let context = context.filter(|c| !c.trim().is_empty());
 
     let (path, mut body) = match ep.protocol {
         Protocol::Openai => (
             "/chat/completions",
-            openai::request_body(model, &full, tools),
+            openai::request_body(model, SYSTEM_PROMPT, context, messages, tools),
         ),
-        Protocol::Anthropic => ("/v1/messages", anthropic::request_body(model, &full, tools)),
+        Protocol::Anthropic => (
+            "/v1/messages",
+            anthropic::request_body(model, SYSTEM_PROMPT, context, messages, tools),
+        ),
     };
     body["stream"] = serde_json::json!(true);
 

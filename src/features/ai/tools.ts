@@ -161,15 +161,18 @@ async function listHosts(): Promise<string> {
   }
   const groupNames = new Map(groups.map((g) => [g.id, g.name]));
   return JSON.stringify(
-    hosts.map((h) => ({
-      id: h.id,
-      label: h.label,
-      address: h.address,
-      port: h.port,
-      username: h.username || undefined,
-      group: h.groupId ? groupNames.get(h.groupId) : undefined,
-      notes: h.notes?.trim() || undefined,
-    })),
+    hosts.map((h) => {
+      const notes = h.notes?.trim();
+      return {
+        id: h.id,
+        label: h.label,
+        address: h.address,
+        port: h.port,
+        username: h.username || undefined,
+        group: h.groupId ? groupNames.get(h.groupId) : undefined,
+        notes: notes ? notes.slice(0, 200) : undefined,
+      };
+    }),
   );
 }
 

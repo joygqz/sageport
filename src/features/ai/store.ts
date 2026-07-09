@@ -22,8 +22,19 @@ import {
 
 const MAX_STEPS = 24;
 
+const TOOL_RESULT_HEAD_CHARS = 2000;
+const TOOL_RESULT_TAIL_CHARS = 6000;
+const TOOL_RESULT_MAX_CHARS =
+  TOOL_RESULT_HEAD_CHARS + TOOL_RESULT_TAIL_CHARS + 500;
+
 const DECLINED_RESULT = "The user declined to run this command.";
 const STOPPED_RESULT = "The user stopped this run before the call executed.";
+
+function truncateToolResult(text: string): string {
+  if (text.length <= TOOL_RESULT_MAX_CHARS) return text;
+  const omitted = text.length - TOOL_RESULT_HEAD_CHARS - TOOL_RESULT_TAIL_CHARS;
+  return `${text.slice(0, TOOL_RESULT_HEAD_CHARS)}\n… (${omitted} characters omitted; call read_terminal_output with fewer lines if you need the rest) …\n${text.slice(-TOOL_RESULT_TAIL_CHARS)}`;
+}
 
 const TITLE_MAX_LEN = 60;
 
@@ -261,7 +272,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     } else {
       if (needsApproval) setToolStatus("running");
       try {
-        resultText = await executeTool(call.name, args);
+        resultText = truncateToolResult(await executeTool(call.name, args));
         setToolStatus("done", resultText);
       } catch (err) {
         resultText = `Error: ${errorMessage(err)}`;
