@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useI18n, type TKey } from "@/i18n";
 import { cn } from "@/lib/utils";
-import type { AgentLogItem, ToolStatus } from "./store";
+import type { AgentLogItem, ToolStatus } from "./transcript";
 import { askUserOptions, askUserQuestion, selectionResult } from "./tools";
 import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 

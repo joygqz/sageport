@@ -35,6 +35,9 @@ pub enum AppError {
     #[error("in use: {0}")]
     InUse(String),
 
+    #[error("{0}")]
+    Network(String),
+
     #[error("cancelled")]
     Cancelled,
 
@@ -56,6 +59,7 @@ impl AppError {
             AppError::NotFound(_) => "not_found",
             AppError::Invalid(_) => "invalid",
             AppError::InUse(_) => "in_use",
+            AppError::Network(_) => "network",
             AppError::Cancelled => "cancelled",
             AppError::Other(_) => "other",
         }

@@ -5,12 +5,26 @@ use crate::error::{AppError, AppResult};
 
 use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec};
 
+fn max_tokens_key(model: &str) -> &'static str {
+    let name = model.rsplit('/').next().unwrap_or(model);
+    if name.starts_with("o1")
+        || name.starts_with("o3")
+        || name.starts_with("o4")
+        || name.starts_with("gpt-5")
+    {
+        "max_completion_tokens"
+    } else {
+        "max_tokens"
+    }
+}
+
 pub(super) fn request_body(
     model: &str,
     system: &str,
     context: Option<&str>,
     messages: &[ChatMessage],
     tools: &[ToolSpec],
+    max_tokens: u32,
 ) -> Value {
     let mut out = Vec::with_capacity(messages.len() + 2);
     out.push(json!({ "role": "system", "content": system }));
@@ -24,9 +38,9 @@ pub(super) fn request_body(
 
     let mut body = json!({
         "model": model,
-        "max_tokens": super::MAX_TOKENS,
         "messages": out,
     });
+    body[max_tokens_key(model)] = json!(max_tokens);
     if !tools.is_empty() {
         let defs: Vec<Value> = tools
             .iter()
@@ -134,12 +148,29 @@ impl StreamAccumulator {
             .tool_calls
             .into_iter()
             .filter(|c| !c.name.is_empty())
-            .map(|c| ToolCall {
-                arguments: serde_json::from_str(&c.arguments).unwrap_or_else(|_| json!({})),
-                id: c.id,
-                name: c.name,
+            .map(|c| {
+                if c.id.is_empty() {
+                    return Err(AppError::Other(
+                        "the assistant returned a tool call without an id".into(),
+                    ));
+                }
+                let arguments = if c.arguments.trim().is_empty() {
+                    json!({})
+                } else {
+                    serde_json::from_str(&c.arguments).map_err(|_| {
+                        AppError::Other(format!(
+                            "the assistant returned invalid arguments for tool {}",
+                            c.name
+                        ))
+                    })?
+                };
+                Ok(ToolCall {
+                    arguments,
+                    id: c.id,
+                    name: c.name,
+                })
             })
-            .collect();
+            .collect::<AppResult<_>>()?;
 
         if content.is_none() && tool_calls.is_empty() {
             return Err(AppError::Other("the assistant returned no content".into()));
@@ -187,4 +218,43 @@ struct StreamFunction {
     name: Option<String>,
     #[serde(default)]
     arguments: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_malformed_streamed_tool_arguments() {
+        let mut accumulator = StreamAccumulator::default();
+        accumulator.feed(
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"run_terminal_command","arguments":"{broken"}}]}}]}"#,
+            &mut |_| {},
+        );
+
+        let error = accumulator.finish().expect_err("invalid arguments");
+        assert!(error.to_string().contains("invalid arguments"));
+    }
+
+    #[test]
+    fn local_tool_error_metadata_is_not_sent_to_provider() {
+        let body = request_body(
+            "gpt-4o",
+            "system",
+            None,
+            &[ChatMessage {
+                role: Role::Tool,
+                content: Some("Error: failed".into()),
+                tool_calls: vec![],
+                tool_call_id: Some("call-1".into()),
+                tool_error: Some(true),
+            }],
+            &[],
+            4096,
+        );
+
+        let message = body["messages"].as_array().unwrap().last().unwrap();
+        assert!(message.get("toolError").is_none());
+        assert!(message.get("tool_error").is_none());
+    }
 }

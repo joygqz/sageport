@@ -11,6 +11,7 @@ pub(super) fn request_body(
     context: Option<&str>,
     messages: &[ChatMessage],
     tools: &[ToolSpec],
+    max_tokens: u32,
 ) -> Value {
     let mut out: Vec<Value> = messages.iter().map(message_to_json).collect();
     merge_tool_results(&mut out);
@@ -30,7 +31,7 @@ pub(super) fn request_body(
 
     let mut body = json!({
         "model": model,
-        "max_tokens": super::MAX_TOKENS,
+        "max_tokens": max_tokens,
         "system": system_blocks,
         "messages": out,
     });
@@ -231,10 +232,24 @@ impl StreamAccumulator {
                     if name.is_empty() {
                         continue;
                     }
+                    if id.is_empty() {
+                        return Err(AppError::Other(
+                            "the assistant returned a tool call without an id".into(),
+                        ));
+                    }
+                    let arguments = if input_json.trim().is_empty() {
+                        json!({})
+                    } else {
+                        serde_json::from_str(&input_json).map_err(|_| {
+                            AppError::Other(format!(
+                                "the assistant returned invalid arguments for tool {name}"
+                            ))
+                        })?
+                    };
                     tool_calls.push(ToolCall {
                         id,
                         name,
-                        arguments: serde_json::from_str(&input_json).unwrap_or_else(|_| json!({})),
+                        arguments,
                     });
                 }
             }
@@ -293,4 +308,51 @@ struct RawDelta {
 #[derive(Deserialize)]
 struct RawError {
     message: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_malformed_streamed_tool_arguments() {
+        let mut accumulator = StreamAccumulator::default();
+        accumulator
+            .feed(
+                r#"{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","name":"run_terminal_command"}}"#,
+                &mut |_| {},
+            )
+            .unwrap();
+        accumulator
+            .feed(
+                r#"{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{broken"}}"#,
+                &mut |_| {},
+            )
+            .unwrap();
+
+        let error = accumulator.finish().expect_err("invalid arguments");
+        assert!(error.to_string().contains("invalid arguments"));
+    }
+
+    #[test]
+    fn local_tool_error_metadata_is_not_sent_to_provider() {
+        let body = request_body(
+            "claude-sonnet",
+            "system",
+            None,
+            &[ChatMessage {
+                role: Role::Tool,
+                content: Some("Error: failed".into()),
+                tool_calls: vec![],
+                tool_call_id: Some("call-1".into()),
+                tool_error: Some(true),
+            }],
+            &[],
+            4096,
+        );
+
+        let serialized = body["messages"].to_string();
+        assert!(!serialized.contains("toolError"));
+        assert!(!serialized.contains("tool_error"));
+    }
 }

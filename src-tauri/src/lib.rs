@@ -138,6 +138,7 @@ pub fn run() {
             commands::ai::ai_set_config,
             commands::ai::ai_set_model,
             commands::ai::ai_list_models,
+            commands::ai::ai_model_limits,
             commands::ai::ai_chat,
             commands::ai::ai_chat_cancel,
             commands::ai::ai_session_list,

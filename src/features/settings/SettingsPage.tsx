@@ -14,6 +14,7 @@ import {
   Field,
   Input,
   Kbd,
+  PasswordInput,
   ScrollArea,
   SectionHeader,
   SegmentedControl,
@@ -359,9 +360,14 @@ function AiForm({ config }: { config: AiConfig }) {
 
   useEffect(
     () => () => {
-      if (pendingSave.current) mutate(pendingSave.current);
+      if (pendingSave.current) {
+        mutate(pendingSave.current, {
+          onError: (err) =>
+            toast.error(t("settings.ai.saveError"), errorMessage(err)),
+        });
+      }
     },
-    [mutate],
+    [mutate, t],
   );
 
   return (
@@ -401,7 +407,7 @@ function AiForm({ config }: { config: AiConfig }) {
         label={t("settings.ai.apiKeyLabel")}
         hint={t("settings.ai.apiKeyHint")}
       >
-        <Input
+        <PasswordInput
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="sk-…"

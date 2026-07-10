@@ -1,8 +1,43 @@
-import type { AiChatMessage } from "@/types/models";
+import type { AiChatMessage, AiModelLimits } from "@/types/models";
 
-// Leaves room for the system prompt, tool schemas, current context, and a
-// 4K-token response on models with moderately sized context windows.
-export const MODEL_HISTORY_TOKEN_BUDGET = 12_000;
+export const DEFAULT_CONTEXT_WINDOW_TOKENS = 128_000;
+export const DEFAULT_MAX_OUTPUT_TOKENS = 16_000;
+export const MAX_OUTPUT_TOKENS = 64_000;
+export const PROMPT_RESERVE_TOKENS = 8_000;
+export const MAX_HISTORY_TOKEN_BUDGET = 200_000;
+
+function contextWindowTokens(limits?: Partial<AiModelLimits> | null): number {
+  const window = limits?.contextWindow;
+  return window && window > 0 ? window : DEFAULT_CONTEXT_WINDOW_TOKENS;
+}
+
+export function outputTokenBudget(
+  limits?: Partial<AiModelLimits> | null,
+): number {
+  const reported = limits?.maxOutputTokens;
+  const requested =
+    reported && reported > 0 ? reported : DEFAULT_MAX_OUTPUT_TOKENS;
+  return Math.max(
+    1,
+    Math.min(
+      requested,
+      MAX_OUTPUT_TOKENS,
+      Math.floor(contextWindowTokens(limits) / 4),
+    ),
+  );
+}
+
+export function historyTokenBudget(
+  limits?: Partial<AiModelLimits> | null,
+): number {
+  const contextWindow = contextWindowTokens(limits);
+  const promptReserve = Math.min(
+    PROMPT_RESERVE_TOKENS,
+    Math.floor(contextWindow / 4),
+  );
+  const budget = contextWindow - outputTokenBudget(limits) - promptReserve;
+  return Math.max(0, Math.min(budget, MAX_HISTORY_TOKEN_BUDGET));
+}
 
 const OMITTED_MARKER = "\n… [older content omitted to fit context] …\n";
 
@@ -129,7 +164,7 @@ function compactTurn(
  */
 export function modelHistoryWindow(
   history: AiChatMessage[],
-  budget = MODEL_HISTORY_TOKEN_BUDGET,
+  budget = historyTokenBudget(),
 ): ModelHistoryWindow {
   if (history.length === 0) {
     return {
@@ -146,20 +181,31 @@ export function modelHistoryWindow(
   const selected = [current.messages];
   let estimatedTokens = estimateMessages(current.messages);
   let selectedOriginalMessages = currentTurn.length;
+  let compactedMessages = current.compactedMessages;
 
   for (let index = turns.length - 2; index >= 0; index -= 1) {
     const turn = turns[index];
+    const remaining = budget - estimatedTokens;
     const turnTokens = estimateMessages(turn);
-    if (estimatedTokens + turnTokens > budget) break;
-    selected.unshift(turn.map(cloneMessage));
+    if (turnTokens <= remaining) {
+      selected.unshift(turn.map(cloneMessage));
+      selectedOriginalMessages += turn.length;
+      estimatedTokens += turnTokens;
+      continue;
+    }
+    const compacted = compactTurn(turn, remaining);
+    const compactedTokens = estimateMessages(compacted.messages);
+    if (compactedTokens > remaining) break;
+    selected.unshift(compacted.messages);
     selectedOriginalMessages += turn.length;
-    estimatedTokens += turnTokens;
+    estimatedTokens += compactedTokens;
+    compactedMessages += compacted.compactedMessages;
   }
 
   return {
     messages: selected.flat(),
     estimatedTokens,
     omittedMessages: history.length - selectedOriginalMessages,
-    compactedMessages: current.compactedMessages,
+    compactedMessages,
   };
 }

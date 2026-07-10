@@ -4,6 +4,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AiChatMessage,
   AiChatResult,
+  AiModelLimits,
   AiConfig,
   AiProtocol,
   AiSession,
@@ -265,6 +266,8 @@ export const ipc = {
 
     listModels: () => invoke<string[]>("ai_list_models"),
     setModel: (model: string) => invoke<void>("ai_set_model", { model }),
+    modelLimits: (model: string) =>
+      invoke<AiModelLimits>("ai_model_limits", { model }),
 
     chat: (
       model: string,
@@ -272,6 +275,7 @@ export const ipc = {
       tools: AiToolSpec[],
       opts?: {
         context?: string;
+        maxTokens?: number;
         requestId?: string;
         onDelta?: (text: string) => void;
       },
@@ -279,11 +283,14 @@ export const ipc = {
       const onDelta = new Channel<{ type: "text"; text: string }>();
       onDelta.onmessage = (e) => opts?.onDelta?.(e.text);
       return invoke<AiChatResult>("ai_chat", {
-        model,
-        messages,
-        tools,
-        context: opts?.context ?? null,
-        requestId: opts?.requestId ?? null,
+        input: {
+          model,
+          messages,
+          tools,
+          context: opts?.context ?? null,
+          maxTokens: opts?.maxTokens ?? null,
+          requestId: opts?.requestId ?? null,
+        },
         onDelta,
       });
     },

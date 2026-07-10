@@ -3,11 +3,15 @@ mod openai;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::OnceLock;
+use std::time::Duration;
 
 use crate::error::{AppError, AppResult};
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
-const MAX_TOKENS: u32 = 4096;
+pub const DEFAULT_MAX_OUTPUT_TOKENS: u32 = 16_000;
+pub const MAX_OUTPUT_TOKENS: u32 = 64_000;
+const MAX_STREAM_BYTES: usize = 8 * 1024 * 1024;
 
 const SYSTEM_PROMPT: &str = "You are an autonomous operations agent inside Sageport, an SSH \
 client. Inspect and act with the provided tools instead of guessing or handing work back to the \
@@ -21,7 +25,8 @@ and read terminal output yourself rather than asking the user to do it. Commands
 the terminal already require user approval. Before destructive or risky actions, briefly explain \
 the effect and risk. Never invent details not supplied by the user or tools. Keep replies concise, \
 beginner-friendly, and in the user's language. Put commands you are only suggesting in fenced code \
-blocks.";
+blocks. For large files or logs, count lines and read consecutive small ranges until the requested \
+scope is covered; never claim to have reviewed omitted or truncated content.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -52,6 +57,9 @@ pub struct ChatMessage {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_error: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -128,17 +136,63 @@ impl Endpoint<'_> {
     }
 }
 
+fn http_client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(15))
+            .build()
+            .expect("valid AI HTTP client configuration")
+    })
+}
+
 pub async fn list_models(ep: &Endpoint<'_>) -> AppResult<Vec<String>> {
     let path = match ep.protocol {
         Protocol::Openai => "/models",
         Protocol::Anthropic => "/v1/models",
     };
-    let req = ep.authorize(reqwest::Client::new().get(ep.url(path)));
+    let req = ep.authorize(http_client().get(ep.url(path)));
     let bytes = send(req).await?;
     let parsed: ModelsResponse = serde_json::from_slice(&bytes)?;
     let mut models: Vec<String> = parsed.data.into_iter().map(|m| m.id).collect();
     models.sort();
     Ok(models)
+}
+
+pub async fn model_limits(ep: &Endpoint<'_>, model: &str) -> ModelLimits {
+    let collection_path = match ep.protocol {
+        Protocol::Openai => "/models",
+        Protocol::Anthropic => "/v1/models",
+    };
+    let Ok(mut url) = reqwest::Url::parse(&ep.url(collection_path)) else {
+        return ModelLimits::default();
+    };
+    let Ok(mut segments) = url.path_segments_mut() else {
+        return ModelLimits::default();
+    };
+    segments.push(model);
+    drop(segments);
+    let req = ep.authorize(http_client().get(url));
+    let Ok(bytes) = send(req).await else {
+        return ModelLimits::default();
+    };
+    let Ok(info) = serde_json::from_slice::<ModelInfo>(&bytes) else {
+        return ModelLimits::default();
+    };
+    let provider = info.top_provider.unwrap_or_default();
+    ModelLimits {
+        context_window: info
+            .max_input_tokens
+            .or(info.context_length)
+            .or(info.max_context_length)
+            .or(info.context_window)
+            .or(provider.context_length),
+        max_output_tokens: info
+            .max_output_tokens
+            .or(info.max_completion_tokens)
+            .or(provider.max_completion_tokens)
+            .or(info.max_tokens),
+    }
 }
 
 pub async fn chat(
@@ -147,6 +201,7 @@ pub async fn chat(
     messages: &[ChatMessage],
     tools: &[ToolSpec],
     context: Option<&str>,
+    max_tokens: u32,
     mut on_text: impl FnMut(&str),
 ) -> AppResult<ChatResult> {
     let context = context.filter(|c| !c.trim().is_empty());
@@ -154,41 +209,45 @@ pub async fn chat(
     let (path, mut body) = match ep.protocol {
         Protocol::Openai => (
             "/chat/completions",
-            openai::request_body(model, SYSTEM_PROMPT, context, messages, tools),
+            openai::request_body(model, SYSTEM_PROMPT, context, messages, tools, max_tokens),
         ),
         Protocol::Anthropic => (
             "/v1/messages",
-            anthropic::request_body(model, SYSTEM_PROMPT, context, messages, tools),
+            anthropic::request_body(model, SYSTEM_PROMPT, context, messages, tools, max_tokens),
         ),
     };
     body["stream"] = serde_json::json!(true);
 
-    let req = ep.authorize(reqwest::Client::new().post(ep.url(path)).json(&body));
+    let req = ep.authorize(http_client().post(ep.url(path)).json(&body));
     let mut response = req
         .send()
         .await
-        .map_err(|e| AppError::Other(format!("request failed: {e}")))?;
+        .map_err(|e| AppError::Network(format!("request failed: {e}")))?;
 
     let status = response.status();
     if !status.is_success() {
         let bytes = response
             .bytes()
             .await
-            .map_err(|e| AppError::Other(format!("failed to read response: {e}")))?;
-        let message = serde_json::from_slice::<ApiError>(&bytes)
-            .map(|e| e.error.message)
-            .unwrap_or_else(|_| format!("AI request failed with status {status}"));
-        return Err(AppError::Other(message));
+            .map_err(|e| AppError::Network(format!("failed to read response: {e}")))?;
+        return Err(status_error(status, &bytes));
     }
 
     let mut openai_acc = openai::StreamAccumulator::default();
     let mut anthropic_acc = anthropic::StreamAccumulator::default();
     let mut buf: Vec<u8> = Vec::new();
+    let mut received_bytes = 0usize;
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|e| AppError::Other(format!("stream interrupted: {e}")))?
+        .map_err(|e| AppError::Network(format!("stream interrupted: {e}")))?
     {
+        received_bytes = received_bytes.saturating_add(chunk.len());
+        if received_bytes > MAX_STREAM_BYTES {
+            return Err(AppError::Other(
+                "the assistant response was too large".into(),
+            ));
+        }
         buf.extend_from_slice(&chunk);
         while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
             let line: Vec<u8> = buf.drain(..=pos).collect();
@@ -200,9 +259,27 @@ pub async fn chat(
             if data.is_empty() || data == "[DONE]" {
                 continue;
             }
-            match ep.protocol {
-                Protocol::Openai => openai_acc.feed(data, &mut on_text),
-                Protocol::Anthropic => anthropic_acc.feed(data, &mut on_text)?,
+            feed_stream_data(
+                ep.protocol,
+                data,
+                &mut openai_acc,
+                &mut anthropic_acc,
+                &mut on_text,
+            )?;
+        }
+    }
+    if !buf.is_empty() {
+        let line = String::from_utf8_lossy(&buf);
+        if let Some(data) = line.trim().strip_prefix("data:") {
+            let data = data.trim();
+            if !data.is_empty() && data != "[DONE]" {
+                feed_stream_data(
+                    ep.protocol,
+                    data,
+                    &mut openai_acc,
+                    &mut anthropic_acc,
+                    &mut on_text,
+                )?;
             }
         }
     }
@@ -213,24 +290,46 @@ pub async fn chat(
     }
 }
 
+fn feed_stream_data(
+    protocol: Protocol,
+    data: &str,
+    openai_acc: &mut openai::StreamAccumulator,
+    anthropic_acc: &mut anthropic::StreamAccumulator,
+    on_text: &mut dyn FnMut(&str),
+) -> AppResult<()> {
+    match protocol {
+        Protocol::Openai => openai_acc.feed(data, on_text),
+        Protocol::Anthropic => anthropic_acc.feed(data, on_text)?,
+    }
+    Ok(())
+}
+
 async fn send(req: reqwest::RequestBuilder) -> AppResult<Vec<u8>> {
     let response = req
         .send()
         .await
-        .map_err(|e| AppError::Other(format!("request failed: {e}")))?;
+        .map_err(|e| AppError::Network(format!("request failed: {e}")))?;
     let status = response.status();
     let bytes = response
         .bytes()
         .await
-        .map_err(|e| AppError::Other(format!("failed to read response: {e}")))?;
+        .map_err(|e| AppError::Network(format!("failed to read response: {e}")))?;
 
     if !status.is_success() {
-        let message = serde_json::from_slice::<ApiError>(&bytes)
-            .map(|e| e.error.message)
-            .unwrap_or_else(|_| format!("AI request failed with status {status}"));
-        return Err(AppError::Other(message));
+        return Err(status_error(status, &bytes));
     }
     Ok(bytes.to_vec())
+}
+
+fn status_error(status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
+    let message = serde_json::from_slice::<ApiError>(bytes)
+        .map(|e| e.error.message)
+        .unwrap_or_else(|_| format!("AI request failed with status {status}"));
+    if status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error() {
+        AppError::Network(message)
+    } else {
+        AppError::Other(message)
+    }
 }
 
 #[derive(Deserialize)]
@@ -242,6 +341,41 @@ struct ModelsResponse {
 #[derive(Deserialize)]
 struct ModelEntry {
     id: String,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelLimits {
+    pub context_window: Option<u32>,
+    pub max_output_tokens: Option<u32>,
+}
+
+#[derive(Default, Deserialize)]
+struct ModelInfo {
+    #[serde(default)]
+    max_input_tokens: Option<u32>,
+    #[serde(default)]
+    context_length: Option<u32>,
+    #[serde(default)]
+    max_context_length: Option<u32>,
+    #[serde(default)]
+    context_window: Option<u32>,
+    #[serde(default)]
+    max_tokens: Option<u32>,
+    #[serde(default)]
+    max_output_tokens: Option<u32>,
+    #[serde(default)]
+    max_completion_tokens: Option<u32>,
+    #[serde(default)]
+    top_provider: Option<TopProviderInfo>,
+}
+
+#[derive(Default, Deserialize)]
+struct TopProviderInfo {
+    #[serde(default)]
+    context_length: Option<u32>,
+    #[serde(default)]
+    max_completion_tokens: Option<u32>,
 }
 
 #[derive(Deserialize)]

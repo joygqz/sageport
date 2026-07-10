@@ -43,6 +43,15 @@ async fn stored_base_url(state: &AppState, protocol: Protocol) -> AppResult<Stri
         .unwrap_or_else(|| protocol.default_base_url().to_string()))
 }
 
+fn effective_base_url(raw: &str, protocol: Protocol) -> String {
+    let trimmed = raw.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        protocol.default_base_url().to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 #[tauri::command]
 pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
     let api_key = settings_repo::get(&state.db, API_KEY_SETTING)
@@ -63,7 +72,12 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
 
 #[tauri::command]
 pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> AppResult<()> {
-    if stored_protocol(&state).await? != input.protocol {
+    let previous_protocol = stored_protocol(&state).await?;
+    let previous_base_url = stored_base_url(&state, previous_protocol).await?;
+    if previous_protocol != input.protocol
+        || effective_base_url(&previous_base_url, previous_protocol)
+            != effective_base_url(&input.base_url, input.protocol)
+    {
         settings_repo::set(&state.db, MODEL_SETTING, "").await?;
     }
     settings_repo::set(&state.db, BASE_URL_SETTING, input.base_url.trim()).await?;
@@ -79,7 +93,7 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
 
 #[tauri::command]
 pub async fn ai_set_model(state: State<'_, AppState>, model: String) -> AppResult<()> {
-    settings_repo::set(&state.db, MODEL_SETTING, &model).await
+    settings_repo::set(&state.db, MODEL_SETTING, model.trim()).await
 }
 
 async fn endpoint(state: &AppState) -> AppResult<(String, String, Protocol)> {
@@ -104,16 +118,53 @@ pub async fn ai_list_models(state: State<'_, AppState>) -> AppResult<Vec<String>
 }
 
 #[tauri::command]
-pub async fn ai_chat(
+pub async fn ai_model_limits(
     state: State<'_, AppState>,
+    model: String,
+) -> AppResult<ai::ModelLimits> {
+    let model = model.trim();
+    if model.is_empty() {
+        return Ok(ai::ModelLimits::default());
+    }
+    let (base_url, api_key, protocol) = endpoint(&state).await?;
+    Ok(ai::model_limits(
+        &Endpoint {
+            base_url: &base_url,
+            api_key: &api_key,
+            protocol,
+        },
+        model,
+    )
+    .await)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiChatInput {
     model: String,
     messages: Vec<ai::ChatMessage>,
     tools: Vec<ai::ToolSpec>,
     context: Option<String>,
+    max_tokens: Option<u32>,
     request_id: Option<String>,
+}
+
+#[tauri::command]
+pub async fn ai_chat(
+    state: State<'_, AppState>,
+    input: AiChatInput,
     on_delta: tauri::ipc::Channel<ai::StreamEvent>,
 ) -> AppResult<ai::ChatResult> {
-    if model.trim().is_empty() {
+    let AiChatInput {
+        model,
+        messages,
+        tools,
+        context,
+        max_tokens,
+        request_id,
+    } = input;
+    let model = model.trim();
+    if model.is_empty() {
         return Err(AppError::Invalid("no model selected".into()));
     }
     let (base_url, api_key, protocol) = endpoint(&state).await?;
@@ -122,11 +173,21 @@ pub async fn ai_chat(
         api_key: &api_key,
         protocol,
     };
-    let chat = ai::chat(&ep, &model, &messages, &tools, context.as_deref(), |text| {
-        let _ = on_delta.send(ai::StreamEvent::Text {
-            text: text.to_string(),
-        });
-    });
+    let chat = ai::chat(
+        &ep,
+        model,
+        &messages,
+        &tools,
+        context.as_deref(),
+        max_tokens
+            .unwrap_or(ai::DEFAULT_MAX_OUTPUT_TOKENS)
+            .clamp(1, ai::MAX_OUTPUT_TOKENS),
+        |text| {
+            let _ = on_delta.send(ai::StreamEvent::Text {
+                text: text.to_string(),
+            });
+        },
+    );
 
     let Some(request_id) = request_id else {
         return chat.await;
@@ -242,4 +303,21 @@ pub async fn ai_session_rename(
 #[tauri::command]
 pub async fn ai_session_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
     ai_session_repo::delete(&state.db, &id).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn effective_url_normalizes_defaults_and_trailing_slashes() {
+        assert_eq!(
+            effective_base_url("", Protocol::Openai),
+            "https://api.openai.com/v1"
+        );
+        assert_eq!(
+            effective_base_url(" https://example.com/v1/// ", Protocol::Openai),
+            "https://example.com/v1"
+        );
+    }
 }

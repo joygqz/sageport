@@ -513,7 +513,6 @@ export const en = {
       title: "Delete Chat",
     },
     thinking: "Thinking",
-    elapsedSeconds: "{seconds}s",
     stop: "Stop Generating",
     stepLimitReached:
       'Reached the step limit for one run. Say "continue" to keep going.',

@@ -501,7 +501,6 @@ export const zhCN: Dictionary = {
       title: "删除对话",
     },
     thinking: "正在思考",
-    elapsedSeconds: "{seconds} 秒",
     stop: "停止生成",
     stepLimitReached: "已达到单次运行的步骤上限，回复“继续”可以接着执行。",
     inputPlaceholder: "询问服务器相关问题",

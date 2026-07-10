@@ -3,84 +3,29 @@ import { create } from "zustand";
 import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
-import { errorCode, errorMessage, toast } from "@/lib/toast";
-import type {
-  AiChatMessage,
-  AiSessionSummary,
-  AiToolCall,
-} from "@/types/models";
-import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
-import { modelHistoryWindow } from "./history";
+import { errorMessage, toast } from "@/lib/toast";
+import type { AiSessionSummary } from "@/types/models";
+import { runAgentLoop, type RunnerHost } from "./runner";
 import {
-  AI_TOOL_SPECS,
-  automaticTerminalSelectionResult,
-  askUserOptions,
-  askUserQuestion,
-  defaultTerminalOption,
-  executeTool,
-  noTerminalSessionError,
-  normalizeArgs,
-  resolveTerminalTab,
-  selectionResult,
-  sessionNotConnectedError,
-  TOOLS_REQUIRING_APPROVAL,
-} from "./tools";
-
-const MAX_STEPS = 24;
-
-const TOOL_RESULT_HEAD_CHARS = 2000;
-const TOOL_RESULT_TAIL_CHARS = 6000;
-const TOOL_RESULT_MAX_CHARS =
-  TOOL_RESULT_HEAD_CHARS + TOOL_RESULT_TAIL_CHARS + 500;
-
-const DECLINED_RESULT = "The user declined to run this command.";
-const STOPPED_RESULT = "The user stopped this run before the call executed.";
-
-function truncateToolResult(text: string): string {
-  if (text.length <= TOOL_RESULT_MAX_CHARS) return text;
-  const omitted = text.length - TOOL_RESULT_HEAD_CHARS - TOOL_RESULT_TAIL_CHARS;
-  return `${text.slice(0, TOOL_RESULT_HEAD_CHARS)}\n… (${omitted} characters omitted; call read_terminal_output with fewer lines if you need the rest) …\n${text.slice(-TOOL_RESULT_TAIL_CHARS)}`;
-}
-
-const TITLE_MAX_LEN = 60;
+  buildLogFromHistory,
+  deriveTitle,
+  repairHistory,
+  type RuntimeSession,
+} from "./transcript";
 
 function t(key: Parameters<typeof translate>[1]): string {
   return translate(detectLocale(), key);
 }
 
-export type ToolStatus =
-  | "awaiting-approval"
-  | "awaiting-input"
-  | "running"
-  | "done"
-  | "denied"
-  | "error";
-
-export type AgentActivity = "thinking" | "responding" | null;
-
-export type AgentLogItem =
-  | { id: string; kind: "user"; content: string }
-  | { id: string; kind: "assistant"; content: string }
-  | {
-      id: string;
-      kind: "tool";
-      toolCallId: string;
-      name: string;
-      args: Record<string, unknown>;
-      status: ToolStatus;
-      result?: string;
-    };
-
-interface RuntimeSession {
-  history: AiChatMessage[];
-
-  log: AgentLogItem[];
-  pending: boolean;
-  activity: AgentActivity;
-
-  requestId: string | null;
-
-  stopRequested: boolean;
+function emptyRuntime(): RuntimeSession {
+  return {
+    history: [],
+    log: [],
+    pending: false,
+    activity: null,
+    requestId: null,
+    stopRequested: false,
+  };
 }
 
 interface AiStoreState {
@@ -88,14 +33,6 @@ interface AiStoreState {
   sessionsLoaded: boolean;
   activeId: string | null;
   runtime: Record<string, RuntimeSession>;
-  approvals: Map<
-    string,
-    { sessionId: string; resolve: (approved: boolean) => void }
-  >;
-  answers: Map<
-    string,
-    { sessionId: string; resolve: (option: string | null) => void }
-  >;
 
   loadSessions: () => Promise<void>;
 
@@ -113,137 +50,19 @@ interface AiStoreState {
   answer: (toolLogId: string, option: string) => void;
 }
 
-function buildContext(omittedHistoryMessages = 0): string {
-  const state = useTabsStore.getState();
-  const sessions = terminalTabs(state.tabs);
-  const currentId = targetTerminalId(state);
-  const current = sessions.find((session) => session.id === currentId);
-  const lines = [
-    `App: Sageport v${__APP_VERSION__}, a desktop SSH client.`,
-    `UI language: ${detectLocale()}.`,
-    current
-      ? `Current terminal (default target): ${JSON.stringify({
-          id: current.id,
-          host: current.title,
-          hostId: current.hostId || undefined,
-          target: current.target,
-          address: current.adhoc?.host,
-          status: current.status,
-        })}`
-      : "Current terminal: none.",
-  ];
-  if (omittedHistoryMessages > 0) {
-    lines.push(
-      `${omittedHistoryMessages} older chat messages are outside the model window; ask for missing details only if essential.`,
-    );
-  }
-  return lines.join("\n");
-}
-
-function buildLogFromHistory(messages: AiChatMessage[]): AgentLogItem[] {
-  const log: AgentLogItem[] = [];
-  const toolItemByCallId = new Map<
-    string,
-    Extract<AgentLogItem, { kind: "tool" }>
-  >();
-
-  for (const m of messages) {
-    if (m.role === "user") {
-      log.push({
-        id: crypto.randomUUID(),
-        kind: "user",
-        content: m.content ?? "",
-      });
-    } else if (m.role === "assistant") {
-      if (m.content) {
-        log.push({
-          id: crypto.randomUUID(),
-          kind: "assistant",
-          content: m.content,
-        });
-      }
-      for (const call of m.toolCalls ?? []) {
-        const item: Extract<AgentLogItem, { kind: "tool" }> = {
-          id: crypto.randomUUID(),
-          kind: "tool",
-          toolCallId: call.id,
-          name: call.name,
-          args: normalizeArgs(call.arguments),
-          status: "done",
-        };
-        log.push(item);
-        toolItemByCallId.set(call.id, item);
-      }
-    } else if (m.role === "tool" && m.toolCallId) {
-      const item = toolItemByCallId.get(m.toolCallId);
-      if (item) {
-        item.result = m.content;
-        if (m.content === DECLINED_RESULT || m.content === STOPPED_RESULT) {
-          item.status = "denied";
-        } else if (m.content?.startsWith("Error:")) {
-          item.status = "error";
-        }
-      }
-    }
-  }
-  return log;
-}
-
-function deriveTitle(prompt: string): string {
-  const firstLine = prompt.split("\n", 1)[0].trim();
-  return firstLine.length > TITLE_MAX_LEN
-    ? `${firstLine.slice(0, TITLE_MAX_LEN).trimEnd()}…`
-    : firstLine;
-}
-
-type PreparedToolCall = {
-  call: AiToolCall;
-  preflightError?: string;
-  automaticResult?: string;
-};
-
-function prepareToolCall(
-  call: AiToolCall,
-  userPrompt: string,
-): PreparedToolCall {
-  if (call.name === "ask_user") {
-    const args = normalizeArgs(call.arguments);
-    const selection = defaultTerminalOption(args, userPrompt);
-    if (selection) {
-      return {
-        call: { ...call, arguments: args },
-        automaticResult: automaticTerminalSelectionResult(
-          selection.option,
-          selection.tab,
-        ),
-      };
-    }
-    return { call: { ...call, arguments: args } };
-  }
-  if (call.name !== "run_terminal_command") return { call };
-
-  const args = normalizeArgs(call.arguments);
-  const requested =
-    typeof args.sessionId === "string" ? args.sessionId : undefined;
-  const tab = resolveTerminalTab(requested);
-
-  if (!tab) {
-    return {
-      call: { ...call, arguments: args },
-      preflightError: noTerminalSessionError(requested),
-    };
-  }
-  if (tab.status !== "connected") {
-    return {
-      call: { ...call, arguments: { ...args, sessionId: tab.id } },
-      preflightError: sessionNotConnectedError(tab),
-    };
-  }
-
-  return { call: { ...call, arguments: { ...args, sessionId: tab.id } } };
-}
-
 export const useAiStore = create<AiStoreState>((set, get) => {
+  const approvals = new Map<
+    string,
+    { sessionId: string; resolve: (approved: boolean) => void }
+  >();
+  const answers = new Map<
+    string,
+    { sessionId: string; resolve: (option: string | null) => void }
+  >();
+  const persistenceFailures = new Set<string>();
+  const saveQueues = new Map<string, Promise<void>>();
+  let sessionsLoad: Promise<void> | null = null;
+
   const patch = (id: string, fn: (r: RuntimeSession) => RuntimeSession) => {
     set((s) => {
       const current = s.runtime[id];
@@ -252,265 +71,43 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     });
   };
 
-  const persist = async (id: string, title: string | null) => {
-    const history = get().runtime[id]?.history ?? [];
-    try {
-      const summary = await ipc.ai.session.save(id, history, title);
-      set((s) => ({
-        sessions: [summary, ...s.sessions.filter((x) => x.id !== id)],
-      }));
-    } catch {}
-  };
-
-  const runToolCall = async (
-    sessionId: string,
-    call: AiToolCall,
-    preflightError?: string,
-    automaticResult?: string,
-  ) => {
-    if (automaticResult) {
-      patch(sessionId, (r) => ({
-        ...r,
-        history: [
-          ...r.history,
-          { role: "tool", toolCallId: call.id, content: automaticResult },
-        ],
-      }));
-      return;
-    }
-    const args = normalizeArgs(call.arguments);
-    const logId = crypto.randomUUID();
-    const needsApproval = TOOLS_REQUIRING_APPROVAL.has(call.name);
-    const isQuestion =
-      call.name === "ask_user" &&
-      Boolean(askUserQuestion(args)) &&
-      askUserOptions(args).length >= 2;
-    const initialStatus: ToolStatus = preflightError
-      ? "error"
-      : isQuestion
-        ? "awaiting-input"
-        : needsApproval
-          ? "awaiting-approval"
-          : "running";
-
-    patch(sessionId, (r) => ({
-      ...r,
-      log: [
-        ...r.log,
-        {
-          id: logId,
-          kind: "tool",
-          toolCallId: call.id,
-          name: call.name,
-          args,
-          status: initialStatus,
-          result: preflightError,
-        },
-      ],
-    }));
-
-    const setToolStatus = (status: ToolStatus, result?: string) =>
-      patch(sessionId, (r) => ({
-        ...r,
-        log: r.log.map((item) =>
-          item.kind === "tool" && item.id === logId
-            ? { ...item, status, result: result ?? item.result }
-            : item,
-        ),
-      }));
-
-    let resultText: string;
-    if (preflightError) {
-      resultText = preflightError;
-    } else if (call.name === "ask_user") {
-      if (!isQuestion) {
-        resultText =
-          "Error: ask_user needs a question and 2-6 non-empty string options.";
-        setToolStatus("error", resultText);
-      } else {
-        const option = await requestAnswer(get, sessionId, logId);
-        if (option === null) {
-          resultText = STOPPED_RESULT;
-          setToolStatus("denied", resultText);
-        } else {
-          resultText = selectionResult(option);
-          setToolStatus("done", resultText);
-        }
-      }
-    } else if (
-      needsApproval &&
-      !(await requestApproval(get, sessionId, logId))
-    ) {
-      resultText = DECLINED_RESULT;
-      setToolStatus("denied", resultText);
-    } else {
-      if (needsApproval) setToolStatus("running");
-      try {
-        resultText = truncateToolResult(await executeTool(call.name, args));
-        setToolStatus("done", resultText);
-      } catch (err) {
-        resultText = `Error: ${errorMessage(err)}`;
-        setToolStatus("error", resultText);
-      }
-    }
-
-    patch(sessionId, (r) => ({
-      ...r,
-      history: [
-        ...r.history,
-        { role: "tool", toolCallId: call.id, content: resultText },
-      ],
-    }));
-  };
-
-  const appendDelta = (sessionId: string, itemId: string, text: string) => {
-    patch(sessionId, (r) => {
-      const existing = r.log.find((i) => i.id === itemId);
-      if (!existing) {
-        return {
-          ...r,
-          activity: "responding",
-          log: [...r.log, { id: itemId, kind: "assistant", content: text }],
-        };
-      }
-      return {
-        ...r,
-        activity: "responding",
-        log: r.log.map((i) =>
-          i.id === itemId && i.kind === "assistant"
-            ? { ...i, content: i.content + text }
-            : i,
-        ),
-      };
-    });
-  };
-
-  const stopped = (sessionId: string) =>
-    get().runtime[sessionId]?.stopRequested ?? false;
-
-  const runLoop = async (sessionId: string, model: string) => {
-    for (let step = 0; step < MAX_STEPS; step++) {
-      const runtime = get().runtime[sessionId];
-
+  const persist = async (id: string, title: string | null = null) => {
+    const previous = saveQueues.get(id) ?? Promise.resolve();
+    const operation = previous.then(async () => {
+      const runtime = get().runtime[id];
       if (!runtime) return;
-
-      const requestId = crypto.randomUUID();
-      const streamItemId = crypto.randomUUID();
-      patch(sessionId, (r) => ({
-        ...r,
-        requestId,
-        activity: "thinking",
-      }));
-
-      let turnDone = false;
-      let result;
       try {
-        const modelHistory = modelHistoryWindow(runtime.history);
-        result = await ipc.ai.chat(
-          model,
-          modelHistory.messages,
-          AI_TOOL_SPECS,
-          {
-            context: buildContext(modelHistory.omittedMessages),
-            requestId,
-            onDelta: (text) => {
-              if (!turnDone) appendDelta(sessionId, streamItemId, text);
-            },
-          },
-        );
+        const summary = await ipc.ai.session.save(id, runtime.history, title);
+        persistenceFailures.delete(id);
+        set((s) => ({
+          sessions: [summary, ...s.sessions.filter((x) => x.id !== id)],
+        }));
       } catch (err) {
-        turnDone = true;
-        if (errorCode(err) !== "cancelled") throw err;
-
-        const partial = get().runtime[sessionId]?.log.find(
-          (i) => i.id === streamItemId,
-        );
-        if (partial?.kind === "assistant" && partial.content) {
-          patch(sessionId, (r) => ({
-            ...r,
-            history: [
-              ...r.history,
-              { role: "assistant", content: partial.content },
-            ],
-          }));
+        if (!persistenceFailures.has(id)) {
+          persistenceFailures.add(id);
+          toast.error(t("ai.error"), errorMessage(err));
         }
-        return;
       }
-
-      turnDone = true;
-      const userPrompt =
-        [...runtime.history]
-          .reverse()
-          .find((message) => message.role === "user")?.content ?? "";
-      const preparedToolCalls = (result.toolCalls ?? []).map((call) =>
-        prepareToolCall(call, userPrompt),
-      );
-      const toolCalls = preparedToolCalls.map((x) => x.call);
-      patch(sessionId, (r) => ({
-        ...r,
-        activity: null,
-        history: [
-          ...r.history,
-          {
-            role: "assistant",
-            content: result.content,
-            toolCalls: toolCalls.length ? toolCalls : undefined,
-          },
-        ],
-
-        log: result.content
-          ? r.log.some((i) => i.id === streamItemId)
-            ? r.log.map((i) =>
-                i.id === streamItemId && i.kind === "assistant"
-                  ? { ...i, content: result.content! }
-                  : i,
-              )
-            : [
-                ...r.log,
-                {
-                  id: streamItemId,
-                  kind: "assistant",
-                  content: result.content,
-                },
-              ]
-          : r.log.filter((i) => i.id !== streamItemId),
-      }));
-
-      if (toolCalls.length === 0) return;
-      for (const {
-        call,
-        preflightError,
-        automaticResult,
-      } of preparedToolCalls) {
-        if (stopped(sessionId)) {
-          patch(sessionId, (r) => ({
-            ...r,
-            history: [
-              ...r.history,
-              {
-                role: "tool",
-                toolCallId: call.id,
-                content: STOPPED_RESULT,
-              },
-            ],
-          }));
-          continue;
-        }
-        await runToolCall(sessionId, call, preflightError, automaticResult);
-      }
-      if (stopped(sessionId)) return;
+    });
+    saveQueues.set(id, operation);
+    await operation;
+    if (saveQueues.get(id) === operation) {
+      saveQueues.delete(id);
     }
-    patch(sessionId, (r) => ({
-      ...r,
-      log: [
-        ...r.log,
-        {
-          id: crypto.randomUUID(),
-          kind: "assistant",
-          content: t("ai.stepLimitReached"),
-        },
-      ],
-    }));
+  };
+
+  const host: RunnerHost = {
+    runtime: (sessionId) => get().runtime[sessionId],
+    patch,
+    persist: (sessionId) => persist(sessionId),
+    requestApproval: (sessionId, toolLogId) =>
+      new Promise((resolve) => {
+        approvals.set(toolLogId, { sessionId, resolve });
+      }),
+    requestAnswer: (sessionId, toolLogId) =>
+      new Promise((resolve) => {
+        answers.set(toolLogId, { sessionId, resolve });
+      }),
   };
 
   return {
@@ -518,35 +115,47 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     sessionsLoaded: false,
     activeId: null,
     runtime: {},
-    approvals: new Map(),
-    answers: new Map(),
 
     loadSessions: async () => {
       if (get().sessionsLoaded) return;
-      const sessions = await ipc.ai.session.list();
-      set({ sessions, sessionsLoaded: true });
-      if (sessions.length > 0) {
-        await get().openSession(sessions[0].id);
+      if (!sessionsLoad) {
+        sessionsLoad = (async () => {
+          try {
+            const sessions = await ipc.ai.session.list();
+            set({ sessions, sessionsLoaded: true });
+            if (sessions.length > 0) {
+              await get().openSession(sessions[0].id);
+            }
+          } catch (err) {
+            toast.error(t("ai.error"), errorMessage(err));
+          } finally {
+            sessionsLoad = null;
+          }
+        })();
       }
+      await sessionsLoad;
     },
 
     openSession: async (id) => {
       set({ activeId: id });
       if (get().runtime[id]) return;
-      const session = await ipc.ai.session.get(id);
-      set((s) => ({
-        runtime: {
-          ...s.runtime,
-          [id]: {
-            history: session.messages,
-            log: buildLogFromHistory(session.messages),
-            pending: false,
-            activity: null,
-            requestId: null,
-            stopRequested: false,
+      try {
+        const session = await ipc.ai.session.get(id);
+        const history = repairHistory(session.messages);
+        set((s) => ({
+          runtime: {
+            ...s.runtime,
+            [id]: {
+              ...emptyRuntime(),
+              history,
+              log: buildLogFromHistory(history),
+            },
           },
-        },
-      }));
+        }));
+      } catch (err) {
+        if (get().activeId === id) set({ activeId: null });
+        toast.error(t("ai.error"), errorMessage(err));
+      }
     },
 
     newSession: async () => {
@@ -561,17 +170,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
           },
           ...s.sessions,
         ],
-        runtime: {
-          ...s.runtime,
-          [session.id]: {
-            history: [],
-            log: [],
-            pending: false,
-            activity: null,
-            requestId: null,
-            stopRequested: false,
-          },
-        },
+        runtime: { ...s.runtime, [session.id]: emptyRuntime() },
         activeId: session.id,
       }));
       return session.id;
@@ -591,6 +190,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     },
 
     deleteSession: async (id) => {
+      get().stop(id);
       try {
         await ipc.ai.session.remove(id);
       } catch (err) {
@@ -604,6 +204,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         const activeId = s.activeId === id ? null : s.activeId;
         return { sessions, runtime, activeId };
       });
+      persistenceFailures.delete(id);
     },
 
     send: async (sessionId, prompt, model) => {
@@ -624,9 +225,10 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         ],
         history: [...r.history, { role: "user", content: trimmed }],
       }));
+      await persist(sessionId, title);
 
       try {
-        await runLoop(sessionId, model);
+        await runAgentLoop(host, sessionId, model);
       } catch (err) {
         const message = errorMessage(err);
         toast.error(t("ai.error"), message);
@@ -649,7 +251,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
           requestId: null,
           stopRequested: false,
         }));
-        void persist(sessionId, title);
+        void persist(sessionId);
       }
     },
 
@@ -658,16 +260,31 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       if (!runtime?.pending) return;
       patch(sessionId, (r) => ({ ...r, stopRequested: true }));
 
-      if (runtime.requestId) void ipc.ai.cancel(runtime.requestId);
+      if (runtime.requestId) {
+        const requestId = runtime.requestId;
+        void ipc.ai
+          .cancel(requestId)
+          .catch(() => {})
+          .finally(() => {
+            globalThis.setTimeout(() => {
+              const current = get().runtime[sessionId];
+              if (
+                current?.pending &&
+                current.stopRequested &&
+                current.requestId === requestId
+              ) {
+                void ipc.ai.cancel(requestId).catch(() => {});
+              }
+            }, 100);
+          });
+      }
 
-      const approvals = get().approvals;
       for (const [logId, entry] of approvals) {
         if (entry.sessionId !== sessionId) continue;
         entry.resolve(false);
         approvals.delete(logId);
       }
 
-      const answers = get().answers;
       for (const [logId, entry] of answers) {
         if (entry.sessionId !== sessionId) continue;
         entry.resolve(null);
@@ -676,38 +293,18 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     },
 
     approve: (toolLogId) => {
-      get().approvals.get(toolLogId)?.resolve(true);
-      get().approvals.delete(toolLogId);
+      approvals.get(toolLogId)?.resolve(true);
+      approvals.delete(toolLogId);
     },
 
     deny: (toolLogId) => {
-      get().approvals.get(toolLogId)?.resolve(false);
-      get().approvals.delete(toolLogId);
+      approvals.get(toolLogId)?.resolve(false);
+      approvals.delete(toolLogId);
     },
 
     answer: (toolLogId, option) => {
-      get().answers.get(toolLogId)?.resolve(option);
-      get().answers.delete(toolLogId);
+      answers.get(toolLogId)?.resolve(option);
+      answers.delete(toolLogId);
     },
   };
 });
-
-function requestApproval(
-  get: () => AiStoreState,
-  sessionId: string,
-  toolLogId: string,
-): Promise<boolean> {
-  return new Promise((resolve) => {
-    get().approvals.set(toolLogId, { sessionId, resolve });
-  });
-}
-
-function requestAnswer(
-  get: () => AiStoreState,
-  sessionId: string,
-  toolLogId: string,
-): Promise<string | null> {
-  return new Promise((resolve) => {
-    get().answers.set(toolLogId, { sessionId, resolve });
-  });
-}

@@ -1,6 +1,7 @@
 import { ipc } from "@/lib/ipc";
 import type { AiToolSpec } from "@/types/models";
 import { getSession, readTerminalContext } from "@/features/terminal/sessions";
+import { isShellPromptLine } from "@/features/terminal/autocomplete/engine";
 import {
   targetTerminalId,
   terminalTabs,
@@ -8,6 +9,8 @@ import {
   type TerminalStatus,
   type TerminalTab,
 } from "@/workbench/tabs";
+
+const MAX_TERMINAL_READ_LINES = 2_000;
 
 export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
@@ -73,7 +76,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "read_terminal_output",
     description:
-      "Read recent on-screen terminal output. Omit sessionId for the Current terminal. Use it instead of asking the user to paste output.",
+      "Read recent on-screen terminal output. Omit sessionId for the Current terminal. Use it instead of asking the user to paste output. Results beyond ~30K characters are truncated in the middle (head and tail kept).",
     parameters: {
       type: "object",
       properties: {
@@ -84,7 +87,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
         },
         lines: {
           type: "integer",
-          description: "Recent lines to return (default 60, max 500).",
+          description: "Recent lines to return (default 60, max 2000).",
         },
       },
       additionalProperties: false,
@@ -93,7 +96,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "run_terminal_command",
     description:
-      "Run a command in a live terminal after user approval and return settled output. Omit sessionId for the Current terminal; never ask to reconfirm it.",
+      "Run a command in a live terminal after user approval and return settled output. Omit sessionId for the Current terminal; never ask to reconfirm it. Results beyond ~30K characters are truncated in the middle (head and tail kept). To read a file or log with thousands of lines completely, first count its lines, then page through it with `sed -n 'START,ENDp' FILE` in consecutive chunks of about 200 lines; continue until the requested range is covered and never treat a truncated result as a complete file.",
     parameters: {
       type: "object",
       properties: {
@@ -118,6 +121,23 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
 ];
 
 export type AiToolName = (typeof AI_TOOL_SPECS)[number]["name"];
+
+export interface ToolExecutionResult {
+  content: string;
+  isError: boolean;
+}
+
+export interface ToolExecutionContext {
+  isCancelled?: () => boolean;
+}
+
+function toolSuccess(content: string): ToolExecutionResult {
+  return { content, isError: false };
+}
+
+function toolFailure(content: string): ToolExecutionResult {
+  return { content, isError: true };
+}
 
 export const TOOLS_REQUIRING_APPROVAL: ReadonlySet<string> = new Set([
   "run_terminal_command",
@@ -256,66 +276,80 @@ function sleep(ms: number) {
 export async function executeTool(
   name: string,
   args: Record<string, unknown>,
-): Promise<string> {
+  context: ToolExecutionContext = {},
+): Promise<ToolExecutionResult> {
   switch (name) {
     case "list_hosts":
       return listHosts();
     case "connect_host":
-      return connectHost(args);
+      return connectHost(args, context);
     case "list_terminal_sessions":
       return listSessions();
     case "read_terminal_output":
       return readOutput(args);
     case "run_terminal_command":
-      return runCommand(args);
+      return runCommand(args, context);
     case "ask_user":
-      return "Error: ask_user is handled by the chat UI and should not reach the executor.";
+      return toolFailure(
+        "Error: ask_user is handled by the chat UI and should not reach the executor.",
+      );
     default:
-      return `Error: unknown tool "${name}".`;
+      return toolFailure(`Error: unknown tool "${name}".`);
   }
 }
 
-async function listHosts(): Promise<string> {
+async function listHosts(): Promise<ToolExecutionResult> {
   const [hosts, groups] = await Promise.all([
     ipc.hosts.list(),
     ipc.groups.list(),
   ]);
   if (hosts.length === 0) {
-    return "No saved hosts yet. The user can add one in the Hosts view.";
+    return toolSuccess(
+      "No saved hosts yet. The user can add one in the Hosts view.",
+    );
   }
   const groupNames = new Map(groups.map((g) => [g.id, g.name]));
-  return JSON.stringify(
-    hosts.map((h) => {
-      const notes = h.notes?.trim();
-      return {
-        id: h.id,
-        label: h.label,
-        address: h.address,
-        port: h.port,
-        username: h.username || undefined,
-        group: h.groupId ? groupNames.get(h.groupId) : undefined,
-        notes: notes ? notes.slice(0, 200) : undefined,
-      };
-    }),
+  return toolSuccess(
+    JSON.stringify(
+      hosts.map((h) => {
+        const notes = h.notes?.trim();
+        return {
+          id: h.id,
+          label: h.label,
+          address: h.address,
+          port: h.port,
+          username: h.username || undefined,
+          group: h.groupId ? groupNames.get(h.groupId) : undefined,
+          notes: notes ? notes.slice(0, 200) : undefined,
+        };
+      }),
+    ),
   );
 }
 
-async function connectHost(args: Record<string, unknown>): Promise<string> {
+async function connectHost(
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> {
   const hostId = typeof args.hostId === "string" ? args.hostId : "";
-  if (!hostId) return "Error: no hostId given.";
+  if (!hostId) return toolFailure("Error: no hostId given.");
 
   let host;
   try {
     host = await ipc.hosts.get(hostId);
   } catch {
-    return `Error: no saved host with id "${hostId}". Call list_hosts to see valid ids.`;
+    return toolFailure(
+      `Error: no saved host with id "${hostId}". Call list_hosts to see valid ids.`,
+    );
   }
 
   const state = useTabsStore.getState();
   const existing = reusableHostSession(state.tabs, hostId);
   if (existing?.status === "connected") {
     state.setActive(existing.id);
-    return `Already connected to "${host.label}". sessionId: ${existing.id}`;
+    return toolSuccess(
+      `Already connected to "${host.label}". sessionId: ${existing.id}`,
+    );
   }
 
   const id =
@@ -327,20 +361,24 @@ async function connectHost(args: Record<string, unknown>): Promise<string> {
     }
   }
 
-  const status = await waitForConnection(id, 30_000);
+  const status = await waitForConnection(id, 30_000, context.isCancelled);
   if (status === "connected") {
-    return `Connected to "${host.label}". sessionId: ${id}`;
+    return toolSuccess(`Connected to "${host.label}". sessionId: ${id}`);
   }
   if (status === "connecting" || status === "idle") {
-    return `Still connecting to "${host.label}" (sessionId: ${id}). The user may need to answer a prompt in the terminal tab (host key trust, password). Check again later with list_terminal_sessions or read_terminal_output.`;
+    return toolSuccess(
+      `Still connecting to "${host.label}" (sessionId: ${id}). The user may need to answer a prompt in the terminal tab (host key trust, password). Check again later with list_terminal_sessions or read_terminal_output.`,
+    );
   }
   const tab = terminalTabs(useTabsStore.getState().tabs).find(
     (t) => t.id === id,
   );
   const detail = tab?.error ? `: ${tab.error}` : ".";
-  return `Error: connection to "${host.label}" ${
-    status === "error" ? "failed" : "was closed"
-  }${detail}`;
+  return toolFailure(
+    `Error: connection to "${host.label}" ${
+      status === "error" ? "failed" : "was closed"
+    }${detail}`,
+  );
 }
 
 export function reusableHostSession(
@@ -362,6 +400,7 @@ export function reusableHostSession(
 async function waitForConnection(
   id: string,
   timeoutMs: number,
+  isCancelled: () => boolean = () => false,
 ): Promise<TerminalStatus> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -369,6 +408,7 @@ async function waitForConnection(
       (t) => t.id === id,
     );
     if (!tab) return "closed";
+    if (isCancelled()) return tab.status;
     if (tab.status !== "connecting" && tab.status !== "idle") {
       return tab.status;
     }
@@ -377,47 +417,53 @@ async function waitForConnection(
   return "connecting";
 }
 
-function listSessions(): string {
+function listSessions(): ToolExecutionResult {
   const state = useTabsStore.getState();
   const sessions = terminalTabs(state.tabs);
   if (sessions.length === 0) {
-    return "No terminal sessions are open right now. Use connect_host to open one.";
+    return toolSuccess(
+      "No terminal sessions are open right now. Use connect_host to open one.",
+    );
   }
   const focusedId = targetTerminalId(state);
-  return JSON.stringify(
-    sessions.map((s) => ({
-      id: s.id,
-      title: s.title,
-      hostId: s.hostId || undefined,
-      status: s.status,
-      current: s.id === focusedId,
-    })),
+  return toolSuccess(
+    JSON.stringify(
+      sessions.map((s) => ({
+        id: s.id,
+        title: s.title,
+        hostId: s.hostId || undefined,
+        status: s.status,
+        current: s.id === focusedId,
+      })),
+    ),
   );
 }
 
-function readOutput(args: Record<string, unknown>): string {
+function readOutput(args: Record<string, unknown>): ToolExecutionResult {
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
   const tab = resolveTerminalTab(requested);
-  if (!tab) return noTerminalSessionError(requested);
+  if (!tab) return toolFailure(noTerminalSessionError(requested));
 
-  const lines =
-    typeof args.lines === "number" && Number.isFinite(args.lines)
-      ? Math.min(Math.max(Math.round(args.lines), 1), 500)
-      : 60;
+  const lines = terminalReadLineLimit(args.lines);
   const text = readTerminalContext(tab.id, lines);
-  return text || "(the terminal has no output yet)";
+  return toolSuccess(text || "(the terminal has no output yet)");
 }
 
-async function runCommand(args: Record<string, unknown>): Promise<string> {
+async function runCommand(
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> {
   const command = typeof args.command === "string" ? args.command.trim() : "";
-  if (!command) return "Error: no command given.";
+  if (!command) return toolFailure("Error: no command given.");
 
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
   const tab = resolveTerminalTab(requested);
-  if (!tab) return noTerminalSessionError(requested);
-  if (tab.status !== "connected") return sessionNotConnectedError(tab);
+  if (!tab) return toolFailure(noTerminalSessionError(requested));
+  if (tab.status !== "connected") {
+    return toolFailure(sessionNotConnectedError(tab));
+  }
 
   const timeoutMs = Math.min(
     typeof args.timeoutMs === "number" && args.timeoutMs > 0
@@ -427,21 +473,39 @@ async function runCommand(args: Record<string, unknown>): Promise<string> {
   );
 
   const session = getSession(tab.id);
-  if (!session) return noTerminalSessionError(requested);
-  const before = readTerminalContext(tab.id, 500) ?? "";
+  if (!session) return toolFailure(noTerminalSessionError(requested));
+  const before = readTerminalContext(tab.id, MAX_TERMINAL_READ_LINES) ?? "";
+  const promptBefore = before.split("\n").at(-1) ?? "";
   session.sendCommand(command);
-  const after = await waitForSettledOutput(tab.id, timeoutMs);
+  const after = await waitForSettledOutput(
+    tab.id,
+    timeoutMs,
+    context.isCancelled,
+    isShellPromptLine(promptBefore),
+    before,
+  );
 
   const diff = newOutput(before, after).trim();
-  if (diff) return diff;
-  return after
-    ? "(the command produced no new output)"
-    : "(the command produced no output)";
+  if (diff) return toolSuccess(diff);
+  return toolSuccess(
+    after
+      ? "(the command produced no new output)"
+      : "(the command produced no output)",
+  );
 }
 
-function newOutput(before: string, after: string): string {
+export function terminalReadLineLimit(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(Math.max(Math.round(value), 1), MAX_TERMINAL_READ_LINES)
+    : 60;
+}
+
+export function newOutput(before: string, after: string): string {
   if (!before) return after;
-  if (after.startsWith(before)) return after.slice(before.length);
+  if (after.startsWith(before)) {
+    const suffix = after.slice(before.length);
+    return suffix.startsWith("\n") ? suffix.slice(1) : suffix;
+  }
 
   const b = before.split("\n");
   const a = after.split("\n");
@@ -461,21 +525,34 @@ function newOutput(before: string, after: string): string {
 async function waitForSettledOutput(
   id: string,
   timeoutMs: number,
+  isCancelled: () => boolean = () => false,
+  waitForPrompt = false,
+  initialOutput = "",
 ): Promise<string> {
   const settleGap = 700;
   const pollInterval = 200;
   const start = Date.now();
 
   await sleep(pollInterval);
-  let last = readTerminalContext(id, 500) ?? "";
+  let last = readTerminalContext(id, MAX_TERMINAL_READ_LINES) ?? "";
   let lastChangeAt = Date.now();
 
   while (Date.now() - start < timeoutMs) {
-    const current = readTerminalContext(id, 500) ?? "";
+    const current = readTerminalContext(id, MAX_TERMINAL_READ_LINES) ?? "";
+    if (isCancelled()) return current;
     if (current !== last) {
       last = current;
       lastChangeAt = Date.now();
-    } else if (Date.now() - lastChangeAt >= settleGap) {
+    }
+    const lastLine = current.split("\n").at(-1) ?? "";
+    if (
+      waitForPrompt &&
+      current !== initialOutput &&
+      isShellPromptLine(lastLine)
+    ) {
+      break;
+    }
+    if (!waitForPrompt && Date.now() - lastChangeAt >= settleGap) {
       break;
     }
     await sleep(pollInterval);

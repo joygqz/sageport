@@ -17,7 +17,13 @@ vi.mock("@/lib/ipc", () => ({
 
 import type { TerminalTab } from "@/workbench/tabs";
 import { useTabsStore } from "@/workbench/tabs";
-import { defaultTerminalOption, reusableHostSession } from "./tools";
+import {
+  defaultTerminalOption,
+  executeTool,
+  newOutput,
+  reusableHostSession,
+  terminalReadLineLimit,
+} from "./tools";
 
 function terminal(
   id: string,
@@ -147,5 +153,48 @@ describe("reusableHostSession", () => {
     stale.hostId = "same-host";
 
     expect(reusableHostSession([stale], "same-host")).toBe(stale);
+  });
+});
+
+describe("terminal output helpers", () => {
+  it("returns structured failures instead of inferring status from text", async () => {
+    await expect(executeTool("read_terminal_output", {})).resolves.toEqual({
+      content: expect.stringContaining("Error: no active terminal session"),
+      isError: true,
+    });
+    await expect(executeTool("unknown_tool", {})).resolves.toEqual({
+      content: 'Error: unknown tool "unknown_tool".',
+      isError: true,
+    });
+  });
+
+  it("accepts large reads but clamps them to the terminal safety limit", () => {
+    expect(terminalReadLineLimit(undefined)).toBe(60);
+    expect(terminalReadLineLimit(0)).toBe(1);
+    expect(terminalReadLineLimit(1_500)).toBe(1_500);
+    expect(terminalReadLineLimit(10_000)).toBe(2_000);
+  });
+
+  it("extracts consecutive pages from a file with thousands of lines", () => {
+    const file = Array.from(
+      { length: 5_000 },
+      (_, index) => `line-${String(index + 1).padStart(4, "0")}`,
+    );
+    const recovered: string[] = [];
+
+    for (let start = 0; start < file.length; start += 200) {
+      const before = ["$ previous command", "previous output"].join("\n");
+      const page = file.slice(start, start + 200);
+      const after = [before, ...page].join("\n");
+      recovered.push(...newOutput(before, after).split("\n"));
+    }
+
+    expect(recovered).toEqual(file);
+  });
+
+  it("recovers output after the terminal buffer drops older lines", () => {
+    const before = ["old-1", "old-2", "overlap-1", "overlap-2"].join("\n");
+    const after = ["overlap-1", "overlap-2", "new-1", "new-2"].join("\n");
+    expect(newOutput(before, after)).toBe("new-1\nnew-2");
   });
 });

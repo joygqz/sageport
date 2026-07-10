@@ -1,11 +1,15 @@
 const PROMPT_TAIL = /.*[$#%❯➜]\s(.*)$/;
 const PROMPT_ONLY = /[$#%❯➜]\s*$/;
 
+export function isShellPromptLine(line: string): boolean {
+  return PROMPT_ONLY.test(line.trimEnd());
+}
+
 export function extractCommand(line: string): string | null {
   const trimmed = line.replace(/\s+$/, "");
   if (!trimmed) return null;
   const match = trimmed.match(PROMPT_TAIL);
-  if (!match && PROMPT_ONLY.test(trimmed)) return null;
+  if (!match && isShellPromptLine(trimmed)) return null;
   const command = (match ? match[1] : trimmed).trim();
   if (!command || command.length > 500 || command.includes("\n")) return null;
   return command;

@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { currentInput, extractCommand, suggest } from "./engine";
+import {
+  currentInput,
+  extractCommand,
+  isShellPromptLine,
+  suggest,
+} from "./engine";
+
+describe("isShellPromptLine", () => {
+  it("recognizes common shell prompts but not commands", () => {
+    expect(isShellPromptLine("user@host:~/app$ ")).toBe(true);
+    expect(isShellPromptLine("root@box:/#")).toBe(true);
+    expect(isShellPromptLine("echo done")).toBe(false);
+  });
+});
 
 describe("extractCommand", () => {
   it("strips a shell prompt", () => {

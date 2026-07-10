@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
 import type { AiConfig, AiProtocol } from "@/types/models";
+import { clearModelLimitsCache } from "./model-limits";
 
 const configKey = ["ai", "config"] as const;
 const modelsKey = ["ai", "models"] as const;
@@ -18,6 +19,10 @@ export function defaultBaseUrl(protocol: AiProtocol): string {
   );
 }
 
+function effectiveBaseUrl(baseUrl: string, protocol: AiProtocol): string {
+  return (baseUrl.trim() || defaultBaseUrl(protocol)).replace(/\/+$/, "");
+}
+
 export function useAiConfig() {
   return useQuery({ queryKey: configKey, queryFn: ipc.ai.getConfig });
 }
@@ -25,13 +30,20 @@ export function useAiConfig() {
 export function useSetAiConfig() {
   const qc = useQueryClient();
   return useMutation({
+    scope: { id: "ai-settings" },
     mutationFn: ipc.ai.setConfig,
     onSuccess: (_, input) => {
+      clearModelLimitsCache();
       qc.setQueryData<AiConfig>(configKey, (prev) =>
         prev
           ? {
               ...input,
-              model: prev.protocol === input.protocol ? prev.model : "",
+              model:
+                prev.protocol === input.protocol &&
+                effectiveBaseUrl(prev.baseUrl, prev.protocol) ===
+                  effectiveBaseUrl(input.baseUrl, input.protocol)
+                  ? prev.model
+                  : "",
             }
           : prev,
       );
@@ -53,7 +65,19 @@ export function useAiModels(enabled: boolean) {
 export function useSetAiModel() {
   const qc = useQueryClient();
   return useMutation({
+    scope: { id: "ai-settings" },
     mutationFn: (model: string) => ipc.ai.setModel(model),
-    onSuccess: () => qc.invalidateQueries({ queryKey: configKey }),
+    onMutate: async (model) => {
+      await qc.cancelQueries({ queryKey: configKey });
+      const previous = qc.getQueryData<AiConfig>(configKey);
+      qc.setQueryData<AiConfig>(configKey, (current) =>
+        current ? { ...current, model } : current,
+      );
+      return { previous };
+    },
+    onError: (_error, _model, context) => {
+      if (context?.previous) qc.setQueryData(configKey, context.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: configKey }),
   });
 }

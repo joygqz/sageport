@@ -268,6 +268,9 @@ export interface AiChatMessage {
   toolCalls?: AiToolCall[];
 
   toolCallId?: string;
+
+  /** Local execution metadata; providers receive only the tool content. */
+  toolError?: boolean;
 }
 
 export interface AiToolSpec {
@@ -279,6 +282,11 @@ export interface AiToolSpec {
 export interface AiChatResult {
   content?: string;
   toolCalls?: AiToolCall[];
+}
+
+export interface AiModelLimits {
+  contextWindow: number | null;
+  maxOutputTokens: number | null;
 }
 
 export interface AiSessionSummary {

@@ -37,13 +37,14 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { toast } from "@/lib/toast";
+import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { AiSessionSummary } from "@/types/models";
 import { useLayoutStore } from "@/workbench/layout";
 import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
-import { useAiStore, type AgentLogItem } from "./store";
+import { useAiStore } from "./store";
+import type { AgentLogItem } from "./transcript";
 import { askUserOptions, askUserQuestion } from "./tools";
 import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
@@ -60,7 +61,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const { data: config } = useAiConfig();
   const setModel = useSetAiModel();
   const configured = Boolean(config?.apiKey);
-  const { data: fetchedModels } = useAiModels(configured);
+  const { data: fetchedModels, error: modelsError } = useAiModels(configured);
   const toggleAux = useLayoutStore((s) => s.toggleAux);
   const openSettings = useTabsStore((s) => s.openSettings);
 
@@ -95,7 +96,6 @@ export function AssistantPanel({ width }: { width: number }) {
     pending && activity === "thinking" && !awaitingUser && !toolRunning;
 
   const [input, setInput] = useState("");
-  const [modelOverride, setModelOverride] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<AiSessionSummary | null>(
     null,
   );
@@ -114,15 +114,20 @@ export function AssistantPanel({ width }: { width: number }) {
     if (configured) void loadSessions();
   }, [configured, loadSessions]);
 
+  useEffect(() => {
+    if (modelsError) toast.error(t("ai.error"), errorMessage(modelsError));
+  }, [modelsError, t]);
+
   const models = [
     ...new Set([config?.model, ...(fetchedModels ?? [])].filter(Boolean)),
   ] as string[];
 
-  const model = modelOverride ?? config?.model ?? models[0] ?? "";
+  const model = config?.model ?? models[0] ?? "";
 
   const changeModel = (next: string) => {
-    setModelOverride(next);
-    setModel.mutate(next);
+    setModel.mutate(next, {
+      onError: (err) => toast.error(t("ai.error"), errorMessage(err)),
+    });
   };
 
   useEffect(() => {
@@ -137,18 +142,23 @@ export function AssistantPanel({ width }: { width: number }) {
     });
   }, [log, pending]);
 
-  const sendPrompt = async (prompt: string) => {
-    if (!prompt || pending || !model) return;
+  const sendPrompt = async (prompt: string): Promise<boolean> => {
+    if (!prompt || pending || !model) return false;
     stickToBottom.current = true;
-    const sessionId = activeId ?? (await newSession());
-    void send(sessionId, prompt, model);
+    try {
+      const sessionId = activeId ?? (await newSession());
+      void send(sessionId, prompt, model);
+      return true;
+    } catch (err) {
+      toast.error(t("ai.error"), errorMessage(err));
+      return false;
+    }
   };
 
   const submit = async () => {
     const prompt = input.trim();
     if (!prompt) return;
-    setInput("");
-    await sendPrompt(prompt);
+    if (await sendPrompt(prompt)) setInput("");
   };
 
   const activeTitle = sessions.find((s) => s.id === activeId)?.title;
@@ -187,7 +197,11 @@ export function AssistantPanel({ width }: { width: number }) {
                   size="icon"
                   variant="ghost"
                   className="size-6"
-                  onClick={() => void newSession()}
+                  onClick={() =>
+                    void newSession().catch((err) =>
+                      toast.error(t("ai.error"), errorMessage(err)),
+                    )
+                  }
                 >
                   <SquarePen className="size-4" />
                 </Button>
@@ -390,15 +404,6 @@ export function AssistantPanel({ width }: { width: number }) {
 
 function ThinkingStatus() {
   const { t } = useI18n();
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    const startedAt = Date.now();
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   return (
     <div
@@ -407,12 +412,6 @@ function ThinkingStatus() {
       aria-live="polite"
     >
       <span className="ai-thinking-shimmer">{t("ai.thinking")}</span>
-      {elapsedSeconds >= 10 && (
-        <span aria-hidden="true">
-          {" · "}
-          {t("ai.elapsedSeconds", { seconds: elapsedSeconds })}
-        </span>
-      )}
     </div>
   );
 }

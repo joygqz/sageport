@@ -1,6 +1,6 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { CheckCircle2, ExternalLink, RotateCw, Sparkles } from "lucide-react";
+import { CheckCircle2, RotateCw, Sparkles } from "lucide-react";
 
 import { Badge, Button, Spinner } from "@/components/ui";
 import { useI18n } from "@/i18n";
@@ -32,11 +32,10 @@ export function AboutSection() {
             {t("settings.about.author")}
             <button
               type="button"
-              className="inline-flex items-center gap-0.5 align-bottom text-link hover:opacity-80"
+              className="text-link hover:opacity-80"
               onClick={() => void openUrl(AUTHOR_URL)}
             >
               {AUTHOR_NAME}
-              <ExternalLink className="size-3" />
             </button>
           </p>
         </div>
