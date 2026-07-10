@@ -47,24 +47,25 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
   return (
     <div className="settings-page h-full overflow-x-auto overflow-y-hidden bg-background">
       <div className="flex h-full min-w-xl flex-col">
-        <div className="shrink-0 border-b border-border p-3">
-          <SegmentedControl
-            className="max-w-2xl"
-            value={section}
-            onChange={setSection}
-            options={NAV.map((item) => {
-              const Icon = item.icon;
-              return {
-                value: item.id,
-                label: (
-                  <span className="flex items-center justify-center gap-2">
-                    <Icon className="size-4 shrink-0" />
-                    <span className="truncate">{t(item.labelKey)}</span>
-                  </span>
-                ),
-              };
-            })}
-          />
+        <div className="shrink-0 border-b border-border">
+          <div className="w-full max-w-2xl px-6 py-3">
+            <SegmentedControl
+              value={section}
+              onChange={setSection}
+              options={NAV.map((item) => {
+                const Icon = item.icon;
+                return {
+                  value: item.id,
+                  label: (
+                    <span className="flex items-center justify-center gap-2">
+                      <Icon className="size-4 shrink-0" />
+                      <span className="truncate">{t(item.labelKey)}</span>
+                    </span>
+                  ),
+                };
+              })}
+            />
+          </div>
         </div>
 
         <ScrollArea className="min-h-0 flex-1">

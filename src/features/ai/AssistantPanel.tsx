@@ -96,6 +96,14 @@ export function AssistantPanel({ width }: { width: number }) {
   );
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+
+  const onLogScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottom.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+  };
 
   useEffect(() => {
     if (configured) void loadSessions();
@@ -113,13 +121,20 @@ export function AssistantPanel({ width }: { width: number }) {
   };
 
   useEffect(() => {
-    requestAnimationFrame(() =>
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }),
-    );
+    stickToBottom.current = true;
+  }, [activeId]);
+
+  useEffect(() => {
+    if (!stickToBottom.current) return;
+    requestAnimationFrame(() => {
+      if (!stickToBottom.current) return;
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    });
   }, [log, pending]);
 
   const sendPrompt = async (prompt: string) => {
     if (!prompt || pending || !model) return;
+    stickToBottom.current = true;
     const sessionId = activeId ?? (await newSession());
     void send(sessionId, prompt, model);
   };
@@ -252,7 +267,11 @@ export function AssistantPanel({ width }: { width: number }) {
         />
       ) : (
         <>
-          <div ref={scrollRef} className="flex-1 overflow-y-auto">
+          <div
+            ref={scrollRef}
+            onScroll={onLogScroll}
+            className="flex-1 overflow-y-auto"
+          >
             <div className="flex flex-col gap-3 p-3">
               {log.length === 0 ? (
                 <div className="mt-10 flex flex-col gap-4">
