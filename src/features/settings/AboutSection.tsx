@@ -101,7 +101,7 @@ function UpdateStatusView({ state }: { state: UpdateStatus }) {
     return (
       <div className="flex flex-col gap-1.5">
         <p className="flex items-center gap-2 text-sm text-foreground">
-          <Sparkles className="size-4 text-primary" />
+          <Sparkles className="size-4 text-link" />
           {t("settings.about.update.available", { version: state.version })}
         </p>
         {state.body && (
@@ -140,7 +140,7 @@ function UpdateStatusView({ state }: { state: UpdateStatus }) {
     );
   }
   return (
-    <p className="text-sm text-destructive">
+    <p className="text-sm text-danger">
       {t("settings.about.update.error", { message: state.message })}
     </p>
   );

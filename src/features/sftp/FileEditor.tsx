@@ -35,7 +35,7 @@ export function FileEditor({ tab }: { tab: FileTab }) {
       </div>
 
       {tab.loadError ? (
-        <p className="p-4 text-sm text-destructive">{tab.loadError}</p>
+        <p className="p-4 text-sm text-danger">{tab.loadError}</p>
       ) : tab.content === null ? (
         <div className="flex flex-1 items-center justify-center">
           <Spinner />

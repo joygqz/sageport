@@ -164,15 +164,13 @@ export function QuestionPrompt({
 function StatusIcon({ status }: { status: ToolStatus }) {
   switch (status) {
     case "running":
-      return (
-        <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
-      );
+      return <Loader2 className="size-3.5 shrink-0 animate-spin text-link" />;
     case "done":
       return <Check className="size-3.5 shrink-0 text-success" />;
     case "denied":
       return <X className="size-3.5 shrink-0 text-muted-foreground" />;
     case "error":
-      return <X className="size-3.5 shrink-0 text-destructive" />;
+      return <X className="size-3.5 shrink-0 text-danger" />;
     case "awaiting-approval":
       return <ShieldAlert className="size-3.5 shrink-0 text-warning" />;
     default:

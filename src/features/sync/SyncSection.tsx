@@ -217,7 +217,7 @@ function VersionsCard() {
       )}
 
       {!isLoading && isError && (
-        <p className="text-sm text-destructive">
+        <p className="text-sm text-danger">
           {t("settings.sync.versions.loadError")}
         </p>
       )}

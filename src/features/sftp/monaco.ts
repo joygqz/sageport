@@ -98,15 +98,35 @@ export function applyEditorTheme(theme: ThemeDefinition) {
   appliedThemeId = theme.id;
 
   const { colors, terminal } = theme;
+  const token = (color: string) => color.replace(/^#/, "");
   monaco.editor.defineTheme(EDITOR_THEME, {
     base: theme.appearance === "dark" ? "vs-dark" : "vs",
     inherit: true,
-    rules: [],
+    rules: [
+      {
+        token: "comment",
+        foreground: token(terminal.brightBlack),
+        fontStyle: "italic",
+      },
+      { token: "string", foreground: token(terminal.green) },
+      { token: "number", foreground: token(terminal.yellow) },
+      { token: "keyword", foreground: token(terminal.magenta) },
+      { token: "type", foreground: token(terminal.cyan) },
+      { token: "type.identifier", foreground: token(terminal.cyan) },
+      { token: "function", foreground: token(terminal.blue) },
+      { token: "tag", foreground: token(terminal.red) },
+      { token: "attribute.name", foreground: token(terminal.yellow) },
+      { token: "invalid", foreground: token(terminal.red) },
+    ],
     colors: {
       "editor.background": terminal.background,
       "editor.foreground": terminal.foreground,
       "editorCursor.foreground": terminal.cursor,
       "editor.selectionBackground": terminal.selectionBackground,
+      "editor.selectionHighlightBackground": `${colors.primary}33`,
+      "editor.findMatchBackground": `${terminal.yellow}66`,
+      "editor.findMatchHighlightBackground": `${terminal.yellow}33`,
+      "editor.findRangeHighlightBackground": `${colors.primary}22`,
       "editor.lineHighlightBackground": `${colors.listHover}99`,
       "editorLineNumber.foreground": colors.mutedForeground,
       "editorLineNumber.activeForeground": colors.foreground,
@@ -120,8 +140,9 @@ export function applyEditorTheme(theme: ThemeDefinition) {
       "editorSuggestWidget.selectedForeground": colors.listActiveForeground,
       "editorHoverWidget.background": colors.popover,
       "editorHoverWidget.border": colors.border,
-      "input.background": colors.input,
+      "input.background": colors.surface,
       "input.foreground": colors.foreground,
+      "input.border": colors.input,
       focusBorder: colors.ring,
       "list.hoverBackground": colors.listHover,
       "list.activeSelectionBackground": colors.listActive,

@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Info, Minus, Palette, Plus, RefreshCw, Sparkles } from "lucide-react";
+import {
+  Check,
+  Info,
+  Minus,
+  Palette,
+  Plus,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 
 import {
   Button,
@@ -108,7 +116,7 @@ function AppearanceSection() {
           <p className="text-xs font-medium text-muted-foreground">
             {t(group.labelKey)}
           </p>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-3">
             {group.themes.map((candidate) => (
               <ThemeCard
                 key={candidate.id}
@@ -211,54 +219,93 @@ function ThemeCard({
   onSelect: () => void;
 }) {
   const { colors, terminal } = theme;
-  const ansi = [
-    terminal.red,
-    terminal.green,
-    terminal.yellow,
-    terminal.blue,
-    terminal.magenta,
-    terminal.cyan,
-  ];
 
   return (
     <button
+      type="button"
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "group flex min-w-0 flex-col overflow-hidden rounded-lg border text-left transition-colors",
+        "flex min-w-0 flex-col overflow-hidden rounded-lg border text-left outline-none transition-[border-color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring/40",
         active
           ? "border-primary ring-2 ring-primary/40"
           : "border-input hover:border-ring",
       )}
     >
-      <div className="flex h-16" style={{ backgroundColor: colors.background }}>
+      <div
+        className="flex h-20"
+        style={{
+          backgroundColor: terminal.background,
+          color: terminal.foreground,
+        }}
+      >
         <div
-          className="w-4 border-r"
+          className="flex w-1/4 flex-col gap-1 border-r p-1.5"
           style={{
             backgroundColor: colors.surface,
             borderColor: colors.border,
           }}
-        />
-        <div className="flex min-w-0 flex-1 flex-col justify-between p-1.5">
-          <div
-            className="h-1.5 w-2/3 rounded-full"
+        >
+          <span
+            className="h-1 w-3/4 rounded-full"
             style={{ backgroundColor: colors.primary }}
           />
-          <div className="flex gap-1">
-            {ansi.map((color, i) => (
-              <span
-                key={i}
-                className="size-1.5 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-            ))}
+          <span
+            className="h-1 w-full rounded-full opacity-70"
+            style={{ backgroundColor: colors.mutedForeground }}
+          />
+          <span
+            className="h-1 w-2/3 rounded-full opacity-70"
+            style={{ backgroundColor: colors.mutedForeground }}
+          />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-2 font-mono">
+          <div
+            className="flex h-5 items-center gap-1 rounded px-1.5"
+            style={{ backgroundColor: colors.listActive }}
+          >
+            <span
+              className="size-1.5 rounded-full"
+              style={{ backgroundColor: terminal.green }}
+            />
+            <span
+              className="h-1 w-1/2 rounded-full"
+              style={{ backgroundColor: colors.listActiveForeground }}
+            />
+          </div>
+          <div className="mt-auto flex items-center gap-1 text-[8px] leading-none">
+            <span style={{ color: terminal.green }}>$</span>
+            <span style={{ color: terminal.blue }}>ssh</span>
+            <span style={{ color: terminal.foreground }}>sageport</span>
+            <span
+              className="h-2 w-px"
+              style={{ backgroundColor: terminal.cursor }}
+            />
           </div>
         </div>
       </div>
-      <div className="border-t border-border bg-surface px-2 py-1.5">
-        <p className="truncate text-xs font-medium text-foreground">
+      <div
+        className="flex w-full items-center gap-1.5 border-t px-2 py-1.5"
+        style={{
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          color: colors.surfaceForeground,
+        }}
+      >
+        <p className="min-w-0 flex-1 truncate text-xs font-medium">
           {theme.name}
         </p>
+        {active && (
+          <span
+            className="flex size-4 shrink-0 items-center justify-center rounded-full"
+            style={{
+              backgroundColor: colors.primary,
+              color: colors.primaryForeground,
+            }}
+          >
+            <Check className="size-2.5" strokeWidth={3} />
+          </span>
+        )}
       </div>
     </button>
   );

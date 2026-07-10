@@ -169,13 +169,13 @@ function ResultRow({ name, result }: { name: string; result: Result }) {
         {result.status === "running" ? (
           <Loader2 className="size-3.5 shrink-0 animate-spin text-warning" />
         ) : result.status === "error" || (result.exitCode ?? 0) !== 0 ? (
-          <XCircle className="size-3.5 shrink-0 text-destructive" />
+          <XCircle className="size-3.5 shrink-0 text-danger" />
         ) : (
           <CheckCircle2 className="size-3.5 shrink-0 text-success" />
         )}
         <span className="min-w-0 flex-1 truncate">{name}</span>
         {result.exitCode !== undefined && result.exitCode !== 0 && (
-          <span className="shrink-0 font-mono text-2xs text-destructive">
+          <span className="shrink-0 font-mono text-2xs text-danger">
             exit {result.exitCode}
           </span>
         )}

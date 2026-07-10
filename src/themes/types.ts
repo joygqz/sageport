@@ -15,6 +15,7 @@ export interface ThemeColors {
 
   primary: string;
   primaryForeground: string;
+  link: string;
 
   secondary: string;
   secondaryForeground: string;
@@ -27,6 +28,7 @@ export interface ThemeColors {
 
   destructive: string;
   destructiveForeground: string;
+  danger: string;
 
   success: string;
   warning: string;

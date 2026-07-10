@@ -163,7 +163,7 @@ function TransferStrip() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="size-5 shrink-0 text-muted-foreground hover:text-destructive"
+                className="size-5 shrink-0 text-muted-foreground hover:text-danger"
                 onClick={() => cancelTransfer(tx.transferId)}
               >
                 <X className="size-3" />

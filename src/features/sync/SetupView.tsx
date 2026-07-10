@@ -275,7 +275,7 @@ function OAuthPanel({
   if (phase.step === "authorized") {
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-input bg-surface px-4 py-3">
-        <Check className="size-4 text-primary" />
+        <Check className="size-4 text-link" />
         <p className="min-w-0 flex-1 text-sm text-foreground">
           {t("settings.sync.setup.authorizedAs", { account: phase.account })}
         </p>

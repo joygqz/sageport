@@ -133,7 +133,7 @@ export function ForwardsView() {
                         active
                           ? "text-success"
                           : errored
-                            ? "text-destructive"
+                            ? "text-danger"
                             : "text-muted-foreground/40",
                       )}
                     />

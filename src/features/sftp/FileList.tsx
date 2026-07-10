@@ -114,7 +114,7 @@ export function FileList({
   if (tab.error) {
     return (
       <div className="flex flex-1 items-center justify-center p-4">
-        <p className="text-center text-xs text-destructive">{tab.error}</p>
+        <p className="text-center text-xs text-danger">{tab.error}</p>
       </div>
     );
   }

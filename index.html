@@ -9,11 +9,11 @@
       Critical theme bootstrap. Runs before the app bundle (and before first
       paint) so the window never flashes the wrong color while loading. The
       storage keys mirror src/themes/apply.ts; the fallback background is the
-      default theme (Dark Modern).
+      default theme (GitHub Dark).
     -->
     <script>
       (function () {
-        var bg = "#1f1f1f";
+        var bg = "#0d1117";
         var scheme = "dark";
         try {
           bg = localStorage.getItem("sageport.theme.bg") || bg;

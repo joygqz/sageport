@@ -14,7 +14,7 @@ const accentFor: Record<ToastKind, string> = {
   info: "text-info",
   success: "text-success",
   warning: "text-warning",
-  error: "text-destructive",
+  error: "text-danger",
 };
 
 export function Toaster() {

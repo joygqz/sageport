@@ -225,7 +225,7 @@ export function AssistantPanel({ width }: { width: number }) {
                         </button>
                         <button
                           type="button"
-                          className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+                          className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-danger"
                           onClick={(e) => {
                             e.stopPropagation();
                             confirmDeleteSession(s);
@@ -307,7 +307,7 @@ export function AssistantPanel({ width }: { width: number }) {
               )}
               {pending && !awaitingUser && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <LoaderCircle className="size-4 animate-spin text-primary" />
+                  <LoaderCircle className="size-4 animate-spin text-link" />
                   {t("ai.working")}
                 </div>
               )}
@@ -522,7 +522,7 @@ const MARKDOWN_COMPONENTS: Components = {
   a: ({ node: _node, href, ...props }) => (
     <a
       href={href}
-      className="text-primary underline underline-offset-2 hover:opacity-80"
+      className="text-link underline underline-offset-2 hover:opacity-80"
       onClick={(e) => {
         e.preventDefault();
         if (href) void openUrl(href);

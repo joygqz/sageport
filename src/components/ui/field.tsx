@@ -27,12 +27,12 @@ export function Field({
       {label && (
         <Label htmlFor={htmlFor}>
           {label}
-          {required && <span className="ml-0.5 text-destructive">*</span>}
+          {required && <span className="ml-0.5 text-danger">*</span>}
         </Label>
       )}
       {children}
       {error ? (
-        <p className="text-xs text-destructive">{error}</p>
+        <p className="text-xs text-danger">{error}</p>
       ) : hint ? (
         <p className="text-xs text-muted-foreground">{hint}</p>
       ) : null}

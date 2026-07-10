@@ -96,8 +96,7 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       className={cn(
         itemClasses,
-        destructive &&
-          "text-destructive focus:bg-destructive/10 focus:text-destructive",
+        destructive && "text-danger focus:bg-danger/10 focus:text-danger",
         className,
       )}
       {...props}

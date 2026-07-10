@@ -97,7 +97,7 @@ export function TransferHistoryDialog({
             <Button
               size="sm"
               variant="ghost"
-              className="mr-6 text-muted-foreground hover:text-destructive"
+              className="mr-6 text-muted-foreground hover:text-danger"
               onClick={confirmClear}
             >
               <Trash2 /> {t("sftp.history.clear")}
@@ -112,9 +112,7 @@ export function TransferHistoryDialog({
         )}
 
         {isError && (
-          <p className="text-sm text-destructive">
-            {t("sftp.history.loadError")}
-          </p>
+          <p className="text-sm text-danger">{t("sftp.history.loadError")}</p>
         )}
 
         {!isLoading && !isError && entries?.length === 0 && (

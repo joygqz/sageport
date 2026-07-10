@@ -10,6 +10,7 @@ import {
 
 import { Button, Input } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { useTheme } from "@/themes";
 import { useTabsStore, type TerminalTab } from "@/workbench/tabs";
 import { terminalFontSize, useZoomStore } from "@/workbench/zoom";
 import { useTerminalSearch } from "./search";
@@ -93,19 +94,19 @@ function StickyCommand({ sessionId }: { sessionId: string }) {
   );
 }
 
-const SEARCH_DECORATIONS = {
-  matchBackground: "#ea5c0055",
-  matchOverviewRuler: "#d18616",
-  activeMatchBackground: "#515c6a",
-  activeMatchColorOverviewRuler: "#a0a0a0",
-};
-
 function SearchBar({ sessionId }: { sessionId: string }) {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const close = useTerminalSearch((s) => s.close);
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<{ index: number; count: number }>();
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchDecorations = {
+    matchBackground: `${theme.terminal.yellow}55`,
+    matchOverviewRuler: theme.terminal.yellow,
+    activeMatchBackground: `${theme.colors.primary}77`,
+    activeMatchColorOverviewRuler: theme.colors.primary,
+  };
 
   useEffect(() => {
     const search = getSession(sessionId)?.search;
@@ -119,7 +120,7 @@ function SearchBar({ sessionId }: { sessionId: string }) {
   const find = (text: string, direction: "next" | "previous") => {
     const search = getSession(sessionId)?.search;
     if (!search || !text) return;
-    const options = { decorations: SEARCH_DECORATIONS };
+    const options = { decorations: searchDecorations };
     if (direction === "next") search.findNext(text, options);
     else search.findPrevious(text, options);
   };
@@ -199,7 +200,7 @@ function StatusOverlay({
   if (tab.status === "connecting") {
     return (
       <Shell>
-        <Loader2 className="size-7 animate-spin text-primary" />
+        <Loader2 className="size-7 animate-spin text-link" />
         <p className="text-sm font-medium text-foreground">
           {t("terminal.connecting", { host: tab.title })}
         </p>
@@ -210,14 +211,14 @@ function StatusOverlay({
   if (tab.status === "error") {
     return (
       <Shell>
-        <span className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+        <span className="flex size-12 items-center justify-center rounded-full bg-danger/10 text-danger">
           <ServerCrash className="size-6" />
         </span>
         <p className="text-sm font-semibold text-foreground">
           {t("terminal.connectFailed")}
         </p>
         {tab.error && (
-          <p className="max-w-md select-text break-words text-center font-mono text-xs leading-relaxed text-destructive">
+          <p className="max-w-md select-text break-words text-center font-mono text-xs leading-relaxed text-danger">
             {tab.error}
           </p>
         )}
