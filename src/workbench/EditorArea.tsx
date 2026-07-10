@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, lazy, Suspense, useEffect, useRef } from "react";
 import { FileText, Plus, Settings, TerminalSquare, X } from "lucide-react";
 
 import {
   ConfirmDialog,
   Kbd,
+  Spinner,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -11,7 +12,6 @@ import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
-import { FileEditor } from "@/features/sftp/FileEditor";
 import { TerminalEditor } from "@/features/terminal/TerminalEditor";
 import { focusTerminal } from "@/features/terminal/registry";
 import { useOverlayStore } from "./overlays";
@@ -22,6 +22,12 @@ import {
   type FileTab,
   type TerminalStatus,
 } from "./tabs";
+
+const FileEditor = lazy(() =>
+  import("@/features/sftp/FileEditor").then((m) => ({
+    default: m.FileEditor,
+  })),
+);
 
 const statusDot: Record<TerminalStatus, string> = {
   idle: "bg-muted-foreground/40",
@@ -127,7 +133,15 @@ export function EditorArea() {
             {tab.kind === "terminal" ? (
               <TerminalEditor tab={tab} active={tab.id === activeId} />
             ) : tab.kind === "file" ? (
-              <FileEditor tab={tab} />
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center bg-background">
+                    <Spinner />
+                  </div>
+                }
+              >
+                <FileEditor tab={tab} />
+              </Suspense>
             ) : (
               <SettingsPage section={tab.section} />
             )}

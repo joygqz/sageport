@@ -1,9 +1,11 @@
-import type { EditorView } from "@codemirror/view";
+interface FocusableEditor {
+  focus: () => void;
+}
 
-const registry = new Map<string, EditorView>();
+const registry = new Map<string, FocusableEditor>();
 
-export function registerFileEditor(id: string, view: EditorView) {
-  registry.set(id, view);
+export function registerFileEditor(id: string, editor: FocusableEditor) {
+  registry.set(id, editor);
 }
 
 export function unregisterFileEditor(id: string) {
