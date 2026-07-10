@@ -12,8 +12,10 @@ import type {
 import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 import {
   AI_TOOL_SPECS,
+  automaticTerminalSelectionResult,
   askUserOptions,
   askUserQuestion,
+  defaultTerminalOption,
   executeTool,
   noTerminalSessionError,
   normalizeArgs,
@@ -111,21 +113,32 @@ function buildContext(): string {
   const state = useTabsStore.getState();
   const sessions = terminalTabs(state.tabs);
   const focusedId = targetTerminalId(state);
+  const current = sessions.find((session) => session.id === focusedId);
+  const sessionDetails = sessions.map((session) => ({
+    id: session.id,
+    host: session.title,
+    hostId: session.hostId || undefined,
+    target: session.target,
+    address: session.adhoc?.host,
+    status: session.status,
+    current: session.id === focusedId,
+  }));
   const lines = [
     `App: Sageport v${__APP_VERSION__}, a desktop SSH client.`,
     `UI language: ${detectLocale()}.`,
     sessions.length === 0
       ? "No terminal sessions are open."
-      : `Open terminal sessions: ${JSON.stringify(
-          sessions.map((s) => ({
-            id: s.id,
-            host: s.title,
-            hostId: s.hostId || undefined,
-            status: s.status,
-            focused: s.id === focusedId,
-          })),
-        )}`,
+      : `Current terminal (the default target): ${JSON.stringify(
+          current
+            ? sessionDetails.find((session) => session.id === current.id)
+            : null,
+        )}\nOpen terminal sessions: ${JSON.stringify(sessionDetails)}`,
   ];
+  if (current) {
+    lines.push(
+      "Routing rule: For requests without an explicit host, use the current terminal above. Do not list hosts, list sessions, or ask the user which server to use. Only ask about the target when there is no current terminal and the request is genuinely ambiguous. If the user explicitly names another host or requests multiple hosts, follow that explicit scope instead.",
+    );
+  }
   return lines.join("\n");
 }
 
@@ -188,9 +201,27 @@ function deriveTitle(prompt: string): string {
 type PreparedToolCall = {
   call: AiToolCall;
   preflightError?: string;
+  automaticResult?: string;
 };
 
-function prepareToolCall(call: AiToolCall): PreparedToolCall {
+function prepareToolCall(
+  call: AiToolCall,
+  userPrompt: string,
+): PreparedToolCall {
+  if (call.name === "ask_user") {
+    const args = normalizeArgs(call.arguments);
+    const selection = defaultTerminalOption(args, userPrompt);
+    if (selection) {
+      return {
+        call: { ...call, arguments: args },
+        automaticResult: automaticTerminalSelectionResult(
+          selection.option,
+          selection.tab,
+        ),
+      };
+    }
+    return { call: { ...call, arguments: args } };
+  }
   if (call.name !== "run_terminal_command") return { call };
 
   const args = normalizeArgs(call.arguments);
@@ -237,7 +268,18 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     sessionId: string,
     call: AiToolCall,
     preflightError?: string,
+    automaticResult?: string,
   ) => {
+    if (automaticResult) {
+      patch(sessionId, (r) => ({
+        ...r,
+        history: [
+          ...r.history,
+          { role: "tool", toolCallId: call.id, content: automaticResult },
+        ],
+      }));
+      return;
+    }
     const args = normalizeArgs(call.arguments);
     const logId = crypto.randomUUID();
     const needsApproval = TOOLS_REQUIRING_APPROVAL.has(call.name);
@@ -386,7 +428,13 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       }
 
       turnDone = true;
-      const preparedToolCalls = (result.toolCalls ?? []).map(prepareToolCall);
+      const userPrompt =
+        [...runtime.history]
+          .reverse()
+          .find((message) => message.role === "user")?.content ?? "";
+      const preparedToolCalls = (result.toolCalls ?? []).map((call) =>
+        prepareToolCall(call, userPrompt),
+      );
       const toolCalls = preparedToolCalls.map((x) => x.call);
       patch(sessionId, (r) => ({
         ...r,
@@ -418,7 +466,11 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       }));
 
       if (toolCalls.length === 0) return;
-      for (const { call, preflightError } of preparedToolCalls) {
+      for (const {
+        call,
+        preflightError,
+        automaticResult,
+      } of preparedToolCalls) {
         if (stopped(sessionId)) {
           patch(sessionId, (r) => ({
             ...r,
@@ -433,7 +485,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
           }));
           continue;
         }
-        await runToolCall(sessionId, call, preflightError);
+        await runToolCall(sessionId, call, preflightError, automaticResult);
       }
       if (stopped(sessionId)) return;
     }

@@ -19,6 +19,7 @@ import { useI18n, type TKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { AgentLogItem, ToolStatus } from "./store";
 import { askUserOptions, askUserQuestion, selectionResult } from "./tools";
+import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
 
@@ -56,6 +57,14 @@ export function ToolActivity({
   const label = labelKey ? t(labelKey) : item.name;
   const command =
     typeof item.args.command === "string" ? item.args.command : undefined;
+  const targetSessionId =
+    typeof item.args.sessionId === "string" ? item.args.sessionId : undefined;
+  const targetTitle = useTabsStore((state) =>
+    targetSessionId
+      ? terminalTabs(state.tabs).find((tab) => tab.id === targetSessionId)
+          ?.title
+      : undefined,
+  );
 
   return (
     <div className="overflow-hidden rounded-md border border-input bg-surface text-xs">
@@ -79,9 +88,21 @@ export function ToolActivity({
       {expanded && (
         <div className="space-y-1.5 border-t border-border px-2.5 py-1.5">
           {command && (
-            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
-              {command}
-            </pre>
+            <>
+              {targetSessionId && (
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Server className="size-3.5 shrink-0" />
+                  <span>
+                    {t("ai.commandTarget", {
+                      name: targetTitle ?? targetSessionId,
+                    })}
+                  </span>
+                </div>
+              )}
+              <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
+                {command}
+              </pre>
+            </>
           )}
           {item.status === "awaiting-approval" && (
             <div className="flex items-center gap-2 pt-1">

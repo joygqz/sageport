@@ -39,7 +39,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "ask_user",
     description:
-      "Ask the user to pick one of a few options, shown as clickable buttons in the chat. Use this whenever you would otherwise ask 'which one?' in plain text — e.g. which server to check, which of several fixes to apply. Keep options short (a few words each) and write them in the user's language. Do not use it for yes/no confirmation of a command; run_terminal_command already asks for approval.",
+      "Ask the user to pick one of a few options, shown as clickable buttons in the chat. Use this only when a real choice remains after applying the current-terminal default. Never ask which server to use when the context provides a current terminal, unless the user explicitly requested another or multiple servers. Keep options short (a few words each) and write them in the user's language. Do not use it for yes/no confirmation of a command; run_terminal_command already asks for approval.",
     parameters: {
       type: "object",
       properties: {
@@ -63,7 +63,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "list_terminal_sessions",
     description:
-      "List the terminal sessions (tabs) currently open, with their id, host title, connection status, and whether each is the one the user is currently looking at. Call this first if you don't already know which session id to use.",
+      "List the terminal sessions (tabs) currently open, with their id, host title, connection status, and current-target marker. The app context already identifies the current terminal, so do not call this merely to choose a target; call it only when you need to inspect all sessions or no current terminal is available.",
     parameters: {
       type: "object",
       properties: {},
@@ -94,7 +94,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "run_terminal_command",
     description:
-      "Type a command into a real terminal session and press Enter, then wait for its output to settle and return it. This executes on a live remote server, so the user is always shown a confirmation and can decline before it runs.",
+      "Type a command into a real terminal session and press Enter, then wait for its output to settle and return it. Omit sessionId to use the current terminal from app context; do not ask the user to choose it again. This executes on a live remote server, so the user is always shown a confirmation and can decline before it runs.",
     parameters: {
       type: "object",
       properties: {
@@ -146,6 +146,89 @@ export function askUserQuestion(args: Record<string, unknown>): string {
 
 export function selectionResult(option: string): string {
   return `The user selected: ${option}`;
+}
+
+const TARGET_QUESTION_RE =
+  /\b(?:host|server|terminal|session|machine)\b|主机|服务器|终端|会话|哪台|哪个环境/i;
+const CURRENT_OPTION_RE = /\bcurrent\b|当前|正在查看|正在使用/i;
+const MULTI_TARGET_RE =
+  /\b(?:both|all|every|each)\b|两台|全部|所有|每台|分别|都(?:查看|检查|执行|运行)/i;
+
+function comparableText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Models occasionally ask the user to choose a host even though the app has
+ * already supplied a current terminal. Resolve only that redundant choice;
+ * genuine multi-host or explicitly named-host requests still reach the user.
+ */
+export function defaultTerminalOption(
+  args: Record<string, unknown>,
+  userPrompt: string,
+): { option: string; tab: TerminalTab } | null {
+  const question = askUserQuestion(args);
+  const options = askUserOptions(args);
+  if (!question || options.length < 2 || !TARGET_QUESTION_RE.test(question)) {
+    return null;
+  }
+
+  const state = useTabsStore.getState();
+  const current = resolveTerminalTab();
+  if (!current || current.status !== "connected") return null;
+
+  const prompt = comparableText(userPrompt);
+  if (MULTI_TARGET_RE.test(prompt)) return null;
+
+  const otherTargets = terminalTabs(state.tabs).filter(
+    (tab) => tab.id !== current.id,
+  );
+  if (
+    otherTargets.some((tab) => {
+      const title = comparableText(tab.title);
+      return title.length >= 3 && prompt.includes(title);
+    })
+  ) {
+    return null;
+  }
+
+  const currentTitle = comparableText(current.title);
+  const explicitlyNamedOption = options.some((candidate) => {
+    const normalized = comparableText(candidate);
+    const describesCurrent =
+      CURRENT_OPTION_RE.test(candidate) ||
+      normalized === currentTitle ||
+      (currentTitle.length >= 3 && normalized.includes(currentTitle));
+    return (
+      !describesCurrent &&
+      !MULTI_TARGET_RE.test(candidate) &&
+      normalized.length >= 3 &&
+      prompt.includes(normalized)
+    );
+  });
+  if (explicitlyNamedOption) return null;
+
+  const option = options.find((candidate) => {
+    const normalized = comparableText(candidate);
+    return (
+      CURRENT_OPTION_RE.test(candidate) ||
+      normalized === currentTitle ||
+      (currentTitle.length >= 3 && normalized.includes(currentTitle)) ||
+      normalized.includes(comparableText(current.id))
+    );
+  });
+  return option ? { option, tab: current } : null;
+}
+
+export function automaticTerminalSelectionResult(
+  option: string,
+  tab: TerminalTab,
+): string {
+  return `The app automatically selected the current terminal: ${option} (title: "${tab.title}", sessionId: ${tab.id}). Continue without asking the user to choose a server.`;
 }
 
 export function resolveTerminalTab(requested?: string): TerminalTab | null {
@@ -231,11 +314,7 @@ async function connectHost(args: Record<string, unknown>): Promise<string> {
   }
 
   const state = useTabsStore.getState();
-  const existing = terminalTabs(state.tabs).find(
-    (t) =>
-      t.hostId === hostId &&
-      (t.status === "connected" || t.status === "connecting"),
-  );
+  const existing = reusableHostSession(state.tabs, hostId);
   if (existing?.status === "connected") {
     state.setActive(existing.id);
     return `Already connected to "${host.label}". sessionId: ${existing.id}`;
@@ -243,7 +322,12 @@ async function connectHost(args: Record<string, unknown>): Promise<string> {
 
   const id =
     existing?.id ?? state.openTerminal({ id: host.id, label: host.label });
-  if (existing) state.setActive(existing.id);
+  if (existing) {
+    state.setActive(existing.id);
+    if (existing.status === "closed" || existing.status === "error") {
+      state.reconnectTerminal(existing.id);
+    }
+  }
 
   const status = await waitForConnection(id, 30_000);
   if (status === "connected") {
@@ -259,6 +343,22 @@ async function connectHost(args: Record<string, unknown>): Promise<string> {
   return `Error: connection to "${host.label}" ${
     status === "error" ? "failed" : "was closed"
   }${detail}`;
+}
+
+export function reusableHostSession(
+  tabs: Parameters<typeof terminalTabs>[0],
+  hostId: string,
+): TerminalTab | undefined {
+  const priority: Record<TerminalStatus, number> = {
+    connected: 0,
+    connecting: 1,
+    idle: 2,
+    closed: 3,
+    error: 4,
+  };
+  return terminalTabs(tabs)
+    .filter((tab) => tab.hostId === hostId)
+    .sort((a, b) => priority[a.status] - priority[b.status])[0];
 }
 
 async function waitForConnection(
@@ -292,7 +392,7 @@ function listSessions(): string {
       title: s.title,
       hostId: s.hostId || undefined,
       status: s.status,
-      active: s.id === focusedId,
+      current: s.id === focusedId,
     })),
   );
 }

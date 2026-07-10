@@ -518,6 +518,7 @@ export const en = {
       'Reached the step limit for one run. Say "continue" to keep going.',
     inputPlaceholder: "Ask about your servers",
     commandLabel: "Command",
+    commandTarget: "Target: {name}",
     error: "Assistant error",
     confirmRun: "Wants to run this command in your terminal",
     approve: "Allow",

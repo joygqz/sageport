@@ -505,6 +505,7 @@ export const zhCN: Dictionary = {
     stepLimitReached: "已达到单次运行的步骤上限，回复“继续”可以接着执行。",
     inputPlaceholder: "询问服务器相关问题",
     commandLabel: "命令",
+    commandTarget: "执行目标：{name}",
     error: "助手出错",
     confirmRun: "请求在终端中运行此命令",
     approve: "允许",
