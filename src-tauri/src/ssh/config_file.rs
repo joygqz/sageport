@@ -13,6 +13,8 @@ pub struct SshConfigHost {
     pub port: u16,
     pub identity_file: Option<String>,
     pub proxy_jump: Option<String>,
+    #[serde(default)]
+    pub existing: bool,
 }
 
 fn is_wildcard(pattern: &str) -> bool {
@@ -52,6 +54,7 @@ pub fn parse_config(text: &str) -> Vec<SshConfigHost> {
                 port: 22,
                 identity_file: None,
                 proxy_jump: None,
+                existing: false,
             });
             continue;
         }

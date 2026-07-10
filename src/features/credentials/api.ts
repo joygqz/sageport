@@ -7,20 +7,20 @@ import type {
   SshKeyInput,
 } from "@/types/models";
 
-const keys = {
+export const credentialKeys = {
   sshKeys: ["keys"] as const,
   identities: ["identities"] as const,
 };
 
 export function useSshKeys() {
-  return useQuery({ queryKey: keys.sshKeys, queryFn: ipc.keys.list });
+  return useQuery({ queryKey: credentialKeys.sshKeys, queryFn: ipc.keys.list });
 }
 
 export function useCreateSshKey() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SshKeyInput) => ipc.keys.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sshKeys }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: credentialKeys.sshKeys }),
   });
 }
 
@@ -28,7 +28,7 @@ export function useGenerateSshKey() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SshKeyGenerateInput) => ipc.keys.generate(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sshKeys }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: credentialKeys.sshKeys }),
   });
 }
 
@@ -42,19 +42,23 @@ export function useDeleteSshKey() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => ipc.keys.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sshKeys }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: credentialKeys.sshKeys }),
   });
 }
 
 export function useIdentities() {
-  return useQuery({ queryKey: keys.identities, queryFn: ipc.identities.list });
+  return useQuery({
+    queryKey: credentialKeys.identities,
+    queryFn: ipc.identities.list,
+  });
 }
 
 export function useCreateIdentity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: IdentityInput) => ipc.identities.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.identities }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: credentialKeys.identities }),
   });
 }
 
@@ -63,7 +67,8 @@ export function useUpdateIdentity() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: IdentityInput }) =>
       ipc.identities.update(id, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.identities }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: credentialKeys.identities }),
   });
 }
 
@@ -71,6 +76,7 @@ export function useDeleteIdentity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => ipc.identities.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.identities }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: credentialKeys.identities }),
   });
 }

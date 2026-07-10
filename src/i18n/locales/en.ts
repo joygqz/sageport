@@ -203,6 +203,7 @@ export const en = {
         "These hosts were found in ~/.ssh/config. Choose which to add.",
       empty: "No importable hosts found in ~/.ssh/config.",
       selectAll: "Select All",
+      alreadyExists: "Already added",
       column: {
         alias: "Alias",
         address: "Address",

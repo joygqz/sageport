@@ -125,6 +125,7 @@ export interface SshConfigHost {
   port: number;
   identityFile: string | null;
   proxyJump: string | null;
+  existing: boolean;
 }
 
 export type HostHealthStatus = "online" | "offline";

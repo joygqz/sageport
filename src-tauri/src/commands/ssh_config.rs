@@ -21,13 +21,27 @@ fn home_dir() -> Option<PathBuf> {
 }
 
 #[tauri::command]
-pub async fn ssh_config_import_preview() -> AppResult<Vec<SshConfigHost>> {
+pub async fn ssh_config_import_preview(
+    state: State<'_, AppState>,
+) -> AppResult<Vec<SshConfigHost>> {
     let home = home_dir().ok_or_else(|| AppError::Other("home directory unavailable".into()))?;
     let config_path = home.join(".ssh").join("config");
     if !config_path.exists() {
         return Ok(Vec::new());
     }
-    Ok(config_file::load(&config_path, &home))
+    let mut hosts = config_file::load(&config_path, &home);
+
+    let existing_targets: std::collections::HashSet<(String, i64)> = host_repo::list(&state.db)
+        .await?
+        .into_iter()
+        .map(|h| (h.address.trim().to_ascii_lowercase(), h.port))
+        .collect();
+    for host in &mut hosts {
+        host.existing = existing_targets
+            .contains(&(host.host_name.trim().to_ascii_lowercase(), host.port as i64));
+    }
+
+    Ok(hosts)
 }
 
 fn jump_token(proxy: &str) -> String {
@@ -46,8 +60,18 @@ pub async fn ssh_config_import_apply(
 ) -> AppResult<usize> {
     let home = home_dir().ok_or_else(|| AppError::Other("home directory unavailable".into()))?;
 
+    let mut key_by_content: HashMap<String, String> = key_repo::list(&state.db)
+        .await?
+        .into_iter()
+        .filter_map(|k| k.private_key.map(|pk| (pk, k.id)))
+        .collect();
+    let mut alias_to_id: HashMap<String, String> = host_repo::list(&state.db)
+        .await?
+        .into_iter()
+        .map(|h| (h.label, h.id))
+        .collect();
+
     let mut key_by_path: HashMap<String, String> = HashMap::new();
-    let mut alias_to_id: HashMap<String, String> = HashMap::new();
     let mut pending_jumps: Vec<(String, String)> = Vec::new();
     let mut created = 0usize;
 
@@ -59,18 +83,25 @@ pub async fn ssh_config_import_apply(
             } else {
                 let path = expand_tilde(identity, &home);
                 if let Ok(contents) = std::fs::read_to_string(&path) {
-                    let key = key_repo::create(
-                        &state.db,
-                        SshKeyInput {
-                            name: format!("{} (imported)", entry.alias),
-                            public_key: None,
-                            private_key: Some(contents),
-                            passphrase: None,
-                        },
-                    )
-                    .await?;
-                    key_by_path.insert(identity.clone(), key.id.clone());
-                    key_id = Some(key.id);
+                    let trimmed = contents.trim().to_string();
+                    let id = if let Some(id) = key_by_content.get(&trimmed) {
+                        id.clone()
+                    } else {
+                        let key = key_repo::create(
+                            &state.db,
+                            SshKeyInput {
+                                name: format!("{} (imported)", entry.alias),
+                                public_key: None,
+                                private_key: Some(contents),
+                                passphrase: None,
+                            },
+                        )
+                        .await?;
+                        key_by_content.insert(trimmed, key.id.clone());
+                        key.id
+                    };
+                    key_by_path.insert(identity.clone(), id.clone());
+                    key_id = Some(id);
                 }
             }
         }

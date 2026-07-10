@@ -13,6 +13,7 @@ import { ipc } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
 import type { SshConfigHost } from "@/types/models";
+import { credentialKeys } from "@/features/credentials/api";
 import { hostKeys } from "./api";
 
 export function SshConfigImportDialog({
@@ -46,7 +47,9 @@ function ImportBody({ onClose }: { onClose: () => void }) {
     void ipc.hosts.importPreview().then(
       (found) => {
         setEntries(found);
-        setSelected(new Set(found.map((h) => h.alias)));
+        setSelected(
+          new Set(found.filter((h) => !h.existing).map((h) => h.alias)),
+        );
       },
       (err) => {
         toast.error(t("hosts.import.error"), errorMessage(err));
@@ -77,6 +80,7 @@ function ImportBody({ onClose }: { onClose: () => void }) {
     try {
       const count = await ipc.hosts.importApply(chosen);
       await qc.invalidateQueries({ queryKey: hostKeys.hosts });
+      await qc.invalidateQueries({ queryKey: credentialKeys.sshKeys });
       toast.success(t("hosts.import.success", { count: String(count) }));
       onClose();
     } catch (err) {
@@ -121,23 +125,31 @@ function ImportBody({ onClose }: { onClose: () => void }) {
         {entries.map((entry, index) => {
           const on = selected.has(entry.alias);
           return (
-            <button
+            <div
               key={entry.alias}
-              type="button"
-              onClick={() => toggle(entry.alias)}
               className={cn(
-                "flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-list-hover",
+                "flex w-full items-center text-sm transition-colors hover:bg-list-hover",
                 index > 0 && "border-t border-border",
                 on && "bg-list-hover",
               )}
             >
               <Switch
+                className="ml-3"
                 checked={on}
                 onCheckedChange={() => toggle(entry.alias)}
               />
-              <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => toggle(entry.alias)}
+                className="min-w-0 flex-1 py-2 pl-3 pr-3 text-left"
+              >
                 <div className="flex items-baseline gap-2">
                   <span className="truncate font-medium">{entry.alias}</span>
+                  {entry.existing && (
+                    <span className="shrink-0 rounded-sm bg-muted px-1 py-px text-2xs text-muted-foreground">
+                      {t("hosts.import.alreadyExists")}
+                    </span>
+                  )}
                   {entry.proxyJump && (
                     <span className="truncate text-2xs text-muted-foreground">
                       {t("hosts.import.viaJump", { jump: entry.proxyJump })}
@@ -149,8 +161,8 @@ function ImportBody({ onClose }: { onClose: () => void }) {
                   {entry.hostName}
                   {entry.port !== 22 ? `:${entry.port}` : ""}
                 </span>
-              </div>
-            </button>
+              </button>
+            </div>
           );
         })}
       </div>

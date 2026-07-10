@@ -200,6 +200,7 @@ export const zhCN: Dictionary = {
       description: "在 ~/.ssh/config 中发现以下主机，请选择要添加的项。",
       empty: "~/.ssh/config 中没有可导入的主机。",
       selectAll: "全选",
+      alreadyExists: "已存在",
       column: {
         alias: "别名",
         address: "地址",
