@@ -691,6 +691,7 @@ export const en = {
     },
     about: {
       version: "Version {version}",
+      author: "Author: ",
       update: {
         check: "Check for Updates",
         checking: "Checking for updates…",

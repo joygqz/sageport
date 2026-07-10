@@ -2,7 +2,7 @@
 name = "sageport"
 version = "1.1.0"
 description = "Sageport — an ops-focused SSH client with an AI assistant"
-authors = ["JoyGqz"]
+authors = ["Quincy Zhang"]
 edition = "2021"
 
 [[bin]]

@@ -1,3 +1,4 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { CheckCircle2, RotateCw, Sparkles } from "lucide-react";
 
@@ -6,6 +7,9 @@ import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import type { UpdateStatus } from "@/types/models";
 import { useUpdateStatus } from "@/features/updates/api";
+
+const AUTHOR_NAME = "Quincy Zhang";
+const AUTHOR_URL = "https://github.com/joygqz";
 
 export function AboutSection() {
   const { t } = useI18n();
@@ -23,6 +27,16 @@ export function AboutSection() {
           <h3 className="text-base font-semibold text-foreground">Sageport</h3>
           <p className="text-sm text-muted-foreground">
             {t("settings.about.version", { version: __APP_VERSION__ })}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {t("settings.about.author")}
+            <button
+              type="button"
+              className="text-link underline underline-offset-2 hover:opacity-80"
+              onClick={() => void openUrl(AUTHOR_URL)}
+            >
+              {AUTHOR_NAME}
+            </button>
           </p>
         </div>
       </div>

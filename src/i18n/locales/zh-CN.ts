@@ -672,6 +672,7 @@ export const zhCN: Dictionary = {
     },
     about: {
       version: "版本 {version}",
+      author: "作者：",
       update: {
         check: "检查更新",
         checking: "正在检查更新…",
