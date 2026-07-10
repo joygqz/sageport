@@ -122,12 +122,10 @@ export function EditorArea() {
         {tabs.map((tab) => (
           <div
             key={tab.id}
-
+            inert={tab.id !== activeId}
             className={cn(
               "absolute inset-0",
-              tab.id === activeId
-                ? "visible"
-                : "invisible [&_.xterm_.scrollbar]:hidden",
+              tab.id !== activeId && "invisible opacity-0",
             )}
           >
             {tab.kind === "terminal" ? (
