@@ -5,7 +5,6 @@ import {
   Copy,
   History,
   KeyRound,
-  LoaderCircle,
   Pencil,
   Sparkles,
   Square,
@@ -83,11 +82,17 @@ export function AssistantPanel({ width }: { width: number }) {
 
   const log = runtime?.log ?? EMPTY_LOG;
   const pending = runtime?.pending ?? false;
+  const activity = runtime?.activity ?? null;
   const awaitingUser = log.some(
     (item) =>
       item.kind === "tool" &&
       (item.status === "awaiting-approval" || item.status === "awaiting-input"),
   );
+  const toolRunning = log.some(
+    (item) => item.kind === "tool" && item.status === "running",
+  );
+  const showThinking =
+    pending && activity === "thinking" && !awaitingUser && !toolRunning;
 
   const [input, setInput] = useState("");
   const [modelOverride, setModelOverride] = useState<string | null>(null);
@@ -195,7 +200,10 @@ export function AssistantPanel({ width }: { width: number }) {
                     </Button>
                   </DropdownMenuTrigger>
                 </Tooltip>
-                <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuContent
+                  align="end"
+                  className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto overscroll-contain"
+                >
                   {sessions.length === 0 ? (
                     <div className="px-2 py-3 text-center text-xs text-muted-foreground">
                       {t("ai.noSessions")}
@@ -305,12 +313,7 @@ export function AssistantPanel({ width }: { width: number }) {
                   />
                 ))
               )}
-              {pending && !awaitingUser && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <LoaderCircle className="size-4 animate-spin text-link" />
-                  {t("ai.working")}
-                </div>
-              )}
+              {showThinking && <ThinkingStatus />}
             </div>
           </div>
 
@@ -382,6 +385,35 @@ export function AssistantPanel({ width }: { width: number }) {
         onClose={() => setConfirmState(null)}
       />
     </aside>
+  );
+}
+
+function ThinkingStatus() {
+  const { t } = useI18n();
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div
+      className="text-xs text-muted-foreground"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="ai-thinking-shimmer">{t("ai.thinking")}</span>
+      {elapsedSeconds >= 10 && (
+        <span aria-hidden="true">
+          {" · "}
+          {t("ai.elapsedSeconds", { seconds: elapsedSeconds })}
+        </span>
+      )}
+    </div>
   );
 }
 

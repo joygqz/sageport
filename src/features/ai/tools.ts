@@ -13,7 +13,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "list_hosts",
     description:
-      "List the user's saved hosts (servers) with their id, label, address, username, group, and notes. Use this to figure out which server the user is talking about, then open a session to it with connect_host if none is open yet.",
+      "List saved hosts with ids and connection details. Use when an explicitly requested host is not identified by current context.",
     parameters: {
       type: "object",
       properties: {},
@@ -23,7 +23,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "connect_host",
     description:
-      "Open a terminal session to a saved host (by id from list_hosts) and wait until it is connected, then return the session id. If a session to that host is already open it is reused instead of opening a duplicate. Use this yourself instead of asking the user to connect manually.",
+      "Connect a saved host by id and return its terminal session id. Reuses or reconnects an existing tab.",
     parameters: {
       type: "object",
       properties: {
@@ -39,7 +39,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "ask_user",
     description:
-      "Ask the user to pick one of a few options, shown as clickable buttons in the chat. Use this only when a real choice remains after applying the current-terminal default. Never ask which server to use when the context provides a current terminal, unless the user explicitly requested another or multiple servers. Keep options short (a few words each) and write them in the user's language. Do not use it for yes/no confirmation of a command; run_terminal_command already asks for approval.",
+      "Show 2-6 choice buttons when a real choice remains. Never use it to confirm the current-terminal default or a command; write short options in the user's language.",
     parameters: {
       type: "object",
       properties: {
@@ -63,7 +63,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "list_terminal_sessions",
     description:
-      "List the terminal sessions (tabs) currently open, with their id, host title, connection status, and current-target marker. The app context already identifies the current terminal, so do not call this merely to choose a target; call it only when you need to inspect all sessions or no current terminal is available.",
+      "List open terminal ids, titles, statuses, and the current marker. Do not call merely to reconfirm the Current terminal in app context.",
     parameters: {
       type: "object",
       properties: {},
@@ -73,7 +73,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "read_terminal_output",
     description:
-      "Read the most recent on-screen output of a terminal session, exactly as the user sees it. Use this on demand whenever you need to see current state or check the result of a command — never ask the user to paste output instead.",
+      "Read recent on-screen terminal output. Omit sessionId for the Current terminal. Use it instead of asking the user to paste output.",
     parameters: {
       type: "object",
       properties: {
@@ -84,8 +84,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
         },
         lines: {
           type: "integer",
-          description:
-            "How many of the most recent lines to return (default 60, max 500).",
+          description: "Recent lines to return (default 60, max 500).",
         },
       },
       additionalProperties: false,
@@ -94,7 +93,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
   {
     name: "run_terminal_command",
     description:
-      "Type a command into a real terminal session and press Enter, then wait for its output to settle and return it. Omit sessionId to use the current terminal from app context; do not ask the user to choose it again. This executes on a live remote server, so the user is always shown a confirmation and can decline before it runs.",
+      "Run a command in a live terminal after user approval and return settled output. Omit sessionId for the Current terminal; never ask to reconfirm it.",
     parameters: {
       type: "object",
       properties: {
@@ -109,8 +108,7 @@ export const AI_TOOL_SPECS: AiToolSpec[] = [
         },
         timeoutMs: {
           type: "integer",
-          description:
-            "Max time to wait for the command's output to settle, in milliseconds (default 10000, max 30000).",
+          description: "Output wait in ms (default 10000, max 30000).",
         },
       },
       required: ["command"],

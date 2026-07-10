@@ -512,7 +512,8 @@ export const en = {
     deleteSession: {
       title: "Delete Chat",
     },
-    working: "Working…",
+    thinking: "Thinking",
+    elapsedSeconds: "{seconds}s",
     stop: "Stop Generating",
     stepLimitReached:
       'Reached the step limit for one run. Say "continue" to keep going.',

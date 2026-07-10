@@ -10,6 +10,7 @@ import type {
   AiToolCall,
 } from "@/types/models";
 import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
+import { modelHistoryWindow } from "./history";
 import {
   AI_TOOL_SPECS,
   automaticTerminalSelectionResult,
@@ -55,6 +56,8 @@ export type ToolStatus =
   | "denied"
   | "error";
 
+export type AgentActivity = "thinking" | "responding" | null;
+
 export type AgentLogItem =
   | { id: string; kind: "user"; content: string }
   | { id: string; kind: "assistant"; content: string }
@@ -73,6 +76,7 @@ interface RuntimeSession {
 
   log: AgentLogItem[];
   pending: boolean;
+  activity: AgentActivity;
 
   requestId: string | null;
 
@@ -109,34 +113,28 @@ interface AiStoreState {
   answer: (toolLogId: string, option: string) => void;
 }
 
-function buildContext(): string {
+function buildContext(omittedHistoryMessages = 0): string {
   const state = useTabsStore.getState();
   const sessions = terminalTabs(state.tabs);
-  const focusedId = targetTerminalId(state);
-  const current = sessions.find((session) => session.id === focusedId);
-  const sessionDetails = sessions.map((session) => ({
-    id: session.id,
-    host: session.title,
-    hostId: session.hostId || undefined,
-    target: session.target,
-    address: session.adhoc?.host,
-    status: session.status,
-    current: session.id === focusedId,
-  }));
+  const currentId = targetTerminalId(state);
+  const current = sessions.find((session) => session.id === currentId);
   const lines = [
     `App: Sageport v${__APP_VERSION__}, a desktop SSH client.`,
     `UI language: ${detectLocale()}.`,
-    sessions.length === 0
-      ? "No terminal sessions are open."
-      : `Current terminal (the default target): ${JSON.stringify(
-          current
-            ? sessionDetails.find((session) => session.id === current.id)
-            : null,
-        )}\nOpen terminal sessions: ${JSON.stringify(sessionDetails)}`,
+    current
+      ? `Current terminal (default target): ${JSON.stringify({
+          id: current.id,
+          host: current.title,
+          hostId: current.hostId || undefined,
+          target: current.target,
+          address: current.adhoc?.host,
+          status: current.status,
+        })}`
+      : "Current terminal: none.",
   ];
-  if (current) {
+  if (omittedHistoryMessages > 0) {
     lines.push(
-      "Routing rule: For requests without an explicit host, use the current terminal above. Do not list hosts, list sessions, or ask the user which server to use. Only ask about the target when there is no current terminal and the request is genuinely ambiguous. If the user explicitly names another host or requests multiple hosts, follow that explicit scope instead.",
+      `${omittedHistoryMessages} older chat messages are outside the model window; ask for missing details only if essential.`,
     );
   }
   return lines.join("\n");
@@ -371,11 +369,13 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       if (!existing) {
         return {
           ...r,
+          activity: "responding",
           log: [...r.log, { id: itemId, kind: "assistant", content: text }],
         };
       }
       return {
         ...r,
+        activity: "responding",
         log: r.log.map((i) =>
           i.id === itemId && i.kind === "assistant"
             ? { ...i, content: i.content + text }
@@ -396,18 +396,28 @@ export const useAiStore = create<AiStoreState>((set, get) => {
 
       const requestId = crypto.randomUUID();
       const streamItemId = crypto.randomUUID();
-      patch(sessionId, (r) => ({ ...r, requestId }));
+      patch(sessionId, (r) => ({
+        ...r,
+        requestId,
+        activity: "thinking",
+      }));
 
       let turnDone = false;
       let result;
       try {
-        result = await ipc.ai.chat(model, runtime.history, AI_TOOL_SPECS, {
-          context: buildContext(),
-          requestId,
-          onDelta: (text) => {
-            if (!turnDone) appendDelta(sessionId, streamItemId, text);
+        const modelHistory = modelHistoryWindow(runtime.history);
+        result = await ipc.ai.chat(
+          model,
+          modelHistory.messages,
+          AI_TOOL_SPECS,
+          {
+            context: buildContext(modelHistory.omittedMessages),
+            requestId,
+            onDelta: (text) => {
+              if (!turnDone) appendDelta(sessionId, streamItemId, text);
+            },
           },
-        });
+        );
       } catch (err) {
         turnDone = true;
         if (errorCode(err) !== "cancelled") throw err;
@@ -438,6 +448,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       const toolCalls = preparedToolCalls.map((x) => x.call);
       patch(sessionId, (r) => ({
         ...r,
+        activity: null,
         history: [
           ...r.history,
           {
@@ -530,6 +541,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
             history: session.messages,
             log: buildLogFromHistory(session.messages),
             pending: false,
+            activity: null,
             requestId: null,
             stopRequested: false,
           },
@@ -555,6 +567,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
             history: [],
             log: [],
             pending: false,
+            activity: null,
             requestId: null,
             stopRequested: false,
           },
@@ -632,6 +645,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         patch(sessionId, (r) => ({
           ...r,
           pending: false,
+          activity: null,
           requestId: null,
           stopRequested: false,
         }));
