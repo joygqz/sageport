@@ -6,6 +6,7 @@ export const zhCN: Dictionary = {
     cancel: "取消",
     copy: "复制",
     copied: "已复制",
+    confirm: "确定",
     create: "创建",
     delete: "删除",
     edit: "编辑",
@@ -496,10 +497,6 @@ export const zhCN: Dictionary = {
     history: "对话历史",
     noSessions: "暂无对话",
     untitledChat: "新对话",
-    renameSession: "重命名对话",
-    deleteSession: {
-      title: "删除对话",
-    },
     thinking: "正在思考",
     stop: "停止生成",
     stepLimitReached: "已达到单次运行的步骤上限，回复“继续”可以接着执行。",

@@ -145,7 +145,6 @@ pub fn run() {
             commands::ai::ai_session_create,
             commands::ai::ai_session_get,
             commands::ai::ai_session_save,
-            commands::ai::ai_session_rename,
             commands::ai::ai_session_delete,
         ])
         .run(tauri::generate_context!())

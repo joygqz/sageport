@@ -4,6 +4,7 @@ export const en = {
     cancel: "Cancel",
     copy: "Copy",
     copied: "Copied",
+    confirm: "Confirm",
     create: "Create",
     delete: "Delete",
     edit: "Edit",
@@ -508,10 +509,6 @@ export const en = {
     history: "Chat History",
     noSessions: "No chats yet",
     untitledChat: "New Chat",
-    renameSession: "Rename Chat",
-    deleteSession: {
-      title: "Delete Chat",
-    },
     thinking: "Thinking",
     stop: "Stop Generating",
     stepLimitReached:

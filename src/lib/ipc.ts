@@ -306,8 +306,6 @@ export const ipc = {
 
       save: (id: string, messages: AiChatMessage[], title: string | null) =>
         invoke<AiSessionSummary>("ai_session_save", { id, messages, title }),
-      rename: (id: string, title: string) =>
-        invoke<AiSessionSummary>("ai_session_rename", { id, title }),
       remove: (id: string) => invoke<void>("ai_session_delete", { id }),
     },
   },

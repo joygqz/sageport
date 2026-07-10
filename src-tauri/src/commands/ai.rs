@@ -287,20 +287,6 @@ pub async fn ai_session_save(
 }
 
 #[tauri::command]
-pub async fn ai_session_rename(
-    state: State<'_, AppState>,
-    id: String,
-    title: String,
-) -> AppResult<AiSessionSummary> {
-    let title = title.trim();
-    if title.is_empty() {
-        return Err(AppError::Invalid("title must not be empty".into()));
-    }
-    let row = ai_session_repo::rename(&state.db, &id, title).await?;
-    Ok(AiSessionSummary::from(row))
-}
-
-#[tauri::command]
 pub async fn ai_session_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
     ai_session_repo::delete(&state.db, &id).await
 }

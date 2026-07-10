@@ -39,7 +39,6 @@ interface AiStoreState {
   openSession: (id: string) => Promise<void>;
 
   newSession: () => Promise<string>;
-  renameSession: (id: string, title: string) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
 
   send: (sessionId: string, prompt: string, model: string) => Promise<void>;
@@ -174,19 +173,6 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         activeId: session.id,
       }));
       return session.id;
-    },
-
-    renameSession: async (id, title) => {
-      const trimmed = title.trim();
-      if (!trimmed) return;
-      try {
-        const summary = await ipc.ai.session.rename(id, trimmed);
-        set((s) => ({
-          sessions: s.sessions.map((x) => (x.id === id ? summary : x)),
-        }));
-      } catch (err) {
-        toast.error(t("ai.error"), errorMessage(err));
-      }
     },
 
     deleteSession: async (id) => {

@@ -78,19 +78,6 @@ pub async fn save(
     get(pool, id).await
 }
 
-pub async fn rename(pool: &SqlitePool, id: &str, title: &str) -> AppResult<AiSessionRow> {
-    let affected = sqlx::query("UPDATE ai_sessions SET title = ? WHERE id = ?")
-        .bind(title)
-        .bind(id)
-        .execute(pool)
-        .await?
-        .rows_affected();
-    if affected == 0 {
-        return Err(AppError::NotFound(format!("ai session {id}")));
-    }
-    get(pool, id).await
-}
-
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let affected = sqlx::query("DELETE FROM ai_sessions WHERE id = ?")
         .bind(id)

@@ -5,7 +5,6 @@ import {
   Copy,
   History,
   KeyRound,
-  Pencil,
   Sparkles,
   Square,
   SquarePen,
@@ -19,27 +18,18 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 import {
   Button,
-  ConfirmDialog,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
-  Input,
   Select,
   Textarea,
   Tooltip,
-  type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import type { AiSessionSummary } from "@/types/models";
 import { useLayoutStore } from "@/workbench/layout";
 import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
@@ -73,7 +63,6 @@ export function AssistantPanel({ width }: { width: number }) {
   const loadSessions = useAiStore((s) => s.loadSessions);
   const openSession = useAiStore((s) => s.openSession);
   const newSession = useAiStore((s) => s.newSession);
-  const renameSession = useAiStore((s) => s.renameSession);
   const deleteSession = useAiStore((s) => s.deleteSession);
   const send = useAiStore((s) => s.send);
   const stop = useAiStore((s) => s.stop);
@@ -96,10 +85,7 @@ export function AssistantPanel({ width }: { width: number }) {
     pending && activity === "thinking" && !awaitingUser && !toolRunning;
 
   const [input, setInput] = useState("");
-  const [renameTarget, setRenameTarget] = useState<AiSessionSummary | null>(
-    null,
-  );
-  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
 
@@ -163,23 +149,6 @@ export function AssistantPanel({ width }: { width: number }) {
 
   const activeTitle = sessions.find((s) => s.id === activeId)?.title;
 
-  const confirmDeleteSession = (session: AiSessionSummary) => {
-    setConfirmState({
-      title: t("ai.deleteSession.title"),
-      description: t("common.deleteConfirm", {
-        name: session.title || t("ai.untitledChat"),
-      }),
-      cancelLabel: t("common.cancel"),
-      actions: [
-        {
-          label: t("common.delete"),
-          variant: "destructive",
-          onSelect: () => void deleteSession(session.id),
-        },
-      ],
-    });
-  };
-
   return (
     <aside
       style={{ width }}
@@ -206,7 +175,11 @@ export function AssistantPanel({ width }: { width: number }) {
                   <SquarePen className="size-4" />
                 </Button>
               </Tooltip>
-              <DropdownMenu>
+              <DropdownMenu
+                onOpenChange={(open) => {
+                  if (!open) setDeleteTargetId(null);
+                }}
+              >
                 <Tooltip content={t("ai.history")}>
                   <DropdownMenuTrigger asChild>
                     <Button size="icon" variant="ghost" className="size-6">
@@ -237,23 +210,27 @@ export function AssistantPanel({ width }: { width: number }) {
                         </span>
                         <button
                           type="button"
-                          className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          className={cn(
+                            "rounded text-muted-foreground hover:bg-accent hover:text-danger",
+                            deleteTargetId === s.id
+                              ? "px-2 py-1 text-xs font-medium text-danger"
+                              : "p-1",
+                          )}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setRenameTarget(s);
+                            if (deleteTargetId === s.id) {
+                              setDeleteTargetId(null);
+                              void deleteSession(s.id);
+                            } else {
+                              setDeleteTargetId(s.id);
+                            }
                           }}
                         >
-                          <Pencil className="size-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            confirmDeleteSession(s);
-                          }}
-                        >
-                          <Trash2 className="size-3.5" />
+                          {deleteTargetId === s.id ? (
+                            t("common.confirm")
+                          ) : (
+                            <Trash2 className="size-3.5" />
+                          )}
                         </button>
                       </DropdownMenuItem>
                     ))
@@ -388,16 +365,6 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
         </>
       )}
-
-      <RenameSessionDialog
-        session={renameTarget}
-        onClose={() => setRenameTarget(null)}
-        onRename={renameSession}
-      />
-      <ConfirmDialog
-        state={confirmState}
-        onClose={() => setConfirmState(null)}
-      />
     </aside>
   );
 }
@@ -413,72 +380,6 @@ function ThinkingStatus() {
     >
       <span className="ai-thinking-shimmer">{t("ai.thinking")}</span>
     </div>
-  );
-}
-
-function RenameSessionDialog({
-  session,
-  onClose,
-  onRename,
-}: {
-  session: AiSessionSummary | null;
-  onClose: () => void;
-  onRename: (id: string, title: string) => void;
-}) {
-  return (
-    <Dialog open={!!session} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-sm">
-        {session && (
-          <RenameSessionForm
-            session={session}
-            onClose={onClose}
-            onRename={onRename}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RenameSessionForm({
-  session,
-  onClose,
-  onRename,
-}: {
-  session: AiSessionSummary;
-  onClose: () => void;
-  onRename: (id: string, title: string) => void;
-}) {
-  const { t } = useI18n();
-  const [value, setValue] = useState(session.title);
-
-  const submit = () => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    onRename(session.id, trimmed);
-    onClose();
-  };
-
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{t("ai.renameSession")}</DialogTitle>
-      </DialogHeader>
-      <Input
-        autoFocus
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") submit();
-        }}
-      />
-      <DialogFooter>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
-        <Button onClick={submit}>{t("common.save")}</Button>
-      </DialogFooter>
-    </>
   );
 }
 
