@@ -1,6 +1,6 @@
 import { ipc } from "@/lib/ipc";
 import type { AiToolSpec } from "@/types/models";
-import { readTerminalContext } from "@/features/terminal/registry";
+import { getSession, readTerminalContext } from "@/features/terminal/sessions";
 import {
   targetTerminalId,
   terminalTabs,
@@ -328,8 +328,10 @@ async function runCommand(args: Record<string, unknown>): Promise<string> {
     30_000,
   );
 
+  const session = getSession(tab.id);
+  if (!session) return noTerminalSessionError(requested);
   const before = readTerminalContext(tab.id, 500) ?? "";
-  await ipc.ssh.send(tab.id, `${command}\n`);
+  session.sendCommand(command);
   const after = await waitForSettledOutput(tab.id, timeoutMs);
 
   const diff = newOutput(before, after).trim();

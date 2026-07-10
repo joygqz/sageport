@@ -20,6 +20,13 @@ describe("extractCommand", () => {
     expect(extractCommand("   ")).toBeNull();
     expect(extractCommand("$ " + "x".repeat(600))).toBeNull();
   });
+
+  it("rejects a bare prompt with no command", () => {
+    expect(extractCommand("user@host:~$ ")).toBeNull();
+    expect(extractCommand("user@host:~$")).toBeNull();
+    expect(extractCommand("❯ ")).toBeNull();
+    expect(extractCommand("me@host:~ %")).toBeNull();
+  });
 });
 
 describe("currentInput", () => {

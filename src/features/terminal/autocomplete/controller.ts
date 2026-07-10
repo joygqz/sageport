@@ -12,6 +12,19 @@ export interface AutocompleteController {
   dispose: () => void;
 }
 
+function styleGhost(el: HTMLElement, term: XTerm, text: string) {
+  el.textContent = text;
+  el.style.fontFamily = term.options.fontFamily ?? "monospace";
+  el.style.fontSize = `${term.options.fontSize ?? 14}px`;
+  el.style.letterSpacing = `${term.options.letterSpacing ?? 0}px`;
+  el.style.lineHeight = `${el.clientHeight}px`;
+  el.style.color = term.options.theme?.foreground ?? "#888888";
+  el.style.opacity = "0.4";
+  el.style.whiteSpace = "pre";
+  el.style.width = "max-content";
+  el.style.pointerEvents = "none";
+}
+
 export function createAutocomplete(opts: {
   hostId: string | null;
   send: (data: string) => void;
@@ -40,18 +53,21 @@ export function createAutocomplete(opts: {
       if (!marker) return;
       const created = term.registerDecoration({ marker, x: buf.cursorX });
       if (!created) return;
-      created.onRender((el) => {
-        el.textContent = ghost;
-        el.style.color = "var(--color-muted-foreground, #888)";
-        el.style.opacity = "0.5";
-        el.style.whiteSpace = "pre";
-        el.style.width = "max-content";
-        el.style.pointerEvents = "none";
-      });
+      const instance = term;
+      const text = ghost;
+      created.onRender((el) => styleGhost(el, instance, text));
       decoration = created;
     } catch {
       clearGhost();
     }
+  };
+
+  const lineAtCursor = (trimRight: boolean) => {
+    if (!term) return "";
+    const buf = term.buffer.active;
+    return (
+      buf.getLine(buf.cursorY + buf.baseY)?.translateToString(trimRight) ?? ""
+    );
   };
 
   const refresh = async () => {
@@ -59,8 +75,7 @@ export function createAutocomplete(opts: {
     const buf = term.buffer.active;
     if (buf.type === "alternate") return clearGhost();
 
-    const line =
-      buf.getLine(buf.cursorY + buf.baseY)?.translateToString(false) ?? "";
+    const line = lineAtCursor(false);
     const afterCursor = line.slice(buf.cursorX).replace(/\s+$/, "");
     if (afterCursor) return clearGhost();
 
@@ -74,8 +89,7 @@ export function createAutocomplete(opts: {
     if (mine !== seq || disposed || !term) return;
 
     const commons = COMMON_COMMANDS.filter((c) => c.startsWith(input));
-    const next = suggest(input, [...history, ...commons]);
-    ghost = next ?? "";
+    ghost = suggest(input, [...history, ...commons]) ?? "";
     render();
   };
 
@@ -85,17 +99,27 @@ export function createAutocomplete(opts: {
   };
 
   const capture = () => {
-    if (!term) return;
-    const buf = term.buffer.active;
-    const line =
-      buf.getLine(buf.cursorY + buf.baseY)?.translateToString(true) ?? "";
-    const command = extractCommand(line);
+    const command = extractCommand(lineAtCursor(true));
     if (command) void ipc.history.add(opts.hostId, command).catch(() => {});
+  };
+
+  const acceptGhost = () => {
+    if (!term || !ghost) return false;
+    const buf = term.buffer.active;
+    const line = lineAtCursor(false);
+    if (line.slice(buf.cursorX).replace(/\s+$/, "")) return false;
+    opts.send(ghost);
+    clearGhost();
+    return true;
   };
 
   const attach = (instance: XTerm) => {
     term = instance;
     instance.onCursorMove(() => schedule());
+    instance.onResize(() => {
+      clearGhost();
+      schedule();
+    });
     instance.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       if (e.key === "Escape" && ghost) {
@@ -103,14 +127,7 @@ export function createAutocomplete(opts: {
         return true;
       }
       if (e.key === "ArrowRight" && ghost) {
-        const buf = instance.buffer.active;
-        const line =
-          buf.getLine(buf.cursorY + buf.baseY)?.translateToString(false) ?? "";
-        if (!line.slice(buf.cursorX).replace(/\s+$/, "")) {
-          opts.send(ghost);
-          clearGhost();
-          return false;
-        }
+        return !acceptGhost();
       }
       return true;
     });

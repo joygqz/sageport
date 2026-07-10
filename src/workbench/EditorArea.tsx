@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
 import { TerminalEditor } from "@/features/terminal/TerminalEditor";
-import { focusTerminal } from "@/features/terminal/registry";
+import { focusTerminal } from "@/features/terminal/sessions";
 import { useOverlayStore } from "./overlays";
 import {
   isFileDirty,

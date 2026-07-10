@@ -194,6 +194,21 @@
       transparent
     );
   }
+
+  .xterm .xterm-viewport {
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .xterm {
+    padding-left: 20px;
+  }
+  .xterm .xterm-scrollable-element {
+    margin-left: -20px;
+    padding-left: 20px;
+  }
 }
 
 @utility scrollbar-none {

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { useTerminalSearch } from "@/features/terminal/search";
+import { getSession } from "@/features/terminal/sessions";
 import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
@@ -376,11 +377,9 @@ export const useTabsStore = create<TabsState>((set, get) => {
 
     sendToTerminal: (command) => {
       const id = targetTerminalId(get());
-      if (!id) return false;
-      const tab = get().tabs.find((t): t is TerminalTab => t.id === id);
-      const data = command + "\n";
-      if (tab?.target === "local") void ipc.pty.write(id, data).catch(() => {});
-      else void ipc.ssh.send(id, data).catch(() => {});
+      const session = getSession(id);
+      if (!id || !session) return false;
+      session.sendCommand(command);
       get().setActive(id);
       return true;
     },

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -11,9 +11,11 @@ import {
 import { Button, Input } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { useTabsStore, type TerminalTab } from "@/workbench/tabs";
-import { focusTerminal, getTerminal } from "./registry";
+import { terminalFontSize, useZoomStore } from "@/workbench/zoom";
 import { useTerminalSearch } from "./search";
+import { focusTerminal, getSession } from "./sessions";
 import { TerminalView } from "./TerminalView";
+import { TERMINAL_FONT_FAMILY } from "./xterm";
 
 export function TerminalEditor({
   tab,
@@ -25,8 +27,12 @@ export function TerminalEditor({
   const reconnect = useTabsStore((s) => s.reconnectTerminal);
   const searchOpen = useTerminalSearch((s) => s.openFor === tab.id);
 
+  useLayoutEffect(() => {
+    if (active) getSession(tab.id)?.refit();
+  }, [active, tab.id]);
+
   return (
-    <div className="relative h-full w-full bg-terminal-background pl-1">
+    <div className="relative h-full w-full bg-terminal-background">
       <TerminalView
         sessionId={tab.id}
         target={tab.target}
@@ -34,9 +40,56 @@ export function TerminalEditor({
         adhoc={tab.adhoc}
         attempt={tab.attempt}
       />
+      <StickyCommand key={tab.attempt} sessionId={tab.id} />
       {searchOpen && active && <SearchBar sessionId={tab.id} />}
       <StatusOverlay tab={tab} onReconnect={() => reconnect(tab.id)} />
     </div>
+  );
+}
+
+function StickyCommand({ sessionId }: { sessionId: string }) {
+  const [sticky, setSticky] = useState<{ text: string; line: number }>();
+  useZoomStore((s) => s.level);
+
+  useEffect(() => {
+    const session = getSession(sessionId);
+    if (!session) return;
+    const term = session.term;
+    const update = () => {
+      const buf = term.buffer.active;
+      if (buf.type === "alternate") return setSticky(undefined);
+      const mark = session.commands.stickyAt(buf.viewportY);
+      setSticky(mark ? { text: mark.text, line: mark.marker.line } : undefined);
+    };
+    const subs = [
+      term.onScroll(update),
+      term.onWriteParsed(update),
+      term.onResize(update),
+    ];
+    return () => subs.forEach((sub) => sub.dispose());
+  }, [sessionId]);
+
+  if (!sticky) return null;
+
+  return (
+    <button
+      onClick={() => {
+        const session = getSession(sessionId);
+        session?.term.scrollToLine(sticky.line);
+        session?.focus();
+      }}
+      className="absolute inset-x-0 top-0 z-10 block overflow-hidden text-ellipsis whitespace-pre border-b border-border bg-terminal-background text-left shadow-sm"
+      style={{
+        color: "var(--terminal-foreground)",
+        fontFamily: TERMINAL_FONT_FAMILY,
+        fontSize: terminalFontSize(),
+        lineHeight: 1.25,
+        paddingLeft: 20,
+        paddingRight: 20,
+      }}
+    >
+      {sticky.text}
+    </button>
   );
 }
 
@@ -55,7 +108,7 @@ function SearchBar({ sessionId }: { sessionId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const search = getTerminal(sessionId)?.search;
+    const search = getSession(sessionId)?.search;
     if (!search) return;
     const sub = search.onDidChangeResults((e) =>
       setResult({ index: e.resultIndex, count: e.resultCount }),
@@ -64,7 +117,7 @@ function SearchBar({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   const find = (text: string, direction: "next" | "previous") => {
-    const search = getTerminal(sessionId)?.search;
+    const search = getSession(sessionId)?.search;
     if (!search || !text) return;
     const options = { decorations: SEARCH_DECORATIONS };
     if (direction === "next") search.findNext(text, options);
@@ -72,7 +125,7 @@ function SearchBar({ sessionId }: { sessionId: string }) {
   };
 
   const dismiss = () => {
-    getTerminal(sessionId)?.search.clearDecorations();
+    getSession(sessionId)?.search.clearDecorations();
     close();
     focusTerminal(sessionId);
   };

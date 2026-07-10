@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { applyTerminalFontSize } from "@/features/terminal/registry";
+import { applyTerminalFontSize } from "@/features/terminal/sessions";
 import { ipc } from "@/lib/ipc";
 import { IS_MACOS } from "@/lib/platform";
 
