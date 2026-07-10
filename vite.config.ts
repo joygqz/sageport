@@ -40,13 +40,34 @@ export default defineConfig(async () => ({
   },
 
   build: {
-    rollupOptions: {
+    // Monaco is intentionally loaded on first file edit. Its editor core is a
+    // single large module, so use a higher warning limit while keeping every
+    // eagerly-loaded application chunk below the default 500 kB budget.
+    chunkSizeWarningLimit: 4_000,
+    rolldownOptions: {
       output: {
-        advancedChunks: {
+        codeSplitting: {
           groups: [
-            { name: "xterm", test: /node_modules\/@xterm\// },
-            { name: "markdown", test: /node_modules\/(react-markdown|remark-gfm)\// },
-            { name: "radix-ui", test: /node_modules\/@radix-ui\// },
+            {
+              name: "react",
+              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              priority: 50,
+            },
+            {
+              name: "radix-ui",
+              test: /node_modules[\\/]@radix-ui[\\/]/,
+              priority: 40,
+            },
+            {
+              name: "xterm",
+              test: /node_modules[\\/]@xterm[\\/]/,
+              priority: 30,
+            },
+            {
+              name: "markdown",
+              test: /node_modules[\\/](react-markdown|remark-gfm)[\\/]/,
+              priority: 30,
+            },
           ],
         },
       },

@@ -1,14 +1,12 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { ResizeHandle } from "@/components/ui";
+import { ResizeHandle, Spinner } from "@/components/ui";
 import { useSettingSync } from "@/lib/settingSync";
 import { IS_MACOS } from "@/lib/platform";
 import { Toaster } from "@/components/ui/toaster";
-import { AssistantPanel } from "@/features/ai/AssistantPanel";
 import { GroupFormDialog } from "@/features/hosts/GroupFormDialog";
 import { HostFormDialog } from "@/features/hosts/HostFormDialog";
-import { SftpPanel } from "@/features/sftp/SftpPanel";
 import { bridgeSftpEvents } from "@/features/sftp/store";
 import { HostKeyDialog } from "@/features/terminal/HostKeyDialog";
 import { ActivityBar } from "./ActivityBar";
@@ -26,6 +24,18 @@ import { SideBar } from "./SideBar";
 import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
 import { syncTrafficLights, useZoomStore, ZOOM_SYNC_KEY } from "./zoom";
+
+const AssistantPanel = lazy(() =>
+  import("@/features/ai/AssistantPanel").then((module) => ({
+    default: module.AssistantPanel,
+  })),
+);
+
+const SftpPanel = lazy(() =>
+  import("@/features/sftp/SftpPanel").then((module) => ({
+    default: module.SftpPanel,
+  })),
+);
 
 export function Workbench() {
   useKeybindings();
@@ -122,7 +132,11 @@ export function Workbench() {
                     : undefined
                 }
               />
-              <SftpPanel height={layout.panelHeight} />
+              <Suspense
+                fallback={<FeatureLoading height={layout.panelHeight} />}
+              >
+                <SftpPanel height={layout.panelHeight} />
+              </Suspense>
             </>
           )}
         </div>
@@ -137,7 +151,9 @@ export function Workbench() {
               onResize={layout.setAuxWidth}
               limits={auxLimits}
             />
-            <AssistantPanel width={layout.auxWidth} />
+            <Suspense fallback={<FeatureLoading width={layout.auxWidth} />}>
+              <AssistantPanel width={layout.auxWidth} />
+            </Suspense>
           </>
         )}
       </div>
@@ -161,6 +177,23 @@ export function Workbench() {
       />
       <HostKeyDialog />
       <Toaster />
+    </div>
+  );
+}
+
+function FeatureLoading({
+  width,
+  height,
+}: {
+  width?: number;
+  height?: number;
+}) {
+  return (
+    <div
+      style={{ width, height }}
+      className="flex shrink-0 items-center justify-center bg-surface"
+    >
+      <Spinner />
     </div>
   );
 }

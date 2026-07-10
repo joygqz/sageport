@@ -40,6 +40,7 @@ export function TerminalEditor({
         hostId={tab.hostId}
         adhoc={tab.adhoc}
         attempt={tab.attempt}
+        active={active}
       />
       <StickyCommand key={tab.attempt} sessionId={tab.id} />
       {searchOpen && active && <SearchBar sessionId={tab.id} />}

@@ -24,12 +24,14 @@ export function TerminalView({
   hostId,
   adhoc,
   attempt,
+  active,
 }: {
   sessionId: string;
   target: TerminalTarget;
   hostId: string;
   adhoc?: AdhocTarget;
   attempt: number;
+  active: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<TerminalSession | null>(null);
@@ -106,6 +108,7 @@ export function TerminalView({
     autocomplete?.attach(session.term);
     registerSession(sessionId, session);
     session.attach(containerRef.current!);
+    if (active) session.focus();
 
     return () => {
       unregisterSession(sessionId);
@@ -119,6 +122,10 @@ export function TerminalView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, target, hostId, attempt]);
+
+  useEffect(() => {
+    if (active) sessionRef.current?.focus();
+  }, [active]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

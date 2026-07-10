@@ -10,9 +10,7 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { SettingsPage } from "@/features/settings/SettingsPage";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
-import { TerminalEditor } from "@/features/terminal/TerminalEditor";
 import { focusTerminal } from "@/features/terminal/sessions";
 import { useOverlayStore } from "./overlays";
 import {
@@ -26,6 +24,18 @@ import {
 const FileEditor = lazy(() =>
   import("@/features/sftp/FileEditor").then((m) => ({
     default: m.FileEditor,
+  })),
+);
+
+const SettingsPage = lazy(() =>
+  import("@/features/settings/SettingsPage").then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
+
+const TerminalEditor = lazy(() =>
+  import("@/features/terminal/TerminalEditor").then((module) => ({
+    default: module.TerminalEditor,
   })),
 );
 
@@ -128,26 +138,28 @@ export function EditorArea() {
               tab.id !== activeId && "invisible opacity-0",
             )}
           >
-            {tab.kind === "terminal" ? (
-              <TerminalEditor tab={tab} active={tab.id === activeId} />
-            ) : tab.kind === "file" ? (
-              <Suspense
-                fallback={
-                  <div className="flex h-full items-center justify-center bg-background">
-                    <Spinner />
-                  </div>
-                }
-              >
+            <Suspense fallback={<EditorLoading />}>
+              {tab.kind === "terminal" ? (
+                <TerminalEditor tab={tab} active={tab.id === activeId} />
+              ) : tab.kind === "file" ? (
                 <FileEditor tab={tab} />
-              </Suspense>
-            ) : (
-              <SettingsPage section={tab.section} />
-            )}
+              ) : (
+                <SettingsPage section={tab.section} />
+              )}
+            </Suspense>
           </div>
         ))}
       </div>
 
       <ConfirmDialog state={confirmState} onClose={clearPendingClose} />
+    </div>
+  );
+}
+
+function EditorLoading() {
+  return (
+    <div className="flex h-full items-center justify-center bg-background">
+      <Spinner />
     </div>
   );
 }
