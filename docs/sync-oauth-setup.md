@@ -36,9 +36,9 @@ Backups are stored in Drive's `appDataFolder`, a hidden app-scoped space where t
 ## Microsoft (public client + PKCE)
 
 1. Open <https://entra.microsoft.com/> → **App registrations → New registration**.
-2. For **Supported account types**, choose *Accounts in any organizational directory and personal Microsoft accounts* (covers both personal and business OneDrive).
+2. For **Supported account types**, choose _Accounts in any organizational directory and personal Microsoft accounts_ (covers both personal and business OneDrive).
 3. For **Redirect URI**, choose the **Mobile and desktop applications** type and enter `http://localhost` (Entra accepts any port on localhost).
-4. On the **Authentication** page, confirm *Allow public client flows* is **Yes**.
+4. On the **Authentication** page, confirm _Allow public client flows_ is **Yes**.
 5. Under **API permissions**, add the Microsoft Graph delegated permissions `Files.ReadWrite.AppFolder`, `User.Read`, and `offline_access`.
 6. Copy the **Application (client) ID** into `SAGEPORT_MS_CLIENT_ID`. No client secret is needed.
 

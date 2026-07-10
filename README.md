@@ -44,11 +44,11 @@ Sageport consolidates the tools of routine server operations — terminal, file 
 
 Download from the [latest release](https://github.com/joygqz/sageport/releases/latest):
 
-| Platform | Package |
-| --- | --- |
-| macOS | `.dmg` (Apple Silicon / Intel) |
-| Windows | `.msi` / `.exe` |
-| Linux | `.deb` / `.rpm` / `.AppImage` |
+| Platform | Package                        |
+| -------- | ------------------------------ |
+| macOS    | `.dmg` (Apple Silicon / Intel) |
+| Windows  | `.msi` / `.exe`                |
+| Linux    | `.deb` / `.rpm` / `.AppImage`  |
 
 The application updates itself; the status bar indicates when a new version is available.
 
@@ -57,8 +57,8 @@ The application updates itself; the status bar indicates when a new version is a
 1. **Add a host** — <kbd>⌘</kbd> <kbd>N</kbd>, then enter the address and choose password or key authentication — or just type `user@host` in the command palette to connect right away.
 2. **Connect** — <kbd>⌘</kbd> <kbd>P</kbd>, type the host name, press Enter.
 3. **Transfer files** — <kbd>⌘</kbd> <kbd>J</kbd> opens the dual-pane file panel.
-4. **AI assistant** (optional) — set an API key under *Settings → AI*, then <kbd>⌘</kbd> <kbd>L</kbd> to chat.
-5. **Sync** (optional) — under *Settings → Sync*, pick a provider (GitHub, Google Drive, OneDrive, WebDAV, or S3), authorize or enter credentials, then set a passphrase; enter the same passphrase on another device to restore.
+4. **AI assistant** (optional) — set an API key under _Settings → AI_, then <kbd>⌘</kbd> <kbd>L</kbd> to chat.
+5. **Sync** (optional) — under _Settings → Sync_, pick a provider (GitHub, Google Drive, OneDrive, WebDAV, or S3), authorize or enter credentials, then set a passphrase; enter the same passphrase on another device to restore.
 
 On Windows and Linux, substitute <kbd>Ctrl</kbd> for <kbd>⌘</kbd>.
 

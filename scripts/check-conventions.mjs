@@ -23,7 +23,9 @@ for (const file of ipcFiles) {
 for (const file of tracked("'src-tauri/src/**/*.rs'")) {
   const text = readFileSync(root + file, "utf8");
   if (/std::sync::Mutex/.test(text)) {
-    problems.push(`${file}: use parking_lot::Mutex instead of std::sync::Mutex`);
+    problems.push(
+      `${file}: use parking_lot::Mutex instead of std::sync::Mutex`,
+    );
   }
 }
 
