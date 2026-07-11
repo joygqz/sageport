@@ -527,14 +527,48 @@ export const en = {
     empty: {
       title: "Ask the assistant",
       description:
-        "It can connect to your hosts, run commands, browse and edit files, and manage snippets and port forwards to get ops work done. Anything that changes a server or your setup needs your approval first.",
+        "It can inspect terminals and run commands, plus use any additional tools enabled in AI settings. Anything that changes a server or your setup needs your approval first.",
       descriptionAutonomous:
         "Autonomous mode is on. The assistant can run operations without asking for each approval; stop it at any time.",
     },
     suggestion: {
-      logs: "Review this host's system logs and help troubleshoot issues",
-      hosts: "Check the availability and connection latency of all hosts",
-      snippets: "Review and organize my saved command snippets",
+      core: {
+        terminalOutput:
+          "Review the current terminal output and identify the error",
+        resourceUsage: "Check this host's CPU, memory, and disk usage",
+        systemLogs:
+          "Review this host's system logs and help troubleshoot issues",
+      },
+      terminal: {
+        gitHistory: "Find the Git commands I ran recently in command history",
+        commonCommands:
+          "Analyze my command history and list my most-used commands",
+        dockerHistory:
+          "Search command history for recently used Docker commands",
+      },
+      hosts: {
+        health: "Check the availability and connection latency of all hosts",
+        inventory: "Summarize my saved hosts by group",
+        stats: "Show resource usage for all online hosts",
+      },
+      files: {
+        largeFiles:
+          "Find the files using the most space in the current directory",
+        config:
+          "Read the config files in the current directory and summarize key settings",
+        bookmarks: "List my file bookmarks and help organize them",
+      },
+      automation: {
+        snippets: "Review and organize my saved command snippets",
+        forwards: "Check my saved port forwards and their running status",
+        saveSnippet:
+          "Save the most recent terminal command as a command snippet",
+      },
+      credentials: {
+        inventory: "List my saved SSH identities and SSH keys",
+        generateKey: "Generate a new Ed25519 SSH key pair",
+        audit: "Check whether my SSH identity settings are complete",
+      },
     },
     newChat: "New Chat",
     history: "Chat History",
@@ -656,6 +690,21 @@ export const en = {
         "When enabled, the assistant automatically approves operations such as commands, file edits, and configuration changes. It will still ask when your intent or target is ambiguous.",
       autonomousModeWarning:
         "This can make irreversible changes to your systems. Enable it only for hosts and tasks you trust.",
+      tools: {
+        title: "Assistant tools",
+        description:
+          "Core tools are always available. Enable only the additional tools you need to reduce prompt size and avoid irrelevant tool choices.",
+        enabledSummary: "{enabled} of {total} tools available globally",
+        required: "Required",
+        group: {
+          core: "Core",
+          terminal: "Terminal",
+          hosts: "Hosts and groups",
+          files: "Files and bookmarks",
+          automation: "Snippets and port forwards",
+          credentials: "Identities and SSH keys",
+        },
+      },
       saveError: "Failed to save configuration",
     },
     sync: {

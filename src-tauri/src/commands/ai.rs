@@ -11,6 +11,7 @@ const API_KEY_SETTING: &str = "ai.api_key";
 const PROTOCOL_SETTING: &str = "ai.protocol";
 const MODEL_SETTING: &str = "ai.model";
 const AUTO_APPROVE_SETTING: &str = "ai.auto_approve";
+const ENABLED_TOOLS_SETTING: &str = "ai.enabled_tools";
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +21,7 @@ pub struct AiConfig {
     pub protocol: Protocol,
     pub model: String,
     pub auto_approve: bool,
+    pub enabled_tools: Vec<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -30,6 +32,8 @@ pub struct AiConfigInput {
     pub api_key: Option<String>,
     #[serde(default)]
     pub auto_approve: bool,
+    #[serde(default)]
+    pub enabled_tools: Vec<String>,
 }
 
 async fn stored_protocol(state: &AppState) -> AppResult<Protocol> {
@@ -70,12 +74,17 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
         .await?
         .as_deref()
         == Some("true");
+    let enabled_tools = settings_repo::get(&state.db, ENABLED_TOOLS_SETTING)
+        .await?
+        .and_then(|value| serde_json::from_str::<Vec<String>>(&value).ok())
+        .unwrap_or_default();
     Ok(AiConfig {
         api_key,
         base_url,
         protocol,
         model,
         auto_approve,
+        enabled_tools,
     })
 }
 
@@ -101,6 +110,20 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
         &state.db,
         AUTO_APPROVE_SETTING,
         if input.auto_approve { "true" } else { "false" },
+    )
+    .await?;
+    let mut enabled_tools = input
+        .enabled_tools
+        .into_iter()
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .collect::<Vec<_>>();
+    enabled_tools.sort();
+    enabled_tools.dedup();
+    settings_repo::set(
+        &state.db,
+        ENABLED_TOOLS_SETTING,
+        &serde_json::to_string(&enabled_tools)?,
     )
     .await?;
     Ok(())

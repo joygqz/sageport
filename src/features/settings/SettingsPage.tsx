@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Check,
+  ChevronRight,
   Info,
   Minus,
   Palette,
@@ -41,6 +42,11 @@ import {
   useAiConfig,
   useSetAiConfig,
 } from "@/features/ai/api";
+import {
+  CORE_TOOL_NAMES,
+  normalizeEnabledToolNames,
+  TOOL_GROUPS,
+} from "@/features/ai/tools";
 import { SyncSection } from "@/features/sync/SyncSection";
 import { AboutSection } from "./AboutSection";
 
@@ -361,6 +367,12 @@ function AiForm({ config }: { config: AiConfig }) {
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
   const [apiKey, setApiKey] = useState(config.apiKey);
   const [autoApprove, setAutoApprove] = useState(config.autoApprove);
+  const [enabledTools, setEnabledTools] = useState(() =>
+    normalizeEnabledToolNames(config.enabledTools ?? []),
+  );
+  const [expandedToolGroups, setExpandedToolGroups] = useState<Set<string>>(
+    () => new Set(),
+  );
   const mutate = setConfig.mutate;
   const skipSave = useRef(true);
   const pendingSave = useRef<{
@@ -368,6 +380,7 @@ function AiForm({ config }: { config: AiConfig }) {
     protocol: AiProtocol;
     apiKey: string;
     autoApprove: boolean;
+    enabledTools: string[];
   } | null>(null);
 
   const changeProtocol = (next: AiProtocol) => {
@@ -380,11 +393,17 @@ function AiForm({ config }: { config: AiConfig }) {
       skipSave.current = false;
       return;
     }
-    pendingSave.current = { baseUrl, protocol, apiKey, autoApprove };
+    pendingSave.current = {
+      baseUrl,
+      protocol,
+      apiKey,
+      autoApprove,
+      enabledTools,
+    };
     const timer = setTimeout(() => {
       pendingSave.current = null;
       mutate(
-        { baseUrl, protocol, apiKey, autoApprove },
+        { baseUrl, protocol, apiKey, autoApprove, enabledTools },
         {
           onError: (err) =>
             toast.error(t("settings.ai.saveError"), errorMessage(err)),
@@ -392,7 +411,34 @@ function AiForm({ config }: { config: AiConfig }) {
       );
     }, 500);
     return () => clearTimeout(timer);
-  }, [protocol, baseUrl, apiKey, autoApprove, mutate, t]);
+  }, [protocol, baseUrl, apiKey, autoApprove, enabledTools, mutate, t]);
+
+  const toggleTool = (name: string, checked: boolean) => {
+    setEnabledTools((current) =>
+      normalizeEnabledToolNames(
+        checked ? [...current, name] : current.filter((item) => item !== name),
+      ),
+    );
+  };
+
+  const toggleToolGroup = (names: readonly string[], checked: boolean) => {
+    setEnabledTools((current) =>
+      normalizeEnabledToolNames(
+        checked
+          ? [...current, ...names]
+          : current.filter((name) => !names.includes(name)),
+      ),
+    );
+  };
+
+  const toggleToolGroupExpanded = (id: string) => {
+    setExpandedToolGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(
     () => () => {
@@ -472,6 +518,171 @@ function AiForm({ config }: { config: AiConfig }) {
           />
         </div>
       </Field>
+
+      <div className="mt-2 flex flex-col gap-3">
+        <SectionHeader
+          title={t("settings.ai.tools.title")}
+          description={t("settings.ai.tools.description")}
+        />
+        <p className="text-xs text-muted-foreground">
+          {t("settings.ai.tools.enabledSummary", {
+            enabled: CORE_TOOL_NAMES.size + enabledTools.length,
+            total: TOOL_GROUPS.reduce(
+              (count, group) => count + group.tools.length,
+              0,
+            ),
+          })}
+        </p>
+
+        <div
+          aria-label={t("settings.ai.tools.title")}
+          className="overflow-hidden rounded-md border border-input"
+        >
+          {TOOL_GROUPS.map((group) => (
+            <ToolTreeGroup
+              key={group.id}
+              group={group}
+              expanded={expandedToolGroups.has(group.id)}
+              enabledTools={enabledTools}
+              onToggleExpanded={() => toggleToolGroupExpanded(group.id)}
+              onToggleTool={toggleTool}
+              onToggleGroup={toggleToolGroup}
+            />
+          ))}
+        </div>
+      </div>
     </div>
+  );
+}
+
+type ToolGroup = (typeof TOOL_GROUPS)[number];
+
+function ToolTreeGroup({
+  group,
+  expanded,
+  enabledTools,
+  onToggleExpanded,
+  onToggleTool,
+  onToggleGroup,
+}: {
+  group: ToolGroup;
+  expanded: boolean;
+  enabledTools: string[];
+  onToggleExpanded: () => void;
+  onToggleTool: (name: string, checked: boolean) => void;
+  onToggleGroup: (names: readonly string[], checked: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const core = group.id === "core";
+  const names = group.tools.map((tool) => tool.spec.name);
+  const enabledCount = core
+    ? names.length
+    : names.filter((name) => enabledTools.includes(name)).length;
+  const allEnabled = enabledCount === names.length;
+  const partiallyEnabled = enabledCount > 0 && !allEnabled;
+  const groupLabel = t(`settings.ai.tools.group.${group.id}`);
+
+  return (
+    <div>
+      <div className="flex min-h-7 items-center gap-1.5 px-2 py-1 hover:bg-accent/60">
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          aria-expanded={expanded}
+          aria-label={groupLabel}
+          className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        >
+          <ChevronRight
+            className={cn(
+              "size-3.5 text-muted-foreground transition-transform",
+              expanded && "rotate-90",
+            )}
+          />
+        </button>
+        <TreeCheckbox
+          checked={allEnabled}
+          indeterminate={partiallyEnabled}
+          disabled={core}
+          onChange={(event) => onToggleGroup(names, event.target.checked)}
+          aria-label={groupLabel}
+        />
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        >
+          <span className="min-w-0 flex-1 truncate text-xs font-medium">
+            {groupLabel}
+          </span>
+          <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
+            {enabledCount}/{names.length}
+          </span>
+          {core && (
+            <span className="shrink-0 text-2xs text-muted-foreground">
+              {t("settings.ai.tools.required")}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="py-0.5 pl-5 pr-2">
+          <div className="pl-5">
+            {group.tools.map((tool) => {
+              const name = tool.spec.name;
+              const checked = core || enabledTools.includes(name);
+              const Icon = tool.icon;
+              return (
+                <label
+                  key={name}
+                  className={cn(
+                    "flex min-h-7 items-center gap-2 rounded py-1 pl-2 pr-0",
+                    core ? "cursor-default" : "cursor-pointer hover:bg-accent",
+                  )}
+                >
+                  <TreeCheckbox
+                    checked={checked}
+                    disabled={core}
+                    onChange={(event) =>
+                      onToggleTool(name, event.target.checked)
+                    }
+                    aria-label={t(tool.labelKey)}
+                  />
+                  <Icon className="size-3 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {t(tool.labelKey)}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TreeCheckbox({
+  indeterminate = false,
+  className,
+  ...props
+}: React.ComponentProps<"input"> & { indeterminate?: boolean }) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+
+  return (
+    <input
+      {...props}
+      ref={ref}
+      type="checkbox"
+      className={cn(
+        "size-4 shrink-0 accent-primary disabled:cursor-not-allowed",
+        className,
+      )}
+    />
   );
 }

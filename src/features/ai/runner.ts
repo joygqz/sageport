@@ -13,9 +13,9 @@ import {
 } from "./history";
 import { resolveModelLimits } from "./model-limits";
 import {
-  AI_TOOL_SPECS,
   askUserOptions,
   askUserQuestion,
+  enabledToolSpecs,
   executeTool,
   normalizeArgs,
   prepareTool,
@@ -36,7 +36,6 @@ const MAX_STEPS = 24;
 
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 
-const TOOL_SPEC_TOKENS = estimateTextTokens(JSON.stringify(AI_TOOL_SPECS));
 const SYSTEM_PROMPT_ALLOWANCE_TOKENS = 1_000;
 
 export interface RunnerHost {
@@ -95,8 +94,15 @@ type PreparedToolCall = {
 async function prepareToolCall(
   call: AiToolCall,
   userPrompt: string,
+  availableToolNames: ReadonlySet<string>,
 ): Promise<PreparedToolCall> {
   const args = normalizeArgs(call.arguments);
+  if (!availableToolNames.has(call.name)) {
+    return {
+      call: { ...call, arguments: args },
+      preflightError: `Error: tool "${call.name}" is disabled in AI settings.`,
+    };
+  }
   const validationError = validateToolArguments(call.name, args);
   if (validationError) {
     return {
@@ -197,6 +203,9 @@ type RunConfig = {
   budget: number;
   maxTokens: number;
   autoApprove: boolean;
+  tools: ReturnType<typeof enabledToolSpecs>;
+  toolNames: ReadonlySet<string>;
+  toolSpecTokens: number;
 };
 
 async function requestStep(
@@ -220,7 +229,7 @@ async function requestStep(
     try {
       const contextWithoutOmissions = buildContext(0, run.autoApprove);
       const nonHistoryTokens =
-        TOOL_SPEC_TOKENS +
+        run.toolSpecTokens +
         estimateTextTokens(contextWithoutOmissions) +
         SYSTEM_PROMPT_ALLOWANCE_TOKENS;
       const historyBudget = Math.max(
@@ -234,7 +243,7 @@ async function requestStep(
       const result = await ipc.ai.chat(
         run.model,
         modelHistory.messages,
-        AI_TOOL_SPECS,
+        run.tools,
         {
           context: buildContext(modelHistory.omittedMessages, run.autoApprove),
           maxTokens: run.maxTokens,
@@ -405,13 +414,18 @@ export async function runAgentLoop(
   sessionId: string,
   model: string,
   autoApprove = false,
+  enabledToolNames: readonly string[] = [],
 ): Promise<void> {
   const limits = await resolveModelLimits(model);
+  const tools = enabledToolSpecs(enabledToolNames);
   const run: RunConfig = {
     model,
     budget: historyTokenBudget(limits),
     maxTokens: outputTokenBudget(limits),
     autoApprove,
+    tools,
+    toolNames: new Set(tools.map((tool) => tool.name)),
+    toolSpecTokens: estimateTextTokens(JSON.stringify(tools)),
   };
 
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -429,7 +443,7 @@ export async function runAgentLoop(
         history.flatMap((message) =>
           (message.toolCalls ?? []).map((call) => call.id),
         ),
-      ).map((call) => prepareToolCall(call, userPrompt)),
+      ).map((call) => prepareToolCall(call, userPrompt, run.toolNames)),
     );
     const toolCalls = preparedToolCalls.map((x) => x.call);
     host.patch(sessionId, (r) => ({

@@ -252,6 +252,7 @@ export interface AiConfig {
   protocol: AiProtocol;
   model: string;
   autoApprove: boolean;
+  enabledTools: string[];
 }
 
 export type AiRole = "system" | "user" | "assistant" | "tool";

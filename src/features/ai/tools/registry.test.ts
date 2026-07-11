@@ -5,10 +5,13 @@ vi.mock("@/lib/ipc", () => ({ ipc: {} }));
 import {
   AI_TOOL_SPECS,
   ALL_TOOLS,
+  CORE_TOOL_NAMES,
   TOOL_ICONS,
   TOOL_LABEL_KEYS,
   TOOLS_REQUIRING_APPROVAL,
   getTool,
+  enabledToolSpecs,
+  normalizeEnabledToolNames,
   prepareTool,
   redactToolArguments,
   validateToolArguments,
@@ -41,6 +44,19 @@ describe("tool registry", () => {
     const askUser = getTool("ask_user");
     expect(askUser?.execute).toBeUndefined();
     expect(TOOLS_REQUIRING_APPROVAL.has("ask_user")).toBe(false);
+  });
+
+  it("always exposes core tools and only selected optional tools", () => {
+    const specs = enabledToolSpecs([
+      "list_hosts",
+      "list_hosts",
+      "unknown_tool",
+      "ask_user",
+    ]);
+    const names = specs.map((spec) => spec.name);
+
+    expect(new Set(names)).toEqual(new Set([...CORE_TOOL_NAMES, "list_hosts"]));
+    expect(normalizeEnabledToolNames(names)).toEqual(["list_hosts"]);
   });
 
   it("returns args unchanged when a tool declares no prepare hook", async () => {

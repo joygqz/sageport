@@ -33,6 +33,28 @@ export const ALL_TOOLS: AiTool[] = [
   ...monitorTools,
 ];
 
+export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "ask_user",
+  "list_terminal_sessions",
+  "read_terminal_output",
+  "run_terminal_command",
+]);
+
+export const TOOL_GROUPS = [
+  {
+    id: "core",
+    tools: ALL_TOOLS.filter((tool) => CORE_TOOL_NAMES.has(tool.spec.name)),
+  },
+  {
+    id: "terminal",
+    tools: terminalTools.filter((tool) => !CORE_TOOL_NAMES.has(tool.spec.name)),
+  },
+  { id: "hosts", tools: [...hostTools, ...groupTools, ...monitorTools] },
+  { id: "files", tools: [...fileTools, ...bookmarkTools] },
+  { id: "automation", tools: [...snippetTools, ...forwardTools] },
+  { id: "credentials", tools: credentialTools },
+] as const;
+
 const TOOLS_BY_NAME = new Map(ALL_TOOLS.map((tool) => [tool.spec.name, tool]));
 
 const SENSITIVE_ARGUMENTS: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -165,6 +187,26 @@ export function validateToolArguments(
 }
 
 export const AI_TOOL_SPECS: AiToolSpec[] = ALL_TOOLS.map((tool) => tool.spec);
+
+export function normalizeEnabledToolNames(names: readonly string[]): string[] {
+  const requested = new Set(names);
+  return ALL_TOOLS.filter(
+    (tool) =>
+      !CORE_TOOL_NAMES.has(tool.spec.name) && requested.has(tool.spec.name),
+  ).map((tool) => tool.spec.name);
+}
+
+export function enabledTools(names: readonly string[]): AiTool[] {
+  const optional = new Set(normalizeEnabledToolNames(names));
+  return ALL_TOOLS.filter(
+    (tool) =>
+      CORE_TOOL_NAMES.has(tool.spec.name) || optional.has(tool.spec.name),
+  );
+}
+
+export function enabledToolSpecs(names: readonly string[]): AiToolSpec[] {
+  return enabledTools(names).map((tool) => tool.spec);
+}
 
 export const TOOLS_REQUIRING_APPROVAL: ReadonlySet<string> = new Set(
   ALL_TOOLS.filter((tool) => tool.requiresApproval).map(

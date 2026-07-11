@@ -516,14 +516,41 @@ export const zhCN: Dictionary = {
     empty: {
       title: "向助手提问",
       description:
-        "助手可以连接主机、执行命令、浏览和编辑文件，并管理命令片段、端口转发等来完成运维任务。任何会改动服务器或你配置的操作都需要你先批准。",
+        "助手可以查看终端并执行命令，也可使用 AI 设置中开启的附加工具。任何会改动服务器或你配置的操作都需要你先批准。",
       descriptionAutonomous:
         "自治模式已开启。助手会自动执行操作，不再逐项请求批准；你可随时停止执行。",
     },
     suggestion: {
-      logs: "查看当前主机的系统日志，帮我排查异常",
-      hosts: "检查所有主机的在线状态和连接延迟",
-      snippets: "查看并整理我保存的常用命令片段",
+      core: {
+        terminalOutput: "查看当前终端输出，帮我定位报错原因",
+        resourceUsage: "检查当前主机的 CPU、内存和磁盘使用情况",
+        systemLogs: "查看当前主机的系统日志，帮我排查异常",
+      },
+      terminal: {
+        gitHistory: "从命令历史中找出我最近执行过的 Git 命令",
+        commonCommands: "分析命令历史，整理我最常用的命令",
+        dockerHistory: "搜索最近执行过的 Docker 相关命令",
+      },
+      hosts: {
+        health: "检查所有主机的在线状态和连接延迟",
+        inventory: "按分组汇总我保存的主机",
+        stats: "查看所有在线主机的资源使用情况",
+      },
+      files: {
+        largeFiles: "找出当前目录中占用空间最大的文件",
+        config: "读取当前目录的配置文件并总结关键设置",
+        bookmarks: "列出文件书签并帮我整理分类",
+      },
+      automation: {
+        snippets: "查看并整理我保存的常用命令片段",
+        forwards: "检查已保存的端口转发及运行状态",
+        saveSnippet: "把当前终端最近执行的命令保存为命令片段",
+      },
+      credentials: {
+        inventory: "列出已保存的 SSH 身份和 SSH 密钥",
+        generateKey: "帮我生成一对新的 Ed25519 SSH 密钥",
+        audit: "检查 SSH 身份配置是否完整",
+      },
     },
     newChat: "新对话",
     history: "对话历史",
@@ -642,6 +669,21 @@ export const zhCN: Dictionary = {
         "开启后，助手会自动批准命令、文件编辑和配置更改等操作。目标或意图不明确时，仍会向你询问。",
       autonomousModeWarning:
         "此模式可能对系统造成不可逆更改，请仅在信任的主机和任务中开启。",
+      tools: {
+        title: "助手工具",
+        description:
+          "核心工具始终可用。仅开启需要的附加工具，以减少提示词长度并避免无关的工具选择。",
+        enabledSummary: "全局已启用 {enabled}/{total} 个工具",
+        required: "必需",
+        group: {
+          core: "核心工具",
+          terminal: "终端",
+          hosts: "主机与分组",
+          files: "文件与书签",
+          automation: "命令片段与端口转发",
+          credentials: "身份与 SSH 密钥",
+        },
+      },
       saveError: "保存配置失败",
     },
     sync: {

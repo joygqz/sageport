@@ -33,18 +33,14 @@ import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/workbench/layout";
 import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
+import { pickSuggestionsForSession } from "./suggestions";
 import { useAiStore } from "./store";
 import type { AgentLogItem } from "./transcript";
 import { askUserOptions, askUserQuestion } from "./tools";
+import { TOOL_GROUPS } from "./tools/registry";
 import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
 const EMPTY_LOG: AgentLogItem[] = [];
-
-const SUGGESTIONS = [
-  "ai.suggestion.logs",
-  "ai.suggestion.hosts",
-  "ai.suggestion.snippets",
-] as const;
 
 export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
@@ -89,6 +85,16 @@ export function AssistantPanel({ width }: { width: number }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const enabledToolNames = new Set(config?.enabledTools ?? []);
+  const enabledSuggestionGroups = TOOL_GROUPS.filter(
+    ({ id, tools }) =>
+      id === "core" ||
+      tools.some(({ spec }) => enabledToolNames.has(spec.name)),
+  ).map(({ id }) => id);
+  const suggestions = pickSuggestionsForSession(
+    activeId ?? "pending-session",
+    enabledSuggestionGroups,
+  );
 
   const onLogScroll = () => {
     const el = scrollRef.current;
@@ -148,7 +154,13 @@ export function AssistantPanel({ width }: { width: number }) {
     stickToBottom.current = true;
     try {
       const sessionId = activeId ?? (await newSession());
-      void send(sessionId, prompt, model, config?.autoApprove ?? false);
+      void send(
+        sessionId,
+        prompt,
+        model,
+        config?.autoApprove ?? false,
+        config?.enabledTools ?? [],
+      );
       return true;
     } catch (err) {
       toast.error(t("ai.error"), errorMessage(err));
@@ -307,15 +319,15 @@ export function AssistantPanel({ width }: { width: number }) {
                     )}
                   />
                   <div className="flex flex-col gap-1.5 px-2">
-                    {SUGGESTIONS.map((key) => (
+                    {suggestions.map((suggestion) => (
                       <button
-                        key={key}
+                        key={suggestion.key}
                         type="button"
                         disabled={pending || !model}
-                        onClick={() => void sendPrompt(t(key))}
+                        onClick={() => void sendPrompt(t(suggestion.key))}
                         className="rounded-md border border-input px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
                       >
-                        {t(key)}
+                        {t(suggestion.key)}
                       </button>
                     ))}
                   </div>

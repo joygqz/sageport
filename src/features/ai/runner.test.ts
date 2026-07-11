@@ -74,6 +74,61 @@ beforeEach(() => {
 });
 
 describe("runAgentLoop", () => {
+  it("sends only core tools by default", async () => {
+    chat.mockResolvedValue({ content: "done" });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model");
+
+    const toolNames = chat.mock.calls[0][2].map(
+      (tool: { name: string }) => tool.name,
+    );
+    expect(toolNames).toEqual([
+      "ask_user",
+      "list_terminal_sessions",
+      "read_terminal_output",
+      "run_terminal_command",
+    ]);
+  });
+
+  it("adds selected optional tools and rejects disabled tool calls", async () => {
+    chat
+      .mockResolvedValueOnce({
+        toolCalls: [
+          { id: "call-1", name: "list_hosts", arguments: {} },
+          { id: "call-2", name: "list_snippets", arguments: {} },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "done" });
+    executeTool.mockResolvedValue({ content: "hosts", isError: false });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model", false, ["list_hosts"]);
+
+    expect(chat.mock.calls[0][2]).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "list_hosts" })]),
+    );
+    expect(chat.mock.calls[0][2]).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "list_snippets" }),
+      ]),
+    );
+    expect(executeTool).toHaveBeenCalledTimes(1);
+    expect(executeTool).toHaveBeenCalledWith(
+      "list_hosts",
+      {},
+      expect.any(Object),
+    );
+    expect(run.state().history).toContainEqual(
+      expect.objectContaining({
+        role: "tool",
+        toolCallId: "call-2",
+        toolError: true,
+        content: expect.stringContaining("disabled in AI settings"),
+      }),
+    );
+  });
+
   it("commits the provider result and clears the active request id", async () => {
     chat.mockImplementation(
       async (
