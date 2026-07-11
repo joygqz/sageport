@@ -28,7 +28,6 @@ import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { useHosts } from "@/features/hosts/api";
-import { dragState } from "./dnd";
 import { FileList } from "./FileList";
 import { BookmarkMenu } from "./BookmarkMenu";
 import { PermissionsDialog } from "./PermissionsDialog";
@@ -59,7 +58,6 @@ export function FilePane({ side }: { side: PaneSide }) {
   const setActive = useSftpStore((s) => s.setActive);
   const navigate = useSftpStore((s) => s.navigate);
   const refresh = useSftpStore((s) => s.refresh);
-  const transfer = useSftpStore((s) => s.transfer);
   const { data: hosts = [] } = useHosts();
 
   const tabStripRef = useRef<HTMLDivElement>(null);
@@ -135,19 +133,8 @@ export function FilePane({ side }: { side: PaneSide }) {
 
   return (
     <div
+      data-file-pane-side={side}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
-      onDragOver={(e) => {
-        if (dragState.fromSide && dragState.fromSide !== side)
-          e.preventDefault();
-      }}
-      onDrop={(e) => {
-        if (dragState.fromSide && dragState.fromSide !== side) {
-          e.preventDefault();
-          void transfer(dragState.fromSide, dragState.entries);
-          dragState.fromSide = null;
-          dragState.entries = [];
-        }
-      }}
     >
       <div
         ref={tabStripRef}

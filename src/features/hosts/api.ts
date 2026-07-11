@@ -11,6 +11,7 @@ import type {
 export const hostKeys = {
   hosts: ["hosts"] as const,
   groups: ["groups"] as const,
+  detail: (id: string) => ["host", id] as const,
 };
 
 export function useHosts() {
@@ -36,7 +37,7 @@ export function useUpdateHost() {
       ipc.hosts.update(id, input),
     onSuccess: (_data, { id }) => {
       qc.invalidateQueries({ queryKey: hostKeys.hosts });
-      qc.invalidateQueries({ queryKey: ["host", id] });
+      qc.invalidateQueries({ queryKey: hostKeys.detail(id) });
     },
   });
 }
@@ -47,17 +48,31 @@ export function useMoveHost() {
     mutationFn: ({ id, groupId }: { id: string; groupId: string | null }) =>
       ipc.hosts.move(id, groupId),
     onMutate: async ({ id, groupId }) => {
-      await qc.cancelQueries({ queryKey: hostKeys.hosts });
+      await Promise.all([
+        qc.cancelQueries({ queryKey: hostKeys.hosts }),
+        qc.cancelQueries({ queryKey: hostKeys.detail(id) }),
+      ]);
       const previous = qc.getQueryData<Host[]>(hostKeys.hosts);
+      const previousHost = qc.getQueryData<Host>(hostKeys.detail(id));
       qc.setQueryData<Host[]>(hostKeys.hosts, (current) =>
         current?.map((host) => (host.id === id ? { ...host, groupId } : host)),
       );
-      return { previous };
+      qc.setQueryData<Host>(hostKeys.detail(id), (current) =>
+        current ? { ...current, groupId } : current,
+      );
+      return { previous, previousHost };
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) qc.setQueryData(hostKeys.hosts, context.previous);
+      if (context?.previousHost) {
+        qc.setQueryData(hostKeys.detail(_vars.id), context.previousHost);
+      }
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: hostKeys.hosts }),
+    onSuccess: (host) => qc.setQueryData(hostKeys.detail(host.id), host),
+    onSettled: (_data, _error, { id }) => {
+      qc.invalidateQueries({ queryKey: hostKeys.hosts });
+      qc.invalidateQueries({ queryKey: hostKeys.detail(id) });
+    },
   });
 }
 

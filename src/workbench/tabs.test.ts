@@ -117,12 +117,31 @@ describe("moveTab", () => {
 
     useTabsStore.getState().moveTab(a, 2);
 
-    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([
-      b,
-      c,
-      a,
-    ]);
+    const reorderedTabs = useTabsStore.getState().tabs;
+    expect(reorderedTabs.map((tab) => tab.id)).toEqual([b, c, a]);
     expect(useTabsStore.getState().activeId).toBe(b);
+  });
+
+  it("retains terminal tab objects and their connection status", () => {
+    const store = useTabsStore.getState();
+    const connected = store.openTerminal(host("connected"));
+    const connecting = store.openTerminal(host("connecting"));
+    store.setTerminalStatus(connected, "connected");
+    const connectedTab = useTabsStore
+      .getState()
+      .tabs.find((tab) => tab.id === connected);
+
+    useTabsStore.getState().moveTab(connected, 1);
+
+    const reorderedTab = useTabsStore
+      .getState()
+      .tabs.find((tab) => tab.id === connected);
+    expect(reorderedTab).toBe(connectedTab);
+    expect(reorderedTab).toMatchObject({ status: "connected" });
+    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([
+      connecting,
+      connected,
+    ]);
   });
 
   it("clamps the destination and ignores unknown tabs", () => {

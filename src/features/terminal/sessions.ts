@@ -10,6 +10,13 @@ export function unregisterSession(id: string) {
   sessions.delete(id);
 }
 
+export function disposeSession(id: string) {
+  const session = sessions.get(id);
+  if (!session) return;
+  sessions.delete(id);
+  session.dispose();
+}
+
 export function getSession(id: string | null): TerminalSession | undefined {
   return id ? sessions.get(id) : undefined;
 }

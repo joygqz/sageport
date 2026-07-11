@@ -20,6 +20,7 @@ export interface SessionStatusEvent {
 
 export interface TerminalSessionOptions {
   id: string;
+  connectionKey: string;
   transport: TerminalTransport;
   fontFamily: string;
   fontSize: number;
@@ -27,12 +28,14 @@ export interface TerminalSessionOptions {
   watchHostKey: boolean;
   onStatus: (event: SessionStatusEvent) => void;
   onUserInput?: (data: string) => void;
+  onDispose?: () => void;
 }
 
 export class TerminalSession {
   readonly term: XTerm;
   readonly search: SearchAddon;
   readonly commands: CommandTracker;
+  readonly connectionKey: string;
 
   private readonly fit: FitAddon;
   private readonly transport: TerminalTransport;
@@ -57,6 +60,7 @@ export class TerminalSession {
 
   constructor(opts: TerminalSessionOptions) {
     this.opts = opts;
+    this.connectionKey = opts.connectionKey;
     this.transport = opts.transport;
 
     const { term, fit, search } = createTerminal({
@@ -85,9 +89,24 @@ export class TerminalSession {
   }
 
   attach(container: HTMLElement) {
-    if (this.disposed || this.container) return;
+    if (this.disposed || this.container === container) return;
+    if (this.container) this.detach();
     this.container = container;
+    if (this.opened) {
+      const element = this.term.element;
+      if (element) container.appendChild(element);
+      this.observe(container);
+      this.refit();
+      return;
+    }
     void this.open(container);
+  }
+
+  detach() {
+    if (!this.container) return;
+    this.observer?.disconnect();
+    this.observer = null;
+    this.container = null;
   }
 
   private async open(container: HTMLElement) {
@@ -107,8 +126,7 @@ export class TerminalSession {
       this.pendingFocus = false;
       this.term.focus();
     }
-    this.observer = new ResizeObserver(() => this.scheduleFit());
-    this.observer.observe(container);
+    this.observe(container);
     void this.start();
   }
 
@@ -182,8 +200,12 @@ export class TerminalSession {
     this.observer?.disconnect();
     this.observer = null;
     for (const dispose of this.disposables.splice(0)) dispose();
-    this.commands.dispose();
-    this.term.dispose();
+    try {
+      this.opts.onDispose?.();
+    } finally {
+      this.commands.dispose();
+      this.term.dispose();
+    }
   }
 
   private async start() {
@@ -303,6 +325,12 @@ export class TerminalSession {
       this.fitQueued = false;
       if (!this.disposed) this.fitNow();
     }, 0);
+  }
+
+  private observe(container: HTMLElement) {
+    this.observer?.disconnect();
+    this.observer = new ResizeObserver(() => this.scheduleFit());
+    this.observer.observe(container);
   }
 
   private fitNow() {

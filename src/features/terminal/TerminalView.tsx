@@ -15,7 +15,7 @@ import { useBroadcastStore } from "./broadcast";
 import { useHostKeyStore } from "./host-key";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
 import { TerminalSession } from "./session";
-import { getSession, registerSession, unregisterSession } from "./sessions";
+import { disposeSession, getSession, registerSession } from "./sessions";
 import { localTransport, sshAdhocTransport, sshTransport } from "./transport";
 import { terminalTheme } from "./xterm";
 
@@ -38,13 +38,31 @@ export function TerminalView({
   const sessionRef = useRef<TerminalSession | null>(null);
   const { theme } = useTheme();
   const { t } = useI18n();
-  const setStatus = useTabsStore((s) => s.setTerminalStatus);
+  const themeRef = useRef(theme);
+  const translateRef = useRef(t);
+  const connectionKey = JSON.stringify({ target, hostId, adhoc, attempt });
 
   useEffect(() => {
+    themeRef.current = theme;
     sessionRef.current?.setTheme(terminalTheme(theme));
   }, [theme]);
 
   useEffect(() => {
+    translateRef.current = t;
+  }, [t]);
+
+  useEffect(() => {
+    const existing = getSession(sessionId);
+    if (existing?.connectionKey === connectionKey) {
+      sessionRef.current = existing;
+      existing.attach(containerRef.current!);
+      return () => {
+        existing.detach();
+        if (sessionRef.current === existing) sessionRef.current = null;
+      };
+    }
+    if (existing) disposeSession(sessionId);
+
     const isLocal = target === "local";
     const isSshLike = !isLocal;
     const transport = isLocal
@@ -55,10 +73,11 @@ export function TerminalView({
     if (isSshLike) bridgeMonitorEvents();
 
     const describeError = (code?: string | null, message?: string) => {
-      if (code === "invalid") return t("ssh.credentialsMissing");
-      if (code === "auth") return t("ssh.authFailed");
-      if (code === "host_key") return t("ssh.hostKeyRejected");
-      if (code === "timeout") return t("ssh.connectTimedOut");
+      const translate = translateRef.current;
+      if (code === "invalid") return translate("ssh.credentialsMissing");
+      if (code === "auth") return translate("ssh.authFailed");
+      if (code === "host_key") return translate("ssh.hostKeyRejected");
+      if (code === "timeout") return translate("ssh.connectTimedOut");
       return message;
     };
 
@@ -72,10 +91,11 @@ export function TerminalView({
 
     const session = new TerminalSession({
       id: sessionId,
+      connectionKey,
       transport,
       fontFamily: monoFontFamily(),
       fontSize: terminalFontSize(),
-      theme: terminalTheme(theme),
+      theme: terminalTheme(themeRef.current),
       watchHostKey: isSshLike,
       onStatus: (e) => {
         if (isSshLike) {
@@ -85,11 +105,13 @@ export function TerminalView({
             useHostKeyStore.getState().rejectSession(sessionId);
           }
         }
-        setStatus(
-          sessionId,
-          e.status,
-          e.status === "error" ? describeError(e.code, e.message) : e.message,
-        );
+        useTabsStore
+          .getState()
+          .setTerminalStatus(
+            sessionId,
+            e.status,
+            e.status === "error" ? describeError(e.code, e.message) : e.message,
+          );
       },
       onUserInput: (data) => {
         autocomplete?.handleData(data);
@@ -105,6 +127,13 @@ export function TerminalView({
           }
         }
       },
+      onDispose: () => {
+        autocomplete?.dispose();
+        if (isSshLike) {
+          stopMonitor(sessionId);
+          useHostKeyStore.getState().rejectSession(sessionId);
+        }
+      },
     });
     sessionRef.current = session;
     autocomplete?.attach(session.term);
@@ -112,16 +141,16 @@ export function TerminalView({
     session.attach(containerRef.current!);
 
     return () => {
-      unregisterSession(sessionId);
-      if (isSshLike) {
-        stopMonitor(sessionId);
-        useHostKeyStore.getState().rejectSession(sessionId);
-      }
-      autocomplete?.dispose();
-      session.dispose();
-      sessionRef.current = null;
+      // A Tab drag can temporarily remount this view. Keep the terminal and
+      // its SSH transport alive; the next view simply reattaches it. Closing
+      // the Tab or starting a real reconnect calls disposeSession instead.
+      session.detach();
+      if (sessionRef.current === session) sessionRef.current = null;
     };
-  }, [sessionId, target, hostId, adhoc, attempt, setStatus, t, theme]);
+    // This effect owns the connection lifetime. Keep presentation-only values
+    // (theme and translations) out of its dependencies so tab re-renders and
+    // visual updates can never dispose and recreate a live terminal.
+  }, [sessionId, target, hostId, adhoc, attempt, connectionKey]);
 
   useEffect(() => {
     if (active) sessionRef.current?.focus();

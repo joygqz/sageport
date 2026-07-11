@@ -1,3 +1,9 @@
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { File, Folder, FolderSymlink, Loader2 } from "lucide-react";
 
 import {
@@ -14,7 +20,6 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { useTabsStore } from "@/workbench/tabs";
-import { dragState } from "./dnd";
 import {
   MAX_EDIT_BYTES,
   parentPath,
@@ -22,6 +27,14 @@ import {
   type PaneSide,
   type SftpTab,
 } from "./store";
+
+interface FileDragState {
+  entry: FileEntry;
+  entries: FileEntry[];
+  clientX: number;
+  clientY: number;
+  rect: DOMRect;
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -73,6 +86,25 @@ export function FileList({
   const transfer = useSftpStore((s) => s.transfer);
   const showHidden = useSftpStore((s) => s.showHidden);
   const openFile = useTabsStore((s) => s.openFile);
+  const [dragState, setDragState] = useState<FileDragState | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    entry: FileEntry;
+    entries: FileEntry[];
+    active: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!dragState) return;
+
+    const style = document.createElement("style");
+    style.textContent = "* { cursor: default !important; }";
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, [dragState]);
 
   const openEditor = (entry: FileEntry) => {
     if (entry.size > MAX_EDIT_BYTES) {
@@ -92,6 +124,10 @@ export function FileList({
   };
 
   const onRowClick = (e: React.MouseEvent, entry: FileEntry) => {
+    if (suppressClickRef.current === entry.path) {
+      suppressClickRef.current = null;
+      return;
+    }
     const multi = e.metaKey || e.ctrlKey;
     if (multi) {
       const next = tab.selected.includes(entry.path)
@@ -101,6 +137,78 @@ export function FileList({
     } else {
       setSelected(side, tab.id, [entry.path]);
     }
+  };
+
+  const handlePointerDown = (
+    e: ReactPointerEvent<HTMLTableRowElement>,
+    entry: FileEntry,
+    entries: FileEntry[],
+  ) => {
+    if (e.button !== 0) return;
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      entry,
+      entries,
+      active: false,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: ReactPointerEvent<HTMLTableRowElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    if (!drag.active) {
+      const distance = Math.hypot(
+        e.clientX - drag.startX,
+        e.clientY - drag.startY,
+      );
+      if (distance < 5) return;
+      drag.active = true;
+      setDragState({
+        entry: drag.entry,
+        entries: drag.entries,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        rect: e.currentTarget.getBoundingClientRect(),
+      });
+    }
+
+    e.preventDefault();
+    setDragState((current) =>
+      current
+        ? { ...current, clientX: e.clientX, clientY: e.clientY }
+        : current,
+    );
+  };
+
+  const finishPointerDrag = (e: ReactPointerEvent<HTMLTableRowElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    if (drag.active) e.preventDefault();
+    dragRef.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+
+    if (e.type !== "pointercancel" && drag.active) {
+      const targetSide = document
+        .elementFromPoint(e.clientX, e.clientY)
+        ?.closest<HTMLElement>("[data-file-pane-side]")?.dataset
+        .filePaneSide as PaneSide | undefined;
+      if (targetSide && targetSide !== side) {
+        void transfer(side, drag.entries);
+      }
+      suppressClickRef.current = drag.entry.path;
+      window.setTimeout(() => {
+        if (suppressClickRef.current === drag.entry.path) {
+          suppressClickRef.current = null;
+        }
+      }, 0);
+    }
+    setDragState(null);
   };
 
   if (tab.loading && tab.entries.length === 0) {
@@ -171,18 +279,26 @@ export function FileList({
                 <ContextMenu key={entry.path}>
                   <ContextMenuTrigger asChild>
                     <tr
-                      draggable
-                      onDragStart={() => {
-                        dragState.fromSide = side;
-                        dragState.entries = selected
-                          ? entries.filter((e) => tab.selected.includes(e.path))
-                          : [entry];
-                      }}
+                      onPointerDown={(e) =>
+                        handlePointerDown(
+                          e,
+                          entry,
+                          selected
+                            ? entries.filter((item) =>
+                                tab.selected.includes(item.path),
+                              )
+                            : [entry],
+                        )
+                      }
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={finishPointerDrag}
+                      onPointerCancel={finishPointerDrag}
                       onClick={(e) => onRowClick(e, entry)}
                       onDoubleClick={() => open(entry)}
                       className={cn(
-                        "cursor-pointer select-none",
+                        "cursor-pointer touch-none select-none",
                         selected ? "bg-primary/15" : "hover:bg-accent",
+                        dragState?.entry.path === entry.path && "opacity-50",
                       )}
                     >
                       <td className="truncate py-1 pl-2 pr-1">
@@ -248,6 +364,35 @@ export function FileList({
           )}
         </tbody>
       </table>
+      {dragState && <FileDragGhost dragState={dragState} />}
     </ScrollArea>
+  );
+}
+
+function FileDragGhost({ dragState }: { dragState: FileDragState }) {
+  const { entry, entries } = dragState;
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed z-[100] flex items-center gap-2 border border-border bg-background px-2 text-xs text-foreground opacity-90 shadow-lg"
+      style={{
+        left: dragState.clientX,
+        top: dragState.clientY,
+        width: dragState.rect.width,
+        height: dragState.rect.height,
+      }}
+    >
+      <EntryIcon entry={entry} />
+      <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+      {entries.length > 1 && (
+        <span className="shrink-0 text-muted-foreground">
+          +{entries.length - 1}
+        </span>
+      )}
+      <span className="shrink-0 text-muted-foreground">
+        {entry.kind === "dir" ? "" : formatSize(entry.size)}
+      </span>
+    </div>
   );
 }

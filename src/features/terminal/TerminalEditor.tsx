@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ISearchOptions } from "@xterm/addon-search";
 import {
   ArrowDown,
@@ -30,7 +30,7 @@ import { useTerminalSearch } from "./search";
 import { focusTerminal, getSession } from "./sessions";
 import { TerminalView } from "./TerminalView";
 
-export function TerminalEditor({
+export const TerminalEditor = memo(function TerminalEditor({
   tab,
   active,
 }: {
@@ -59,7 +59,7 @@ export function TerminalEditor({
       <StatusOverlay tab={tab} onReconnect={() => reconnect(tab.id)} />
     </div>
   );
-}
+});
 
 function StickyCommand({ sessionId }: { sessionId: string }) {
   const [sticky, setSticky] = useState<{ text: string; line: number }>();
