@@ -142,11 +142,14 @@ export function AssistantPanel({ width }: { width: number }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [log, pending]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
+    if (stickToBottom.current && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [input]);
 
   const sendPrompt = async (prompt: string): Promise<boolean> => {
