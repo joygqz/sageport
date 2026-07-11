@@ -36,6 +36,7 @@ interface ResizeHandleProps {
   reverse?: boolean;
   className?: string;
   showLine?: boolean;
+  highlightOffset?: number;
 
   sashId?: string;
 
@@ -53,6 +54,7 @@ export function ResizeHandle({
   reverse = false,
   className,
   showLine = true,
+  highlightOffset = 0,
   sashId,
   limits,
   startCorner,
@@ -78,6 +80,11 @@ export function ResizeHandle({
   };
 
   const liveSize = () => getSize?.() ?? size;
+
+  const highlightTransform =
+    axis === "x"
+      ? `translateX(calc(-50% + ${highlightOffset}px))`
+      : `translateY(calc(-50% + ${highlightOffset}px))`;
 
   const onPointerDown = (e: React.PointerEvent) => {
     const startSize = liveSize();
@@ -121,12 +128,13 @@ export function ResizeHandle({
       <div
         className={cn(
           "absolute z-20 bg-primary opacity-0 transition-opacity group-hover:opacity-100 group-hover:delay-300",
-          axis === "x"
-            ? "inset-y-0 left-1/2 w-1 -translate-x-1/2"
-            : "inset-x-0 top-1/2 h-1 -translate-y-1/2",
+          axis === "x" ? "inset-y-0 left-1/2 w-1" : "inset-x-0 top-1/2 h-1",
         )}
 
-        style={hot ? { opacity: 1, transitionDelay: "0ms" } : undefined}
+        style={{
+          transform: highlightTransform,
+          ...(hot ? { opacity: 1, transitionDelay: "0ms" } : {}),
+        }}
       />
       <div
         onPointerDown={onPointerDown}
