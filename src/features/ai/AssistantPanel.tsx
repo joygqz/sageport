@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
   Check,
@@ -173,12 +173,10 @@ export function AssistantPanel({ width }: { width: number }) {
     stickToBottom.current = true;
   }, [activeId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!stickToBottom.current) return;
-    requestAnimationFrame(() => {
-      if (!stickToBottom.current) return;
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-    });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [log, pending]);
 
   useEffect(() => {
