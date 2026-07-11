@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ipc } from "@/lib/ipc";
 import type { SnippetInput } from "@/types/models";
 
-const snippetsKey = ["snippets"] as const;
+export const snippetsKey = ["snippets"] as const;
 
 export function useSnippets() {
   return useQuery({ queryKey: snippetsKey, queryFn: ipc.snippets.list });

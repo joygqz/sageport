@@ -3,11 +3,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Eye,
-  ListTree,
   Loader2,
-  MessageCircleQuestion,
-  Plug,
   Server,
   ShieldAlert,
   Terminal as TerminalIcon,
@@ -15,31 +11,20 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useI18n, type TKey } from "@/i18n";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { AgentLogItem, ToolStatus } from "./transcript";
-import { askUserOptions, askUserQuestion, selectionResult } from "./tools";
+import {
+  askUserOptions,
+  askUserQuestion,
+  selectionResult,
+  TOOL_CONFIRM_KEYS,
+  TOOL_ICONS,
+  TOOL_LABEL_KEYS,
+} from "./tools";
 import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
-
-const TOOL_ICON: Record<string, typeof TerminalIcon> = {
-  ask_user: MessageCircleQuestion,
-  list_hosts: Server,
-  connect_host: Plug,
-  list_terminal_sessions: ListTree,
-  read_terminal_output: Eye,
-  run_terminal_command: TerminalIcon,
-};
-
-const TOOL_LABEL_KEY: Record<string, TKey> = {
-  ask_user: "ai.tool.askUser",
-  list_hosts: "ai.tool.listHosts",
-  connect_host: "ai.tool.connectHost",
-  list_terminal_sessions: "ai.tool.listTerminalSessions",
-  read_terminal_output: "ai.tool.readTerminalOutput",
-  run_terminal_command: "ai.tool.runTerminalCommand",
-};
 
 export function ToolActivity({
   item,
@@ -52,11 +37,17 @@ export function ToolActivity({
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(item.status === "awaiting-approval");
-  const Icon = TOOL_ICON[item.name] ?? TerminalIcon;
-  const labelKey = TOOL_LABEL_KEY[item.name];
+  const Icon = TOOL_ICONS[item.name] ?? TerminalIcon;
+  const labelKey = TOOL_LABEL_KEYS[item.name];
   const label = labelKey ? t(labelKey) : item.name;
   const command =
     typeof item.args.command === "string" ? item.args.command : undefined;
+  const path =
+    typeof item.args.path === "string"
+      ? item.args.path
+      : typeof item.args.from === "string"
+        ? item.args.from
+        : undefined;
   const targetSessionId =
     typeof item.args.sessionId === "string" ? item.args.sessionId : undefined;
   const targetTitle = useTabsStore((state) =>
@@ -104,11 +95,18 @@ export function ToolActivity({
               </pre>
             </>
           )}
+          {!command && path && (
+            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
+              {path}
+            </pre>
+          )}
           {item.status === "awaiting-approval" && (
             <div className="flex items-center gap-2 pt-1">
               <span className="mr-auto flex min-w-0 items-center gap-1 text-warning">
                 <ShieldAlert className="size-3.5 shrink-0" />
-                <span className="truncate">{t("ai.confirmRun")}</span>
+                <span className="truncate">
+                  {t(TOOL_CONFIRM_KEYS[item.name] ?? "ai.confirmAction")}
+                </span>
               </span>
               <Button
                 size="sm"

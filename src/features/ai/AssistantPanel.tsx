@@ -40,36 +40,49 @@ import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
 const EMPTY_LOG: AgentLogItem[] = [];
 
-const SUGGESTION_KEYS = [
-  "ai.suggestion.health",
-  "ai.suggestion.logs",
-  "ai.suggestion.services",
-  "ai.suggestion.disk",
-  "ai.suggestion.network",
-  "ai.suggestion.processes",
-  "ai.suggestion.security",
-  "ai.suggestion.docker",
-  "ai.suggestion.updates",
-  "ai.suggestion.uptime",
+const SUGGESTION_GROUPS = [
+  ["ai.suggestion.health", "ai.suggestion.disk", "ai.suggestion.docker"],
+  [
+    "ai.suggestion.snippetSave",
+    "ai.suggestion.snippetRun",
+    "ai.suggestion.snippetVar",
+  ],
+  [
+    "ai.suggestion.forwardCreate",
+    "ai.suggestion.forwardList",
+    "ai.suggestion.forwardSocks",
+  ],
+  [
+    "ai.suggestion.fileRead",
+    "ai.suggestion.fileEdit",
+    "ai.suggestion.fileBrowse",
+  ],
+  [
+    "ai.suggestion.multiHost",
+    "ai.suggestion.hostHealth",
+    "ai.suggestion.hostBatch",
+  ],
 ] as const;
+
+type SuggestionKey = (typeof SUGGESTION_GROUPS)[number][number];
 
 const SUGGESTION_COUNT = 3;
 
-function sampleSuggestions(
-  count: number,
-  seed: string,
-): (typeof SUGGESTION_KEYS)[number][] {
-  const pool = [...SUGGESTION_KEYS];
+function sampleSuggestions(count: number, seed: string): SuggestionKey[] {
   let state = 2166136261;
   for (let i = 0; i < seed.length; i++) {
     state = Math.imul(state ^ seed.charCodeAt(i), 16777619);
   }
-  for (let i = pool.length - 1; i > 0; i--) {
+  const next = () => {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    const j = state % (i + 1);
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+    return state;
+  };
+  const groups = SUGGESTION_GROUPS.map((group) => group);
+  for (let i = groups.length - 1; i > 0; i--) {
+    const j = next() % (i + 1);
+    [groups[i], groups[j]] = [groups[j], groups[i]];
   }
-  return pool.slice(0, count);
+  return groups.slice(0, count).map((group) => group[next() % group.length]);
 }
 
 export function AssistantPanel({ width }: { width: number }) {

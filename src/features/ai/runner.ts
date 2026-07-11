@@ -12,16 +12,12 @@ import {
 import { resolveModelLimits } from "./model-limits";
 import {
   AI_TOOL_SPECS,
-  automaticTerminalSelectionResult,
   askUserOptions,
   askUserQuestion,
-  defaultTerminalOption,
   executeTool,
-  noTerminalSessionError,
   normalizeArgs,
-  resolveTerminalTab,
+  prepareTool,
   selectionResult,
-  sessionNotConnectedError,
   TOOLS_REQUIRING_APPROVAL,
 } from "./tools";
 import {
@@ -83,45 +79,18 @@ type PreparedToolCall = {
   automaticResult?: string;
 };
 
-function prepareToolCall(
+async function prepareToolCall(
   call: AiToolCall,
   userPrompt: string,
-): PreparedToolCall {
-  if (call.name === "ask_user") {
-    const args = normalizeArgs(call.arguments);
-    const selection = defaultTerminalOption(args, userPrompt);
-    if (selection) {
-      return {
-        call: { ...call, arguments: args },
-        automaticResult: automaticTerminalSelectionResult(
-          selection.option,
-          selection.tab,
-        ),
-      };
-    }
-    return { call: { ...call, arguments: args } };
-  }
-  if (call.name !== "run_terminal_command") return { call };
-
-  const args = normalizeArgs(call.arguments);
-  const requested =
-    typeof args.sessionId === "string" ? args.sessionId : undefined;
-  const tab = resolveTerminalTab(requested);
-
-  if (!tab) {
-    return {
-      call: { ...call, arguments: args },
-      preflightError: noTerminalSessionError(requested),
-    };
-  }
-  if (tab.status !== "connected") {
-    return {
-      call: { ...call, arguments: { ...args, sessionId: tab.id } },
-      preflightError: sessionNotConnectedError(tab),
-    };
-  }
-
-  return { call: { ...call, arguments: { ...args, sessionId: tab.id } } };
+): Promise<PreparedToolCall> {
+  const prepared = await prepareTool(call.name, normalizeArgs(call.arguments), {
+    userPrompt,
+  });
+  return {
+    call: { ...call, arguments: prepared.args },
+    preflightError: prepared.preflightError,
+    automaticResult: prepared.automaticResult,
+  };
 }
 
 function stopped(host: RunnerHost, sessionId: string): boolean {
@@ -392,8 +361,8 @@ export async function runAgentLoop(
     const userPrompt =
       [...history].reverse().find((message) => message.role === "user")
         ?.content ?? "";
-    const preparedToolCalls = (result.toolCalls ?? []).map((call) =>
-      prepareToolCall(call, userPrompt),
+    const preparedToolCalls = await Promise.all(
+      (result.toolCalls ?? []).map((call) => prepareToolCall(call, userPrompt)),
     );
     const toolCalls = preparedToolCalls.map((x) => x.call);
     host.patch(sessionId, (r) => ({

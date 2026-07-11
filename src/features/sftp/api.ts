@@ -4,7 +4,7 @@ import { ipc } from "@/lib/ipc";
 import type { SftpBookmarkInput } from "@/types/models";
 
 const historyKey = ["sftp", "transferHistory"] as const;
-const bookmarkKey = ["sftp", "bookmarks"] as const;
+export const bookmarkKey = ["sftp", "bookmarks"] as const;
 
 export function useBookmarks() {
   return useQuery({ queryKey: bookmarkKey, queryFn: ipc.bookmarks.list });
