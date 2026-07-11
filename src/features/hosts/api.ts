@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
-import type { GroupInput, HostHealthCheck, HostInput } from "@/types/models";
+import type {
+  GroupInput,
+  Host,
+  HostHealthCheck,
+  HostInput,
+} from "@/types/models";
 
 export const hostKeys = {
   hosts: ["hosts"] as const,
@@ -33,6 +38,28 @@ export function useUpdateHost() {
       qc.invalidateQueries({ queryKey: hostKeys.hosts });
       qc.invalidateQueries({ queryKey: ["host", id] });
     },
+  });
+}
+
+export function useMoveHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, groupId }: { id: string; groupId: string | null }) =>
+      ipc.hosts.move(id, groupId),
+    onMutate: async ({ id, groupId }) => {
+      await qc.cancelQueries({ queryKey: hostKeys.hosts });
+      const previous = qc.getQueryData<Host[]>(hostKeys.hosts);
+      qc.setQueryData<Host[]>(hostKeys.hosts, (current) =>
+        current?.map((host) =>
+          host.id === id ? { ...host, groupId } : host,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(hostKeys.hosts, context.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: hostKeys.hosts }),
   });
 }
 

@@ -69,6 +69,8 @@ export const ipc = {
     create: (input: HostInput) => invoke<Host>("hosts_create", { input }),
     update: (id: string, input: HostInput) =>
       invoke<Host>("hosts_update", { id, input }),
+    move: (id: string, groupId: string | null) =>
+      invoke<Host>("hosts_move", { id, groupId }),
     remove: (id: string) => invoke<void>("hosts_delete", { id }),
     runCommand: (
       hostIds: string[],

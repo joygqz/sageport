@@ -155,6 +155,34 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
     get(pool, id).await
 }
 
+pub async fn move_to_group(
+    pool: &SqlitePool,
+    id: &str,
+    group_id: Option<String>,
+) -> AppResult<Host> {
+    let group_id = group_id
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
+    if let Some(gid) = group_id.as_deref() {
+        crate::repository::group_repo::get(pool, gid).await?;
+    }
+    let ts = now();
+    let affected = sqlx::query(
+        "UPDATE hosts SET group_id = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND deleted_at IS NULL",
+    )
+    .bind(&group_id)
+    .bind(&ts)
+    .bind(id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("host {id}")));
+    }
+    get(pool, id).await
+}
+
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let ts = now();
     let affected = sqlx::query(

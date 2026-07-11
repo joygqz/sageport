@@ -264,6 +264,9 @@ export const zhCN: Dictionary = {
       title: "删除主机",
       error: "删除主机失败",
     },
+    move: {
+      error: "移动主机失败",
+    },
     deleteGroup: {
       title: "删除分组",
       withHostsDescription: "{name} 中包含 {count} 台主机，请选择处理方式。",

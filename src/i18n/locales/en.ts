@@ -267,6 +267,9 @@ export const en = {
       title: "Delete Host",
       error: "Failed to delete host",
     },
+    move: {
+      error: "Failed to move host",
+    },
     deleteGroup: {
       title: "Delete Group",
       withHostsDescription:

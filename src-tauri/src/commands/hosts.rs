@@ -71,6 +71,15 @@ pub async fn hosts_update(
 }
 
 #[tauri::command]
+pub async fn hosts_move(
+    state: State<'_, AppState>,
+    id: String,
+    group_id: Option<String>,
+) -> AppResult<Host> {
+    host_repo::move_to_group(&state.db, &id, group_id).await
+}
+
+#[tauri::command]
 pub async fn hosts_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
     host_repo::delete(&state.db, &id).await
 }

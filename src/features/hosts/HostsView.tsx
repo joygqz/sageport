@@ -41,6 +41,7 @@ import {
   useDeleteHost,
   useGroups,
   useHosts,
+  useMoveHost,
 } from "./api";
 import { SshConfigImportDialog } from "./SshConfigImportDialog";
 
@@ -60,6 +61,7 @@ export function HostsView() {
   const { data: groups = [] } = useGroups();
   const deleteHost = useDeleteHost();
   const deleteGroup = useDeleteGroup();
+  const moveHost = useMoveHost();
   const checkHealth = useCheckHostHealth();
   const openHostForm = useOverlayStore((s) => s.openHostForm);
   const openGroupForm = useOverlayStore((s) => s.openGroupForm);
@@ -76,8 +78,57 @@ export function HostsView() {
   const [checkingAll, setCheckingAll] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const dragHostRef = useRef<{ id: string; from: string } | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   const searching = query.trim().length > 0;
+
+  const beginHostDrag = (host: Host) => {
+    dragHostRef.current = { id: host.id, from: host.groupId ?? UNGROUPED };
+    setDraggingId(host.id);
+  };
+  const endHostDrag = () => {
+    dragHostRef.current = null;
+    setDraggingId(null);
+    setDropTarget(null);
+  };
+  const canDropOn = (sectionId: string) => {
+    const drag = dragHostRef.current;
+    return drag != null && drag.from !== sectionId;
+  };
+  const dropOnSection = (sectionId: string) => {
+    const drag = dragHostRef.current;
+    endHostDrag();
+    if (!drag || drag.from === sectionId) return;
+    moveHost.mutate(
+      { id: drag.id, groupId: sectionId === UNGROUPED ? null : sectionId },
+      { onError: (err) => toast.error(t("hosts.move.error"), errorMessage(err)) },
+    );
+  };
+  const sectionDragProps = (sectionId: string) => ({
+    isDropTarget: dropTarget === sectionId,
+    onDragEnter: (e: React.DragEvent) => {
+      if (!canDropOn(sectionId)) return;
+      e.preventDefault();
+      setDropTarget(sectionId);
+    },
+    onDragOver: (e: React.DragEvent) => {
+      if (!canDropOn(sectionId)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (dropTarget !== sectionId) setDropTarget(sectionId);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+      setDropTarget((cur) => (cur === sectionId ? null : cur));
+    },
+    onDrop: (e: React.DragEvent) => {
+      if (!canDropOn(sectionId)) return;
+      e.preventDefault();
+      dropOnSection(sectionId);
+    },
+  });
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -317,6 +368,7 @@ export function HostsView() {
               }
               onEdit={() => openGroupForm(section.id)}
               onDelete={() => requestDeleteGroup(section)}
+              {...sectionDragProps(section.id)}
             >
               {section.hosts.map((host) => (
                 <HostRow
@@ -324,6 +376,9 @@ export function HostsView() {
                   host={host}
                   health={healthByHost[host.id]}
                   checking={(checkingHosts[host.id] ?? 0) > 0}
+                  dragging={draggingId === host.id}
+                  onDragStart={() => beginHostDrag(host)}
+                  onDragEnd={endHostDrag}
                   onCheckHealth={() => runHealthCheck([host.id])}
                   onEdit={() => openHostForm(host.id)}
                   onDelete={() => requestDeleteHost(host)}
@@ -351,18 +406,28 @@ function GroupSection({
   name,
   count,
   collapsed,
+  isDropTarget,
   onToggle,
   onEdit,
   onDelete,
+  onDragEnter,
+  onDragOver,
+  onDragLeave,
+  onDrop,
   children,
 }: {
   isGroup: boolean;
   name: string;
   count: number;
   collapsed: boolean;
+  isDropTarget: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDragEnter: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
   children: React.ReactNode;
 }) {
   const { t } = useI18n();
@@ -383,7 +448,16 @@ function GroupSection({
   );
 
   return (
-    <div className="mb-0.5">
+    <div
+      className={cn(
+        "mb-0.5 rounded-md",
+        isDropTarget && "bg-primary/10 ring-1 ring-inset ring-primary/60",
+      )}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       {isGroup ? (
         <ContextMenu>
           <ContextMenuTrigger asChild>{header}</ContextMenuTrigger>
@@ -409,6 +483,9 @@ function HostRow({
   host,
   health,
   checking,
+  dragging,
+  onDragStart,
+  onDragEnd,
   onCheckHealth,
   onEdit,
   onDelete,
@@ -416,6 +493,9 @@ function HostRow({
   host: Host;
   health?: HostHealthCheck;
   checking: boolean;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
   onCheckHealth: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -452,8 +532,18 @@ function HostRow({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", host.id);
+            onDragStart();
+          }}
+          onDragEnd={onDragEnd}
           onDoubleClick={() => openTerminal(host)}
-          className="group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover"
+          className={cn(
+            "group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover",
+            dragging && "opacity-50",
+          )}
         >
           <Tooltip content={healthTooltip}>
             <span
