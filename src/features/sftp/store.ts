@@ -339,6 +339,11 @@ export const useSftpStore = create<SftpState>((set, get) => {
       const dstTab = dst.tabs.find((t) => t.id === dst.activeTabId);
       if (!srcTab || !dstTab) return;
 
+      if (srcTab.status !== "connected" || dstTab.status !== "connected") {
+        toast.error(t("sftp.notConnected"));
+        return;
+      }
+
       const items =
         entries ??
         srcTab.entries.filter((e) => srcTab.selected.includes(e.path));

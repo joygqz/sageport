@@ -465,6 +465,7 @@ export const zhCN: Dictionary = {
     deleteError: "删除失败",
     transferError: "启动传输失败",
     transferFailed: "传输失败",
+    notConnected: "请先连接后再传输文件",
     toggleHidden: "显示隐藏文件",
     bookmarks: {
       title: "收藏",

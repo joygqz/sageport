@@ -474,6 +474,7 @@ export const en = {
     deleteError: "Failed to delete",
     transferError: "Failed to start transfer",
     transferFailed: "Transfer failed",
+    notConnected: "Connect before transferring files",
     toggleHidden: "Show Hidden Files",
     bookmarks: {
       title: "Bookmarks",
