@@ -1,4 +1,5 @@
 import {
+  ArrowRightLeft,
   FileText,
   Folder,
   FolderInput,
@@ -13,6 +14,7 @@ import { parentPath, useSftpStore } from "@/features/sftp/store";
 import { ipc } from "@/lib/ipc";
 import { errorMessage } from "@/lib/toast";
 import type { SftpStatusKind } from "@/types/models";
+import type { FsEndpoint, TransferEvent } from "@/types/models";
 import { resolveTerminalTab, sleep } from "./terminal";
 import {
   bool,
@@ -21,6 +23,7 @@ import {
   toolFailure,
   toolSuccess,
   type AiTool,
+  type ToolExecutionContext,
   type ToolExecutionResult,
 } from "./types";
 
@@ -142,6 +145,185 @@ function refreshSftpViews(hostId: string, ...dirs: string[]): void {
   }
 }
 
+type TransferEndpointInput = {
+  kind: "local" | "sftp";
+  path: string;
+  hostId?: string;
+};
+
+type ResolvedTransferEndpoint = {
+  endpoint: FsEndpoint;
+  label: string;
+};
+
+function transferEndpointInput(
+  args: Record<string, unknown>,
+  key: "source" | "destination",
+): TransferEndpointInput | string {
+  const raw = args[key];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return `Error: ${key} must be an endpoint object.`;
+  }
+  const endpoint = raw as Record<string, unknown>;
+  const kind = endpoint.kind;
+  const path = optionalStr(endpoint, "path");
+  if (kind !== "local" && kind !== "sftp") {
+    return `Error: ${key}.kind must be "local" or "sftp".`;
+  }
+  if (!path) return `Error: ${key}.path is required.`;
+
+  const hostId = optionalStr(endpoint, "hostId");
+  if (kind === "sftp" && !hostId) {
+    return `Error: ${key}.hostId is required for an SFTP endpoint. Use list_hosts to get a host id.`;
+  }
+  if (kind === "local" && hostId) {
+    return `Error: ${key}.hostId is only valid for an SFTP endpoint.`;
+  }
+  if (kind === "local" && !isAbsoluteLocalPath(path)) {
+    return `Error: ${key}.path must be an absolute local path.`;
+  }
+  return { kind, path, hostId };
+}
+
+function isAbsoluteLocalPath(path: string): boolean {
+  return (
+    path.startsWith("/") ||
+    /^[A-Za-z]:[\\/]/.test(path) ||
+    path.startsWith("\\\\")
+  );
+}
+
+async function resolveTransferEndpoint(
+  input: TransferEndpointInput,
+  connections: Map<string, ReturnType<typeof resolveSftpConnection>>,
+): Promise<ResolvedTransferEndpoint | string> {
+  if (input.kind === "local") {
+    return {
+      endpoint: { connectionId: null, path: input.path },
+      label: `local:${input.path}`,
+    };
+  }
+
+  const hostId = input.hostId!;
+  let pending = connections.get(hostId);
+  if (!pending) {
+    pending = Promise.resolve(resolveSftpConnection(hostId));
+    connections.set(hostId, pending);
+  }
+  const resolved = await pending;
+  if (resolved.error || !resolved.connectionId) {
+    return resolved.error ?? `Error: no SFTP connection for host "${hostId}".`;
+  }
+  return {
+    endpoint: { connectionId: resolved.connectionId, path: input.path },
+    label: `sftp:${hostId}:${input.path}`,
+  };
+}
+
+function refreshEndpointView(endpoint: FsEndpoint): void {
+  const state = useSftpStore.getState();
+  for (const side of ["left", "right"] as const) {
+    for (const tab of state.panes[side].tabs) {
+      if (
+        tab.connectionId === endpoint.connectionId &&
+        tab.cwd === endpoint.path
+      ) {
+        void state.refresh(side, tab.id);
+      }
+    }
+  }
+}
+
+async function createTransferWaiter(
+  transferId: string,
+  context: ToolExecutionContext,
+): Promise<{ completion: Promise<TransferEvent>; cleanup: () => void }> {
+  let resolveCompletion!: (event: TransferEvent) => void;
+  const completion = new Promise<TransferEvent>((resolve) => {
+    resolveCompletion = resolve;
+  });
+  const unlisten = await ipc.sftp.onTransfer((candidate) => {
+    if (candidate.transferId !== transferId || candidate.status === "active") {
+      return;
+    }
+    resolveCompletion(candidate);
+  });
+  let cancelRequested = false;
+  const interval = globalThis.setInterval(() => {
+    if (!cancelRequested && context.isCancelled?.()) {
+      cancelRequested = true;
+      void ipc.sftp.cancelTransfer(transferId);
+    }
+  }, 200);
+  return {
+    completion,
+    cleanup: () => {
+      globalThis.clearInterval(interval);
+      unlisten();
+    },
+  };
+}
+
+async function transferFile(
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> {
+  const source = transferEndpointInput(args, "source");
+  if (typeof source === "string") return toolFailure(source);
+  const destination = transferEndpointInput(args, "destination");
+  if (typeof destination === "string") return toolFailure(destination);
+  if (source.kind === "local" && destination.kind === "local") {
+    return toolFailure(
+      "Error: transfer_file requires at least one SFTP endpoint; use local filesystem tools for local-only operations.",
+    );
+  }
+
+  const connections = new Map<
+    string,
+    ReturnType<typeof resolveSftpConnection>
+  >();
+  const resolvedSource = await resolveTransferEndpoint(source, connections);
+  if (typeof resolvedSource === "string") return toolFailure(resolvedSource);
+  const resolvedDestination = await resolveTransferEndpoint(
+    destination,
+    connections,
+  );
+  if (typeof resolvedDestination === "string") {
+    return toolFailure(resolvedDestination);
+  }
+
+  const transferId = crypto.randomUUID();
+  let waiter:
+    { completion: Promise<TransferEvent>; cleanup: () => void } | undefined;
+  try {
+    // Register before starting so a fast completion event cannot be missed.
+    waiter = await createTransferWaiter(transferId, context);
+    await ipc.sftp.transfer(
+      transferId,
+      resolvedSource.endpoint,
+      resolvedDestination.endpoint,
+      bool(args, "compress"),
+    );
+    const event = await waiter.completion;
+    if (event.status === "done") {
+      refreshEndpointView(resolvedDestination.endpoint);
+      return toolSuccess(
+        `Transferred ${resolvedSource.label} to directory ${resolvedDestination.label}. transferId: ${transferId}`,
+      );
+    }
+    if (event.status === "cancelled") {
+      return toolFailure(`Error: transfer ${transferId} was cancelled.`);
+    }
+    return toolFailure(
+      `Error: transfer ${transferId} failed${event.message ? `: ${event.message}` : "."}`,
+    );
+  } catch (err) {
+    return toolFailure(`Error: ${errorMessage(err)}`);
+  } finally {
+    waiter?.cleanup();
+  }
+}
+
 async function listFiles(
   args: Record<string, unknown>,
 ): Promise<ToolExecutionResult> {
@@ -249,6 +431,64 @@ const HOST_ARG = {
 } as const;
 
 export const fileTools: AiTool[] = [
+  {
+    spec: {
+      name: "transfer_file",
+      description:
+        "Transfer a file or directory between the local computer and an SFTP host, or between two SFTP hosts. The destination path must be an existing directory. Use absolute paths for local endpoints. Set compress for directories with many small files.",
+      parameters: {
+        type: "object",
+        properties: {
+          source: {
+            type: "object",
+            description: "File or directory to transfer.",
+            properties: {
+              kind: { type: "string", enum: ["local", "sftp"] },
+              path: { type: "string", description: "Source path." },
+              hostId: {
+                type: "string",
+                description:
+                  "Required when kind is sftp. Host id from list_hosts.",
+              },
+            },
+            required: ["kind", "path"],
+            additionalProperties: false,
+          },
+          destination: {
+            type: "object",
+            description:
+              "Existing directory that will receive the source basename.",
+            properties: {
+              kind: { type: "string", enum: ["local", "sftp"] },
+              path: {
+                type: "string",
+                description: "Existing destination directory path.",
+              },
+              hostId: {
+                type: "string",
+                description:
+                  "Required when kind is sftp. Host id from list_hosts.",
+              },
+            },
+            required: ["kind", "path"],
+            additionalProperties: false,
+          },
+          compress: {
+            type: "boolean",
+            description:
+              "Compress directory transfers in transit; useful for many small files. Defaults to false.",
+          },
+        },
+        required: ["source", "destination"],
+        additionalProperties: false,
+      },
+    },
+    icon: ArrowRightLeft,
+    labelKey: "ai.tool.transferFile",
+    confirmKey: "ai.confirmTransfer",
+    requiresApproval: true,
+    execute: async (args, context) => transferFile(args, context),
+  },
   {
     spec: {
       name: "list_files",

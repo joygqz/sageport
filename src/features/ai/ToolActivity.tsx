@@ -26,6 +26,22 @@ import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
 
+function transferEndpointLabel(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  const endpoint = value as Record<string, unknown>;
+  if (
+    (endpoint.kind !== "local" && endpoint.kind !== "sftp") ||
+    typeof endpoint.path !== "string"
+  ) {
+    return;
+  }
+  const host =
+    endpoint.kind === "sftp" && typeof endpoint.hostId === "string"
+      ? `${endpoint.hostId}:`
+      : "";
+  return `${endpoint.kind}:${host}${endpoint.path}`;
+}
+
 export function ToolActivity({
   item,
   onApprove,
@@ -48,6 +64,12 @@ export function ToolActivity({
       : typeof item.args.from === "string"
         ? item.args.from
         : undefined;
+  const transferSource = transferEndpointLabel(item.args.source);
+  const transferDestination = transferEndpointLabel(item.args.destination);
+  const transfer =
+    transferSource && transferDestination
+      ? `${transferSource}  →  ${transferDestination}`
+      : undefined;
   const targetSessionId =
     typeof item.args.sessionId === "string" ? item.args.sessionId : undefined;
   const targetTitle = useTabsStore((state) =>
@@ -95,7 +117,12 @@ export function ToolActivity({
               </pre>
             </>
           )}
-          {!command && path && (
+          {!command && transfer && (
+            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
+              {transfer}
+            </pre>
+          )}
+          {!command && !transfer && path && (
             <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
               {path}
             </pre>
