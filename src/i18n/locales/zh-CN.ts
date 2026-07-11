@@ -145,6 +145,7 @@ export const zhCN: Dictionary = {
 
   editor: {
     newSession: "新建会话",
+    tabList: "已打开的会话",
     closeTab: "关闭标签页",
     unsavedTitle: "未保存的更改",
     unsavedDescription: "{name} 有未保存的更改，不保存将丢失这些更改。",

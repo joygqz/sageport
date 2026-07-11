@@ -95,6 +95,7 @@ interface TabsState {
   openSettings: (section?: SettingsSection) => void;
   setSettingsSection: (section: SettingsSection) => void;
   close: (id: string, opts?: { force?: boolean }) => void;
+  moveTab: (id: string, toIndex: number) => void;
   setActive: (id: string) => void;
   activateNext: (direction: 1 | -1) => void;
 
@@ -332,6 +333,21 @@ export const useTabsStore = create<TabsState>((set, get) => {
         return { tabs, activeId, lastTerminalId };
       });
     },
+
+    moveTab: (id, toIndex) =>
+      set((s) => {
+        const fromIndex = s.tabs.findIndex((tab) => tab.id === id);
+        if (fromIndex === -1) return s;
+
+        const nextIndex = Math.max(0, Math.min(toIndex, s.tabs.length - 1));
+        if (fromIndex === nextIndex) return s;
+
+        const tabs = [...s.tabs];
+        const [tab] = tabs.splice(fromIndex, 1);
+        if (!tab) return s;
+        tabs.splice(nextIndex, 0, tab);
+        return { tabs };
+      }),
 
     setActive: (id) =>
       set((s) => {

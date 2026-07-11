@@ -107,6 +107,37 @@ describe("activateNext", () => {
   });
 });
 
+describe("moveTab", () => {
+  it("reorders tabs without changing the active tab", () => {
+    const store = useTabsStore.getState();
+    const a = store.openTerminal(host("a"));
+    const b = store.openTerminal(host("b"));
+    const c = store.openTerminal(host("c"));
+    useTabsStore.getState().setActive(b);
+
+    useTabsStore.getState().moveTab(a, 2);
+
+    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([
+      b,
+      c,
+      a,
+    ]);
+    expect(useTabsStore.getState().activeId).toBe(b);
+  });
+
+  it("clamps the destination and ignores unknown tabs", () => {
+    const store = useTabsStore.getState();
+    const a = store.openTerminal(host("a"));
+    const b = store.openTerminal(host("b"));
+
+    useTabsStore.getState().moveTab(a, 100);
+    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([b, a]);
+
+    useTabsStore.getState().moveTab("missing", 0);
+    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([b, a]);
+  });
+});
+
 describe("openSettings", () => {
   it("creates one settings tab and refocuses it with a new section", () => {
     useTabsStore.getState().openSettings();

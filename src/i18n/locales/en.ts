@@ -146,6 +146,7 @@ export const en = {
 
   editor: {
     newSession: "New Session",
+    tabList: "Open sessions",
     closeTab: "Close Tab",
     unsavedTitle: "Unsaved Changes",
     unsavedDescription:
