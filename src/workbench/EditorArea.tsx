@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, useEffect, useRef } from "react";
+import { Fragment, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { FileText, Plus, Settings, TerminalSquare, X } from "lucide-react";
 
 import {
@@ -56,6 +56,7 @@ export function EditorArea() {
   const saveFile = useTabsStore((s) => s.saveFile);
   const openPalette = useOverlayStore((s) => s.openPalette);
   const stripRef = useRef<HTMLDivElement>(null);
+  const [stripScrolled, setStripScrolled] = useState(false);
   const pendingCloseId = useTabsStore((s) => s.pendingCloseId);
   const clearPendingClose = useTabsStore((s) => s.clearPendingClose);
 
@@ -98,10 +99,11 @@ export function EditorArea() {
   if (tabs.length === 0) return <Watermark />;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+    <div className="isolate flex min-h-0 min-w-0 flex-1 flex-col bg-background">
       <div className="relative -mt-px shrink-0">
         <div
           ref={stripRef}
+          onScroll={(e) => setStripScrolled(e.currentTarget.scrollLeft > 0)}
           onWheel={(e) => {
             const el = stripRef.current;
             if (!el || el.scrollWidth <= el.clientWidth) return;
@@ -128,6 +130,9 @@ export function EditorArea() {
           </Tooltip>
         </div>
         <span className="pointer-events-none absolute inset-0 border-y border-border" />
+        {!stripScrolled && tabs[0]?.id === activeId && (
+          <span className="pointer-events-none absolute -left-px top-0 h-px w-px bg-primary" />
+        )}
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">

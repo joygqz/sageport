@@ -110,8 +110,8 @@ export function ResizeHandle({
         className={cn(
           "absolute z-10 bg-border",
           axis === "x"
-            ? "inset-y-0 left-1/2 w-px -translate-x-1/2"
-            : "inset-x-0 top-1/2 h-px -translate-y-1/2",
+            ? cn("inset-y-0 w-px", reverse ? "left-1/2" : "right-1/2")
+            : cn("inset-x-0 h-px", reverse ? "top-1/2" : "bottom-1/2"),
         )}
       />
       <div
