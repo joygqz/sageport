@@ -270,3 +270,11 @@
     -webkit-text-fill-color: currentColor;
   }
 }
+
+.monaco-editor .sageport-find-match {
+  background-color: var(--vscode-editor-findMatchHighlightBackground);
+}
+
+.monaco-editor .sageport-find-match-current {
+  background-color: var(--vscode-editor-findMatchBackground);
+}

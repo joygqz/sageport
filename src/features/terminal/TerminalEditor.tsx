@@ -1,15 +1,27 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { ISearchOptions } from "@xterm/addon-search";
 import {
   ArrowDown,
   ArrowUp,
+  CaseSensitive,
   Loader2,
   PlugZap,
+  Regex,
   ServerCrash,
+  WholeWord,
   X,
 } from "lucide-react";
 
-import { Button, Input } from "@/components/ui";
+import {
+  Button,
+  FindActionButton,
+  FindBar,
+  FindCount,
+  FindInput,
+  FindToggleButton,
+} from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { isValidRegex } from "@/lib/utils";
 import { useTheme } from "@/themes";
 import { monoFontFamily, useFontStore } from "@/workbench/font";
 import { useTabsStore, type TerminalTab } from "@/workbench/tabs";
@@ -96,19 +108,30 @@ function StickyCommand({ sessionId }: { sessionId: string }) {
   );
 }
 
+interface SearchToggles {
+  matchCase: boolean;
+  wholeWord: boolean;
+  regex: boolean;
+}
+
 function SearchBar({ sessionId }: { sessionId: string }) {
   const { t } = useI18n();
   const { theme } = useTheme();
   const close = useTerminalSearch((s) => s.close);
+  const requestId = useTerminalSearch((s) => s.requestId);
   const [query, setQuery] = useState("");
+  const [toggles, setToggles] = useState<SearchToggles>({
+    matchCase: false,
+    wholeWord: false,
+    regex: false,
+  });
   const [result, setResult] = useState<{ index: number; count: number }>();
   const inputRef = useRef<HTMLInputElement>(null);
-  const searchDecorations = {
-    matchBackground: `${theme.terminal.yellow}55`,
-    matchOverviewRuler: theme.terminal.yellow,
-    activeMatchBackground: `${theme.colors.primary}77`,
-    activeMatchColorOverviewRuler: theme.colors.primary,
-  };
+
+  useLayoutEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [requestId]);
 
   useEffect(() => {
     const search = getSession(sessionId)?.search;
@@ -119,12 +142,39 @@ function SearchBar({ sessionId }: { sessionId: string }) {
     return () => sub.dispose();
   }, [sessionId]);
 
-  const find = (text: string, direction: "next" | "previous") => {
+  const runSearch = (
+    text: string,
+    nextToggles: SearchToggles,
+    direction: "next" | "previous",
+    incremental: boolean,
+  ) => {
     const search = getSession(sessionId)?.search;
-    if (!search || !text) return;
-    const options = { decorations: searchDecorations };
+    if (!search) return;
+    if (!text || (nextToggles.regex && !isValidRegex(text))) {
+      search.clearDecorations();
+      setResult(undefined);
+      return;
+    }
+    const options: ISearchOptions = {
+      caseSensitive: nextToggles.matchCase,
+      wholeWord: nextToggles.wholeWord,
+      regex: nextToggles.regex,
+      incremental: direction === "next" && incremental,
+      decorations: {
+        matchBackground: `${theme.terminal.yellow}55`,
+        matchOverviewRuler: theme.terminal.yellow,
+        activeMatchBackground: `${theme.colors.primary}77`,
+        activeMatchColorOverviewRuler: theme.colors.primary,
+      },
+    };
     if (direction === "next") search.findNext(text, options);
     else search.findPrevious(text, options);
+  };
+
+  const toggle = (key: keyof SearchToggles) => {
+    const next = { ...toggles, [key]: !toggles[key] };
+    setToggles(next);
+    runSearch(query, next, "next", true);
   };
 
   const dismiss = () => {
@@ -133,60 +183,86 @@ function SearchBar({ sessionId }: { sessionId: string }) {
     focusTerminal(sessionId);
   };
 
+  const invalidRegex = Boolean(query) && toggles.regex && !isValidRegex(query);
+  const hasResults = Boolean(result && result.count > 0);
+  const resultLabel = invalidRegex
+    ? t("terminal.search.invalidRegex")
+    : !query || !result || result.count === 0
+      ? t("terminal.search.noResults")
+      : result.index < 0
+        ? `${result.count}+`
+        : t("terminal.search.resultCount", {
+            current: result.index + 1,
+            total: result.count,
+          });
+
   return (
-    <div className="absolute right-4 top-3 z-20 flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md">
-      <Input
-        ref={inputRef}
-        autoFocus
-        value={query}
-        placeholder={t("terminal.search.placeholder")}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          find(e.target.value, "next");
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") find(query, e.shiftKey ? "previous" : "next");
-          if (e.key === "Escape") dismiss();
-        }}
-        className="h-6 w-44 border-0 bg-transparent text-xs focus-visible:ring-0"
+    <FindBar
+      label={t("terminal.search.dialogLabel")}
+      onDismiss={dismiss}
+      className="flex w-[min(26rem,calc(100%-1.5rem))] items-center gap-1"
+    >
+      <div className="relative min-w-0 flex-1">
+        <FindInput
+          ref={inputRef}
+          value={query}
+          placeholder={t("terminal.search.placeholder")}
+          aria-label={t("terminal.search.placeholder")}
+          aria-invalid={invalidRegex || undefined}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            runSearch(e.target.value, toggles, "next", true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            runSearch(query, toggles, e.shiftKey ? "previous" : "next", false);
+          }}
+          onBlur={() => getSession(sessionId)?.search.clearActiveDecoration()}
+          className="pr-[4.75rem]"
+        />
+        <div className="absolute inset-y-0 right-0.5 flex items-center">
+          <FindToggleButton
+            active={toggles.matchCase}
+            label={t("terminal.search.matchCase")}
+            icon={CaseSensitive}
+            onClick={() => toggle("matchCase")}
+          />
+          <FindToggleButton
+            active={toggles.wholeWord}
+            label={t("terminal.search.wholeWord")}
+            icon={WholeWord}
+            onClick={() => toggle("wholeWord")}
+          />
+          <FindToggleButton
+            active={toggles.regex}
+            label={t("terminal.search.regex")}
+            icon={Regex}
+            onClick={() => toggle("regex")}
+          />
+        </div>
+      </div>
+      <FindCount danger={Boolean(query) && (invalidRegex || !hasResults)}>
+        {resultLabel}
+      </FindCount>
+      <FindActionButton
+        label={t("terminal.search.previous")}
+        icon={ArrowUp}
+        disabled={!query || invalidRegex}
+        onClick={() => runSearch(query, toggles, "previous", false)}
       />
-      <span className="min-w-10 text-center text-2xs tabular-nums text-muted-foreground">
-        {query && result
-          ? result.count > 0
-            ? `${result.index + 1}/${result.count}`
-            : t("terminal.search.noResults")
-          : ""}
-      </span>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
-        disabled={!query}
-        onClick={() => find(query, "previous")}
-        aria-label={t("terminal.search.previous")}
-      >
-        <ArrowUp className="size-3.5" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
-        disabled={!query}
-        onClick={() => find(query, "next")}
-        aria-label={t("terminal.search.next")}
-      >
-        <ArrowDown className="size-3.5" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
+      <FindActionButton
+        label={t("terminal.search.next")}
+        icon={ArrowDown}
+        disabled={!query || invalidRegex}
+        onClick={() => runSearch(query, toggles, "next", false)}
+      />
+      <FindActionButton
+        label={t("terminal.search.close")}
+        icon={X}
         onClick={dismiss}
-        aria-label={t("terminal.search.close")}
-      >
-        <X className="size-3.5" />
-      </Button>
-    </div>
+      />
+    </FindBar>
   );
 }
 

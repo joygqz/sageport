@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cn, formatBytes } from "./utils";
+import { cn, formatBytes, isValidRegex } from "./utils";
 
 describe("cn", () => {
   it("merges conditional classes", () => {
@@ -10,6 +10,21 @@ describe("cn", () => {
 
   it("dedupes conflicting tailwind utilities", () => {
     expect(cn("p-2", "p-4")).toBe("p-4");
+  });
+});
+
+describe("isValidRegex", () => {
+  it("accepts valid regular expressions, including an empty one", () => {
+    expect(isValidRegex("")).toBe(true);
+    expect(isValidRegex("(foo|bar)+")).toBe(true);
+    expect(isValidRegex("[a-z]\\d{2}")).toBe(true);
+  });
+
+  it("rejects invalid regular expressions", () => {
+    expect(isValidRegex("(")).toBe(false);
+    expect(isValidRegex("[a-z")).toBe(false);
+    expect(isValidRegex("foo\\")).toBe(false);
+    expect(isValidRegex("\\8")).toBe(false);
   });
 });
 

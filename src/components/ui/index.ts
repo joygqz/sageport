@@ -5,6 +5,7 @@ export * from "./password-input";
 export * from "./textarea";
 export * from "./label";
 export * from "./field";
+export * from "./find-bar";
 export * from "./dialog";
 export * from "./form-dialog";
 export * from "./confirm-dialog";

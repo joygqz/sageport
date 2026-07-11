@@ -151,6 +151,24 @@ export const en = {
     unsavedDescription:
       "{name} has unsaved changes. Your changes will be lost if you don't save them.",
     discard: "Don't Save",
+    find: {
+      dialogLabel: "Find and Replace",
+      placeholder: "Find",
+      replacePlaceholder: "Replace",
+      noResults: "No results",
+      invalidRegex: "Invalid regex",
+      resultCount: "{current} of {total}",
+      previous: "Previous Match",
+      next: "Next Match",
+      close: "Close Find",
+      toggleReplace: "Toggle Replace",
+      matchCase: "Match Case",
+      wholeWord: "Match Whole Word",
+      regex: "Use Regular Expression",
+      preserveCase: "Preserve Case",
+      replace: "Replace",
+      replaceAll: "Replace All",
+    },
   },
 
   statusBar: {
@@ -183,11 +201,17 @@ export const en = {
       error: "Error",
     },
     search: {
+      dialogLabel: "Find",
       placeholder: "Find",
       noResults: "No results",
+      invalidRegex: "Invalid regex",
+      resultCount: "{current} of {total}",
       previous: "Previous Match",
       next: "Next Match",
       close: "Close Find",
+      matchCase: "Match Case",
+      wholeWord: "Match Whole Word",
+      regex: "Use Regular Expression",
     },
   },
 
