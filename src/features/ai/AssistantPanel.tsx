@@ -5,9 +5,9 @@ import {
   Copy,
   History,
   KeyRound,
+  MessageCirclePlus,
   Sparkles,
   Square,
-  SquarePen,
   Terminal as TerminalIcon,
   Trash2,
   X,
@@ -202,7 +202,7 @@ export function AssistantPanel({ width }: { width: number }) {
                     )
                   }
                 >
-                  <SquarePen className="size-4" />
+                  <MessageCirclePlus className="size-4" />
                 </Button>
               </Tooltip>
               <DropdownMenu
