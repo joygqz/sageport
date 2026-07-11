@@ -5,10 +5,12 @@ import { ScrollArea } from "@/components/ui";
 export function SideBarView({
   title,
   actions,
+  topContent,
   children,
 }: {
   title: string;
   actions?: ReactNode;
+  topContent?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -19,6 +21,7 @@ export function SideBarView({
         </h2>
         {actions && <div className="flex items-center gap-0.5">{actions}</div>}
       </div>
+      {topContent}
       <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea>
     </div>
   );

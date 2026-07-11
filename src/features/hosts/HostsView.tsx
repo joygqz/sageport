@@ -331,16 +331,17 @@ export function HostsView() {
           </Tooltip>
         </>
       }
+      topContent={
+        <div className="relative z-10 px-2 pb-1">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("hosts.filterPlaceholder")}
+            className="h-6.5 bg-background text-xs"
+          />
+        </div>
+      }
     >
-      <div className="px-2 pb-1">
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("hosts.filterPlaceholder")}
-          className="h-6.5 bg-background text-xs"
-        />
-      </div>
-
       <div className="px-1 pb-4">
         {isLoading ? null : sections.length === 0 ? (
           <EmptyState
