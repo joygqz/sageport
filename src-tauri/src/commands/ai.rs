@@ -10,6 +10,7 @@ const BASE_URL_SETTING: &str = "ai.base_url";
 const API_KEY_SETTING: &str = "ai.api_key";
 const PROTOCOL_SETTING: &str = "ai.protocol";
 const MODEL_SETTING: &str = "ai.model";
+const AUTO_APPROVE_SETTING: &str = "ai.auto_approve";
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +19,7 @@ pub struct AiConfig {
     pub base_url: String,
     pub protocol: Protocol,
     pub model: String,
+    pub auto_approve: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -26,6 +28,8 @@ pub struct AiConfigInput {
     pub base_url: String,
     pub protocol: Protocol,
     pub api_key: Option<String>,
+    #[serde(default)]
+    pub auto_approve: bool,
 }
 
 async fn stored_protocol(state: &AppState) -> AppResult<Protocol> {
@@ -62,11 +66,16 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
     let model = settings_repo::get(&state.db, MODEL_SETTING)
         .await?
         .unwrap_or_default();
+    let auto_approve = settings_repo::get(&state.db, AUTO_APPROVE_SETTING)
+        .await?
+        .as_deref()
+        == Some("true");
     Ok(AiConfig {
         api_key,
         base_url,
         protocol,
         model,
+        auto_approve,
     })
 }
 
@@ -86,6 +95,12 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
         &state.db,
         API_KEY_SETTING,
         input.api_key.as_deref().unwrap_or_default().trim(),
+    )
+    .await?;
+    settings_repo::set(
+        &state.db,
+        AUTO_APPROVE_SETTING,
+        if input.auto_approve { "true" } else { "false" },
     )
     .await?;
     Ok(())

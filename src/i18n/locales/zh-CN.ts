@@ -517,6 +517,8 @@ export const zhCN: Dictionary = {
       title: "向助手提问",
       description:
         "助手可以连接主机、执行命令、浏览和编辑文件，并管理命令片段、端口转发等来完成运维任务。任何会改动服务器或你配置的操作都需要你先批准。",
+      descriptionAutonomous:
+        "自治模式已开启。助手会自动执行操作，不再逐项请求批准；你可随时停止执行。",
     },
     suggestion: {
       health: "给服务器做个整体健康检查，汇总 CPU、内存和磁盘状况",
@@ -552,6 +554,8 @@ export const zhCN: Dictionary = {
     deny: "拒绝",
     modelLabel: "模型",
     modelLoading: "正在加载模型…",
+    autonomousMode: "自治",
+    autonomousModeHint: "操作将被自动批准。打开 AI 设置即可关闭此模式。",
     tool: {
       askUser: "请求你选择",
       listHosts: "列出主机",
@@ -641,6 +645,12 @@ export const zhCN: Dictionary = {
       baseUrlHint: "OpenAI 兼容接口的地址通常以 /v1 结尾。",
       apiKeyLabel: "API 密钥",
       apiKeyHint: "不会离开本设备；仅在启用同步时包含在加密备份中。",
+      autonomousModeLabel: "助手模式",
+      autonomousMode: "自动执行操作",
+      autonomousModeHint:
+        "开启后，助手会自动批准命令、文件编辑和配置更改等操作。目标或意图不明确时，仍会向你询问。",
+      autonomousModeWarning:
+        "此模式可能对系统造成不可逆更改，请仅在信任的主机和任务中开启。",
       saveError: "保存配置失败",
     },
     sync: {

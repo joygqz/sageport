@@ -18,7 +18,7 @@ By using the Application, you agree to:
 
 - Connect only to servers and systems you are authorized to access, and comply with the policies of those systems' owners and all applicable laws.
 - Safeguard the passwords, private keys, passphrases, and third-party credentials (API keys, sync provider authorizations, etc.) you store in the Application; you are responsible for any loss resulting from their compromise.
-- Review every remote command proposed by the AI assistant before confirming it. AI-generated output may contain errors or inappropriate actions, and you are solely responsible for whether a command is executed and for its consequences.
+- Review AI-proposed operations before approving them in the default supervised mode. If you enable Autonomous mode, AI-generated operations may execute without individual prompts; AI output can contain errors or inappropriate actions, and you remain solely responsible for its consequences.
 - Remember the passphrase you set when enabling Sync — losing it makes previously synced data permanently unrecoverable, and neither the Application nor the developer can recover it for you.
 - Comply with the terms of service of any third-party service you connect to or authorize through the Application (GitHub, Google Drive, Microsoft OneDrive, WebDAV/S3 providers, AI providers, etc.).
 

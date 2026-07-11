@@ -47,7 +47,7 @@ The AI assistant requires you to supply your own API key for a third-party servi
 
 - Your API key, conversation content, and the terminal context necessary to answer your questions are sent directly from your device to the AI provider you configured — not through the developer.
 - How that data is stored, used, or potentially used for model training is governed entirely by your chosen AI provider's own privacy policy, not by this one.
-- Any remote command proposed by the AI assistant requires your explicit confirmation before it runs on a target server; Sageport never executes AI-generated commands automatically.
+- AI assistant operations require your explicit confirmation by default. If you explicitly enable Autonomous mode, Sageport automatically approves AI-generated operations; use it only for hosts and tasks you trust.
 - Conversation history is stored only in the local database; deleting a conversation removes it.
 
 ## 6. Automatic updates

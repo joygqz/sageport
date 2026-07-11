@@ -528,6 +528,8 @@ export const en = {
       title: "Ask the assistant",
       description:
         "It can connect to your hosts, run commands, browse and edit files, and manage snippets and port forwards to get ops work done. Anything that changes a server or your setup needs your approval first.",
+      descriptionAutonomous:
+        "Autonomous mode is on. The assistant can run operations without asking for each approval; stop it at any time.",
     },
     suggestion: {
       health: "Give my server a health check — summarize CPU, memory, and disk",
@@ -567,6 +569,9 @@ export const en = {
     deny: "Deny",
     modelLabel: "Model",
     modelLoading: "Loading models…",
+    autonomousMode: "Autonomous",
+    autonomousModeHint:
+      "Operation approvals are being granted automatically. Open AI settings to turn this off.",
     tool: {
       askUser: "Ask for your choice",
       listHosts: "List hosts",
@@ -658,6 +663,12 @@ export const en = {
       apiKeyLabel: "API Key",
       apiKeyHint:
         "Never leaves this device, except inside encrypted backups when sync is enabled.",
+      autonomousModeLabel: "Assistant mode",
+      autonomousMode: "Autonomous operation",
+      autonomousModeHint:
+        "When enabled, the assistant automatically approves operations such as commands, file edits, and configuration changes. It will still ask when your intent or target is ambiguous.",
+      autonomousModeWarning:
+        "This can make irreversible changes to your systems. Enable it only for hosts and tasks you trust.",
       saveError: "Failed to save configuration",
     },
     sync: {

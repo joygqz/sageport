@@ -41,7 +41,12 @@ interface AiStoreState {
   newSession: () => Promise<string>;
   deleteSession: (id: string) => Promise<void>;
 
-  send: (sessionId: string, prompt: string, model: string) => Promise<void>;
+  send: (
+    sessionId: string,
+    prompt: string,
+    model: string,
+    autoApprove: boolean,
+  ) => Promise<void>;
 
   stop: (sessionId: string) => void;
   approve: (toolLogId: string) => void;
@@ -198,7 +203,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       deleting.delete(id);
     },
 
-    send: async (sessionId, prompt, model) => {
+    send: async (sessionId, prompt, model, autoApprove) => {
       const trimmed = prompt.trim();
       const runtime = get().runtime[sessionId];
       if (!trimmed || !model || !runtime || runtime.pending) return;
@@ -219,7 +224,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       await persist(sessionId, title);
 
       try {
-        await runAgentLoop(host, sessionId, model);
+        await runAgentLoop(host, sessionId, model, autoApprove);
       } catch (err) {
         const message = errorMessage(err);
         toast.error(t("ai.error"), message);

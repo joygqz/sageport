@@ -133,7 +133,7 @@ export const snippetTools: AiTool[] = [
     spec: {
       name: "run_snippet",
       description:
-        "Run a saved snippet in a live terminal after user approval. Fill any {{variable}} placeholders via values. Omit sessionId for the Current terminal.",
+        "Run a saved snippet in a live terminal. This requires user approval in supervised mode and runs automatically in autonomous mode. Fill any {{variable}} placeholders via values. Omit sessionId for the Current terminal.",
       parameters: {
         type: "object",
         properties: {

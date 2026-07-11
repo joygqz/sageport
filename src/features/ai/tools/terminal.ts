@@ -266,7 +266,7 @@ export const terminalTools: AiTool[] = [
     spec: {
       name: "run_terminal_command",
       description:
-        "Run a command in a live terminal after user approval and return settled output. Omit sessionId for the Current terminal; never ask to reconfirm it. Results beyond ~30K characters are truncated in the middle (head and tail kept). To read a file or log with thousands of lines completely, first count its lines, then page through it with `sed -n 'START,ENDp' FILE` in consecutive chunks of about 200 lines; continue until the requested range is covered and never treat a truncated result as a complete file.",
+        "Run a command in a live terminal and return settled output. This requires user approval in supervised mode and runs automatically in autonomous mode. Omit sessionId for the Current terminal; never ask to reconfirm it. Results beyond ~30K characters are truncated in the middle (head and tail kept). To read a file or log with thousands of lines completely, first count its lines, then page through it with `sed -n 'START,ENDp' FILE` in consecutive chunks of about 200 lines; continue until the requested range is covered and never treat a truncated result as a complete file.",
       parameters: {
         type: "object",
         properties: {

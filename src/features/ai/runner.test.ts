@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { chat, modelLimits } = vi.hoisted(() => ({
+const { chat, modelLimits, executeTool } = vi.hoisted(() => ({
   chat: vi.fn(),
   modelLimits: vi.fn(),
+  executeTool: vi.fn(),
 }));
 
 vi.mock("@/lib/ipc", () => ({
@@ -17,6 +18,11 @@ vi.mock("@/i18n/config", () => ({ detectLocale: () => "en" }));
 vi.mock("@/i18n/translate", () => ({
   translate: (_locale: string, key: string) => key,
 }));
+
+vi.mock("./tools", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, executeTool };
+});
 
 import { clearModelLimitsCache } from "./model-limits";
 import { runAgentLoop, type RunnerHost } from "./runner";
@@ -54,6 +60,7 @@ beforeEach(() => {
   clearModelLimitsCache();
   chat.mockReset();
   modelLimits.mockReset();
+  executeTool.mockReset();
   modelLimits.mockResolvedValue({
     contextWindow: 128_000,
     maxOutputTokens: 16_000,
@@ -167,5 +174,55 @@ describe("runAgentLoop", () => {
       content: "The user declined to run this command.",
       toolError: false,
     });
+  });
+
+  it("executes approval-required tools immediately in autonomous mode", async () => {
+    useTabsStore.setState({
+      tabs: [
+        {
+          kind: "terminal",
+          id: "terminal-1",
+          target: "ssh",
+          hostId: "host-1",
+          title: "Production",
+          status: "connected",
+          attempt: 0,
+        },
+      ],
+      activeId: "terminal-1",
+      lastTerminalId: "terminal-1",
+    });
+    chat
+      .mockResolvedValueOnce({
+        toolCalls: [
+          {
+            id: "call-1",
+            name: "run_terminal_command",
+            arguments: { command: "uptime" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "Done." });
+    executeTool.mockResolvedValue({
+      content: "load average: 0.1",
+      isError: false,
+    });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model", true);
+
+    expect(run.host.requestApproval).not.toHaveBeenCalled();
+    expect(executeTool).toHaveBeenCalledWith(
+      "run_terminal_command",
+      { command: "uptime", sessionId: "terminal-1" },
+      expect.any(Object),
+    );
+    expect(run.state().log).toContainEqual(
+      expect.objectContaining({
+        kind: "tool",
+        toolCallId: "call-1",
+        status: "done",
+      }),
+    );
   });
 });

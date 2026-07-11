@@ -19,6 +19,7 @@ import {
   SectionHeader,
   SegmentedControl,
   Select,
+  Switch,
   Tooltip,
 } from "@/components/ui";
 import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
@@ -359,12 +360,14 @@ function AiForm({ config }: { config: AiConfig }) {
   const [protocol, setProtocol] = useState<AiProtocol>(config.protocol);
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
   const [apiKey, setApiKey] = useState(config.apiKey);
+  const [autoApprove, setAutoApprove] = useState(config.autoApprove);
   const mutate = setConfig.mutate;
   const skipSave = useRef(true);
   const pendingSave = useRef<{
     baseUrl: string;
     protocol: AiProtocol;
     apiKey: string;
+    autoApprove: boolean;
   } | null>(null);
 
   const changeProtocol = (next: AiProtocol) => {
@@ -377,11 +380,11 @@ function AiForm({ config }: { config: AiConfig }) {
       skipSave.current = false;
       return;
     }
-    pendingSave.current = { baseUrl, protocol, apiKey };
+    pendingSave.current = { baseUrl, protocol, apiKey, autoApprove };
     const timer = setTimeout(() => {
       pendingSave.current = null;
       mutate(
-        { baseUrl, protocol, apiKey },
+        { baseUrl, protocol, apiKey, autoApprove },
         {
           onError: (err) =>
             toast.error(t("settings.ai.saveError"), errorMessage(err)),
@@ -389,7 +392,7 @@ function AiForm({ config }: { config: AiConfig }) {
       );
     }, 500);
     return () => clearTimeout(timer);
-  }, [protocol, baseUrl, apiKey, mutate, t]);
+  }, [protocol, baseUrl, apiKey, autoApprove, mutate, t]);
 
   useEffect(
     () => () => {
@@ -447,6 +450,27 @@ function AiForm({ config }: { config: AiConfig }) {
           autoComplete="off"
           spellCheck={false}
         />
+      </Field>
+
+      <Field
+        label={t("settings.ai.autonomousModeLabel")}
+        hint={t("settings.ai.autonomousModeHint")}
+      >
+        <div className="flex items-center justify-between gap-4 rounded-md border border-input px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {t("settings.ai.autonomousMode")}
+            </p>
+            <p className="mt-0.5 text-xs text-danger">
+              {t("settings.ai.autonomousModeWarning")}
+            </p>
+          </div>
+          <Switch
+            checked={autoApprove}
+            onCheckedChange={setAutoApprove}
+            aria-label={t("settings.ai.autonomousMode")}
+          />
+        </div>
       </Field>
     </div>
   );

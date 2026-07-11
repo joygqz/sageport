@@ -34,7 +34,7 @@ Sageport consolidates the tools of routine server operations — terminal, file 
 
 **Snippets** — Frequently used commands with `{{variable}}` placeholders, sent to the active terminal or run across many hosts at once with per-host results.
 
-**AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model, with prompt caching to cut token costs. The assistant works with your workbench through tools: it can list saved hosts, open connections, inspect terminal output, and propose commands — every remote command requires explicit confirmation before it runs, and when a decision is ambiguous it asks you to pick from options instead of guessing. Conversations are stored locally.
+**AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model, with prompt caching to cut token costs. The assistant works with your workbench through tools: it can list saved hosts, open connections, inspect terminal output, and propose commands. Supervised mode requires confirmation for operations; an explicitly enabled Autonomous mode approves them automatically while still asking when scope is ambiguous. Conversations are stored locally.
 
 **Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials — encrypted end to end with a passphrase-derived key. Only ciphertext ever leaves the device. Syncs hosts, credentials, snippets, port forwards, bookmarks, and interface preferences (locale, theme, zoom). Automatic last-write-wins conflict resolution, revision history with restore, and encrypted export/import for offline backups.
 
@@ -66,7 +66,7 @@ On Windows and Linux, substitute <kbd>Ctrl</kbd> for <kbd>⌘</kbd>.
 
 - All data resides in a local SQLite database; no cloud service is required.
 - Sync and backups derive the encryption key from your passphrase with **Argon2id** and seal payloads with **AES-256-GCM**. Only ciphertext leaves the device; the passphrase never does. **A lost passphrase makes synced data unrecoverable.**
-- Every remote command initiated by the AI assistant executes only after user approval.
+- AI assistant operations require approval by default. Autonomous mode is an explicit opt-in that automatically approves them, so enable it only for trusted hosts and tasks.
 
 ## Development
 

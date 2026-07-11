@@ -184,7 +184,7 @@ export function AssistantPanel({ width }: { width: number }) {
     stickToBottom.current = true;
     try {
       const sessionId = activeId ?? (await newSession());
-      void send(sessionId, prompt, model);
+      void send(sessionId, prompt, model, config?.autoApprove ?? false);
       return true;
     } catch (err) {
       toast.error(t("ai.error"), errorMessage(err));
@@ -206,9 +206,21 @@ export function AssistantPanel({ width }: { width: number }) {
       className="flex shrink-0 flex-col overflow-hidden bg-surface"
     >
       <div className="flex h-9 shrink-0 items-center justify-between gap-1 pl-4 pr-2">
-        <h2 className="min-w-0 truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {activeTitle || t("ai.viewTitle")}
-        </h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="min-w-0 truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {activeTitle || t("ai.viewTitle")}
+          </h2>
+          {config?.autoApprove && (
+            <button
+              type="button"
+              onClick={() => openSettings("ai")}
+              className="shrink-0 rounded bg-danger/15 px-1.5 py-0.5 text-2xs font-medium text-danger hover:bg-danger/25"
+              title={t("ai.autonomousModeHint")}
+            >
+              {t("ai.autonomousMode")}
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-0.5">
           {configured && (
             <>
@@ -328,7 +340,11 @@ export function AssistantPanel({ width }: { width: number }) {
                   <EmptyState
                     icon={Sparkles}
                     title={t("ai.empty.title")}
-                    description={t("ai.empty.description")}
+                    description={t(
+                      config?.autoApprove
+                        ? "ai.empty.descriptionAutonomous"
+                        : "ai.empty.description",
+                    )}
                   />
                   <div className="flex flex-col gap-1.5 px-2">
                     {suggestions.map((key) => (

@@ -46,7 +46,10 @@ export interface RunnerHost {
 const wait = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-function buildContext(omittedHistoryMessages: number): string {
+function buildContext(
+  omittedHistoryMessages: number,
+  autoApprove: boolean,
+): string {
   const state = useTabsStore.getState();
   const sessions = terminalTabs(state.tabs);
   const currentId = targetTerminalId(state);
@@ -64,6 +67,9 @@ function buildContext(omittedHistoryMessages: number): string {
           status: current.status,
         })}`
       : "Current terminal: none.",
+    autoApprove
+      ? "Assistant mode: autonomous. Approved operation tools run automatically; keep the user informed and ask before an action only when the requested scope is genuinely ambiguous."
+      : "Assistant mode: supervised. Operation tools require the user's approval before they run.",
   ];
   if (omittedHistoryMessages > 0) {
     lines.push(
@@ -154,6 +160,7 @@ type RunConfig = {
   model: string;
   budget: number;
   maxTokens: number;
+  autoApprove: boolean;
 };
 
 async function requestStep(
@@ -181,7 +188,7 @@ async function requestStep(
         modelHistory.messages,
         AI_TOOL_SPECS,
         {
-          context: buildContext(modelHistory.omittedMessages),
+          context: buildContext(modelHistory.omittedMessages, run.autoApprove),
           maxTokens: run.maxTokens,
           requestId,
           onDelta: (text) => {
@@ -227,6 +234,7 @@ async function runToolCall(
   host: RunnerHost,
   sessionId: string,
   call: AiToolCall,
+  autoApprove: boolean,
   preflightError?: string,
   automaticResult?: string,
 ): Promise<void> {
@@ -248,6 +256,7 @@ async function runToolCall(
   const args = normalizeArgs(call.arguments);
   const logId = crypto.randomUUID();
   const needsApproval = TOOLS_REQUIRING_APPROVAL.has(call.name);
+  const waitForApproval = needsApproval && !autoApprove;
   const isQuestion =
     call.name === "ask_user" &&
     Boolean(askUserQuestion(args)) &&
@@ -256,7 +265,7 @@ async function runToolCall(
     ? "error"
     : isQuestion
       ? "awaiting-input"
-      : needsApproval
+      : waitForApproval
         ? "awaiting-approval"
         : "running";
 
@@ -307,11 +316,14 @@ async function runToolCall(
         setToolStatus("done", resultText);
       }
     }
-  } else if (needsApproval && !(await host.requestApproval(sessionId, logId))) {
+  } else if (
+    waitForApproval &&
+    !(await host.requestApproval(sessionId, logId))
+  ) {
     resultText = DECLINED_RESULT;
     setToolStatus("denied", resultText);
   } else {
-    if (needsApproval) setToolStatus("running");
+    if (waitForApproval) setToolStatus("running");
     try {
       const result = await executeTool(call.name, args, {
         isCancelled: () => stopped(host, sessionId),
@@ -344,12 +356,14 @@ export async function runAgentLoop(
   host: RunnerHost,
   sessionId: string,
   model: string,
+  autoApprove = false,
 ): Promise<void> {
   const limits = await resolveModelLimits(model);
   const run: RunConfig = {
     model,
     budget: historyTokenBudget(limits),
     maxTokens: outputTokenBudget(limits),
+    autoApprove,
   };
 
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -413,7 +427,14 @@ export async function runAgentLoop(
         }));
         continue;
       }
-      await runToolCall(host, sessionId, call, preflightError, automaticResult);
+      await runToolCall(
+        host,
+        sessionId,
+        call,
+        run.autoApprove,
+        preflightError,
+        automaticResult,
+      );
     }
     await host.persist(sessionId);
     if (stopped(host, sessionId)) return;
