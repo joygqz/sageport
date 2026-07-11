@@ -4,13 +4,13 @@
 
 # Sageport
 
-**SSH workbench with integrated SFTP, credential management, and an AI assistant**
+**A modern SSH workbench — terminal, SFTP, key management, and an AI assistant in one desktop app**
 
 [![Latest release](https://img.shields.io/github/v/release/joygqz/sageport)](https://github.com/joygqz/sageport/releases/latest)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB)](https://tauri.app)
 
-[Download](https://github.com/joygqz/sageport/releases/latest) · [Features](#features) · [Quick start](#quick-start) · [Security](#security)
+[Download](https://github.com/joygqz/sageport/releases/latest) · [Highlights](#highlights) · [Features](#features) · [Quick start](#quick-start) · [Security](#security)
 
 </div>
 
@@ -18,15 +18,42 @@
 
 ![Sageport workbench](docs/screenshot.png)
 
-Sageport consolidates the tools of routine server operations — terminal, file transfer, key management, and command snippets — into a single desktop application with a VSCode-style layout: activity bar, side bar, tabbed editor area, bottom panel, and command palette. All data is stored in a local SQLite database; optional multi-device sync transmits only end-to-end encrypted ciphertext.
+Sageport brings every tool of routine server work — terminal, file transfer, key management, monitoring, and command snippets — into a single VSCode-style desktop app. Everything lives in a local SQLite database; optional multi-device sync moves only end-to-end encrypted ciphertext.
+
+## Highlights
+
+- **All your server tools in one window** — SSH terminal, SFTP, credentials, monitoring, port forwarding, and snippets, laid out like VSCode: activity bar, side bar, tabbed editor area, bottom panel, and command palette.
+- **A terminal that keeps up** — GPU-accelerated xterm.js (WebGL) on a pure-Rust SSH stack (russh), with inline history autocomplete, scrollback search, and broadcast-to-all-sessions.
+- **An AI assistant that operates the workbench** — beyond chat, it lists hosts, opens connections, reads terminal output, and proposes or runs commands through guarded tools — in supervised or autonomous mode.
+- **End-to-end encrypted multi-device sync** — five providers (GitHub Gist, Google Drive, OneDrive, WebDAV, S3), keys derived with Argon2id and payloads sealed with AES-256-GCM. Only ciphertext ever leaves the device.
+- **Local-first, no account required** — all data stays in a local SQLite database; the cloud is strictly opt-in.
+- **Cross-platform & self-updating** — a lightweight native app for macOS, Windows, and Linux, built on Tauri 2.
 
 ## Features
 
-**Terminal** — GPU-accelerated rendering via xterm.js with WebGL, built on a pure-Rust SSH stack (russh). Tabbed concurrent sessions that persist in the background without reflow, keepalives with one-click reconnect, scrollback search (<kbd>⌘</kbd> <kbd>F</kbd>), clickable links, and full Unicode support. Inline autocomplete suggests commands from your history as you type, and input can be broadcast to every connected session at once. Local shell tabs run alongside SSH sessions, and typing `user@host` in the command palette connects immediately — no saved host required.
+**Terminal** — GPU-accelerated rendering via xterm.js with WebGL, on a pure-Rust SSH stack (russh).
 
-**Hosts & credentials** — Hosts organized into collapsible groups with live connection indicators, jump-host (ProxyJump) chains, per-host startup commands, and one-click import from your existing `~/.ssh/config`. Connections verify host keys on first use and support the system SSH agent. Credentials are decoupled from hosts, so one identity can be reused across servers. The built-in key manager generates and imports Ed25519, RSA, and ECDSA keys in OpenSSH format, with optional passphrase protection.
+- Tabbed concurrent sessions that persist in the background without reflow
+- Keepalives with one-click reconnect
+- Scrollback search (<kbd>⌘</kbd> <kbd>F</kbd>), clickable links, and full Unicode support
+- Inline autocomplete suggests commands from your history as you type
+- Broadcast input to every connected session at once
+- Local shell tabs alongside SSH — type `user@host` in the command palette to connect with no saved host
 
-**File transfer & editing** — Dual-pane browser where each pane can show the local filesystem or an SFTP connection. Drag-and-drop transfer in both directions, in-transit archiving for directories with many small files, a permissions editor, path bookmarks, and a complete transfer history. Text files open in an editor tab with syntax highlighting and save straight back over SFTP.
+**Hosts & credentials** — Hosts organized into collapsible groups with live connection indicators.
+
+- Jump-host (ProxyJump) chains and per-host startup commands
+- One-click import from your existing `~/.ssh/config`
+- Host-key verification on first use and system SSH-agent support
+- Credentials decoupled from hosts, so one identity can be reused across servers
+- Built-in key manager generates and imports Ed25519, RSA, and ECDSA keys in OpenSSH format, with optional passphrase protection
+
+**File transfer & editing** — Dual-pane browser where each pane can show the local filesystem or an SFTP connection.
+
+- Drag-and-drop transfer in both directions
+- In-transit archiving for directories with many small files
+- Permissions editor, path bookmarks, and a complete transfer history
+- Open text files in an editor tab with syntax highlighting and save straight back over SFTP
 
 **Monitoring** — A dedicated sidebar shows live CPU, memory, disk, and network statistics for connected hosts, with a compact summary for the active host in the status bar.
 
@@ -34,9 +61,18 @@ Sageport consolidates the tools of routine server operations — terminal, file 
 
 **Snippets** — Frequently used commands with `{{variable}}` placeholders, sent to the active terminal or run across many hosts at once with per-host results.
 
-**AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model, with prompt caching to cut token costs. The assistant works with your workbench through tools: it can list saved hosts, open connections, inspect terminal output, and propose commands. Supervised mode requires confirmation for operations; an explicitly enabled Autonomous mode approves them automatically while still asking when scope is ambiguous. Conversations are stored locally.
+**AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model, plus prompt caching to cut token costs.
 
-**Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials — encrypted end to end with a passphrase-derived key. Only ciphertext ever leaves the device. Syncs hosts, credentials, snippets, port forwards, bookmarks, and interface preferences (locale, theme, zoom). Automatic last-write-wins conflict resolution, revision history with restore, and encrypted export/import for offline backups.
+- Works through your workbench: lists saved hosts, opens connections, inspects terminal output, and proposes commands
+- Supervised mode requires confirmation for operations; explicitly enabled Autonomous mode approves them automatically while still asking when scope is ambiguous
+- Conversations are stored locally
+
+**Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials.
+
+- End-to-end encrypted with a passphrase-derived key; only ciphertext ever leaves the device
+- Syncs hosts, credentials, snippets, port forwards, bookmarks, and interface preferences (locale, theme, zoom)
+- Automatic last-write-wins conflict resolution and revision history with restore
+- Encrypted export/import for offline backups
 
 **Interface** — Six full themes (terminal palette included), English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘</kbd> <kbd>P</kbd> / <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd>), and automatic updates.
 
