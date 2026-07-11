@@ -160,6 +160,15 @@ export function AssistantPanel({ width }: { width: number }) {
     });
   };
 
+  const createSession = async () => {
+    try {
+      await newSession();
+      inputRef.current?.focus();
+    } catch (err) {
+      toast.error(t("ai.error"), errorMessage(err));
+    }
+  };
+
   useEffect(() => {
     stickToBottom.current = true;
   }, [activeId]);
@@ -229,11 +238,7 @@ export function AssistantPanel({ width }: { width: number }) {
                   size="icon"
                   variant="ghost"
                   className="size-6"
-                  onClick={() =>
-                    void newSession().catch((err) =>
-                      toast.error(t("ai.error"), errorMessage(err)),
-                    )
-                  }
+                  onClick={() => void createSession()}
                 >
                   <MessageCirclePlus className="size-4" />
                 </Button>
