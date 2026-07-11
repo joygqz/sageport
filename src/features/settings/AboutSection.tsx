@@ -129,7 +129,8 @@ function UpdateStatusView({ state }: { state: UpdateStatus }) {
   if (state.status === "downloading") {
     return (
       <div className="flex flex-col gap-1.5">
-        <p className="text-sm text-foreground">
+        <p className="flex items-center gap-2 text-sm text-foreground">
+          <Spinner />
           {t("settings.about.update.available", { version: state.version })}
         </p>
         {state.total && (
