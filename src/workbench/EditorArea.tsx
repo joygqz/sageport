@@ -99,33 +99,35 @@ export function EditorArea() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-      <div
-        ref={stripRef}
-
-        onWheel={(e) => {
-          const el = stripRef.current;
-          if (!el || el.scrollWidth <= el.clientWidth) return;
-          el.scrollLeft += e.deltaX + e.deltaY;
-        }}
-        className="scrollbar-none flex h-9 shrink-0 items-end overflow-x-auto border-b border-border bg-surface"
-      >
-        {tabs.map((tab) => (
-          <TabItem
-            key={tab.id}
-            tab={tab}
-            active={tab.id === activeId}
-            onSelect={() => setActive(tab.id)}
-            onClose={() => close(tab.id)}
-          />
-        ))}
-        <Tooltip content={t("editor.newSession")}>
-          <button
-            onClick={() => openPalette("quick")}
-            className="mx-1 flex size-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            <Plus className="size-4" />
-          </button>
-        </Tooltip>
+      <div className="relative -mt-px shrink-0">
+        <div
+          ref={stripRef}
+          onWheel={(e) => {
+            const el = stripRef.current;
+            if (!el || el.scrollWidth <= el.clientWidth) return;
+            el.scrollLeft += e.deltaX + e.deltaY;
+          }}
+          className="scrollbar-none flex h-9 items-end overflow-x-auto bg-surface"
+        >
+          {tabs.map((tab) => (
+            <TabItem
+              key={tab.id}
+              tab={tab}
+              active={tab.id === activeId}
+              onSelect={() => setActive(tab.id)}
+              onClose={() => close(tab.id)}
+            />
+          ))}
+          <Tooltip content={t("editor.newSession")}>
+            <button
+              onClick={() => openPalette("quick")}
+              className="mx-1 flex size-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <Plus className="size-4" />
+            </button>
+          </Tooltip>
+        </div>
+        <span className="pointer-events-none absolute inset-0 border-y border-border" />
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -198,13 +200,13 @@ function TabItem({
         if (e.button === 1) onClose();
       }}
       className={cn(
-        "group relative flex h-full min-w-32 max-w-52 cursor-pointer items-center gap-2 border-r border-border px-3 text-xs",
+        "group relative flex h-full w-44 shrink-0 cursor-pointer items-center gap-2 border-r border-border px-3 text-xs",
         active
-          ? "bg-background text-foreground"
+          ? "z-10 bg-background text-foreground"
           : "bg-surface text-muted-foreground hover:text-foreground",
       )}
     >
-      {active && <span className="absolute inset-x-0 top-0 h-px bg-primary" />}
+      {active && <span className="absolute -inset-x-px top-0 h-px bg-primary" />}
 
       {tab.kind === "terminal" ? (
         <span className="relative flex shrink-0 items-center justify-center">
