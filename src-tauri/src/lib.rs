@@ -13,13 +13,35 @@ mod state;
 mod sync;
 mod update;
 
+use tauri::webview::PageLoadEvent;
 use tauri::Manager;
 
 use state::AppState;
 
+fn cleanup_orphaned_sessions(state: &AppState) {
+    state.ssh.close_all();
+    state.pty.close_all();
+    state.sftp.disconnect_all();
+    state.monitor.stop_all();
+    state.host_key_prompts.lock().clear();
+    state.ai_cancels.lock().clear();
+    let mut oauth = state.sync_oauth.lock();
+    if let Some(cancel) = oauth.cancel.take() {
+        let _ = cancel.send(());
+    }
+    oauth.pending = None;
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .on_page_load(|webview, payload| {
+            if payload.event() == PageLoadEvent::Started {
+                if let Some(state) = webview.try_state::<AppState>() {
+                    cleanup_orphaned_sessions(&state);
+                }
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_dialog::init())

@@ -149,6 +149,13 @@ impl SftpManager {
         }
     }
 
+    pub fn disconnect_all(&self) {
+        for flag in self.cancel_flags.lock().values() {
+            flag.store(true, Ordering::SeqCst);
+        }
+        self.conns.lock().clear();
+    }
+
     pub fn get(&self, id: &str) -> AppResult<Arc<Conn>> {
         self.conns
             .lock()

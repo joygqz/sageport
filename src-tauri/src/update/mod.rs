@@ -77,9 +77,7 @@ pub async fn run_periodic(app: AppHandle) {
     loop {
         let busy = matches!(
             app.state::<AppState>().update.snapshot(),
-            UpdateStatus::Checking
-                | UpdateStatus::Downloading { .. }
-                | UpdateStatus::Ready { .. }
+            UpdateStatus::Checking | UpdateStatus::Downloading { .. } | UpdateStatus::Ready { .. }
         );
         if !busy {
             check(&app).await;

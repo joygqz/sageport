@@ -136,6 +136,12 @@ impl PtyManager {
         }
         Ok(())
     }
+
+    pub fn close_all(&self) {
+        for (_, mut entry) in self.ptys.lock().drain() {
+            let _ = entry.killer.kill();
+        }
+    }
 }
 
 fn spawn_reader(app: AppHandle, id: String, mut reader: Box<dyn Read + Send>) {

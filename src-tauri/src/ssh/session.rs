@@ -110,6 +110,12 @@ impl SessionManager {
         Ok(())
     }
 
+    pub fn close_all(&self) {
+        for (_, entry) in self.sessions.lock().drain() {
+            let _ = entry.tx.send(SessionCommand::Close);
+        }
+    }
+
     fn dispatch(&self, id: &str, cmd: SessionCommand) -> AppResult<()> {
         let sessions = self.sessions.lock();
         let entry = sessions

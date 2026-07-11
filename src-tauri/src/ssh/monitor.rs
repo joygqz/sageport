@@ -171,6 +171,12 @@ impl MonitorManager {
         }
     }
 
+    pub fn stop_all(&self) {
+        for (_, tx) in self.active.lock().drain() {
+            let _ = tx.send(true);
+        }
+    }
+
     pub fn start(&self, app: AppHandle, sessions: Arc<SessionManager>, session_id: String) {
         let (tx, rx) = watch::channel(false);
         {
