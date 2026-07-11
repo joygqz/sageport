@@ -59,6 +59,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     { sessionId: string; resolve: (option: string | null) => void }
   >();
   const persistenceFailures = new Set<string>();
+  const deleting = new Set<string>();
   const saveQueues = new Map<string, Promise<void>>();
   let sessionsLoad: Promise<void> | null = null;
 
@@ -74,7 +75,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     const previous = saveQueues.get(id) ?? Promise.resolve();
     const operation = previous.then(async () => {
       const runtime = get().runtime[id];
-      if (!runtime) return;
+      if (!runtime || deleting.has(id)) return;
       try {
         const summary = await ipc.ai.session.save(id, runtime.history, title);
         persistenceFailures.delete(id);
@@ -82,6 +83,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
           sessions: [summary, ...s.sessions.filter((x) => x.id !== id)],
         }));
       } catch (err) {
+        if (deleting.has(id) || !get().runtime[id]) return;
         if (!persistenceFailures.has(id)) {
           persistenceFailures.add(id);
           toast.error(t("ai.error"), errorMessage(err));
@@ -176,10 +178,12 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     },
 
     deleteSession: async (id) => {
+      deleting.add(id);
       get().stop(id);
       try {
         await ipc.ai.session.remove(id);
       } catch (err) {
+        deleting.delete(id);
         toast.error(t("ai.error"), errorMessage(err));
         return;
       }
@@ -191,6 +195,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         return { sessions, runtime, activeId };
       });
       persistenceFailures.delete(id);
+      deleting.delete(id);
     },
 
     send: async (sessionId, prompt, model) => {
