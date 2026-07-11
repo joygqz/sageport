@@ -116,9 +116,18 @@ export function Workbench() {
           size={layout.sidebarVisible ? layout.sidebarWidth : 0}
           onResize={layout.setSidebarWidth}
           limits={sidebarLimits}
+          showLine={false}
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-px bg-border"
+          />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-px bg-border"
+          />
           <EditorArea />
           {layout.panelVisible && (
             <>
@@ -144,6 +153,7 @@ export function Workbench() {
                       }
                     : undefined
                 }
+                showLine={false}
               />
               <Suspense
                 fallback={<FeatureLoading height={layout.panelHeight} />}
@@ -163,6 +173,7 @@ export function Workbench() {
               size={layout.auxWidth}
               onResize={layout.setAuxWidth}
               limits={auxLimits}
+              showLine={false}
             />
             <Suspense fallback={<FeatureLoading width={layout.auxWidth} />}>
               <AssistantPanel width={layout.auxWidth} />

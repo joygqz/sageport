@@ -50,9 +50,13 @@ export function SftpPanel({ height }: { height: number }) {
 
   return (
     <div
-      className="flex shrink-0 flex-col overflow-hidden bg-background"
+      className="relative flex shrink-0 flex-col overflow-hidden bg-background"
       style={{ height }}
     >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-border"
+      />
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-surface pl-4 pr-2">
         <h2 className="truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
           {t("sftp.panelTitle")}

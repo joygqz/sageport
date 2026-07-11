@@ -35,6 +35,7 @@ interface ResizeHandleProps {
   onResize: (size: number) => void;
   reverse?: boolean;
   className?: string;
+  showLine?: boolean;
 
   sashId?: string;
 
@@ -51,6 +52,7 @@ export function ResizeHandle({
   onResize,
   reverse = false,
   className,
+  showLine = true,
   sashId,
   limits,
   startCorner,
@@ -106,14 +108,16 @@ export function ResizeHandle({
         className,
       )}
     >
-      <div
-        className={cn(
-          "absolute z-10 bg-border",
-          axis === "x"
-            ? cn("inset-y-0 w-px", reverse ? "left-1/2" : "right-1/2")
-            : cn("inset-x-0 h-px", reverse ? "top-1/2" : "bottom-1/2"),
-        )}
-      />
+      {showLine && (
+        <div
+          className={cn(
+            "absolute z-10 bg-border",
+            axis === "x"
+              ? cn("inset-y-0 w-px", reverse ? "left-1/2" : "right-1/2")
+              : cn("inset-x-0 h-px", reverse ? "top-1/2" : "bottom-1/2"),
+          )}
+        />
+      )}
       <div
         className={cn(
           "absolute z-20 bg-primary opacity-0 transition-opacity group-hover:opacity-100 group-hover:delay-300",
