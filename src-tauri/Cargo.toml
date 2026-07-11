@@ -10,7 +10,6 @@ name = "Sageport"
 path = "src/main.rs"
 
 [lib]
-# _lib suffix avoids a bin/lib name conflict on Windows (rust-lang/cargo#8519)
 name = "sageport_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -83,9 +82,7 @@ objc2-foundation = { version = "0.3", default-features = false, features = [
 ] }
 
 [features]
-# required for production builds without a dev server, DO NOT REMOVE
 custom-protocol = ["tauri/custom-protocol"]
 
 [profile.release]
-# rustc debuginfo stripping mis-aligns the Mach-O LINKEDIT string pool, which macOS dyld rejects; DO NOT REMOVE
 strip = "none"

@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sageport</title>
 
-    <!--
-      Critical theme bootstrap. Runs before the app bundle (and before first
-      paint) so the window never flashes the wrong color while loading. The
-      storage keys mirror src/themes/apply.ts; the fallback background is the
-      default theme (GitHub Dark).
-    -->
     <script>
       (function () {
         var bg = "#0d1117";
@@ -18,9 +12,7 @@
         try {
           bg = localStorage.getItem("sageport.theme.bg") || bg;
           scheme = localStorage.getItem("sageport.theme.scheme") || scheme;
-        } catch (e) {
-          /* localStorage unavailable, keep defaults */
-        }
+        } catch (e) {}
         var root = document.documentElement;
         root.style.backgroundColor = bg;
         root.style.colorScheme = scheme;

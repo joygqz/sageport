@@ -40,9 +40,6 @@ export default defineConfig(async () => ({
   },
 
   build: {
-    // Monaco is intentionally loaded on first file edit. Its editor core is a
-    // single large module, so use a higher warning limit while keeping every
-    // eagerly-loaded application chunk below the default 500 kB budget.
     chunkSizeWarningLimit: 4_000,
     rolldownOptions: {
       output: {

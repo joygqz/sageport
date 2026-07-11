@@ -3,7 +3,6 @@ import {
   lazy,
   Suspense,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -22,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
 import { focusTerminal } from "@/features/terminal/sessions";
 import { useOverlayStore } from "./overlays";
+import { getTabDropTarget } from "./tab-drag";
 import {
   isFileDirty,
   useTabsStore,
@@ -69,11 +69,6 @@ interface TabDragState extends TabDragPointer {
   indicatorHeight: number;
 }
 
-interface ActiveTabIndicator {
-  left: number;
-  width: number;
-}
-
 export function EditorArea() {
   const { t } = useI18n();
   const tabs = useTabsStore((s) => s.tabs);
@@ -85,8 +80,6 @@ export function EditorArea() {
   const openPalette = useOverlayStore((s) => s.openPalette);
   const stripRef = useRef<HTMLDivElement>(null);
   const [dragState, setDragState] = useState<TabDragState | null>(null);
-  const [activeTabIndicator, setActiveTabIndicator] =
-    useState<ActiveTabIndicator | null>(null);
   const isDragging = dragState !== null;
   const dropIndexRef = useRef<number | null>(null);
   const suppressClickRef = useRef<string | null>(null);
@@ -101,43 +94,6 @@ export function EditorArea() {
     document.head.appendChild(style);
     return () => style.remove();
   }, [isDragging]);
-
-  useLayoutEffect(() => {
-    const strip = stripRef.current;
-    const activeTab = activeId
-      ? strip?.querySelector<HTMLElement>(
-          `[data-tab-id="${CSS.escape(activeId)}"]`,
-        )
-      : null;
-    if (!strip || !activeTab) {
-      setActiveTabIndicator(null);
-      return;
-    }
-
-    const updateIndicator = () => {
-      const stripRect = strip.getBoundingClientRect();
-      const tabRect = activeTab.getBoundingClientRect();
-      const next = {
-        left: tabRect.left - stripRect.left,
-        width: tabRect.width,
-      };
-      setActiveTabIndicator((current) =>
-        current?.left === next.left && current.width === next.width
-          ? current
-          : next,
-      );
-    };
-
-    updateIndicator();
-    strip.addEventListener("scroll", updateIndicator, { passive: true });
-    const observer = new ResizeObserver(updateIndicator);
-    observer.observe(strip);
-    observer.observe(activeTab);
-    return () => {
-      strip.removeEventListener("scroll", updateIndicator);
-      observer.disconnect();
-    };
-  }, [activeId, tabs]);
 
   const handleTabDragStart = (id: string, pointer: TabDragPointer) => {
     const sourceIndex = tabs.findIndex((tab) => tab.id === id);
@@ -168,22 +124,13 @@ export function EditorArea() {
     const tabElements = tabs.map((tab) =>
       strip.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(tab.id)}"]`),
     );
-    let insertIndex = tabs.length;
-    for (const [index, element] of tabElements.entries()) {
-      if (!element) continue;
-      const rect = element.getBoundingClientRect();
-      if (clientX < rect.left + rect.width / 2) {
-        insertIndex = index;
-        break;
-      }
-    }
-
-    const previousTab = tabElements[insertIndex - 1];
-    const firstTab = tabElements[0];
-    const indicatorX =
-      insertIndex === 0
-        ? (firstTab?.getBoundingClientRect().left ?? bounds.left)
-        : (previousTab?.getBoundingClientRect().right ?? bounds.right) - 1;
+    const { insertIndex, indicatorX } = getTabDropTarget({
+      pointerX: clientX,
+      stripRect: bounds,
+      tabRects: tabElements.map(
+        (element) => element?.getBoundingClientRect() ?? null,
+      ),
+    });
 
     const nextIndex = sourceIndex < insertIndex ? insertIndex - 1 : insertIndex;
     dropIndexRef.current = nextIndex;
@@ -272,20 +219,21 @@ export function EditorArea() {
 
   return (
     <div className="isolate flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-      <div className="relative -mt-px shrink-0">
+      <div className="relative shrink-0 bg-surface">
         <div
           ref={stripRef}
           onWheel={(e) => {
             const el = stripRef.current;
             if (!el || el.scrollWidth <= el.clientWidth) return;
-            el.scrollLeft += e.deltaX + e.deltaY;
+            e.preventDefault();
+            el.scrollLeft += e.deltaX || e.deltaY;
           }}
-          className="scrollbar-none flex h-9 items-end overflow-x-auto bg-surface"
+          className="scrollbar-none flex h-9 overflow-x-auto overflow-y-hidden"
         >
           <div
             role="tablist"
             aria-label={t("editor.tabList")}
-            className="flex h-full items-end"
+            className="flex h-full"
           >
             {tabs.map((tab) => (
               <TabItem
@@ -315,23 +263,16 @@ export function EditorArea() {
           <Tooltip content={t("editor.newSession")}>
             <button
               onClick={() => openPalette("quick")}
-              className="mx-1 flex size-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="mx-1 flex size-7 shrink-0 items-center justify-center self-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <Plus className="size-4" />
             </button>
           </Tooltip>
         </div>
-        <span className="pointer-events-none absolute inset-0 z-0 border-y border-border" />
-        {activeTabIndicator && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 z-20 h-px bg-primary"
-            style={{
-              width: activeTabIndicator.width,
-              transform: `translateX(${activeTabIndicator.left}px)`,
-            }}
-          />
-        )}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border"
+        />
         {dragState && draggedTab && (
           <>
             <span
@@ -492,12 +433,12 @@ function TabItem({
         if (e.button === 1) onClose();
       }}
       className={cn(
-        "group relative flex h-full w-44 shrink-0 cursor-pointer items-center gap-2 border-r border-border px-3 text-xs",
-        "touch-none select-none",
+        "group relative flex h-full w-44 shrink-0 cursor-pointer items-center gap-2 border-r border-border px-3 text-xs transition-colors",
+        "touch-none select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
         dragged && "opacity-50",
         active
-          ? "z-10 bg-background text-foreground"
-          : "bg-surface text-muted-foreground hover:text-foreground",
+          ? "z-10 bg-background text-foreground before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-primary after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-background"
+          : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
       )}
     >
       {tab.kind === "terminal" ? (
@@ -519,6 +460,13 @@ function TabItem({
 
       <span className="min-w-0 flex-1 truncate">{title}</span>
 
+      {dirty && (
+        <span
+          aria-label={t("editor.unsavedTitle")}
+          className="size-1.5 shrink-0 rounded-full bg-foreground/70"
+        />
+      )}
+
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -526,20 +474,13 @@ function TabItem({
         }}
         aria-label={t("editor.closeTab")}
         className={cn(
-          "group/close flex size-4.5 shrink-0 items-center justify-center rounded transition-opacity hover:bg-accent",
-          dirty
-            ? "opacity-100"
-            : active
-              ? "opacity-60 hover:opacity-100"
-              : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100",
+          "flex size-5 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          active
+            ? "opacity-70"
+            : "opacity-0 group-hover:opacity-70 group-focus-within:opacity-70",
         )}
       >
-        {dirty && (
-          <span className="size-2 rounded-full bg-foreground group-hover/close:hidden" />
-        )}
-        <X
-          className={cn("size-3.5", dirty && "hidden group-hover/close:block")}
-        />
+        <X className="size-3.5" />
       </button>
     </div>
   );
@@ -559,7 +500,7 @@ function TabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[100] flex items-center gap-2 rounded-sm border border-primary/60 bg-background px-3 text-xs text-foreground opacity-90 shadow-xl ring-1 ring-primary/20"
+      className="pointer-events-none fixed z-[100] flex items-center gap-2 border border-border bg-background px-3 text-xs text-foreground opacity-90 shadow-lg"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,

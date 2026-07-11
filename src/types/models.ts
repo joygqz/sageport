@@ -269,7 +269,6 @@ export interface AiChatMessage {
 
   toolCallId?: string;
 
-  /** Local execution metadata; providers receive only the tool content. */
   toolError?: boolean;
 }
 

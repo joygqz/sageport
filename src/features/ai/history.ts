@@ -48,11 +48,6 @@ export interface ModelHistoryWindow {
   compactedMessages: number;
 }
 
-/**
- * Conservative cross-provider estimate. Exact tokenizers differ by model, so
- * code-heavy ASCII is budgeted at three characters per token and non-ASCII at
- * two tokens per code point.
- */
 export function estimateTextTokens(text: string): number {
   let ascii = 0;
   let nonAscii = 0;
@@ -135,8 +130,6 @@ function compactTurn(
   let compactedMessages = 0;
   if (total <= budget) return { messages, compactedMessages };
 
-  // Tool output is reproducible and usually the largest content. Compact it
-  // before assistant reasoning and the user's request, oldest first.
   const candidates = ["tool", "assistant", "user"].flatMap((role) =>
     messages.filter(
       (message) => message.role === role && Boolean(message.content),
@@ -157,11 +150,6 @@ function compactTurn(
   return { messages, compactedMessages };
 }
 
-/**
- * Creates the request-only history window. Full history remains untouched for
- * persistence and UI. Previous turns are included only as complete units, so
- * tool calls never lose their corresponding tool results.
- */
 export function modelHistoryWindow(
   history: AiChatMessage[],
   budget = historyTokenBudget(),

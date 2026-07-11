@@ -389,8 +389,7 @@ function AiForm({ config }: { config: AiConfig }) {
       );
     }, 500);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [protocol, baseUrl, apiKey]);
+  }, [protocol, baseUrl, apiKey, mutate, t]);
 
   useEffect(
     () => () => {

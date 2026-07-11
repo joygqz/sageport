@@ -180,11 +180,6 @@ function comparableText(value: string): string {
     .trim();
 }
 
-/**
- * Models occasionally ask the user to choose a host even though the app has
- * already supplied a current terminal. Resolve only that redundant choice;
- * genuine multi-host or explicitly named-host requests still reach the user.
- */
 export function defaultTerminalOption(
   args: Record<string, unknown>,
   userPrompt: string,

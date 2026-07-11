@@ -1,8 +1,5 @@
 import type { ThemeDefinition } from "./types";
 
-// The UI neutrals stay deliberately quieter than the ANSI palette so the
-// terminal remains the visual focus. Brand palettes are adapted for readable
-// application controls instead of being copied token-for-token from editors.
 const githubDark: ThemeDefinition = {
   id: "github-dark",
   name: "GitHub Dark",

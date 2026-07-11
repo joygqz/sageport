@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
@@ -9,7 +9,7 @@ export function useSettingSync(
   onRemote: (value: string) => void,
 ) {
   const qc = useQueryClient();
-  const queryKey = ["settings", key];
+  const queryKey = useMemo(() => ["settings", key] as const, [key]);
 
   const { data } = useQuery({
     queryKey,
@@ -24,15 +24,13 @@ export function useSettingSync(
       return;
     }
     onRemote(data);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, current]);
+  }, [data, current, key, onRemote, qc, queryKey]);
 
   return useCallback(
     (value: string) => {
       qc.setQueryData(queryKey, value);
       void ipc.settings.set(key, value).catch(() => {});
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key, qc],
+    [key, qc, queryKey],
   );
 }
