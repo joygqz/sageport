@@ -118,6 +118,7 @@ export function AssistantPanel({ width }: { width: number }) {
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const onLogScroll = () => {
     const el = scrollRef.current;
@@ -157,6 +158,13 @@ export function AssistantPanel({ width }: { width: number }) {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
     });
   }, [log, pending]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
 
   const sendPrompt = async (prompt: string): Promise<boolean> => {
     if (!prompt || pending || !model) return false;
@@ -341,6 +349,8 @@ export function AssistantPanel({ width }: { width: number }) {
           <div className="p-2.5">
             <div className="rounded-md border border-input bg-surface transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
               <Textarea
+                ref={inputRef}
+                rows={1}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -350,9 +360,9 @@ export function AssistantPanel({ width }: { width: number }) {
                   }
                 }}
                 placeholder={t("ai.inputPlaceholder")}
-                className="max-h-40 min-h-16 resize-none border-0 focus-visible:ring-0"
+                className="max-h-40 min-h-0 resize-none border-0 focus-visible:ring-0"
               />
-              <div className="flex items-center gap-1.5 px-1.5 pb-1.5">
+              <div className="flex items-center gap-1.5 border-t border-border px-1.5 py-1.5">
                 <Select
                   value={model}
                   onChange={(e) => changeModel(e.target.value)}
