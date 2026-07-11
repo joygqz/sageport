@@ -435,6 +435,7 @@ export const zhCN: Dictionary = {
     run: "在终端中运行",
     sent: "已发送到终端",
     noTerminal: "当前没有打开的终端会话",
+    notConnected: "终端尚未连接",
   },
 
   sftp: {

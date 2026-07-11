@@ -47,10 +47,17 @@ export function SnippetsView() {
   const [batch, setBatch] = useState<Snippet | null>(null);
 
   const send = (command: string) => {
-    if (sendToTerminal(command)) {
+    const result = sendToTerminal(command);
+    if (result === "sent") {
       toast.success(t("snippets.sent"));
     } else {
-      toast.error(t("snippets.noTerminal"));
+      toast.error(
+        t(
+          result === "not-connected"
+            ? "snippets.notConnected"
+            : "snippets.noTerminal",
+        ),
+      );
     }
   };
 

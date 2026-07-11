@@ -541,10 +541,17 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   const run = () => {
-    if (sendToTerminal(code)) {
+    const result = sendToTerminal(code);
+    if (result === "sent") {
       toast.success(t("snippets.sent"));
     } else {
-      toast.error(t("snippets.noTerminal"));
+      toast.error(
+        t(
+          result === "not-connected"
+            ? "snippets.notConnected"
+            : "snippets.noTerminal",
+        ),
+      );
     }
   };
 

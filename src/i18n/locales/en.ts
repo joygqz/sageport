@@ -444,6 +444,7 @@ export const en = {
     run: "Run in Terminal",
     sent: "Sent to terminal",
     noTerminal: "No terminal session is open",
+    notConnected: "Terminal is not connected yet",
   },
 
   sftp: {

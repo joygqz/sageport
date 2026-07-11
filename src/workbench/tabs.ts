@@ -16,6 +16,8 @@ export type TerminalStatus = SshStatusKind | "idle";
 
 export type TerminalTarget = "ssh" | "local" | "ssh-adhoc";
 
+export type SendToTerminalResult = "sent" | "no-terminal" | "not-connected";
+
 export interface AdhocTarget {
   host: string;
   port: number;
@@ -107,7 +109,7 @@ interface TabsState {
 
   reconnectTerminal: (id: string) => void;
 
-  sendToTerminal: (command: string) => boolean;
+  sendToTerminal: (command: string) => SendToTerminalResult;
 }
 
 const isTerminal = (tab: EditorTab): tab is TerminalTab =>
@@ -394,11 +396,13 @@ export const useTabsStore = create<TabsState>((set, get) => {
 
     sendToTerminal: (command) => {
       const id = targetTerminalId(get());
+      const tab = findOpenTerminal(get().tabs, id);
       const session = getSession(id);
-      if (!id || !session) return false;
+      if (!id || !tab || !session) return "no-terminal";
+      if (tab.status !== "connected") return "not-connected";
       session.sendCommand(command);
       get().setActive(id);
-      return true;
+      return "sent";
     },
   };
 });
