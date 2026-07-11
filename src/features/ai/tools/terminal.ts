@@ -198,6 +198,11 @@ export async function executeTerminalCommand(
     isShellPromptLine(promptBefore),
     before,
   );
+  if (context.isCancelled?.()) {
+    return toolFailure(
+      "Error: the assistant run was stopped; the command had already started and may still be running in the terminal.",
+    );
+  }
 
   const diff = newOutput(before, after).trim();
   if (diff) return toolSuccess(diff);

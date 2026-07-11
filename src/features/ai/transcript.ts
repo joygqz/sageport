@@ -1,5 +1,5 @@
 import type { AiChatMessage } from "@/types/models";
-import { normalizeArgs } from "./tools";
+import { normalizeArgs, redactToolArguments } from "./tools";
 
 export const DECLINED_RESULT = "The user declined to run this command.";
 export const STOPPED_RESULT =
@@ -68,6 +68,18 @@ export function deriveTitle(prompt: string): string {
   return firstLine.length > TITLE_MAX_LEN
     ? `${firstLine.slice(0, TITLE_MAX_LEN).trimEnd()}…`
     : firstLine;
+}
+
+export function redactSensitiveHistory(
+  messages: AiChatMessage[],
+): AiChatMessage[] {
+  return messages.map((message) => ({
+    ...message,
+    toolCalls: message.toolCalls?.map((call) => ({
+      ...call,
+      arguments: redactToolArguments(call.name, call.arguments),
+    })),
+  }));
 }
 
 export function repairHistory(messages: AiChatMessage[]): AiChatMessage[] {

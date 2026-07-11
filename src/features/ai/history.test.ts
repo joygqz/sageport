@@ -177,4 +177,31 @@ describe("modelHistoryWindow", () => {
     expect(window.messages[2].content).toContain("older content omitted");
     expect(history[2].content).toHaveLength(20_000);
   });
+
+  it("omits oversized completed tool arguments when they exceed the budget", () => {
+    const history: AiChatMessage[] = [
+      user("write the file"),
+      {
+        role: "assistant",
+        toolCalls: [
+          {
+            id: "call-write",
+            name: "write_file",
+            arguments: { path: "/tmp/a", content: "x".repeat(30_000) },
+          },
+        ],
+      },
+      { role: "tool", toolCallId: "call-write", content: "Wrote file." },
+    ];
+
+    const window = modelHistoryWindow(history, 500);
+    expect(window.estimatedTokens).toBeLessThanOrEqual(500);
+    expect(window.messages[1].toolCalls?.[0].arguments).toEqual({
+      _omitted:
+        "Completed tool arguments omitted to fit the model context window.",
+    });
+    expect(
+      (history[1].toolCalls?.[0].arguments as { content: string }).content,
+    ).toHaveLength(30_000);
+  });
 });

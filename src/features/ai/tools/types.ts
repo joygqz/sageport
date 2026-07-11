@@ -65,6 +65,17 @@ export function optionalStr(
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
+export function nullableStr(
+  args: Record<string, unknown>,
+  key: string,
+): string | null | undefined {
+  if (!(key in args)) return undefined;
+  const value = args[key];
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
+  return value.trim() ? value : null;
+}
+
 export function num(
   args: Record<string, unknown>,
   key: string,
@@ -73,6 +84,15 @@ export function num(
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
+}
+
+export function nullableNum(
+  args: Record<string, unknown>,
+  key: string,
+): number | null | undefined {
+  if (!(key in args)) return undefined;
+  if (args[key] === null) return null;
+  return num(args, key);
 }
 
 export function bool(args: Record<string, unknown>, key: string): boolean {

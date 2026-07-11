@@ -9,6 +9,7 @@ import { runAgentLoop, type RunnerHost } from "./runner";
 import {
   buildLogFromHistory,
   deriveTitle,
+  redactSensitiveHistory,
   repairHistory,
   type RuntimeSession,
 } from "./transcript";
@@ -82,7 +83,11 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       const runtime = get().runtime[id];
       if (!runtime || deleting.has(id)) return;
       try {
-        const summary = await ipc.ai.session.save(id, runtime.history, title);
+        const summary = await ipc.ai.session.save(
+          id,
+          redactSensitiveHistory(runtime.history),
+          title,
+        );
         persistenceFailures.delete(id);
         set((s) => ({
           sessions: [summary, ...s.sessions.filter((x) => x.id !== id)],
@@ -227,15 +232,17 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         await runAgentLoop(host, sessionId, model, autoApprove);
       } catch (err) {
         const message = errorMessage(err);
+        const content = `⚠️ ${message}`;
         toast.error(t("ai.error"), message);
         patch(sessionId, (r) => ({
           ...r,
+          history: [...r.history, { role: "assistant", content }],
           log: [
             ...r.log,
             {
               id: crypto.randomUUID(),
               kind: "assistant",
-              content: `⚠️ ${message}`,
+              content,
             },
           ],
         }));

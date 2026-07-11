@@ -152,7 +152,7 @@ export function AssistantPanel({ width }: { width: number }) {
     ...new Set([config?.model, ...(fetchedModels ?? [])].filter(Boolean)),
   ] as string[];
 
-  const model = config?.model ?? models[0] ?? "";
+  const model = config?.model || models[0] || "";
 
   const changeModel = (next: string) => {
     setModel.mutate(next, {

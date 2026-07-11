@@ -10,6 +10,8 @@ import {
   TOOLS_REQUIRING_APPROVAL,
   getTool,
   prepareTool,
+  redactToolArguments,
+  validateToolArguments,
 } from "./registry";
 
 describe("tool registry", () => {
@@ -48,5 +50,37 @@ describe("tool registry", () => {
       { userPrompt: "" },
     );
     expect(prepared).toEqual({ args: { foo: "bar" } });
+  });
+
+  it("redacts credential fields without dropping ordinary arguments", () => {
+    expect(
+      redactToolArguments("update_identity", {
+        id: "identity-1",
+        username: "root",
+        password: "secret",
+      }),
+    ).toEqual({
+      id: "identity-1",
+      username: "root",
+      password: "[REDACTED]",
+    });
+  });
+
+  it("validates required fields, enums, and extra properties locally", () => {
+    expect(validateToolArguments("delete_host", {})).toContain(
+      "id is required",
+    );
+    expect(
+      validateToolArguments("generate_ssh_key", {
+        name: "deploy",
+        algorithm: "weak-key",
+      }),
+    ).toContain("must be one of");
+    expect(validateToolArguments("list_hosts", { unexpected: true })).toContain(
+      "is not allowed",
+    );
+    expect(
+      validateToolArguments("delete_host", { id: "host-1" }),
+    ).toBeUndefined();
   });
 });

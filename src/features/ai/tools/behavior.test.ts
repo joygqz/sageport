@@ -101,6 +101,27 @@ describe("run_snippet prepare", () => {
   });
 });
 
+describe("SFTP target preparation", () => {
+  it("pins the current host before an approval wait", async () => {
+    const current = terminal("t1");
+    useTabsStore.setState({
+      tabs: [current],
+      activeId: current.id,
+      lastTerminalId: current.id,
+    });
+
+    const prepared = await getTool("write_file")!.prepare!(
+      { path: "/etc/app.conf", content: "enabled=true" },
+      { userPrompt: "update the config" },
+    );
+
+    expect(prepared.args).toMatchObject({
+      hostId: "host-t1",
+      path: "/etc/app.conf",
+    });
+  });
+});
+
 describe("list_forwards", () => {
   it("merges the active set into each forward", async () => {
     forwardsList.mockResolvedValue([

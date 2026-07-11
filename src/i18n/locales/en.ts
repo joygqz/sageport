@@ -664,7 +664,7 @@ export const en = {
       baseUrlHint: "OpenAI-compatible endpoints usually end with /v1.",
       apiKeyLabel: "API Key",
       apiKeyHint:
-        "Never leaves this device, except inside encrypted backups when sync is enabled.",
+        "Sent only to the AI endpoint you configure; included in end-to-end encrypted backups when sync is enabled.",
       autonomousModeLabel: "Assistant mode",
       autonomousMode: "Autonomous operation",
       autonomousModeHint:

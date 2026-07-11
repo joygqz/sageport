@@ -20,6 +20,8 @@ export {
   executeTool,
   getTool,
   prepareTool,
+  redactToolArguments,
+  validateToolArguments,
   TOOL_CONFIRM_KEYS,
   TOOL_ICONS,
   TOOL_LABEL_KEYS,

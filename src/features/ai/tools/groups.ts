@@ -5,6 +5,7 @@ import type { Group, GroupInput } from "@/types/models";
 import { invalidateGroups, invalidateHosts } from "./cache";
 import {
   bool,
+  nullableStr,
   optionalStr,
   str,
   toolFailure,
@@ -22,9 +23,10 @@ function inputFromArgs(
   args: Record<string, unknown>,
   base?: Group,
 ): GroupInput {
+  const parentId = nullableStr(args, "parentId");
   return {
     name: optionalStr(args, "name") ?? base?.name ?? "",
-    parentId: optionalStr(args, "parentId") ?? base?.parentId ?? null,
+    parentId: parentId === undefined ? (base?.parentId ?? null) : parentId,
   };
 }
 
@@ -103,7 +105,10 @@ export const groupTools: AiTool[] = [
         properties: {
           id: { type: "string", description: "Group id." },
           name: { type: "string" },
-          parentId: { type: "string", description: "New parent group id." },
+          parentId: {
+            type: ["string", "null"],
+            description: "New parent group id. Set null to make it top-level.",
+          },
         },
         required: ["id"],
         additionalProperties: false,

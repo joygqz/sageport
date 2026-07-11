@@ -268,6 +268,7 @@ describe("transfer_file", () => {
         },
       }));
       mocks.transfer.mockResolvedValueOnce(undefined);
+      let stopped = false;
       mocks.cancelTransfer.mockImplementationOnce(async (transferId) => {
         const handler = mocks.onTransfer.mock.calls[0]?.[0];
         handler?.(terminalEvent(transferId, "cancelled"));
@@ -278,8 +279,10 @@ describe("transfer_file", () => {
           source: { kind: "sftp", hostId: "host-1", path: "/large-dir" },
           destination: { kind: "local", path: "/tmp" },
         },
-        { isCancelled: () => true },
+        { isCancelled: () => stopped },
       );
+      await vi.advanceTimersByTimeAsync(1);
+      stopped = true;
       await vi.advanceTimersByTimeAsync(250);
 
       await expect(pending).resolves.toEqual({

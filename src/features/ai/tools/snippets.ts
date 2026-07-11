@@ -7,6 +7,7 @@ import { invalidateSnippets } from "./cache";
 import { executeTerminalCommand, prepareTerminalTarget } from "./terminal";
 import {
   optionalStr,
+  nullableStr,
   record,
   str,
   toolFailure,
@@ -67,10 +68,12 @@ function inputFromArgs(
   args: Record<string, unknown>,
   base?: Snippet,
 ): SnippetInput {
+  const description = nullableStr(args, "description");
   return {
     name: optionalStr(args, "name") ?? base?.name ?? "",
     command: optionalStr(args, "command") ?? base?.command ?? "",
-    description: optionalStr(args, "description") ?? base?.description ?? null,
+    description:
+      description === undefined ? (base?.description ?? null) : description,
   };
 }
 
@@ -196,7 +199,10 @@ export const snippetTools: AiTool[] = [
           id: { type: "string", description: "Snippet id." },
           name: { type: "string" },
           command: { type: "string" },
-          description: { type: "string" },
+          description: {
+            type: ["string", "null"],
+            description: "Set null to clear the description.",
+          },
         },
         required: ["id"],
         additionalProperties: false,

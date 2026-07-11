@@ -23,6 +23,7 @@ import {
   toolFailure,
   toolSuccess,
   type AiTool,
+  type PreparedCall,
   type ToolExecutionContext,
   type ToolExecutionResult,
 } from "./types";
@@ -54,7 +55,11 @@ function reuseTabConnection(hostId: string): string | undefined {
 
 async function resolveSftpConnection(
   hostId?: string,
+  context: ToolExecutionContext = {},
 ): Promise<{ connectionId?: string; hostId?: string; error?: string }> {
+  if (context.isCancelled?.()) {
+    return { error: "Error: the assistant run was stopped." };
+  }
   let targetHostId = hostId;
   if (!targetHostId) {
     targetHostId = resolveTerminalTab()?.hostId || undefined;
@@ -96,6 +101,14 @@ async function resolveSftpConnection(
 
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
+    if (context.isCancelled?.()) {
+      if (aiConnByHost.get(targetHostId) === id) {
+        aiConnByHost.delete(targetHostId);
+        connStatus.delete(id);
+        void ipc.sftp.disconnect(id).catch(() => {});
+      }
+      return { error: "Error: the assistant run was stopped." };
+    }
     const status = connStatus.get(id);
     if (status === "connected")
       return { connectionId: id, hostId: targetHostId };
@@ -116,17 +129,35 @@ async function resolveSftpConnection(
 
 async function withConn(
   hostId: string | undefined,
+  context: ToolExecutionContext,
   fn: (connectionId: string, hostId: string) => Promise<ToolExecutionResult>,
 ): Promise<ToolExecutionResult> {
-  const resolved = await resolveSftpConnection(hostId);
+  const resolved = await resolveSftpConnection(hostId, context);
   if (resolved.error || !resolved.connectionId || !resolved.hostId) {
     return toolFailure(resolved.error ?? "Error: no SFTP connection.");
+  }
+  if (context.isCancelled?.()) {
+    return toolFailure("Error: the assistant run was stopped.");
   }
   try {
     return await fn(resolved.connectionId, resolved.hostId);
   } catch (err) {
     return toolFailure(`Error: ${errorMessage(err)}`);
   }
+}
+
+function prepareSftpTarget(args: Record<string, unknown>): PreparedCall {
+  const requested = optionalStr(args, "hostId");
+  if (requested) return { args: { ...args, hostId: requested } };
+  const hostId = resolveTerminalTab()?.hostId || undefined;
+  if (!hostId) {
+    return {
+      args,
+      preflightError:
+        "Error: no host given and no current terminal to infer one from. Pass hostId (from list_hosts).",
+    };
+  }
+  return { args: { ...args, hostId } };
 }
 
 function refreshSftpViews(hostId: string, ...dirs: string[]): void {
@@ -196,6 +227,7 @@ function isAbsoluteLocalPath(path: string): boolean {
 async function resolveTransferEndpoint(
   input: TransferEndpointInput,
   connections: Map<string, ReturnType<typeof resolveSftpConnection>>,
+  context: ToolExecutionContext,
 ): Promise<ResolvedTransferEndpoint | string> {
   if (input.kind === "local") {
     return {
@@ -207,7 +239,7 @@ async function resolveTransferEndpoint(
   const hostId = input.hostId!;
   let pending = connections.get(hostId);
   if (!pending) {
-    pending = Promise.resolve(resolveSftpConnection(hostId));
+    pending = Promise.resolve(resolveSftpConnection(hostId, context));
     connections.set(hostId, pending);
   }
   const resolved = await pending;
@@ -282,11 +314,16 @@ async function transferFile(
     string,
     ReturnType<typeof resolveSftpConnection>
   >();
-  const resolvedSource = await resolveTransferEndpoint(source, connections);
+  const resolvedSource = await resolveTransferEndpoint(
+    source,
+    connections,
+    context,
+  );
   if (typeof resolvedSource === "string") return toolFailure(resolvedSource);
   const resolvedDestination = await resolveTransferEndpoint(
     destination,
     connections,
+    context,
   );
   if (typeof resolvedDestination === "string") {
     return toolFailure(resolvedDestination);
@@ -326,8 +363,9 @@ async function transferFile(
 
 async function listFiles(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
-  return withConn(optionalStr(args, "hostId"), async (conn) => {
+  return withConn(optionalStr(args, "hostId"), context, async (conn) => {
     const path = optionalStr(args, "path") ?? (await ipc.sftp.home(conn));
     const entries = await ipc.sftp.list(conn, path);
     return toolSuccess(
@@ -346,10 +384,11 @@ async function listFiles(
 
 async function readFile(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const path = optionalStr(args, "path");
   if (!path) return toolFailure("Error: no path given.");
-  return withConn(optionalStr(args, "hostId"), async (conn) => {
+  return withConn(optionalStr(args, "hostId"), context, async (conn) => {
     const text = await ipc.sftp.readText(conn, path);
     return toolSuccess(text || "(the file is empty)");
   });
@@ -357,11 +396,12 @@ async function readFile(
 
 async function writeFile(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const path = optionalStr(args, "path");
   if (!path) return toolFailure("Error: no path given.");
   const content = str(args, "content");
-  return withConn(optionalStr(args, "hostId"), async (conn, host) => {
+  return withConn(optionalStr(args, "hostId"), context, async (conn, host) => {
     await ipc.sftp.writeText(conn, path, content);
     refreshSftpViews(host, parentPath(path));
     return toolSuccess(`Wrote ${content.length} characters to ${path}.`);
@@ -370,10 +410,11 @@ async function writeFile(
 
 async function makeDirectory(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const path = optionalStr(args, "path");
   if (!path) return toolFailure("Error: no path given.");
-  return withConn(optionalStr(args, "hostId"), async (conn, host) => {
+  return withConn(optionalStr(args, "hostId"), context, async (conn, host) => {
     await ipc.sftp.mkdir(conn, path);
     refreshSftpViews(host, parentPath(path));
     return toolSuccess(`Created directory ${path}.`);
@@ -382,11 +423,12 @@ async function makeDirectory(
 
 async function movePath(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const from = optionalStr(args, "from");
   const to = optionalStr(args, "to");
   if (!from || !to) return toolFailure("Error: from and to are required.");
-  return withConn(optionalStr(args, "hostId"), async (conn, host) => {
+  return withConn(optionalStr(args, "hostId"), context, async (conn, host) => {
     await ipc.sftp.rename(conn, from, to);
     refreshSftpViews(host, parentPath(from), parentPath(to));
     return toolSuccess(`Moved ${from} to ${to}.`);
@@ -395,10 +437,11 @@ async function movePath(
 
 async function deleteFile(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const path = optionalStr(args, "path");
   if (!path) return toolFailure("Error: no path given.");
-  return withConn(optionalStr(args, "hostId"), async (conn, host) => {
+  return withConn(optionalStr(args, "hostId"), context, async (conn, host) => {
     await ipc.sftp.remove(conn, path, bool(args, "isDir"));
     refreshSftpViews(host, parentPath(path));
     return toolSuccess(`Deleted ${path}.`);
@@ -407,6 +450,7 @@ async function deleteFile(
 
 async function chmodPath(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const path = optionalStr(args, "path");
   if (!path) return toolFailure("Error: no path given.");
@@ -415,7 +459,7 @@ async function chmodPath(
   if (mode === null) {
     return toolFailure('Error: mode must be octal permissions like "644".');
   }
-  return withConn(optionalStr(args, "hostId"), async (conn, host) => {
+  return withConn(optionalStr(args, "hostId"), context, async (conn, host) => {
     await ipc.sftp.chmod(conn, path, mode);
     refreshSftpViews(host, parentPath(path));
     return toolSuccess(`Set ${path} to ${octal}.`);
@@ -505,7 +549,8 @@ export const fileTools: AiTool[] = [
     },
     icon: Folder,
     labelKey: "ai.tool.listFiles",
-    execute: async (args) => listFiles(args),
+    prepare: prepareSftpTarget,
+    execute: listFiles,
   },
   {
     spec: {
@@ -524,7 +569,8 @@ export const fileTools: AiTool[] = [
     },
     icon: FileText,
     labelKey: "ai.tool.readFile",
-    execute: async (args) => readFile(args),
+    prepare: prepareSftpTarget,
+    execute: readFile,
   },
   {
     spec: {
@@ -545,7 +591,8 @@ export const fileTools: AiTool[] = [
     icon: SquarePen,
     labelKey: "ai.tool.writeFile",
     requiresApproval: true,
-    execute: async (args) => writeFile(args),
+    prepare: prepareSftpTarget,
+    execute: writeFile,
   },
   {
     spec: {
@@ -564,7 +611,8 @@ export const fileTools: AiTool[] = [
     icon: FolderPlus,
     labelKey: "ai.tool.makeDirectory",
     requiresApproval: true,
-    execute: async (args) => makeDirectory(args),
+    prepare: prepareSftpTarget,
+    execute: makeDirectory,
   },
   {
     spec: {
@@ -584,7 +632,8 @@ export const fileTools: AiTool[] = [
     icon: FolderInput,
     labelKey: "ai.tool.movePath",
     requiresApproval: true,
-    execute: async (args) => movePath(args),
+    prepare: prepareSftpTarget,
+    execute: movePath,
   },
   {
     spec: {
@@ -608,7 +657,8 @@ export const fileTools: AiTool[] = [
     icon: Trash2,
     labelKey: "ai.tool.deleteFile",
     requiresApproval: true,
-    execute: async (args) => deleteFile(args),
+    prepare: prepareSftpTarget,
+    execute: deleteFile,
   },
   {
     spec: {
@@ -631,6 +681,7 @@ export const fileTools: AiTool[] = [
     icon: KeyRound,
     labelKey: "ai.tool.chmodPath",
     requiresApproval: true,
-    execute: async (args) => chmodPath(args),
+    prepare: prepareSftpTarget,
+    execute: chmodPath,
   },
 ];

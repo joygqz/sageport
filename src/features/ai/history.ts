@@ -81,7 +81,10 @@ function estimateMessages(messages: AiChatMessage[]): number {
 function cloneMessage(message: AiChatMessage): AiChatMessage {
   return {
     ...message,
-    toolCalls: message.toolCalls?.map((call) => ({ ...call })),
+    toolCalls: message.toolCalls?.map((call) => ({
+      ...call,
+      arguments: structuredClone(call.arguments),
+    })),
   };
 }
 
@@ -145,6 +148,21 @@ function compactTurn(
     message.content = clipped;
     compactedMessages += 1;
     total = estimateMessages(messages);
+  }
+
+  for (const message of messages) {
+    if (total <= budget) break;
+    for (const call of message.toolCalls ?? []) {
+      if (total <= budget) break;
+      const argumentTokens = estimateTextTokens(JSON.stringify(call.arguments));
+      if (argumentTokens <= 24) continue;
+      call.arguments = {
+        _omitted:
+          "Completed tool arguments omitted to fit the model context window.",
+      };
+      compactedMessages += 1;
+      total = estimateMessages(messages);
+    }
   }
 
   return { messages, compactedMessages };

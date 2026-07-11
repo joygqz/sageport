@@ -28,6 +28,7 @@ import { invalidateHosts } from "./cache";
 import { sleep } from "./terminal";
 import {
   num,
+  nullableStr,
   optionalStr,
   str,
   strArray,
@@ -150,6 +151,11 @@ async function connectHost(
   }
 
   const status = await waitForConnection(id, 30_000, context.isCancelled);
+  if (context.isCancelled?.()) {
+    return toolFailure(
+      `Error: the assistant run was stopped while connecting to "${host.label}". The terminal tab may still be open.`,
+    );
+  }
   if (status === "connected") {
     return toolSuccess(`Connected to "${host.label}". sessionId: ${id}`);
   }
@@ -171,6 +177,7 @@ async function connectHost(
 
 async function runCommandOnHosts(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const hostIds = strArray(args, "hostIds");
   const command = str(args, "command").trim();
@@ -180,11 +187,19 @@ async function runCommandOnHosts(
     );
   }
   if (!command) return toolFailure("Error: no command given.");
+  if (context.isCancelled?.()) {
+    return toolFailure("Error: the assistant run was stopped.");
+  }
 
   const results = new Map<string, BatchExecEvent>();
   await ipc.hosts.runCommand(hostIds, command, (event) => {
     results.set(event.hostId, event);
   });
+  if (context.isCancelled?.()) {
+    return toolFailure(
+      "Error: the assistant run was stopped; commands that had already started may still have completed.",
+    );
+  }
 
   const hosts = await ipc.hosts.list();
   const label = new Map(hosts.map((h) => [h.id, h.label]));
@@ -204,11 +219,18 @@ async function runCommandOnHosts(
 
 async function checkHostHealth(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
+  if (context.isCancelled?.()) {
+    return toolFailure("Error: the assistant run was stopped.");
+  }
   const requested = strArray(args, "hostIds");
   const results: HostHealthCheck[] = await ipc.hosts.checkHealth(
     requested.length ? requested : undefined,
   );
+  if (context.isCancelled?.()) {
+    return toolFailure("Error: the assistant run was stopped.");
+  }
   if (results.length === 0) return toolSuccess("No hosts to check.");
   const hosts = await ipc.hosts.list();
   const label = new Map(hosts.map((h) => [h.id, h.label]));
@@ -225,21 +247,27 @@ async function checkHostHealth(
 }
 
 function inputFromArgs(args: Record<string, unknown>, base?: Host): HostInput {
+  const groupId = nullableStr(args, "groupId");
+  const identityId = nullableStr(args, "identityId");
+  const username = nullableStr(args, "username");
+  const notes = nullableStr(args, "notes");
+  const password = nullableStr(args, "password");
   return {
     label: optionalStr(args, "label") ?? base?.label ?? "",
     address: optionalStr(args, "address") ?? base?.address ?? "",
     port: num(args, "port") ?? base?.port,
-    groupId: optionalStr(args, "groupId") ?? base?.groupId ?? null,
-    identityId: optionalStr(args, "identityId") ?? base?.identityId ?? null,
-    username: optionalStr(args, "username") ?? base?.username ?? null,
+    groupId: groupId === undefined ? (base?.groupId ?? null) : groupId,
+    identityId:
+      identityId === undefined ? (base?.identityId ?? null) : identityId,
+    username: username === undefined ? (base?.username ?? null) : username,
     authType: base?.authType ?? null,
     keyId: base?.keyId ?? null,
     osHint: base?.osHint ?? null,
     color: base?.color ?? null,
-    notes: optionalStr(args, "notes") ?? base?.notes ?? null,
+    notes: notes === undefined ? (base?.notes ?? null) : notes,
     jumpHostId: base?.jumpHostId ?? null,
     startupCommand: base?.startupCommand ?? null,
-    password: optionalStr(args, "password") ?? base?.password ?? null,
+    password: password === undefined ? (base?.password ?? null) : password,
   };
 }
 
@@ -326,17 +354,27 @@ const HOST_FIELDS = {
   label: { type: "string", description: "Display name." },
   address: { type: "string", description: "Hostname or IP address." },
   port: { type: "integer", description: "SSH port (default 22)." },
-  username: { type: "string", description: "Login user." },
+  username: {
+    type: ["string", "null"],
+    description: "Login user. Set null to clear it.",
+  },
   password: {
-    type: "string",
-    description: "Password, if using password auth.",
+    type: ["string", "null"],
+    description: "Password, if using password auth. Set null to clear it.",
   },
   identityId: {
-    type: "string",
-    description: "Saved identity id (from list_identities) to authenticate as.",
+    type: ["string", "null"],
+    description:
+      "Saved identity id (from list_identities) to authenticate as. Set null to clear it.",
   },
-  groupId: { type: "string", description: "Group id from list_groups." },
-  notes: { type: "string", description: "Free-form notes." },
+  groupId: {
+    type: ["string", "null"],
+    description: "Group id from list_groups. Set null to clear it.",
+  },
+  notes: {
+    type: ["string", "null"],
+    description: "Free-form notes. Set null to clear it.",
+  },
 } as const;
 
 export const hostTools: AiTool[] = [
@@ -373,7 +411,7 @@ export const hostTools: AiTool[] = [
     spec: {
       name: "connect_host",
       description:
-        "Connect a saved host by id and return its terminal session id. Reuses or reconnects an existing tab.",
+        "Connect a saved host by id and return its terminal session id. Reuses or reconnects an existing tab. This requires user approval in supervised mode and runs automatically in autonomous mode.",
       parameters: {
         type: "object",
         properties: {
@@ -385,6 +423,7 @@ export const hostTools: AiTool[] = [
     },
     icon: Plug,
     labelKey: "ai.tool.connectHost",
+    requiresApproval: true,
     execute: connectHost,
   },
   {
@@ -410,7 +449,7 @@ export const hostTools: AiTool[] = [
     icon: TerminalIcon,
     labelKey: "ai.tool.runCommandOnHosts",
     requiresApproval: true,
-    execute: async (args) => runCommandOnHosts(args),
+    execute: runCommandOnHosts,
   },
   {
     spec: {
@@ -431,7 +470,7 @@ export const hostTools: AiTool[] = [
     },
     icon: Activity,
     labelKey: "ai.tool.checkHostHealth",
-    execute: async (args) => checkHostHealth(args),
+    execute: checkHostHealth,
   },
   {
     spec: {

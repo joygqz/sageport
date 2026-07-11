@@ -17,6 +17,7 @@ import {
   toolFailure,
   toolSuccess,
   type AiTool,
+  type ToolExecutionContext,
   type ToolExecutionResult,
 } from "./types";
 
@@ -67,6 +68,7 @@ function formatStats(stats: HostStats): string {
 
 async function getHostStats(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
@@ -81,6 +83,9 @@ async function getHostStats(
 
   const deadline = Date.now() + 6_000;
   while (Date.now() < deadline) {
+    if (context.isCancelled?.()) {
+      return toolFailure("Error: the assistant run was stopped.");
+    }
     const entry = useMonitorStore.getState().bySession[tab.id];
     if (entry?.unsupported) {
       return toolSuccess(
@@ -115,6 +120,6 @@ export const monitorTools: AiTool[] = [
     },
     icon: Gauge,
     labelKey: "ai.tool.getHostStats",
-    execute: async (args) => getHostStats(args),
+    execute: getHostStats,
   },
 ];

@@ -5,6 +5,7 @@ import {
   buildLogFromHistory,
   completedToolStatus,
   INTERRUPTED_RESULT,
+  redactSensitiveHistory,
   repairHistory,
   truncateToolResult,
 } from "./transcript";
@@ -70,6 +71,33 @@ describe("repairHistory", () => {
       { role: "assistant", content: "hi" },
     ];
     expect(repairHistory(history)).toEqual(history);
+  });
+});
+
+describe("redactSensitiveHistory", () => {
+  it("removes tool passwords from persisted/provider history", () => {
+    const history: AiChatMessage[] = [
+      {
+        role: "assistant",
+        toolCalls: [
+          {
+            id: "call-1",
+            name: "create_host",
+            arguments: { label: "prod", password: "secret" },
+          },
+        ],
+      },
+    ];
+
+    const redacted = redactSensitiveHistory(history);
+    expect(redacted[0].toolCalls?.[0].arguments).toEqual({
+      label: "prod",
+      password: "[REDACTED]",
+    });
+    expect(history[0].toolCalls?.[0].arguments).toEqual({
+      label: "prod",
+      password: "secret",
+    });
   });
 });
 

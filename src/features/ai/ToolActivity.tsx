@@ -21,10 +21,42 @@ import {
   TOOL_CONFIRM_KEYS,
   TOOL_ICONS,
   TOOL_LABEL_KEYS,
+  TOOLS_REQUIRING_APPROVAL,
 } from "./tools";
 import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
+
+const HIDDEN_APPROVAL_KEYS = new Set(["password", "passphrase", "privateKey"]);
+
+function approvalValue(key: string, value: unknown): unknown {
+  if (HIDDEN_APPROVAL_KEYS.has(key)) {
+    return value === null || value === undefined ? value : "[provided]";
+  }
+  if (key === "content" && typeof value === "string") {
+    return `[${value.length} characters]`;
+  }
+  if (Array.isArray(value)) return value.map((item) => approvalValue("", item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(
+        ([nestedKey, item]) => [nestedKey, approvalValue(nestedKey, item)],
+      ),
+    );
+  }
+  return value;
+}
+
+function approvalSummary(args: Record<string, unknown>): string | undefined {
+  const summary = Object.fromEntries(
+    Object.entries(args)
+      .filter(([key]) => key !== "command" && key !== "sessionId")
+      .map(([key, value]) => [key, approvalValue(key, value)]),
+  );
+  return Object.keys(summary).length
+    ? JSON.stringify(summary, null, 2)
+    : undefined;
+}
 
 function transferEndpointLabel(value: unknown): string | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return;
@@ -70,6 +102,9 @@ export function ToolActivity({
     transferSource && transferDestination
       ? `${transferSource}  →  ${transferDestination}`
       : undefined;
+  const details = TOOLS_REQUIRING_APPROVAL.has(item.name)
+    ? approvalSummary(item.args)
+    : undefined;
   const targetSessionId =
     typeof item.args.sessionId === "string" ? item.args.sessionId : undefined;
   const targetTitle = useTabsStore((state) =>
@@ -125,6 +160,11 @@ export function ToolActivity({
           {!command && !transfer && path && (
             <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
               {path}
+            </pre>
+          )}
+          {details && (
+            <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap rounded bg-muted/60 p-1.5 font-mono text-[0.7rem] text-muted-foreground">
+              {details}
             </pre>
           )}
           {item.status === "awaiting-approval" && (

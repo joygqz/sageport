@@ -17,6 +17,7 @@ import type {
 import { invalidateIdentities, invalidateSshKeys } from "./cache";
 import {
   optionalStr,
+  nullableStr,
   str,
   toolFailure,
   toolSuccess,
@@ -58,14 +59,16 @@ function identityInput(
   args: Record<string, unknown>,
   base?: Identity,
 ): IdentityInput {
+  const keyId = nullableStr(args, "keyId");
+  const password = nullableStr(args, "password");
   return {
     name: optionalStr(args, "name") ?? base?.name ?? "",
     username: optionalStr(args, "username") ?? base?.username ?? "",
     authType: (optionalStr(args, "authType") ??
       base?.authType ??
       "password") as AuthType,
-    keyId: optionalStr(args, "keyId") ?? base?.keyId ?? null,
-    password: optionalStr(args, "password") ?? base?.password ?? null,
+    keyId: keyId === undefined ? (base?.keyId ?? null) : keyId,
+    password: password === undefined ? (base?.password ?? null) : password,
   };
 }
 
@@ -230,8 +233,14 @@ export const credentialTools: AiTool[] = [
           name: { type: "string" },
           username: { type: "string" },
           authType: { type: "string", enum: ["password", "key", "agent"] },
-          keyId: { type: "string" },
-          password: { type: "string" },
+          keyId: {
+            type: ["string", "null"],
+            description: "Set null to clear the key association.",
+          },
+          password: {
+            type: ["string", "null"],
+            description: "Set null to clear the saved password.",
+          },
         },
         required: ["id"],
         additionalProperties: false,

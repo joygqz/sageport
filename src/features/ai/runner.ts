@@ -5,9 +5,11 @@ import { errorCode, errorMessage } from "@/lib/toast";
 import type { AiToolCall } from "@/types/models";
 import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 import {
+  estimateTextTokens,
   historyTokenBudget,
   modelHistoryWindow,
   outputTokenBudget,
+  PROMPT_RESERVE_TOKENS,
 } from "./history";
 import { resolveModelLimits } from "./model-limits";
 import {
@@ -19,10 +21,12 @@ import {
   prepareTool,
   selectionResult,
   TOOLS_REQUIRING_APPROVAL,
+  validateToolArguments,
 } from "./tools";
 import {
   DECLINED_RESULT,
   STOPPED_RESULT,
+  redactSensitiveHistory,
   truncateToolResult,
   type RuntimeSession,
   type ToolStatus,
@@ -31,6 +35,9 @@ import {
 const MAX_STEPS = 24;
 
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
+
+const TOOL_SPEC_TOKENS = estimateTextTokens(JSON.stringify(AI_TOOL_SPECS));
+const SYSTEM_PROMPT_ALLOWANCE_TOKENS = 1_000;
 
 export interface RunnerHost {
   runtime: (sessionId: string) => RuntimeSession | undefined;
@@ -89,14 +96,43 @@ async function prepareToolCall(
   call: AiToolCall,
   userPrompt: string,
 ): Promise<PreparedToolCall> {
-  const prepared = await prepareTool(call.name, normalizeArgs(call.arguments), {
-    userPrompt,
+  const args = normalizeArgs(call.arguments);
+  const validationError = validateToolArguments(call.name, args);
+  if (validationError) {
+    return {
+      call: { ...call, arguments: args },
+      preflightError: validationError,
+    };
+  }
+  try {
+    const prepared = await prepareTool(call.name, args, { userPrompt });
+    return {
+      call: { ...call, arguments: prepared.args },
+      preflightError: prepared.preflightError,
+      automaticResult: prepared.automaticResult,
+    };
+  } catch (err) {
+    return {
+      call: { ...call, arguments: args },
+      preflightError: `Error: ${call.name} preflight failed: ${errorMessage(err)}`,
+    };
+  }
+}
+
+function uniqueToolCalls(
+  calls: AiToolCall[],
+  existing: Iterable<string> = [],
+): AiToolCall[] {
+  const seen = new Set(existing);
+  return calls.map((call) => {
+    if (!seen.has(call.id)) {
+      seen.add(call.id);
+      return call;
+    }
+    const id = `${call.id}-${crypto.randomUUID()}`;
+    seen.add(id);
+    return { ...call, id };
   });
-  return {
-    call: { ...call, arguments: prepared.args },
-    preflightError: prepared.preflightError,
-    automaticResult: prepared.automaticResult,
-  };
 }
 
 function stopped(host: RunnerHost, sessionId: string): boolean {
@@ -182,7 +218,19 @@ async function requestStep(
 
     let turnDone = false;
     try {
-      const modelHistory = modelHistoryWindow(runtime.history, run.budget);
+      const contextWithoutOmissions = buildContext(0, run.autoApprove);
+      const nonHistoryTokens =
+        TOOL_SPEC_TOKENS +
+        estimateTextTokens(contextWithoutOmissions) +
+        SYSTEM_PROMPT_ALLOWANCE_TOKENS;
+      const historyBudget = Math.max(
+        0,
+        run.budget - Math.max(0, nonHistoryTokens - PROMPT_RESERVE_TOKENS),
+      );
+      const modelHistory = modelHistoryWindow(
+        redactSensitiveHistory(runtime.history),
+        historyBudget,
+      );
       const result = await ipc.ai.chat(
         run.model,
         modelHistory.messages,
@@ -376,7 +424,12 @@ export async function runAgentLoop(
       [...history].reverse().find((message) => message.role === "user")
         ?.content ?? "";
     const preparedToolCalls = await Promise.all(
-      (result.toolCalls ?? []).map((call) => prepareToolCall(call, userPrompt)),
+      uniqueToolCalls(
+        result.toolCalls ?? [],
+        history.flatMap((message) =>
+          (message.toolCalls ?? []).map((call) => call.id),
+        ),
+      ).map((call) => prepareToolCall(call, userPrompt)),
     );
     const toolCalls = preparedToolCalls.map((x) => x.call);
     host.patch(sessionId, (r) => ({
@@ -439,15 +492,18 @@ export async function runAgentLoop(
     await host.persist(sessionId);
     if (stopped(host, sessionId)) return;
   }
+  const limitMessage = translate(detectLocale(), "ai.stepLimitReached");
   host.patch(sessionId, (r) => ({
     ...r,
+    history: [...r.history, { role: "assistant", content: limitMessage }],
     log: [
       ...r.log,
       {
         id: crypto.randomUUID(),
         kind: "assistant",
-        content: translate(detectLocale(), "ai.stepLimitReached"),
+        content: limitMessage,
       },
     ],
   }));
+  await host.persist(sessionId);
 }

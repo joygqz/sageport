@@ -646,7 +646,8 @@ export const zhCN: Dictionary = {
       baseUrlLabel: "接口地址",
       baseUrlHint: "OpenAI 兼容接口的地址通常以 /v1 结尾。",
       apiKeyLabel: "API 密钥",
-      apiKeyHint: "不会离开本设备；仅在启用同步时包含在加密备份中。",
+      apiKeyHint:
+        "仅发送到你配置的 AI 服务地址；启用同步时会包含在端到端加密备份中。",
       autonomousModeLabel: "助手模式",
       autonomousMode: "自动执行操作",
       autonomousModeHint:

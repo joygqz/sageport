@@ -17,6 +17,8 @@ import { invalidateForwards } from "./cache";
 import {
   bool,
   num,
+  nullableNum,
+  nullableStr,
   optionalStr,
   str,
   toolFailure,
@@ -62,14 +64,18 @@ function inputFromArgs(
   const kind = (optionalStr(args, "kind") ??
     base?.kind ??
     "local") as ForwardKind;
+  const targetHost = nullableStr(args, "targetHost");
+  const targetPort = nullableNum(args, "targetPort");
   return {
     hostId: optionalStr(args, "hostId") ?? base?.hostId ?? "",
     label: optionalStr(args, "label") ?? base?.label ?? "",
     kind,
     bindHost: optionalStr(args, "bindHost") ?? base?.bindHost,
     bindPort: num(args, "bindPort") ?? base?.bindPort ?? 0,
-    targetHost: optionalStr(args, "targetHost") ?? base?.targetHost ?? null,
-    targetPort: num(args, "targetPort") ?? base?.targetPort ?? null,
+    targetHost:
+      targetHost === undefined ? (base?.targetHost ?? null) : targetHost,
+    targetPort:
+      targetPort === undefined ? (base?.targetPort ?? null) : targetPort,
     autoStart:
       "autoStart" in args ? bool(args, "autoStart") : Boolean(base?.autoStart),
   };
@@ -164,12 +170,13 @@ const FORWARD_FIELDS = {
   },
   bindPort: { type: "integer", description: "Local port to listen on." },
   targetHost: {
-    type: "string",
-    description: "Remote host to reach (local forwards only).",
+    type: ["string", "null"],
+    description:
+      "Remote host to reach (local forwards only). Set null to clear it.",
   },
   targetPort: {
-    type: "integer",
-    description: "Remote port (local forwards only).",
+    type: ["integer", "null"],
+    description: "Remote port (local forwards only). Set null to clear it.",
   },
   autoStart: {
     type: "boolean",
