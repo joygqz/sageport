@@ -672,7 +672,7 @@ export const zhCN: Dictionary = {
       tools: {
         title: "助手工具",
         description:
-          "核心工具始终可用。仅开启需要的附加工具，以减少提示词长度并避免无关的工具选择。",
+          "核心工具始终可用。只开启需要的附加工具，可缩短提示词，并避免助手选用无关工具。",
         enabledSummary: "全局已启用 {enabled}/{total} 个工具",
         required: "必需",
         group: {
