@@ -185,16 +185,18 @@ function SearchBar({ sessionId }: { sessionId: string }) {
 
   const invalidRegex = Boolean(query) && toggles.regex && !isValidRegex(query);
   const hasResults = Boolean(result && result.count > 0);
-  const resultLabel = invalidRegex
-    ? t("terminal.search.invalidRegex")
-    : !query || !result || result.count === 0
-      ? t("terminal.search.noResults")
-      : result.index < 0
-        ? `${result.count}+`
-        : t("terminal.search.resultCount", {
-            current: result.index + 1,
-            total: result.count,
-          });
+  const resultLabel = !query
+    ? t("terminal.search.noResults")
+    : invalidRegex
+      ? t("terminal.search.invalidRegex")
+      : !result || result.count === 0
+        ? t("terminal.search.noResults")
+        : result.index < 0
+          ? `${result.count}+`
+          : t("terminal.search.resultCount", {
+              current: result.index + 1,
+              total: result.count,
+            });
 
   return (
     <FindBar
@@ -248,13 +250,13 @@ function SearchBar({ sessionId }: { sessionId: string }) {
       <FindActionButton
         label={t("terminal.search.previous")}
         icon={ArrowUp}
-        disabled={!query || invalidRegex}
+        disabled={!hasResults}
         onClick={() => runSearch(query, toggles, "previous", false)}
       />
       <FindActionButton
         label={t("terminal.search.next")}
         icon={ArrowDown}
-        disabled={!query || invalidRegex}
+        disabled={!hasResults}
         onClick={() => runSearch(query, toggles, "next", false)}
       />
       <FindActionButton
