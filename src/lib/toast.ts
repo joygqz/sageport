@@ -2,16 +2,23 @@ import { create } from "zustand";
 
 export type ToastKind = "info" | "success" | "warning" | "error";
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: string;
   kind: ToastKind;
   title: string;
   description?: string;
+  actions?: ToastAction[];
+  persistent?: boolean;
 }
 
 interface ToastState {
   toasts: Toast[];
-  push: (toast: Omit<Toast, "id">) => void;
+  push: (toast: Omit<Toast, "id">) => string;
   dismiss: (id: string) => void;
   pause: (id: string) => void;
   resume: (id: string) => void;
@@ -41,7 +48,8 @@ export const useToastStore = create<ToastState>((set) => ({
   push: (toast) => {
     const id = crypto.randomUUID();
     set((s) => ({ toasts: [...s.toasts, { ...toast, id }] }));
-    scheduleDismiss(id, DURATION);
+    if (!toast.persistent) scheduleDismiss(id, DURATION);
+    return id;
   },
   dismiss: (id) => {
     const timer = timers.get(id);
@@ -68,14 +76,18 @@ export const useToastStore = create<ToastState>((set) => ({
 }));
 
 export const toast = {
-  info: (title: string, description?: string) =>
-    useToastStore.getState().push({ kind: "info", title, description }),
-  success: (title: string, description?: string) =>
-    useToastStore.getState().push({ kind: "success", title, description }),
-  warning: (title: string, description?: string) =>
-    useToastStore.getState().push({ kind: "warning", title, description }),
-  error: (title: string, description?: string) =>
-    useToastStore.getState().push({ kind: "error", title, description }),
+  info: (title: string, description?: string) => {
+    useToastStore.getState().push({ kind: "info", title, description });
+  },
+  success: (title: string, description?: string) => {
+    useToastStore.getState().push({ kind: "success", title, description });
+  },
+  warning: (title: string, description?: string) => {
+    useToastStore.getState().push({ kind: "warning", title, description });
+  },
+  error: (title: string, description?: string) => {
+    useToastStore.getState().push({ kind: "error", title, description });
+  },
 };
 
 export function errorMessage(err: unknown): string {

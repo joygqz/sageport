@@ -38,9 +38,7 @@ pub fn run() {
             }
 
             let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                update::check(&handle).await;
-            });
+            tauri::async_runtime::spawn(update::run_periodic(handle));
 
             let forward_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

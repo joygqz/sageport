@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useToastStore, type ToastKind } from "@/lib/toast";
+import { Button } from "./button";
 
 const iconFor: Record<ToastKind, typeof Info> = {
   info: Info,
@@ -38,6 +39,23 @@ export function Toaster() {
                 <p className="mt-0.5 select-text break-words text-xs text-muted-foreground">
                   {t.description}
                 </p>
+              )}
+              {t.actions && t.actions.length > 0 && (
+                <div className="mt-2.5 flex gap-2">
+                  {t.actions.map((action, i) => (
+                    <Button
+                      key={action.label}
+                      size="sm"
+                      variant={i === 0 ? "primary" : "secondary"}
+                      onClick={() => {
+                        dismiss(t.id);
+                        action.onClick();
+                      }}
+                    >
+                      {action.label}
+                    </Button>
+                  ))}
+                </div>
               )}
             </div>
             <button

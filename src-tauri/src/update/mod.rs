@@ -10,6 +10,8 @@ use crate::state::AppState;
 
 pub const EVENT: &str = "update://status";
 
+const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(4 * 60 * 60);
+
 const LAST_CHECKED_AT_KEY: &str = "update.last_checked_at";
 const LAST_KNOWN_VERSION_KEY: &str = "update.last_known_version";
 const LAST_KNOWN_BODY_KEY: &str = "update.last_known_body";
@@ -69,6 +71,21 @@ async fn persist_check(pool: &SqlitePool, update: Option<&Update>) {
     };
     let _ = settings_repo::set(pool, LAST_KNOWN_VERSION_KEY, version).await;
     let _ = settings_repo::set(pool, LAST_KNOWN_BODY_KEY, body).await;
+}
+
+pub async fn run_periodic(app: AppHandle) {
+    loop {
+        let busy = matches!(
+            app.state::<AppState>().update.snapshot(),
+            UpdateStatus::Checking
+                | UpdateStatus::Downloading { .. }
+                | UpdateStatus::Ready { .. }
+        );
+        if !busy {
+            check(&app).await;
+        }
+        tokio::time::sleep(CHECK_INTERVAL).await;
+    }
 }
 
 pub async fn check(app: &AppHandle) -> UpdateStatus {

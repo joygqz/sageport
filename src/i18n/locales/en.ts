@@ -697,6 +697,7 @@ export const en = {
         upToDate: "Sageport is up to date.",
         available: "Version {version} is available.",
         install: "Download and Install",
+        details: "View Details",
         downloading: "Downloading…",
         downloadingProgress: "Downloading {percent}%",
         ready: "Version {version} is ready to install.",

@@ -678,6 +678,7 @@ export const zhCN: Dictionary = {
         upToDate: "Sageport 已是最新版本。",
         available: "发现新版本 {version}。",
         install: "下载并安装",
+        details: "查看详情",
         downloading: "正在下载…",
         downloadingProgress: "正在下载 {percent}%",
         ready: "新版本 {version} 已就绪。",
