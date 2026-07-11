@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
   Check,
@@ -44,7 +44,33 @@ const SUGGESTION_KEYS = [
   "ai.suggestion.health",
   "ai.suggestion.logs",
   "ai.suggestion.services",
+  "ai.suggestion.disk",
+  "ai.suggestion.network",
+  "ai.suggestion.processes",
+  "ai.suggestion.security",
+  "ai.suggestion.docker",
+  "ai.suggestion.updates",
+  "ai.suggestion.uptime",
 ] as const;
+
+const SUGGESTION_COUNT = 3;
+
+function sampleSuggestions(
+  count: number,
+  seed: string,
+): (typeof SUGGESTION_KEYS)[number][] {
+  const pool = [...SUGGESTION_KEYS];
+  let state = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    state = Math.imul(state ^ seed.charCodeAt(i), 16777619);
+  }
+  for (let i = pool.length - 1; i > 0; i--) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    const j = state % (i + 1);
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count);
+}
 
 export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
@@ -86,6 +112,10 @@ export function AssistantPanel({ width }: { width: number }) {
 
   const [input, setInput] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const suggestions = useMemo(
+    () => sampleSuggestions(SUGGESTION_COUNT, activeId ?? ""),
+    [activeId],
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
 
@@ -280,7 +310,7 @@ export function AssistantPanel({ width }: { width: number }) {
                     description={t("ai.empty.description")}
                   />
                   <div className="flex flex-col gap-1.5 px-2">
-                    {SUGGESTION_KEYS.map((key) => (
+                    {suggestions.map((key) => (
                       <button
                         key={key}
                         type="button"
