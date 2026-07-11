@@ -103,7 +103,9 @@ export function HostsView() {
     if (!drag || drag.from === sectionId) return;
     moveHost.mutate(
       { id: drag.id, groupId: sectionId === UNGROUPED ? null : sectionId },
-      { onError: (err) => toast.error(t("hosts.move.error"), errorMessage(err)) },
+      {
+        onError: (err) => toast.error(t("hosts.move.error"), errorMessage(err)),
+      },
     );
   };
   const sectionDragProps = (sectionId: string) => ({
@@ -342,7 +344,7 @@ export function HostsView() {
         </div>
       }
     >
-      <div className="px-1 pb-4">
+      <div className="pb-4">
         {isLoading ? null : sections.length === 0 ? (
           <EmptyState
             icon={Server}
@@ -436,7 +438,7 @@ function GroupSection({
   const header = (
     <button
       onClick={onToggle}
-      className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-list-hover hover:text-foreground"
+      className="flex w-full items-center gap-1 px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-list-hover hover:text-foreground"
     >
       {collapsed ? (
         <ChevronRight className="size-3.5 shrink-0" />
@@ -450,10 +452,7 @@ function GroupSection({
 
   return (
     <div
-      className={cn(
-        "mb-0.5 rounded-md",
-        isDropTarget && "bg-primary/10 ring-1 ring-inset ring-primary/60",
-      )}
+      className={cn(isDropTarget && "bg-list-hover")}
       onDragEnter={onDragEnter}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -542,7 +541,7 @@ function HostRow({
           onDragEnd={onDragEnd}
           onDoubleClick={() => openTerminal(host)}
           className={cn(
-            "group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover",
+            "group flex cursor-pointer items-center gap-2 py-1 pl-6 pr-2 hover:bg-list-hover",
             dragging && "opacity-50",
           )}
         >

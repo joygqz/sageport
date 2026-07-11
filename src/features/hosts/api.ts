@@ -50,9 +50,7 @@ export function useMoveHost() {
       await qc.cancelQueries({ queryKey: hostKeys.hosts });
       const previous = qc.getQueryData<Host[]>(hostKeys.hosts);
       qc.setQueryData<Host[]>(hostKeys.hosts, (current) =>
-        current?.map((host) =>
-          host.id === id ? { ...host, groupId } : host,
-        ),
+        current?.map((host) => (host.id === id ? { ...host, groupId } : host)),
       );
       return { previous };
     },

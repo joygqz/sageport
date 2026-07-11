@@ -94,11 +94,11 @@ function Section({
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="mb-1 px-1">
+    <div className="mb-1">
       <div className="group flex items-center">
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-list-hover hover:text-foreground"
+          className="flex min-w-0 flex-1 items-center gap-1 px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-list-hover hover:text-foreground"
         >
           {collapsed ? (
             <ChevronRight className="size-3.5 shrink-0" />
@@ -195,7 +195,7 @@ function KeyRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover">
+        <div className="group flex cursor-pointer items-center gap-2 py-1 pl-6 pr-2 hover:bg-list-hover">
           <KeyRound className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate text-sm">{sshKey.name}</span>
           {tag && <Badge className="font-mono text-2xs uppercase">{tag}</Badge>}
@@ -283,7 +283,7 @@ function IdentityList({
           <ContextMenuTrigger asChild>
             <div
               onDoubleClick={() => onEdit(identity)}
-              className="group flex cursor-pointer items-center gap-2 rounded-md py-1 pl-6 pr-2 hover:bg-list-hover"
+              className="group flex cursor-pointer items-center gap-2 py-1 pl-6 pr-2 hover:bg-list-hover"
             >
               <User className="size-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate text-sm">{identity.name}</span>

@@ -98,7 +98,7 @@ export function ForwardsView() {
         </Tooltip>
       }
     >
-      <div className="px-1 pb-4">
+      <div className="pb-4">
         {forwards.length === 0 ? (
           <EmptyState
             icon={Network}
@@ -124,7 +124,7 @@ export function ForwardsView() {
               <ContextMenu key={forward.id}>
                 <ContextMenuTrigger asChild>
                   <div
-                    className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-list-hover"
+                    className="group flex items-center gap-2 px-2 py-1.5 hover:bg-list-hover"
                     title={statusMessage}
                   >
                     <Circle

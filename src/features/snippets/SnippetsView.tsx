@@ -5,6 +5,7 @@ import {
   Plus,
   Server,
   SquareTerminal,
+  Terminal,
   Trash2,
 } from "lucide-react";
 
@@ -95,7 +96,7 @@ export function SnippetsView() {
         </Tooltip>
       }
     >
-      <div className="px-1 pb-4">
+      <div className="pb-4">
         {snippets.length === 0 ? (
           <EmptyState
             icon={SquareTerminal}
@@ -116,8 +117,9 @@ export function SnippetsView() {
               <ContextMenuTrigger asChild>
                 <div
                   onDoubleClick={() => run(snippet)}
-                  className="group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-list-hover"
+                  className="group flex cursor-pointer items-center gap-2 px-2 py-1.5 hover:bg-list-hover"
                 >
+                  <Terminal className="size-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{snippet.name}</p>
                     <p className="truncate font-mono text-2xs text-muted-foreground">
