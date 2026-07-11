@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowUp,
   Check,
@@ -40,50 +40,11 @@ import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
 const EMPTY_LOG: AgentLogItem[] = [];
 
-const SUGGESTION_GROUPS = [
-  ["ai.suggestion.health", "ai.suggestion.disk", "ai.suggestion.docker"],
-  [
-    "ai.suggestion.snippetSave",
-    "ai.suggestion.snippetRun",
-    "ai.suggestion.snippetVar",
-  ],
-  [
-    "ai.suggestion.forwardCreate",
-    "ai.suggestion.forwardList",
-    "ai.suggestion.forwardSocks",
-  ],
-  [
-    "ai.suggestion.fileRead",
-    "ai.suggestion.fileEdit",
-    "ai.suggestion.fileBrowse",
-  ],
-  [
-    "ai.suggestion.multiHost",
-    "ai.suggestion.hostHealth",
-    "ai.suggestion.hostBatch",
-  ],
+const SUGGESTIONS = [
+  "ai.suggestion.logs",
+  "ai.suggestion.hosts",
+  "ai.suggestion.snippets",
 ] as const;
-
-type SuggestionKey = (typeof SUGGESTION_GROUPS)[number][number];
-
-const SUGGESTION_COUNT = 3;
-
-function sampleSuggestions(count: number, seed: string): SuggestionKey[] {
-  let state = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    state = Math.imul(state ^ seed.charCodeAt(i), 16777619);
-  }
-  const next = () => {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    return state;
-  };
-  const groups = SUGGESTION_GROUPS.map((group) => group);
-  for (let i = groups.length - 1; i > 0; i--) {
-    const j = next() % (i + 1);
-    [groups[i], groups[j]] = [groups[j], groups[i]];
-  }
-  return groups.slice(0, count).map((group) => group[next() % group.length]);
-}
 
 export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
@@ -125,10 +86,6 @@ export function AssistantPanel({ width }: { width: number }) {
 
   const [input, setInput] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const suggestions = useMemo(
-    () => sampleSuggestions(SUGGESTION_COUNT, activeId ?? ""),
-    [activeId],
-  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -350,7 +307,7 @@ export function AssistantPanel({ width }: { width: number }) {
                     )}
                   />
                   <div className="flex flex-col gap-1.5 px-2">
-                    {suggestions.map((key) => (
+                    {SUGGESTIONS.map((key) => (
                       <button
                         key={key}
                         type="button"

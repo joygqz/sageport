@@ -532,24 +532,9 @@ export const en = {
         "Autonomous mode is on. The assistant can run operations without asking for each approval; stop it at any time.",
     },
     suggestion: {
-      health: "Give my server a health check — summarize CPU, memory, and disk",
-      disk: "Find the directories and files eating the most disk space",
-      docker:
-        "Check which Docker containers are running and their resource use",
-      snippetSave: "Save a command I run often as a reusable snippet",
-      snippetRun: "Run one of my saved command snippets on this server",
-      snippetVar: "Turn a command into a snippet with variables I can fill in",
-      forwardCreate:
-        "Set up a port forward from a remote service to my machine",
-      forwardList: "Show my port forwards and which ones are running",
-      forwardSocks: "Start a dynamic SOCKS proxy to reach an internal network",
-      fileRead: "Read a remote config file and suggest improvements",
-      fileEdit: "Edit a config file on the server and save it back",
-      fileBrowse: "Browse a remote directory and list what's inside",
-      multiHost: "Run a disk-space check across several of my hosts at once",
-      hostHealth:
-        "Check which of my hosts are online right now and their latency",
-      hostBatch: "Run the same command on a few selected hosts at once",
+      logs: "Review this host's system logs and help troubleshoot issues",
+      hosts: "Check the availability and connection latency of all hosts",
+      snippets: "Review and organize my saved command snippets",
     },
     newChat: "New Chat",
     history: "Chat History",
