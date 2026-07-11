@@ -23,6 +23,10 @@ export function applyTerminalFontSize(size: number) {
   for (const session of sessions.values()) session.setFontSize(size);
 }
 
+export function applyTerminalFontFamily(family: string) {
+  for (const session of sessions.values()) session.setFontFamily(family);
+}
+
 export function readTerminalContext(
   id: string | null,
   maxLines = 60,

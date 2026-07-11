@@ -7,11 +7,7 @@ import type { TerminalStatus } from "@/workbench/tabs";
 import { CommandTracker } from "./commands";
 import { hasHostKeyPrompt, useHostKeyStore } from "./host-key";
 import type { TerminalStatusUpdate, TerminalTransport } from "./transport";
-import {
-  attachWebglRenderer,
-  createTerminal,
-  TERMINAL_FONT_FAMILY,
-} from "./xterm";
+import { attachWebglRenderer, createTerminal } from "./xterm";
 
 const CONNECT_TIMEOUT_MS = 45_000;
 const COLUMN_RESIZE_DEBOUNCE_MS = 100;
@@ -25,6 +21,7 @@ export interface SessionStatusEvent {
 export interface TerminalSessionOptions {
   id: string;
   transport: TerminalTransport;
+  fontFamily: string;
   fontSize: number;
   theme: ITheme;
   watchHostKey: boolean;
@@ -63,6 +60,7 @@ export class TerminalSession {
     this.transport = opts.transport;
 
     const { term, fit, search } = createTerminal({
+      fontFamily: opts.fontFamily,
       fontSize: opts.fontSize,
       theme: opts.theme,
     });
@@ -95,7 +93,7 @@ export class TerminalSession {
   private async open(container: HTMLElement) {
     try {
       await document.fonts.load(
-        `${this.term.options.fontSize ?? 13}px ${TERMINAL_FONT_FAMILY}`,
+        `${this.term.options.fontSize ?? 13}px ${this.term.options.fontFamily}`,
       );
     } catch {}
     if (this.disposed) return;
@@ -147,6 +145,16 @@ export class TerminalSession {
     try {
       this.fit.fit();
     } catch {}
+  }
+
+  setFontFamily(family: string) {
+    if (family === this.term.options.fontFamily) return;
+    this.term.options.fontFamily = family;
+    if (!this.container) return;
+    try {
+      this.fit.fit();
+    } catch {}
+    this.term.refresh(0, this.term.rows - 1);
   }
 
   setTheme(theme: ITheme) {

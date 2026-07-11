@@ -25,6 +25,7 @@ import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { THEMES, useTheme, type ThemeDefinition } from "@/themes";
+import { useFontStore } from "@/workbench/font";
 import { useTabsStore, type SettingsSection } from "@/workbench/tabs";
 import {
   useZoomStore,
@@ -148,8 +149,41 @@ function AppearanceSection() {
         </Select>
       </Field>
 
+      <FontField />
+
       <ZoomField />
     </div>
+  );
+}
+
+function FontField() {
+  const { t } = useI18n();
+  const family = useFontStore((s) => s.family);
+  const setFamily = useFontStore((s) => s.setFamily);
+  const [draft, setDraft] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (draft === null) return;
+    const timer = setTimeout(() => {
+      setFamily(draft);
+      setDraft(null);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [draft, setFamily]);
+
+  return (
+    <Field
+      label={t("settings.appearance.fontFamily")}
+      hint={t("settings.appearance.fontFamilyHint")}
+    >
+      <Input
+        value={draft ?? family}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder='"JetBrains Mono Variable"'
+        autoComplete="off"
+        spellCheck={false}
+      />
+    </Field>
   );
 }
 

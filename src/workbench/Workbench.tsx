@@ -12,6 +12,7 @@ import { HostKeyDialog } from "@/features/terminal/HostKeyDialog";
 import { ActivityBar } from "./ActivityBar";
 import { CommandPalette } from "./CommandPalette";
 import { EditorArea } from "./EditorArea";
+import { FONT_SYNC_KEY, useFontStore } from "./font";
 import { useKeybindings } from "./keybindings";
 import {
   auxLimits,
@@ -73,6 +74,16 @@ export function Workbench() {
       if (state.level !== prev.level) pushZoom(String(state.level));
     });
   }, [pushZoom]);
+
+  const fontFamily = useFontStore((s) => s.family);
+  const pushFont = useSettingSync(FONT_SYNC_KEY, fontFamily, (remote) => {
+    useFontStore.getState().setFamily(remote);
+  });
+  useEffect(() => {
+    return useFontStore.subscribe((state, prev) => {
+      if (state.family !== prev.family) pushFont(state.family);
+    });
+  }, [pushFont]);
 
   useEffect(() => {
     if (!IS_MACOS) return;

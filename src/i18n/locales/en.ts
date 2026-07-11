@@ -548,6 +548,9 @@ export const en = {
       lightThemes: "Light themes",
       language: "Language",
       languageHint: "Sets the display language of the app.",
+      fontFamily: "Font Family",
+      fontFamilyHint:
+        "Applies to the terminal and file editor. Separate multiple fonts with commas; leave empty for the default font.",
       zoom: "Zoom",
       zoomHint:
         "Scales the whole interface, including the terminal. Shortcuts:",

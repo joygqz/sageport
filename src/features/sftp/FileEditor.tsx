@@ -4,6 +4,7 @@ import { HardDrive, Server } from "lucide-react";
 
 import { Spinner } from "@/components/ui";
 import { useTheme } from "@/themes";
+import { monoFontFamily, useFontStore } from "@/workbench/font";
 import { useTabsStore, type FileTab } from "@/workbench/tabs";
 import { useZoomStore, zoomFactor } from "@/workbench/zoom";
 import { registerFileEditor, unregisterFileEditor } from "./editor-registry";
@@ -69,9 +70,7 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
 
     const editor = monaco.editor.create(hostRef.current!, {
       model,
-      fontFamily: getComputedStyle(document.documentElement)
-        .getPropertyValue("--font-mono")
-        .trim(),
+      fontFamily: monoFontFamily(),
       fontSize: editorFontSize(useZoomStore.getState().level),
       automaticLayout: true,
       renderWhitespace: "boundary",
@@ -90,11 +89,15 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
     const unsubscribeZoom = useZoomStore.subscribe((s) => {
       editor.updateOptions({ fontSize: editorFontSize(s.level) });
     });
+    const unsubscribeFont = useFontStore.subscribe((s) => {
+      editor.updateOptions({ fontFamily: monoFontFamily(s.family) });
+    });
 
     registerFileEditor(tabId, editor);
     if (useTabsStore.getState().activeId === tabId) editor.focus();
 
     return () => {
+      unsubscribeFont();
       unsubscribeZoom();
       contentSub.dispose();
       unregisterFileEditor(tabId);

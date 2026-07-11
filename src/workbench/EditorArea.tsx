@@ -211,7 +211,9 @@ function TabItem({
           : "bg-surface text-muted-foreground hover:text-foreground",
       )}
     >
-      {active && <span className="absolute -inset-x-px top-0 h-px bg-primary" />}
+      {active && (
+        <span className="absolute -inset-x-px top-0 h-px bg-primary" />
+      )}
 
       {tab.kind === "terminal" ? (
         <span className="relative flex shrink-0 items-center justify-center">

@@ -11,12 +11,12 @@ import {
 import { Button, Input } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { useTheme } from "@/themes";
+import { monoFontFamily, useFontStore } from "@/workbench/font";
 import { useTabsStore, type TerminalTab } from "@/workbench/tabs";
 import { terminalFontSize, useZoomStore } from "@/workbench/zoom";
 import { useTerminalSearch } from "./search";
 import { focusTerminal, getSession } from "./sessions";
 import { TerminalView } from "./TerminalView";
-import { TERMINAL_FONT_FAMILY } from "./xterm";
 
 export function TerminalEditor({
   tab,
@@ -52,6 +52,7 @@ export function TerminalEditor({
 function StickyCommand({ sessionId }: { sessionId: string }) {
   const [sticky, setSticky] = useState<{ text: string; line: number }>();
   useZoomStore((s) => s.level);
+  useFontStore((s) => s.family);
 
   useEffect(() => {
     const session = getSession(sessionId);
@@ -83,7 +84,7 @@ function StickyCommand({ sessionId }: { sessionId: string }) {
       className="absolute inset-x-0 top-0 z-10 block overflow-hidden text-ellipsis whitespace-pre border-b border-border bg-terminal-background text-left shadow-sm"
       style={{
         color: "var(--terminal-foreground)",
-        fontFamily: TERMINAL_FONT_FAMILY,
+        fontFamily: monoFontFamily(),
         fontSize: terminalFontSize(),
         lineHeight: 1.25,
         paddingLeft: 20,

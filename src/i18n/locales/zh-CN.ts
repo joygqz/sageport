@@ -535,6 +535,9 @@ export const zhCN: Dictionary = {
       lightThemes: "浅色主题",
       language: "语言",
       languageHint: "设置应用的显示语言。",
+      fontFamily: "字体",
+      fontFamilyHint:
+        "应用于终端和文件编辑器。多个字体用逗号分隔；留空使用默认字体。",
       zoom: "缩放",
       zoomHint: "缩放整个界面，包括终端。快捷键：",
       zoomIn: "放大",

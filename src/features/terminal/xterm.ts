@@ -10,9 +10,6 @@ import "@xterm/xterm/css/xterm.css";
 
 import type { ThemeDefinition } from "@/themes";
 
-export const TERMINAL_FONT_FAMILY =
-  '"JetBrains Mono Variable", "SFMono-Regular", ui-monospace, Menlo, monospace';
-
 export function terminalTheme(theme: ThemeDefinition): ITheme {
   return {
     ...theme.terminal,
@@ -30,12 +27,13 @@ export interface TerminalInstance {
 }
 
 export function createTerminal(opts: {
+  fontFamily: string;
   fontSize: number;
   theme: ITheme;
 }): TerminalInstance {
   const term = new XTerm({
     allowProposedApi: true,
-    fontFamily: TERMINAL_FONT_FAMILY,
+    fontFamily: opts.fontFamily,
     fontSize: opts.fontSize,
     lineHeight: 1.25,
     theme: opts.theme,

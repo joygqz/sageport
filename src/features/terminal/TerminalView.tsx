@@ -8,6 +8,7 @@ import {
   type AdhocTarget,
   type TerminalTarget,
 } from "@/workbench/tabs";
+import { monoFontFamily } from "@/workbench/font";
 import { terminalFontSize } from "@/workbench/zoom";
 import { createAutocomplete } from "./autocomplete/controller";
 import { useBroadcastStore } from "./broadcast";
@@ -72,6 +73,7 @@ export function TerminalView({
     const session = new TerminalSession({
       id: sessionId,
       transport,
+      fontFamily: monoFontFamily(),
       fontSize: terminalFontSize(),
       theme: terminalTheme(theme),
       watchHostKey: isSshLike,
