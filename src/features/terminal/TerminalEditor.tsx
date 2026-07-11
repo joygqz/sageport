@@ -161,10 +161,11 @@ function SearchBar({ sessionId }: { sessionId: string }) {
       regex: nextToggles.regex,
       incremental: direction === "next" && incremental,
       decorations: {
-        matchBackground: `${theme.terminal.yellow}55`,
-        matchOverviewRuler: theme.terminal.yellow,
-        activeMatchBackground: `${theme.colors.primary}77`,
-        activeMatchColorOverviewRuler: theme.colors.primary,
+        matchBackground: theme.terminal.selectionBackground,
+        matchOverviewRuler: theme.terminal.selectionBackground,
+        activeMatchBackground: theme.terminal.selectionBackground,
+        activeMatchBorder: theme.terminal.cursor,
+        activeMatchColorOverviewRuler: theme.terminal.selectionBackground,
       },
     };
     if (direction === "next") search.findNext(text, options);
