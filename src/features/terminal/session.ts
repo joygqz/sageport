@@ -56,6 +56,7 @@ export class TerminalSession {
   private colsTimer: ReturnType<typeof setTimeout> | undefined;
   private fitQueued = false;
   private opened = false;
+  private opening = false;
   private pendingFocus = false;
 
   constructor(opts: TerminalSessionOptions) {
@@ -99,7 +100,14 @@ export class TerminalSession {
       this.refit();
       return;
     }
-    void this.open(container);
+    // React StrictMode can mount, detach, and remount this view while the
+    // asynchronous font load below is still pending. Only one open may run:
+    // a second one would subscribe to transport data again and render every
+    // incoming byte twice.
+    if (!this.opening) {
+      this.opening = true;
+      void this.open();
+    }
   }
 
   detach() {
@@ -109,25 +117,33 @@ export class TerminalSession {
     this.container = null;
   }
 
-  private async open(container: HTMLElement) {
+  private async open() {
     try {
-      await document.fonts.load(
-        `${this.term.options.fontSize ?? 13}px ${this.term.options.fontFamily}`,
-      );
-    } catch {}
-    if (this.disposed) return;
-    this.term.open(container);
-    attachWebglRenderer(this.term);
-    try {
-      this.fit.fit();
-    } catch {}
-    this.opened = true;
-    if (this.pendingFocus) {
-      this.pendingFocus = false;
-      this.term.focus();
+      try {
+        await document.fonts.load(
+          `${this.term.options.fontSize ?? 13}px ${this.term.options.fontFamily}`,
+        );
+      } catch {}
+      if (this.disposed || this.opened || !this.container) return;
+
+      // Read the container after awaiting fonts. The original container may
+      // have been detached and replaced during a StrictMode remount.
+      const container = this.container;
+      this.term.open(container);
+      attachWebglRenderer(this.term);
+      try {
+        this.fit.fit();
+      } catch {}
+      this.opened = true;
+      if (this.pendingFocus) {
+        this.pendingFocus = false;
+        this.term.focus();
+      }
+      this.observe(container);
+      void this.start();
+    } finally {
+      this.opening = false;
     }
-    this.observe(container);
-    void this.start();
   }
 
   refit() {
