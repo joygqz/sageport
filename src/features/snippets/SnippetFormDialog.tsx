@@ -79,7 +79,11 @@ function SnippetFormBody({
           placeholder={t("snippets.namePlaceholder")}
         />
       </Field>
-      <Field label={t("snippets.command")} required>
+      <Field
+        label={t("snippets.command")}
+        hint={t("snippets.commandHint")}
+        required
+      >
         <Textarea
           rows={3}
           value={command}

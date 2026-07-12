@@ -10,6 +10,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <input
         type={type}
         ref={ref}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
         className={cn(
           "flex h-9 w-full rounded-md border border-input bg-surface px-3 py-1 text-sm transition-colors",
           "placeholder:text-muted-foreground",

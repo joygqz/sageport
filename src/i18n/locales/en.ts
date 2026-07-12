@@ -428,6 +428,8 @@ export const en = {
     namePlaceholder: "Tail nginx errors",
     command: "Command",
     commandPlaceholder: "tail -f /var/log/nginx/error.log",
+    commandHint:
+      "Add {{name}} for a value you fill in each run, or {{name:default}} to preset one.",
     description: "Description",
     descriptionPlaceholder: "Optional",
     empty: {

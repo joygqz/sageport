@@ -420,6 +420,7 @@ export const zhCN: Dictionary = {
     namePlaceholder: "查看 nginx 错误日志",
     command: "命令",
     commandPlaceholder: "tail -f /var/log/nginx/error.log",
+    commandHint: "用 {{name}} 添加每次运行时填写的变量，或用 {{name:default}} 预设默认值。",
     description: "描述",
     descriptionPlaceholder: "选填",
     empty: {
