@@ -58,6 +58,17 @@ impl UpdateManager {
     }
 }
 
+pub fn can_self_update() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        std::env::var_os("APPIMAGE").is_some()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        true
+    }
+}
+
 fn set_status(app: &AppHandle, mgr: &UpdateManager, status: UpdateStatus) {
     *mgr.status.lock() = status.clone();
     let _ = app.emit(EVENT, status);

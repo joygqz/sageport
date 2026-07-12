@@ -1,11 +1,12 @@
 import { useEffect } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { useToastStore } from "@/lib/toast";
 import { useTabsStore } from "@/workbench/tabs";
-import { useUpdateStatus } from "./api";
+import { RELEASES_URL, useCanSelfUpdate, useUpdateStatus } from "./api";
 
 const notified = new Set<string>();
 let availableToastId: string | null = null;
@@ -13,6 +14,7 @@ let availableToastId: string | null = null;
 export function useUpdateNotifier() {
   const { t } = useI18n();
   const state = useUpdateStatus();
+  const canSelfUpdate = useCanSelfUpdate();
 
   useEffect(() => {
     const { push, dismiss } = useToastStore.getState();
@@ -27,23 +29,38 @@ export function useUpdateNotifier() {
 
     if (state.status === "available" && !notified.has(state.version)) {
       notified.add(state.version);
-      availableToastId = push({
-        kind: "info",
-        title: t("settings.about.update.available", {
-          version: state.version,
-        }),
-        persistent: true,
-        actions: [
-          {
-            label: t("settings.about.update.install"),
-            onClick: () => void ipc.update.install(),
-          },
-          {
-            label: t("settings.about.update.details"),
-            onClick: () => useTabsStore.getState().openSettings("about"),
-          },
-        ],
-      });
+      if (canSelfUpdate) {
+        availableToastId = push({
+          kind: "info",
+          title: t("settings.about.update.available", {
+            version: state.version,
+          }),
+          persistent: true,
+          actions: [
+            {
+              label: t("settings.about.update.install"),
+              onClick: () => void ipc.update.install(),
+            },
+            {
+              label: t("settings.about.update.details"),
+              onClick: () => useTabsStore.getState().openSettings("about"),
+            },
+          ],
+        });
+      } else {
+        push({
+          kind: "info",
+          title: t("settings.about.update.available", {
+            version: state.version,
+          }),
+          actions: [
+            {
+              label: t("settings.about.update.viewRelease"),
+              onClick: () => void openUrl(RELEASES_URL),
+            },
+          ],
+        });
+      }
     }
 
     if (state.status === "ready" && !notified.has(`ready:${state.version}`)) {
@@ -60,5 +77,5 @@ export function useUpdateNotifier() {
         ],
       });
     }
-  }, [state, t]);
+  }, [state, t, canSelfUpdate]);
 }

@@ -6,7 +6,11 @@ import { Badge, Button, Spinner } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import type { UpdateStatus } from "@/types/models";
-import { useUpdateStatus } from "@/features/updates/api";
+import {
+  RELEASES_URL,
+  useCanSelfUpdate,
+  useUpdateStatus,
+} from "@/features/updates/api";
 
 const AUTHOR_NAME = "Quincy Zhang";
 const AUTHOR_URL = "https://github.com/joygqz";
@@ -14,6 +18,7 @@ const AUTHOR_URL = "https://github.com/joygqz";
 export function AboutSection() {
   const { t } = useI18n();
   const state = useUpdateStatus();
+  const canSelfUpdate = useCanSelfUpdate();
 
   return (
     <div className="flex flex-col gap-6">
@@ -59,11 +64,16 @@ export function AboutSection() {
               </Button>
             )}
 
-            {state.status === "available" && (
-              <Button size="sm" onClick={() => void ipc.update.install()}>
-                {t("settings.about.update.install")}
-              </Button>
-            )}
+            {state.status === "available" &&
+              (canSelfUpdate ? (
+                <Button size="sm" onClick={() => void ipc.update.install()}>
+                  {t("settings.about.update.install")}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => void openUrl(RELEASES_URL)}>
+                  {t("settings.about.update.viewRelease")}
+                </Button>
+              ))}
 
             {state.status === "downloading" && (
               <Button variant="secondary" size="sm" disabled loading>

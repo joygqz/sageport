@@ -356,6 +356,7 @@ export const ipc = {
   },
   update: {
     status: () => invoke<UpdateStatus>("update_status"),
+    canSelfUpdate: () => invoke<boolean>("update_can_self_update"),
     check: () => invoke<UpdateStatus>("update_check"),
     install: () => invoke<UpdateStatus>("update_install"),
     onStatus: (handler: (e: UpdateStatus) => void): Promise<UnlistenFn> =>

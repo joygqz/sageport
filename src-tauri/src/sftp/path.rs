@@ -80,7 +80,7 @@ pub fn clean_local_path(path: &Path) -> PathBuf {
 }
 
 pub fn normalize_local_path(path: &Path) -> PathBuf {
-    let absolute = std::fs::canonicalize(path).unwrap_or_else(|_| {
+    let absolute = dunce::canonicalize(path).unwrap_or_else(|_| {
         if path.is_absolute() {
             path.to_path_buf()
         } else {

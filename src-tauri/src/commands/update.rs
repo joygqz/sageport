@@ -9,6 +9,11 @@ pub fn update_status(state: State<'_, AppState>) -> UpdateStatus {
 }
 
 #[tauri::command]
+pub fn update_can_self_update() -> bool {
+    update::can_self_update()
+}
+
+#[tauri::command]
 pub async fn update_check(app: AppHandle) -> UpdateStatus {
     update::check(&app).await
 }

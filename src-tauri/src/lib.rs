@@ -153,6 +153,7 @@ pub fn run() {
             commands::sync::sync_file_import,
             commands::window::window_set_traffic_light_inset,
             commands::update::update_status,
+            commands::update::update_can_self_update,
             commands::update::update_check,
             commands::update::update_install,
             commands::ai::ai_get_config,

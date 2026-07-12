@@ -109,7 +109,7 @@
     sans-serif;
   --font-mono:
     "JetBrains Mono Variable", "SFMono-Regular", ui-monospace, "Menlo",
-    monospace;
+    "Cascadia Code", "Consolas", monospace;
 
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
