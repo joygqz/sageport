@@ -1,4 +1,3 @@
-<!-- GENERATED from scripts/logo.svg — edit that file and run `pnpm icon` -->
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="tunnel" x1="736" y1="268" x2="288" y2="756" gradientUnits="userSpaceOnUse">

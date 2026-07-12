@@ -74,8 +74,7 @@ try {
 if (isSvg) {
   writeFileSync(
     join(root, "src", "assets", "app-logo.svg"),
-    "<!-- GENERATED from scripts/logo.svg — edit that file and run `pnpm icon` -->\n" +
-      readFileSync(source, "utf8"),
+    readFileSync(source, "utf8"),
   );
   log("copied → src/assets/app-logo.svg (title-bar logo)");
 }
