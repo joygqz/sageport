@@ -44,7 +44,8 @@ function RunBody({
   const preview = substitute(snippet.command, values);
 
   const isFilled = (variable: (typeof variables)[number]) =>
-    Boolean(variable.defaultValue) || (values[variable.name] ?? "").trim() !== "";
+    Boolean(variable.defaultValue) ||
+    (values[variable.name] ?? "").trim() !== "";
   const canRun = variables.every(isFilled);
 
   return (

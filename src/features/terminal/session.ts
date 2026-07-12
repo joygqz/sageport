@@ -100,10 +100,6 @@ export class TerminalSession {
       this.refit();
       return;
     }
-    // React StrictMode can mount, detach, and remount this view while the
-    // asynchronous font load below is still pending. Only one open may run:
-    // a second one would subscribe to transport data again and render every
-    // incoming byte twice.
     if (!this.opening) {
       this.opening = true;
       void this.open();
@@ -126,8 +122,6 @@ export class TerminalSession {
       } catch {}
       if (this.disposed || this.opened || !this.container) return;
 
-      // Read the container after awaiting fonts. The original container may
-      // have been detached and replaced during a StrictMode remount.
       const container = this.container;
       this.term.open(container);
       attachWebglRenderer(this.term);

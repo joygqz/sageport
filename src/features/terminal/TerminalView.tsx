@@ -141,15 +141,9 @@ export function TerminalView({
     session.attach(containerRef.current!);
 
     return () => {
-      // A Tab drag can temporarily remount this view. Keep the terminal and
-      // its SSH transport alive; the next view simply reattaches it. Closing
-      // the Tab or starting a real reconnect calls disposeSession instead.
       session.detach();
       if (sessionRef.current === session) sessionRef.current = null;
     };
-    // This effect owns the connection lifetime. Keep presentation-only values
-    // (theme and translations) out of its dependencies so tab re-renders and
-    // visual updates can never dispose and recreate a live terminal.
   }, [sessionId, target, hostId, adhoc, attempt, connectionKey]);
 
   useEffect(() => {

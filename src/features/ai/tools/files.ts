@@ -333,7 +333,6 @@ async function transferFile(
   let waiter:
     { completion: Promise<TransferEvent>; cleanup: () => void } | undefined;
   try {
-    // Register before starting so a fast completion event cannot be missed.
     waiter = await createTransferWaiter(transferId, context);
     await ipc.sftp.transfer(
       transferId,
