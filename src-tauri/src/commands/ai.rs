@@ -12,6 +12,7 @@ const PROTOCOL_SETTING: &str = "ai.protocol";
 const MODEL_SETTING: &str = "ai.model";
 const AUTO_APPROVE_SETTING: &str = "ai.auto_approve";
 const ENABLED_TOOLS_SETTING: &str = "ai.enabled_tools";
+const MAX_HISTORY_TOKENS_SETTING: &str = "ai.max_history_tokens";
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +23,7 @@ pub struct AiConfig {
     pub model: String,
     pub auto_approve: bool,
     pub enabled_tools: Vec<String>,
+    pub max_history_tokens: Option<u32>,
 }
 
 #[derive(serde::Deserialize)]
@@ -34,6 +36,8 @@ pub struct AiConfigInput {
     pub auto_approve: bool,
     #[serde(default)]
     pub enabled_tools: Vec<String>,
+    #[serde(default)]
+    pub max_history_tokens: Option<u32>,
 }
 
 async fn stored_protocol(state: &AppState) -> AppResult<Protocol> {
@@ -78,6 +82,10 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
         .await?
         .and_then(|value| serde_json::from_str::<Vec<String>>(&value).ok())
         .unwrap_or_default();
+    let max_history_tokens = settings_repo::get(&state.db, MAX_HISTORY_TOKENS_SETTING)
+        .await?
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .filter(|value| *value > 0);
     Ok(AiConfig {
         api_key,
         base_url,
@@ -85,6 +93,7 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
         model,
         auto_approve,
         enabled_tools,
+        max_history_tokens,
     })
 }
 
@@ -124,6 +133,16 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
         &state.db,
         ENABLED_TOOLS_SETTING,
         &serde_json::to_string(&enabled_tools)?,
+    )
+    .await?;
+    settings_repo::set(
+        &state.db,
+        MAX_HISTORY_TOKENS_SETTING,
+        &input
+            .max_history_tokens
+            .filter(|value| *value > 0)
+            .map(|value| value.to_string())
+            .unwrap_or_default(),
     )
     .await?;
     Ok(())

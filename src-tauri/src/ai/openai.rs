@@ -3,7 +3,7 @@ use serde_json::{json, Map, Value};
 
 use crate::error::{AppError, AppResult};
 
-use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec};
+use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec, Usage};
 
 fn max_tokens_key(model: &str) -> &'static str {
     let name = model.rsplit('/').next().unwrap_or(model);
@@ -39,6 +39,7 @@ pub(super) fn request_body(
     let mut body = json!({
         "model": model,
         "messages": out,
+        "stream_options": { "include_usage": true },
     });
     body[max_tokens_key(model)] = json!(max_tokens);
     if !tools.is_empty() {
@@ -101,6 +102,7 @@ fn message_to_json(m: &ChatMessage) -> Value {
 pub(super) struct StreamAccumulator {
     content: String,
     tool_calls: Vec<PartialToolCall>,
+    usage: Option<Usage>,
 }
 
 #[derive(Default)]
@@ -115,6 +117,12 @@ impl StreamAccumulator {
         let Ok(chunk) = serde_json::from_str::<StreamChunk>(data) else {
             return;
         };
+        if let Some(usage) = chunk.usage {
+            self.usage = Some(Usage {
+                input_tokens: usage.prompt_tokens,
+                output_tokens: usage.completion_tokens,
+            });
+        }
         for choice in chunk.choices {
             let delta = choice.delta;
             if let Some(text) = delta.content.filter(|t| !t.is_empty()) {
@@ -178,6 +186,7 @@ impl StreamAccumulator {
         Ok(ChatResult {
             content,
             tool_calls,
+            usage: self.usage,
         })
     }
 }
@@ -186,6 +195,16 @@ impl StreamAccumulator {
 struct StreamChunk {
     #[serde(default)]
     choices: Vec<StreamChoice>,
+    #[serde(default)]
+    usage: Option<StreamUsage>,
+}
+
+#[derive(Deserialize)]
+struct StreamUsage {
+    #[serde(default)]
+    prompt_tokens: u32,
+    #[serde(default)]
+    completion_tokens: u32,
 }
 
 #[derive(Deserialize)]
@@ -234,6 +253,20 @@ mod tests {
 
         let error = accumulator.finish().expect_err("invalid arguments");
         assert!(error.to_string().contains("invalid arguments"));
+    }
+
+    #[test]
+    fn captures_usage_from_final_chunk() {
+        let mut accumulator = StreamAccumulator::default();
+        accumulator.feed(r#"{"choices":[{"delta":{"content":"hi"}}]}"#, &mut |_| {});
+        accumulator.feed(
+            r#"{"choices":[],"usage":{"prompt_tokens":1234,"completion_tokens":56}}"#,
+            &mut |_| {},
+        );
+
+        let usage = accumulator.finish().unwrap().usage.expect("usage");
+        assert_eq!(usage.input_tokens, 1234);
+        assert_eq!(usage.output_tokens, 56);
     }
 
     #[test]

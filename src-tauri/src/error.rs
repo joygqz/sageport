@@ -38,6 +38,9 @@ pub enum AppError {
     #[error("{0}")]
     Network(String),
 
+    #[error("{0}")]
+    ContextLength(String),
+
     #[error("cancelled")]
     Cancelled,
 
@@ -60,6 +63,7 @@ impl AppError {
             AppError::Invalid(_) => "invalid",
             AppError::InUse(_) => "in_use",
             AppError::Network(_) => "network",
+            AppError::ContextLength(_) => "context_length",
             AppError::Cancelled => "cancelled",
             AppError::Other(_) => "other",
         }

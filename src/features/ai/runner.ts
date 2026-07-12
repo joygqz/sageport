@@ -1,10 +1,10 @@
 import { detectLocale } from "@/i18n/config";
-import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
 import { errorCode, errorMessage } from "@/lib/toast";
-import type { AiToolCall } from "@/types/models";
+import type { AiChatMessage, AiToolCall } from "@/types/models";
 import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 import {
+  DEFAULT_CONTEXT_WINDOW_TOKENS,
   estimateTextTokens,
   historyTokenBudget,
   modelHistoryWindow,
@@ -36,6 +36,9 @@ const MAX_STEPS = 24;
 
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 
+const CONTEXT_SHRINK_FACTOR = 0.6;
+const MAX_CONTEXT_SHRINKS = 3;
+
 const SYSTEM_PROMPT_ALLOWANCE_TOKENS = 1_000;
 
 export interface RunnerHost {
@@ -55,6 +58,7 @@ const wait = (ms: number) =>
 function buildContext(
   omittedHistoryMessages: number,
   autoApprove: boolean,
+  summary = "",
 ): string {
   const state = useTabsStore.getState();
   const sessions = terminalTabs(state.tabs);
@@ -82,7 +86,23 @@ function buildContext(
       `${omittedHistoryMessages} older chat messages are outside the model window; ask for missing details only if essential.`,
     );
   }
+  if (summary) {
+    lines.push(
+      `Summary of the earlier conversation (older raw messages are outside the window):\n${summary}`,
+    );
+  }
   return lines.join("\n");
+}
+
+function historyBudgetFor(run: RunConfig, summary: string): number {
+  const nonHistoryTokens =
+    run.toolSpecTokens +
+    estimateTextTokens(buildContext(0, run.autoApprove, summary)) +
+    SYSTEM_PROMPT_ALLOWANCE_TOKENS;
+  return Math.max(
+    0,
+    run.budget - Math.max(0, nonHistoryTokens - PROMPT_RESERVE_TOKENS),
+  );
 }
 
 type PreparedToolCall = {
@@ -214,7 +234,10 @@ async function requestStep(
   run: RunConfig,
   streamItemId: string,
 ) {
-  for (let attempt = 0; ; attempt++) {
+  let networkAttempt = 0;
+  let contextShrinks = 0;
+  let historyScale = 1;
+  for (;;) {
     const runtime = host.runtime(sessionId);
     if (!runtime) return null;
 
@@ -227,25 +250,21 @@ async function requestStep(
 
     let turnDone = false;
     try {
-      const contextWithoutOmissions = buildContext(0, run.autoApprove);
-      const nonHistoryTokens =
-        run.toolSpecTokens +
-        estimateTextTokens(contextWithoutOmissions) +
-        SYSTEM_PROMPT_ALLOWANCE_TOKENS;
-      const historyBudget = Math.max(
-        0,
-        run.budget - Math.max(0, nonHistoryTokens - PROMPT_RESERVE_TOKENS),
+      const summary = runtime.summary;
+      const historyBudget = Math.floor(
+        historyBudgetFor(run, summary) * historyScale,
       );
-      const modelHistory = modelHistoryWindow(
-        redactSensitiveHistory(runtime.history),
-        historyBudget,
-      );
+      const modelHistory = modelHistoryWindow(runtime.history, historyBudget);
       const result = await ipc.ai.chat(
         run.model,
-        modelHistory.messages,
+        redactSensitiveHistory(modelHistory.messages),
         run.tools,
         {
-          context: buildContext(modelHistory.omittedMessages, run.autoApprove),
+          context: buildContext(
+            modelHistory.omittedMessages,
+            run.autoApprove,
+            summary,
+          ),
           maxTokens: run.maxTokens,
           requestId,
           onDelta: (text) => {
@@ -265,15 +284,16 @@ async function requestStep(
     } catch (err) {
       turnDone = true;
       clearRequestId(host, sessionId, requestId);
-      if (errorCode(err) === "cancelled") {
+      const code = errorCode(err);
+      if (code === "cancelled") {
         salvagePartial(host, sessionId, streamItemId);
         return null;
       }
-      if (
-        errorCode(err) !== "network" ||
-        attempt >= RETRY_DELAYS_MS.length ||
-        stopped(host, sessionId)
-      ) {
+      const canShrink =
+        code === "context_length" && contextShrinks < MAX_CONTEXT_SHRINKS;
+      const canRetryNetwork =
+        code === "network" && networkAttempt < RETRY_DELAYS_MS.length;
+      if ((!canShrink && !canRetryNetwork) || stopped(host, sessionId)) {
         salvagePartial(host, sessionId, streamItemId);
         throw err;
       }
@@ -281,7 +301,13 @@ async function requestStep(
         ...r,
         log: r.log.filter((i) => i.id !== streamItemId),
       }));
-      await wait(RETRY_DELAYS_MS[attempt]);
+      if (canShrink) {
+        contextShrinks += 1;
+        historyScale *= CONTEXT_SHRINK_FACTOR;
+      } else {
+        await wait(RETRY_DELAYS_MS[networkAttempt]);
+        networkAttempt += 1;
+      }
       if (stopped(host, sessionId)) return null;
     }
   }
@@ -409,29 +435,127 @@ async function runToolCall(
   }));
 }
 
+const SUMMARY_MAX_OUTPUT_TOKENS = 1_024;
+const SUMMARY_MESSAGE_CLIP_CHARS = 2_000;
+const SUMMARY_ARGS_CLIP_CHARS = 400;
+
+const SUMMARY_INSTRUCTIONS =
+  "You are compacting an ongoing operations chat so it fits the model context window. " +
+  "Rewrite the earlier conversation into a dense factual summary that preserves the user's " +
+  "goals and constraints, the hosts/targets and connection state, decisions made and actions " +
+  "taken, notable command results and the current system state, and any unresolved follow-ups. " +
+  "Merge it with any existing summary. Do not invent details. Output only the summary text.";
+
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function renderTranscript(messages: AiChatMessage[]): string {
+  const lines: string[] = [];
+  for (const message of messages) {
+    if (message.role === "user") {
+      lines.push(
+        `User: ${clip(message.content ?? "", SUMMARY_MESSAGE_CLIP_CHARS)}`,
+      );
+    } else if (message.role === "assistant") {
+      if (message.content) {
+        lines.push(
+          `Assistant: ${clip(message.content, SUMMARY_MESSAGE_CLIP_CHARS)}`,
+        );
+      }
+      for (const call of message.toolCalls ?? []) {
+        lines.push(
+          `Assistant called ${call.name}(${clip(
+            JSON.stringify(call.arguments),
+            SUMMARY_ARGS_CLIP_CHARS,
+          )})`,
+        );
+      }
+    } else if (message.role === "tool") {
+      lines.push(
+        `Tool result: ${clip(message.content ?? "", SUMMARY_MESSAGE_CLIP_CHARS)}`,
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
+async function ensureSummary(
+  host: RunnerHost,
+  sessionId: string,
+  run: RunConfig,
+): Promise<void> {
+  const runtime = host.runtime(sessionId);
+  if (!runtime || stopped(host, sessionId)) return;
+
+  const budget = historyBudgetFor(run, runtime.summary);
+  const window = modelHistoryWindow(runtime.history, budget);
+  if (window.omittedMessages <= runtime.summaryUpTo) return;
+
+  const upTo = window.omittedMessages;
+  const slice = redactSensitiveHistory(
+    runtime.history.slice(runtime.summaryUpTo, upTo),
+  );
+  const priorSummary = runtime.summary;
+  const prompt =
+    `${SUMMARY_INSTRUCTIONS}\n\n` +
+    (priorSummary ? `Existing summary:\n${priorSummary}\n\n` : "") +
+    `Conversation excerpt to fold into the summary:\n${renderTranscript(slice)}`;
+
+  const requestId = crypto.randomUUID();
+  host.patch(sessionId, (r) => ({ ...r, requestId, activity: "thinking" }));
+  try {
+    const result = await ipc.ai.chat(
+      run.model,
+      [{ role: "user", content: prompt }],
+      [],
+      { maxTokens: SUMMARY_MAX_OUTPUT_TOKENS, requestId },
+    );
+    const summary = result.content?.trim();
+    clearRequestId(host, sessionId, requestId);
+    if (summary && !stopped(host, sessionId)) {
+      host.patch(sessionId, (r) => ({ ...r, summary, summaryUpTo: upTo }));
+    }
+  } catch {
+    clearRequestId(host, sessionId, requestId);
+  }
+}
+
 export async function runAgentLoop(
   host: RunnerHost,
   sessionId: string,
   model: string,
   autoApprove = false,
   enabledToolNames: readonly string[] = [],
+  maxHistoryTokens?: number | null,
 ): Promise<void> {
   const limits = await resolveModelLimits(model);
   const tools = enabledToolSpecs(enabledToolNames);
   const run: RunConfig = {
     model,
-    budget: historyTokenBudget(limits),
+    budget: historyTokenBudget(limits, maxHistoryTokens),
     maxTokens: outputTokenBudget(limits),
     autoApprove,
     tools,
     toolNames: new Set(tools.map((tool) => tool.name)),
     toolSpecTokens: estimateTextTokens(JSON.stringify(tools)),
   };
+  const contextWindow =
+    limits?.contextWindow && limits.contextWindow > 0
+      ? limits.contextWindow
+      : DEFAULT_CONTEXT_WINDOW_TOKENS;
+  host.patch(sessionId, (r) => ({ ...r, contextWindow }));
 
   for (let step = 0; step < MAX_STEPS; step++) {
+    await ensureSummary(host, sessionId, run);
+    if (stopped(host, sessionId)) return;
     const streamItemId = crypto.randomUUID();
     const result = await requestStep(host, sessionId, run, streamItemId);
     if (!result) return;
+    if (result.usage) {
+      const inputTokens = result.usage.inputTokens;
+      host.patch(sessionId, (r) => ({ ...r, contextTokens: inputTokens }));
+    }
 
     const history = host.runtime(sessionId)?.history ?? [];
     const userPrompt =
@@ -506,18 +630,6 @@ export async function runAgentLoop(
     await host.persist(sessionId);
     if (stopped(host, sessionId)) return;
   }
-  const limitMessage = translate(detectLocale(), "ai.stepLimitReached");
-  host.patch(sessionId, (r) => ({
-    ...r,
-    history: [...r.history, { role: "assistant", content: limitMessage }],
-    log: [
-      ...r.log,
-      {
-        id: crypto.randomUUID(),
-        kind: "assistant",
-        content: limitMessage,
-      },
-    ],
-  }));
+  host.patch(sessionId, (r) => ({ ...r, stepLimitReached: true }));
   await host.persist(sessionId);
 }

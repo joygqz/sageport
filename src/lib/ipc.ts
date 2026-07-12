@@ -266,6 +266,7 @@ export const ipc = {
       apiKey: string;
       autoApprove: boolean;
       enabledTools: string[];
+      maxHistoryTokens: number | null;
     }) => invoke<void>("ai_set_config", { input }),
 
     listModels: () => invoke<string[]>("ai_list_models"),

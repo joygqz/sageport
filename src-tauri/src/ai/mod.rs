@@ -77,6 +77,15 @@ pub struct ChatResult {
     pub content: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<ToolCall>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<Usage>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Usage {
+    pub input_tokens: u32,
+    pub output_tokens: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -322,14 +331,48 @@ async fn send(req: reqwest::RequestBuilder) -> AppResult<Vec<u8>> {
 }
 
 fn status_error(status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
-    let message = serde_json::from_slice::<ApiError>(bytes)
-        .map(|e| e.error.message)
-        .unwrap_or_else(|_| format!("AI request failed with status {status}"));
+    let parsed = serde_json::from_slice::<ApiError>(bytes).ok();
+    let message = parsed
+        .as_ref()
+        .map(|e| e.error.message.clone())
+        .unwrap_or_else(|| format!("AI request failed with status {status}"));
     if status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error() {
         AppError::Network(message)
+    } else if is_context_length_error(status, parsed.as_ref(), &message) {
+        AppError::ContextLength(message)
     } else {
         AppError::Other(message)
     }
+}
+
+fn is_context_length_error(
+    status: reqwest::StatusCode,
+    parsed: Option<&ApiError>,
+    message: &str,
+) -> bool {
+    if status != reqwest::StatusCode::BAD_REQUEST
+        && status != reqwest::StatusCode::PAYLOAD_TOO_LARGE
+    {
+        return false;
+    }
+    if parsed
+        .and_then(|e| e.error.code.as_deref())
+        .is_some_and(|code| code == "context_length_exceeded")
+    {
+        return true;
+    }
+    let lower = message.to_ascii_lowercase();
+    [
+        "context length",
+        "context window",
+        "maximum context",
+        "too many tokens",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+        || (lower.contains("prompt is too long"))
+        || (lower.contains("input") && lower.contains("too long"))
+        || (lower.contains("reduce") && lower.contains("length"))
 }
 
 #[derive(Deserialize)]
@@ -386,4 +429,45 @@ struct ApiError {
 #[derive(Deserialize)]
 struct ApiErrorBody {
     message: String,
+    #[serde(default)]
+    code: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::StatusCode;
+
+    #[test]
+    fn classifies_context_length_by_code() {
+        let body = br#"{"error":{"message":"whatever","code":"context_length_exceeded"}}"#;
+        assert_eq!(
+            status_error(StatusCode::BAD_REQUEST, body).code(),
+            "context_length"
+        );
+    }
+
+    #[test]
+    fn classifies_context_length_by_message() {
+        let body = br#"{"error":{"message":"prompt is too long: 250000 tokens > 200000 maximum context"}}"#;
+        assert_eq!(
+            status_error(StatusCode::BAD_REQUEST, body).code(),
+            "context_length"
+        );
+    }
+
+    #[test]
+    fn keeps_other_bad_requests_as_other() {
+        let body = br#"{"error":{"message":"invalid model"}}"#;
+        assert_eq!(status_error(StatusCode::BAD_REQUEST, body).code(), "other");
+    }
+
+    #[test]
+    fn server_errors_stay_network() {
+        let body = br#"{"error":{"message":"context length exceeded"}}"#;
+        assert_eq!(
+            status_error(StatusCode::INTERNAL_SERVER_ERROR, body).code(),
+            "network"
+        );
+    }
 }

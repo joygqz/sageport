@@ -37,6 +37,11 @@ function runtime(): RuntimeSession {
     activity: null,
     requestId: null,
     stopRequested: false,
+    stepLimitReached: false,
+    contextTokens: null,
+    contextWindow: null,
+    summary: "",
+    summaryUpTo: 0,
   };
 }
 
@@ -279,5 +284,78 @@ describe("runAgentLoop", () => {
         status: "done",
       }),
     );
+  });
+
+  it("records provider usage and the model context window", async () => {
+    chat.mockResolvedValue({
+      content: "done",
+      usage: { inputTokens: 4321, outputTokens: 100 },
+    });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model");
+
+    expect(run.state().contextTokens).toBe(4321);
+    expect(run.state().contextWindow).toBe(128_000);
+  });
+
+  it("retries with a smaller window on a context-length error", async () => {
+    chat
+      .mockRejectedValueOnce({ code: "context_length", message: "too long" })
+      .mockResolvedValueOnce({ content: "ok" });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model");
+
+    expect(chat).toHaveBeenCalledTimes(2);
+    expect(run.state().history.at(-1)).toMatchObject({
+      role: "assistant",
+      content: "ok",
+    });
+    expect(run.state().requestId).toBeNull();
+  });
+
+  it("summarizes overflowed older turns and injects the summary", async () => {
+    modelLimits.mockResolvedValue({
+      contextWindow: 2_000,
+      maxOutputTokens: 500,
+    });
+    const initial = runtime();
+    initial.history = [
+      { role: "user", content: `first question ${"x".repeat(4_000)}` },
+      { role: "assistant", content: `first answer ${"x".repeat(4_000)}` },
+      { role: "user", content: `second question ${"y".repeat(4_000)}` },
+    ];
+    const run = harness(initial);
+    chat
+      .mockResolvedValueOnce({ content: "SUMMARY: earlier context" })
+      .mockResolvedValueOnce({ content: "final" });
+
+    await runAgentLoop(run.host, "session", "model");
+
+    expect(chat).toHaveBeenCalledTimes(2);
+    expect(chat.mock.calls[0][2]).toEqual([]);
+    expect(chat.mock.calls[0][1][0].content).toContain("fold into the summary");
+    expect(run.state().summary).toBe("SUMMARY: earlier context");
+    expect(run.state().summaryUpTo).toBe(2);
+    expect(chat.mock.calls[1][3].context).toContain("SUMMARY: earlier context");
+  });
+
+  it("flags the step limit instead of appending filler text", async () => {
+    chat.mockResolvedValue({
+      toolCalls: [
+        { id: "loop", name: "list_terminal_sessions", arguments: {} },
+      ],
+    });
+    executeTool.mockResolvedValue({ content: "sessions", isError: false });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model", true);
+
+    expect(chat).toHaveBeenCalledTimes(24);
+    expect(run.state().stepLimitReached).toBe(true);
+    expect(
+      run.state().history.some((m) => m.role === "assistant" && !m.toolCalls),
+    ).toBe(false);
   });
 });

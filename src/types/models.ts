@@ -253,6 +253,7 @@ export interface AiConfig {
   model: string;
   autoApprove: boolean;
   enabledTools: string[];
+  maxHistoryTokens: number | null;
 }
 
 export type AiRole = "system" | "user" | "assistant" | "tool";
@@ -283,6 +284,12 @@ export interface AiToolSpec {
 export interface AiChatResult {
   content?: string;
   toolCalls?: AiToolCall[];
+  usage?: AiUsage;
+}
+
+export interface AiUsage {
+  inputTokens: number;
+  outputTokens: number;
 }
 
 export interface AiModelLimits {

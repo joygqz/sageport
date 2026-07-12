@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 
 use crate::error::{AppError, AppResult};
 
-use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec};
+use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec, Usage};
 
 pub(super) fn request_body(
     model: &str,
@@ -139,6 +139,8 @@ fn is_tool_result_message(v: &Value) -> bool {
 #[derive(Default)]
 pub(super) struct StreamAccumulator {
     blocks: Vec<Block>,
+    input_tokens: u32,
+    output_tokens: u32,
 }
 
 enum Block {
@@ -156,6 +158,19 @@ impl StreamAccumulator {
             return Ok(());
         };
         match event.kind.as_str() {
+            "message_start" => {
+                if let Some(usage) = event.message.and_then(|m| m.usage) {
+                    self.input_tokens = usage.input_tokens
+                        + usage.cache_creation_input_tokens
+                        + usage.cache_read_input_tokens;
+                    self.output_tokens = usage.output_tokens;
+                }
+            }
+            "message_delta" => {
+                if let Some(usage) = event.usage {
+                    self.output_tokens = usage.output_tokens;
+                }
+            }
             "content_block_start" => {
                 let index = event.index as usize;
                 while self.blocks.len() <= index {
@@ -258,6 +273,14 @@ impl StreamAccumulator {
         if content.is_empty() && tool_calls.is_empty() {
             return Err(AppError::Other("the assistant returned no content".into()));
         }
+        let usage = if self.input_tokens > 0 || self.output_tokens > 0 {
+            Some(Usage {
+                input_tokens: self.input_tokens,
+                output_tokens: self.output_tokens,
+            })
+        } else {
+            None
+        };
         Ok(ChatResult {
             content: if content.is_empty() {
                 None
@@ -265,6 +288,7 @@ impl StreamAccumulator {
                 Some(content)
             },
             tool_calls,
+            usage,
         })
     }
 }
@@ -281,6 +305,28 @@ struct StreamPayload {
     delta: Option<RawDelta>,
     #[serde(default)]
     error: Option<RawError>,
+    #[serde(default)]
+    message: Option<RawMessage>,
+    #[serde(default)]
+    usage: Option<RawUsage>,
+}
+
+#[derive(Deserialize)]
+struct RawMessage {
+    #[serde(default)]
+    usage: Option<RawUsage>,
+}
+
+#[derive(Default, Deserialize)]
+struct RawUsage {
+    #[serde(default)]
+    input_tokens: u32,
+    #[serde(default)]
+    output_tokens: u32,
+    #[serde(default)]
+    cache_creation_input_tokens: u32,
+    #[serde(default)]
+    cache_read_input_tokens: u32,
 }
 
 #[derive(Deserialize)]
@@ -297,7 +343,7 @@ struct RawBlock {
 
 #[derive(Deserialize)]
 struct RawDelta {
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default)]
     kind: String,
     #[serde(default)]
     text: String,
@@ -332,6 +378,33 @@ mod tests {
 
         let error = accumulator.finish().expect_err("invalid arguments");
         assert!(error.to_string().contains("invalid arguments"));
+    }
+
+    #[test]
+    fn captures_usage_across_message_events() {
+        let mut accumulator = StreamAccumulator::default();
+        accumulator
+            .feed(
+                r#"{"type":"message_start","message":{"usage":{"input_tokens":1000,"cache_read_input_tokens":200,"cache_creation_input_tokens":50}}}"#,
+                &mut |_| {},
+            )
+            .unwrap();
+        accumulator
+            .feed(
+                r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":"hi"}}"#,
+                &mut |_| {},
+            )
+            .unwrap();
+        accumulator
+            .feed(
+                r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":77}}"#,
+                &mut |_| {},
+            )
+            .unwrap();
+
+        let usage = accumulator.finish().unwrap().usage.expect("usage");
+        assert_eq!(usage.input_tokens, 1250);
+        assert_eq!(usage.output_tokens, 77);
     }
 
     #[test]

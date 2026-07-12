@@ -61,6 +61,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const newSession = useAiStore((s) => s.newSession);
   const deleteSession = useAiStore((s) => s.deleteSession);
   const send = useAiStore((s) => s.send);
+  const resume = useAiStore((s) => s.resume);
   const stop = useAiStore((s) => s.stop);
   const approve = useAiStore((s) => s.approve);
   const deny = useAiStore((s) => s.deny);
@@ -69,6 +70,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const log = runtime?.log ?? EMPTY_LOG;
   const pending = runtime?.pending ?? false;
   const activity = runtime?.activity ?? null;
+  const stepLimitReached = runtime?.stepLimitReached ?? false;
   const awaitingUser = log.some(
     (item) =>
       item.kind === "tool" &&
@@ -163,6 +165,7 @@ export function AssistantPanel({ width }: { width: number }) {
         model,
         config?.autoApprove ?? false,
         config?.enabledTools ?? [],
+        config?.maxHistoryTokens,
       );
       return true;
     } catch (err) {
@@ -175,6 +178,18 @@ export function AssistantPanel({ width }: { width: number }) {
     const prompt = input.trim();
     if (!prompt) return;
     if (await sendPrompt(prompt)) setInput("");
+  };
+
+  const continueRun = () => {
+    if (!activeId || !model || pending) return;
+    stickToBottom.current = true;
+    void resume(
+      activeId,
+      model,
+      config?.autoApprove ?? false,
+      config?.enabledTools ?? [],
+      config?.maxHistoryTokens,
+    );
   };
 
   const activeTitle = sessions.find((s) => s.id === activeId)?.title;
@@ -347,6 +362,9 @@ export function AssistantPanel({ width }: { width: number }) {
                 ))
               )}
               {showThinking && <ThinkingStatus />}
+              {stepLimitReached && !pending && (
+                <ContinueRun onContinue={continueRun} disabled={!model} />
+              )}
             </div>
           </div>
 
@@ -383,27 +401,33 @@ export function AssistantPanel({ width }: { width: number }) {
                     ))
                   )}
                 </Select>
-                {pending ? (
-                  <Tooltip content={t("ai.stop")}>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <ContextMeter
+                    tokens={runtime?.contextTokens ?? null}
+                    window={runtime?.contextWindow ?? null}
+                  />
+                  {pending ? (
+                    <Tooltip content={t("ai.stop")}>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="size-7 shrink-0"
+                        onClick={() => activeId && stop(activeId)}
+                      >
+                        <Square className="size-3.5 fill-current" />
+                      </Button>
+                    </Tooltip>
+                  ) : (
                     <Button
                       size="icon"
-                      variant="secondary"
-                      className="ml-auto size-7 shrink-0"
-                      onClick={() => activeId && stop(activeId)}
+                      className="size-7 shrink-0"
+                      disabled={!input.trim() || !model}
+                      onClick={() => void submit()}
                     >
-                      <Square className="size-3.5 fill-current" />
+                      <ArrowUp className="size-4" />
                     </Button>
-                  </Tooltip>
-                ) : (
-                  <Button
-                    size="icon"
-                    className="ml-auto size-7 shrink-0"
-                    disabled={!input.trim() || !model}
-                    onClick={() => void submit()}
-                  >
-                    <ArrowUp className="size-4" />
-                  </Button>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -424,6 +448,73 @@ function ThinkingStatus() {
     >
       <span className="ai-thinking-shimmer">{t("ai.thinking")}</span>
     </div>
+  );
+}
+
+function ContinueRun({
+  onContinue,
+  disabled,
+}: {
+  onContinue: () => void;
+  disabled: boolean;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-input bg-surface px-3 py-2">
+      <span className="min-w-0 truncate text-xs text-muted-foreground">
+        {t("ai.stepLimitReached")}
+      </span>
+      <Button
+        size="sm"
+        variant="secondary"
+        className="h-7 shrink-0"
+        disabled={disabled}
+        onClick={onContinue}
+      >
+        {t("ai.continueRun")}
+      </Button>
+    </div>
+  );
+}
+
+function formatTokens(count: number): string {
+  if (count < 1000) return String(count);
+  return `${(count / 1000).toFixed(count < 10_000 ? 1 : 0)}k`;
+}
+
+function ContextMeter({
+  tokens,
+  window,
+}: {
+  tokens: number | null;
+  window: number | null;
+}) {
+  const { t } = useI18n();
+  if (tokens === null || !window || window <= 0) return null;
+
+  const percent = Math.min(100, Math.round((tokens / window) * 100));
+  return (
+    <Tooltip
+      content={t("ai.contextUsage", {
+        percent,
+        used: formatTokens(tokens),
+        total: formatTokens(window),
+      })}
+    >
+      <span
+        className={cn(
+          "shrink-0 cursor-default select-none tabular-nums text-2xs font-medium",
+          percent >= 90
+            ? "text-danger"
+            : percent >= 75
+              ? "text-warning"
+              : "text-muted-foreground",
+        )}
+      >
+        {percent}%
+      </span>
+    </Tooltip>
   );
 }
 

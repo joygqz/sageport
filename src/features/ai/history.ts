@@ -29,6 +29,7 @@ export function outputTokenBudget(
 
 export function historyTokenBudget(
   limits?: Partial<AiModelLimits> | null,
+  maxBudget?: number | null,
 ): number {
   const contextWindow = contextWindowTokens(limits);
   const promptReserve = Math.min(
@@ -36,7 +37,8 @@ export function historyTokenBudget(
     Math.floor(contextWindow / 4),
   );
   const budget = contextWindow - outputTokenBudget(limits) - promptReserve;
-  return Math.max(0, Math.min(budget, MAX_HISTORY_TOKEN_BUDGET));
+  const cap = maxBudget && maxBudget > 0 ? maxBudget : MAX_HISTORY_TOKEN_BUDGET;
+  return Math.max(0, Math.min(budget, cap));
 }
 
 const OMITTED_MARKER = "\n… [older content omitted to fit context] …\n";
@@ -58,7 +60,12 @@ export function estimateTextTokens(text: string): number {
   return Math.ceil(ascii / 3) + nonAscii * 2;
 }
 
+const messageTokenCache = new WeakMap<AiChatMessage, number>();
+
 export function estimateMessageTokens(message: AiChatMessage): number {
+  const cached = messageTokenCache.get(message);
+  if (cached !== undefined) return cached;
+
   let tokens = 12 + estimateTextTokens(message.content ?? "");
   for (const call of message.toolCalls ?? []) {
     tokens +=
@@ -68,6 +75,7 @@ export function estimateMessageTokens(message: AiChatMessage): number {
       estimateTextTokens(JSON.stringify(call.arguments));
   }
   if (message.toolCallId) tokens += estimateTextTokens(message.toolCallId);
+  messageTokenCache.set(message, tokens);
   return tokens;
 }
 
@@ -146,6 +154,7 @@ function compactTurn(
     const clipped = clipText(message.content, targetTokens);
     if (clipped === message.content) continue;
     message.content = clipped;
+    messageTokenCache.delete(message);
     compactedMessages += 1;
     total = estimateMessages(messages);
   }
@@ -160,6 +169,7 @@ function compactTurn(
         _omitted:
           "Completed tool arguments omitted to fit the model context window.",
       };
+      messageTokenCache.delete(message);
       compactedMessages += 1;
       total = estimateMessages(messages);
     }

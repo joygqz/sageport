@@ -560,7 +560,8 @@ export const zhCN: Dictionary = {
     untitledChat: "新对话",
     thinking: "正在思考",
     stop: "停止生成",
-    stepLimitReached: "已达到单次运行的步骤上限，回复“继续”可以接着执行。",
+    stepLimitReached: "本次运行已达到步骤上限。",
+    continueRun: "继续",
     inputPlaceholder: "询问服务器相关问题",
     commandLabel: "命令",
     commandTarget: "执行目标：{name}",
@@ -572,6 +573,7 @@ export const zhCN: Dictionary = {
     deny: "拒绝",
     modelLabel: "模型",
     modelLoading: "正在加载模型…",
+    contextUsage: "上下文 {percent}% · {used} / {total} tokens",
     autonomousMode: "自治",
     autonomousModeHint: "操作将被自动批准。打开 AI 设置即可关闭此模式。",
     tool: {
@@ -671,6 +673,9 @@ export const zhCN: Dictionary = {
         "开启后，助手会自动批准命令、文件编辑和配置更改等操作。目标或意图不明确时，仍会向你询问。",
       autonomousModeWarning:
         "此模式可能对系统造成不可逆更改，请仅在信任的主机和任务中开启。",
+      maxHistoryTokensLabel: "历史 token 上限",
+      maxHistoryTokensHint:
+        "每轮发送给模型的对话 token 上限。留空则使用默认值（200,000）。大上下文模型可调高以保留更多历史，也可调低以节省成本。",
       tools: {
         title: "助手工具",
         description:

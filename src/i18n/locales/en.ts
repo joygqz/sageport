@@ -578,8 +578,8 @@ export const en = {
     untitledChat: "New Chat",
     thinking: "Thinking",
     stop: "Stop Generating",
-    stepLimitReached:
-      'Reached the step limit for one run. Say "continue" to keep going.',
+    stepLimitReached: "Paused at the step limit for this run.",
+    continueRun: "Continue",
     inputPlaceholder: "Ask about your servers",
     commandLabel: "Command",
     commandTarget: "Target: {name}",
@@ -591,6 +591,7 @@ export const en = {
     deny: "Deny",
     modelLabel: "Model",
     modelLoading: "Loading models…",
+    contextUsage: "Context {percent}% · {used} / {total} tokens",
     autonomousMode: "Autonomous",
     autonomousModeHint:
       "Operation approvals are being granted automatically. Open AI settings to turn this off.",
@@ -692,6 +693,9 @@ export const en = {
         "When enabled, the assistant automatically approves operations such as commands, file edits, and configuration changes. It will still ask when your intent or target is ambiguous.",
       autonomousModeWarning:
         "This can make irreversible changes to your systems. Enable it only for hosts and tasks you trust.",
+      maxHistoryTokensLabel: "Max history tokens",
+      maxHistoryTokensHint:
+        "Upper bound on conversation tokens sent to the model each turn. Leave empty for the default (200,000). Raise it on large-context models to keep more history, or lower it to reduce cost.",
       tools: {
         title: "Assistant tools",
         description:

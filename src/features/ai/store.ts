@@ -26,6 +26,11 @@ function emptyRuntime(): RuntimeSession {
     activity: null,
     requestId: null,
     stopRequested: false,
+    stepLimitReached: false,
+    contextTokens: null,
+    contextWindow: null,
+    summary: "",
+    summaryUpTo: 0,
   };
 }
 
@@ -48,6 +53,15 @@ interface AiStoreState {
     model: string,
     autoApprove: boolean,
     enabledTools: string[],
+    maxHistoryTokens?: number | null,
+  ) => Promise<void>;
+
+  resume: (
+    sessionId: string,
+    model: string,
+    autoApprove: boolean,
+    enabledTools: string[],
+    maxHistoryTokens?: number | null,
   ) => Promise<void>;
 
   stop: (sessionId: string) => void;
@@ -120,6 +134,46 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       new Promise((resolve) => {
         answers.set(toolLogId, { sessionId, resolve });
       }),
+  };
+
+  const runLoop = async (
+    sessionId: string,
+    model: string,
+    autoApprove: boolean,
+    enabledTools: string[],
+    maxHistoryTokens?: number | null,
+  ) => {
+    try {
+      await runAgentLoop(
+        host,
+        sessionId,
+        model,
+        autoApprove,
+        enabledTools,
+        maxHistoryTokens,
+      );
+    } catch (err) {
+      const message = errorMessage(err);
+      const content = `⚠️ ${message}`;
+      toast.error(t("ai.error"), message);
+      patch(sessionId, (r) => ({
+        ...r,
+        history: [...r.history, { role: "assistant", content }],
+        log: [
+          ...r.log,
+          { id: crypto.randomUUID(), kind: "assistant", content },
+        ],
+      }));
+    } finally {
+      patch(sessionId, (r) => ({
+        ...r,
+        pending: false,
+        activity: null,
+        requestId: null,
+        stopRequested: false,
+      }));
+      void persist(sessionId);
+    }
   };
 
   return {
@@ -209,7 +263,14 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       deleting.delete(id);
     },
 
-    send: async (sessionId, prompt, model, autoApprove, enabledTools) => {
+    send: async (
+      sessionId,
+      prompt,
+      model,
+      autoApprove,
+      enabledTools,
+      maxHistoryTokens,
+    ) => {
       const trimmed = prompt.trim();
       const runtime = get().runtime[sessionId];
       if (!trimmed || !model || !runtime || runtime.pending) return;
@@ -221,6 +282,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         ...r,
         pending: true,
         stopRequested: false,
+        stepLimitReached: false,
         log: [
           ...r.log,
           { id: crypto.randomUUID(), kind: "user", content: trimmed },
@@ -228,35 +290,39 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         history: [...r.history, { role: "user", content: trimmed }],
       }));
       await persist(sessionId, title);
+      await runLoop(
+        sessionId,
+        model,
+        autoApprove,
+        enabledTools,
+        maxHistoryTokens,
+      );
+    },
 
-      try {
-        await runAgentLoop(host, sessionId, model, autoApprove, enabledTools);
-      } catch (err) {
-        const message = errorMessage(err);
-        const content = `⚠️ ${message}`;
-        toast.error(t("ai.error"), message);
-        patch(sessionId, (r) => ({
-          ...r,
-          history: [...r.history, { role: "assistant", content }],
-          log: [
-            ...r.log,
-            {
-              id: crypto.randomUUID(),
-              kind: "assistant",
-              content,
-            },
-          ],
-        }));
-      } finally {
-        patch(sessionId, (r) => ({
-          ...r,
-          pending: false,
-          activity: null,
-          requestId: null,
-          stopRequested: false,
-        }));
-        void persist(sessionId);
+    resume: async (
+      sessionId,
+      model,
+      autoApprove,
+      enabledTools,
+      maxHistoryTokens,
+    ) => {
+      const runtime = get().runtime[sessionId];
+      if (!model || !runtime || runtime.pending || !runtime.stepLimitReached) {
+        return;
       }
+      patch(sessionId, (r) => ({
+        ...r,
+        pending: true,
+        stopRequested: false,
+        stepLimitReached: false,
+      }));
+      await runLoop(
+        sessionId,
+        model,
+        autoApprove,
+        enabledTools,
+        maxHistoryTokens,
+      );
     },
 
     stop: (sessionId) => {

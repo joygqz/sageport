@@ -370,6 +370,9 @@ function AiForm({ config }: { config: AiConfig }) {
   const [enabledTools, setEnabledTools] = useState(() =>
     normalizeEnabledToolNames(config.enabledTools ?? []),
   );
+  const [maxHistoryTokens, setMaxHistoryTokens] = useState(
+    config.maxHistoryTokens,
+  );
   const [expandedToolGroups, setExpandedToolGroups] = useState<Set<string>>(
     () => new Set(),
   );
@@ -381,6 +384,7 @@ function AiForm({ config }: { config: AiConfig }) {
     apiKey: string;
     autoApprove: boolean;
     enabledTools: string[];
+    maxHistoryTokens: number | null;
   } | null>(null);
 
   const changeProtocol = (next: AiProtocol) => {
@@ -399,11 +403,19 @@ function AiForm({ config }: { config: AiConfig }) {
       apiKey,
       autoApprove,
       enabledTools,
+      maxHistoryTokens,
     };
     const timer = setTimeout(() => {
       pendingSave.current = null;
       mutate(
-        { baseUrl, protocol, apiKey, autoApprove, enabledTools },
+        {
+          baseUrl,
+          protocol,
+          apiKey,
+          autoApprove,
+          enabledTools,
+          maxHistoryTokens,
+        },
         {
           onError: (err) =>
             toast.error(t("settings.ai.saveError"), errorMessage(err)),
@@ -411,7 +423,16 @@ function AiForm({ config }: { config: AiConfig }) {
       );
     }, 500);
     return () => clearTimeout(timer);
-  }, [protocol, baseUrl, apiKey, autoApprove, enabledTools, mutate, t]);
+  }, [
+    protocol,
+    baseUrl,
+    apiKey,
+    autoApprove,
+    enabledTools,
+    maxHistoryTokens,
+    mutate,
+    t,
+  ]);
 
   const toggleTool = (name: string, checked: boolean) => {
     setEnabledTools((current) =>
@@ -517,6 +538,27 @@ function AiForm({ config }: { config: AiConfig }) {
             aria-label={t("settings.ai.autonomousMode")}
           />
         </div>
+      </Field>
+
+      <Field
+        label={t("settings.ai.maxHistoryTokensLabel")}
+        hint={t("settings.ai.maxHistoryTokensHint")}
+      >
+        <Input
+          type="number"
+          min={0}
+          step={1000}
+          value={maxHistoryTokens ?? ""}
+          onChange={(e) => {
+            const parsed = Number.parseInt(e.target.value, 10);
+            setMaxHistoryTokens(
+              Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+            );
+          }}
+          placeholder="200000"
+          autoComplete="off"
+          spellCheck={false}
+        />
       </Field>
 
       <div className="mt-2 flex flex-col gap-3">
