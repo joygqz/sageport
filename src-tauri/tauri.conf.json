@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app", "dmg", "nsis", "appimage", "deb"],
     "createUpdaterArtifacts": true,
     "publisher": "Quincy Zhang",
     "copyright": "Copyright © 2026 Quincy Zhang",
