@@ -39,6 +39,7 @@ interface FormBodyProps {
   onSubmit: () => void | Promise<void>;
   submitLabel: ReactNode;
   pending?: boolean;
+  submitDisabled?: boolean;
   footerStart?: ReactNode;
   children: ReactNode;
 }
@@ -48,6 +49,7 @@ export function FormBody({
   onSubmit,
   submitLabel,
   pending,
+  submitDisabled,
   footerStart,
   children,
 }: FormBodyProps) {
@@ -66,7 +68,7 @@ export function FormBody({
         <Button type="button" variant="ghost" onClick={onClose}>
           {t("common.cancel")}
         </Button>
-        <Button type="submit" loading={pending}>
+        <Button type="submit" loading={pending} disabled={submitDisabled}>
           {submitLabel}
         </Button>
       </div>

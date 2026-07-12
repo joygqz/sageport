@@ -43,17 +43,27 @@ function RunBody({
 
   const preview = substitute(snippet.command, values);
 
+  const isFilled = (variable: (typeof variables)[number]) =>
+    Boolean(variable.defaultValue) || (values[variable.name] ?? "").trim() !== "";
+  const canRun = variables.every(isFilled);
+
   return (
     <FormBody
       onClose={onClose}
       onSubmit={() => {
+        if (!canRun) return;
         onRun(preview);
         onClose();
       }}
       submitLabel={t("snippets.run")}
+      submitDisabled={!canRun}
     >
       {variables.map((variable, index) => (
-        <Field key={variable.name} label={variable.name}>
+        <Field
+          key={variable.name}
+          label={variable.name}
+          required={!variable.defaultValue}
+        >
           <Input
             autoFocus={index === 0}
             value={values[variable.name] ?? ""}
