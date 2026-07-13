@@ -7,7 +7,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { FileText, Plus, Settings, TerminalSquare, X } from "lucide-react";
+import { FileText, Plus, TerminalSquare, X } from "lucide-react";
 
 import {
   ConfirmDialog,
@@ -33,12 +33,6 @@ import {
 const FileEditor = lazy(() =>
   import("@/features/sftp/FileEditor").then((m) => ({
     default: m.FileEditor,
-  })),
-);
-
-const SettingsPage = lazy(() =>
-  import("@/features/settings/SettingsPage").then((module) => ({
-    default: module.SettingsPage,
   })),
 );
 
@@ -228,7 +222,7 @@ export function EditorArea() {
             e.preventDefault();
             el.scrollLeft += e.deltaX || e.deltaY;
           }}
-          className="scrollbar-none flex h-9 overflow-x-auto overflow-y-hidden"
+          className="scrollbar-none flex h-[var(--workbench-bar-height)] overflow-x-auto overflow-y-hidden"
         >
           <div
             role="tablist"
@@ -263,7 +257,7 @@ export function EditorArea() {
           <Tooltip content={t("editor.newSession")}>
             <button
               onClick={() => openPalette("quick")}
-              className="mx-1 flex size-7 shrink-0 items-center justify-center self-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="mx-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               <Plus className="size-4" />
             </button>
@@ -302,10 +296,8 @@ export function EditorArea() {
             <Suspense fallback={<EditorLoading />}>
               {tab.kind === "terminal" ? (
                 <TerminalEditor tab={tab} active={tab.id === activeId} />
-              ) : tab.kind === "file" ? (
-                <FileEditor tab={tab} />
               ) : (
-                <SettingsPage section={tab.section} />
+                <FileEditor tab={tab} />
               )}
             </Suspense>
           </div>
@@ -356,7 +348,7 @@ function TabItem({
     active: boolean;
   } | null>(null);
 
-  const title = tab.kind === "settings" ? t("settings.title") : tab.title;
+  const title = tab.title;
   const dirty = tab.kind === "file" && isFileDirty(tab);
 
   const reopen =
@@ -437,7 +429,7 @@ function TabItem({
         "touch-none select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
         dragged && "opacity-50",
         active
-          ? "z-10 bg-background text-foreground before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-primary after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-background"
+          ? "z-10 bg-background font-medium text-foreground before:absolute before:inset-x-2 before:top-0 before:h-0.5 before:rounded-b-full before:bg-primary after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-background"
           : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
       )}
     >
@@ -452,10 +444,8 @@ function TabItem({
             )}
           />
         </span>
-      ) : tab.kind === "file" ? (
-        <FileText className="size-3.5 shrink-0" />
       ) : (
-        <Settings className="size-3.5 shrink-0" />
+        <FileText className="size-3.5 shrink-0" />
       )}
 
       <span className="min-w-0 flex-1 truncate">{title}</span>
@@ -493,8 +483,7 @@ function TabDragGhost({
   tab: EditorTab;
   dragState: TabDragState;
 }) {
-  const { t } = useI18n();
-  const title = tab.kind === "settings" ? t("settings.title") : tab.title;
+  const title = tab.title;
   const dirty = tab.kind === "file" && isFileDirty(tab);
 
   return (
@@ -518,10 +507,8 @@ function TabDragGhost({
             )}
           />
         </span>
-      ) : tab.kind === "file" ? (
-        <FileText className="size-3.5 shrink-0" />
       ) : (
-        <Settings className="size-3.5 shrink-0" />
+        <FileText className="size-3.5 shrink-0" />
       )}
       <span className="min-w-0 flex-1 truncate">{title}</span>
       {dirty ? (
@@ -544,7 +531,7 @@ function Watermark() {
   ];
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
+    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background [background-image:radial-gradient(circle_at_50%_42%,color-mix(in_oklch,var(--color-primary)_7%,transparent),transparent_32%)]">
       <div className="m-auto grid min-w-max grid-cols-[auto_auto] items-center gap-x-4 gap-y-2.5 p-3">
         {hints.map((hint) => (
           <Fragment key={hint.label}>

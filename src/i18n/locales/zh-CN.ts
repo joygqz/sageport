@@ -4,6 +4,7 @@ export const zhCN: Dictionary = {
   common: {
     add: "添加",
     cancel: "取消",
+    close: "关闭",
     copy: "复制",
     copied: "已复制",
     confirm: "确定",
@@ -55,6 +56,8 @@ export const zhCN: Dictionary = {
 
   monitor: {
     viewTitle: "监控",
+    filterPlaceholder: "筛选活跃主机",
+    noMatches: "没有匹配的活跃主机",
     cpu: "CPU",
     memory: "内存",
     disk: "磁盘",
@@ -74,6 +77,8 @@ export const zhCN: Dictionary = {
 
   forwards: {
     viewTitle: "端口转发",
+    filterPlaceholder: "筛选端口转发",
+    noMatches: "没有匹配的端口转发",
     new: "新建转发",
     start: "启动",
     stop: "停止",
@@ -339,6 +344,8 @@ export const zhCN: Dictionary = {
 
   credentials: {
     viewTitle: "凭据",
+    filterPlaceholder: "筛选凭据",
+    noMatches: "没有匹配的凭据",
     keys: {
       sectionTitle: "SSH 密钥",
       add: "添加密钥",
@@ -405,6 +412,8 @@ export const zhCN: Dictionary = {
 
   snippets: {
     viewTitle: "命令片段",
+    filterPlaceholder: "筛选命令片段",
+    noMatches: "没有匹配的命令片段",
     new: "新建片段",
     batch: {
       action: "在多台主机运行…",
@@ -462,7 +471,6 @@ export const zhCN: Dictionary = {
     },
     emptyDir: "此文件夹为空",
     fileList: "文件列表",
-    selectFile: "选择 {name}",
     deleteManyConfirm: "将永久删除选中的 {count} 个项目，此操作无法撤销。",
     noTabTitle: "未打开任何位置",
     mkdirError: "创建文件夹失败",
@@ -645,8 +653,15 @@ export const zhCN: Dictionary = {
     },
     appearance: {
       themeTitle: "主题",
-      themeDescription:
-        "选择 Sageport 的外观。每套主题都会应用到整个界面，包括终端。",
+      themeDescription: "选择一套协调的主题系列，并设置它如何跟随系统外观。",
+      colorMode: "颜色模式",
+      modeSystem: "跟随系统",
+      modeLight: "浅色",
+      modeDark: "深色",
+      themeFamily: "主题系列",
+      familyMidnight: "专注终端工作的深海军蓝",
+      familyGraphite: "层级清晰的专业中性灰",
+      familyDracula: "深邃紫色搭配鲜明的终端强调色",
       darkThemes: "深色主题",
       lightThemes: "浅色主题",
       language: "语言",

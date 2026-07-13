@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { ResizeHandle, Spinner } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { useSettingSync } from "@/lib/settingSync";
 import { IS_MACOS } from "@/lib/platform";
 import { Toaster } from "@/components/ui/toaster";
@@ -36,6 +37,12 @@ const AssistantPanel = lazy(() =>
 const SftpPanel = lazy(() =>
   import("@/features/sftp/SftpPanel").then((module) => ({
     default: module.SftpPanel,
+  })),
+);
+
+const SettingsDialog = lazy(() =>
+  import("@/features/settings/SettingsPage").then((module) => ({
+    default: module.SettingsDialog,
   })),
 );
 
@@ -101,6 +108,7 @@ export function Workbench() {
   const layout = useLayoutStore();
   const overlay = useOverlayStore((s) => s.overlay);
   const closeOverlay = useOverlayStore((s) => s.close);
+  const setSettingsSection = useOverlayStore((s) => s.setSettingsSection);
 
   return (
     <div className="flex h-full flex-col bg-surface text-surface-foreground">
@@ -120,7 +128,13 @@ export function Workbench() {
           highlightOffset={0.5}
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col border-x border-border">
+        <div
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 flex-col border-border",
+            layout.sidebarVisible && "border-l",
+            layout.auxVisible && "border-r",
+          )}
+        >
           <EditorArea />
           {layout.panelVisible && (
             <>
@@ -194,6 +208,16 @@ export function Workbench() {
         initialMode={overlay?.type === "palette" ? overlay.mode : "quick"}
         onClose={closeOverlay}
       />
+      {overlay?.type === "settings" && (
+        <Suspense fallback={null}>
+          <SettingsDialog
+            open
+            section={overlay.section}
+            onSectionChange={setSettingsSection}
+            onClose={closeOverlay}
+          />
+        </Suspense>
+      )}
       <HostKeyDialog />
       <Toaster />
     </div>

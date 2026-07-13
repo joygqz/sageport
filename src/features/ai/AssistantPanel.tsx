@@ -31,6 +31,11 @@ import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/workbench/layout";
+import { useOverlayStore } from "@/workbench/overlays";
+import {
+  PanelHeader,
+  PANEL_HEADER_ACTION_CLASS,
+} from "@/workbench/PanelHeader";
 import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
 import { pickSuggestionsForSession } from "./suggestions";
@@ -49,7 +54,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const configured = Boolean(config?.apiKey);
   const { data: fetchedModels, error: modelsError } = useAiModels(configured);
   const toggleAux = useLayoutStore((s) => s.toggleAux);
-  const openSettings = useTabsStore((s) => s.openSettings);
+  const openSettings = useOverlayStore((s) => s.openSettings);
 
   const sessions = useAiStore((s) => s.sessions);
   const activeId = useAiStore((s) => s.activeId);
@@ -197,14 +202,12 @@ export function AssistantPanel({ width }: { width: number }) {
   return (
     <aside
       style={{ width }}
-      className="flex shrink-0 flex-col overflow-hidden bg-surface"
+      className="flex shrink-0 flex-col overflow-hidden bg-surface/80"
     >
-      <div className="flex h-9 shrink-0 items-center justify-between gap-1 pl-4 pr-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <h2 className="min-w-0 truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {activeTitle || t("ai.viewTitle")}
-          </h2>
-          {config?.autoApprove && (
+      <PanelHeader
+        title={activeTitle || t("ai.viewTitle")}
+        titleAfter={
+          config?.autoApprove ? (
             <button
               type="button"
               onClick={() => openSettings("ai")}
@@ -213,97 +216,103 @@ export function AssistantPanel({ width }: { width: number }) {
             >
               {t("ai.autonomousMode")}
             </button>
-          )}
-        </div>
-        <div className="flex items-center gap-0.5">
-          {configured && (
-            <>
-              <Tooltip content={t("ai.newChat")}>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-6"
-                  onClick={() => void createSession()}
-                >
-                  <MessageCirclePlus className="size-4" />
-                </Button>
-              </Tooltip>
-              <DropdownMenu
-                onOpenChange={(open) => {
-                  if (!open) setDeleteTargetId(null);
-                }}
-              >
-                <Tooltip content={t("ai.history")}>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="ghost" className="size-6">
-                      <History className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
+          ) : undefined
+        }
+        actions={
+          <>
+            {configured && (
+              <>
+                <Tooltip content={t("ai.newChat")}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={PANEL_HEADER_ACTION_CLASS}
+                    onClick={() => void createSession()}
+                  >
+                    <MessageCirclePlus className="size-4" />
+                  </Button>
                 </Tooltip>
-                <DropdownMenuContent
-                  align="end"
-                  className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto overscroll-contain"
+                <DropdownMenu
+                  onOpenChange={(open) => {
+                    if (!open) setDeleteTargetId(null);
+                  }}
                 >
-                  {sessions.length === 0 ? (
-                    <div className="px-2 py-3 text-center text-xs text-muted-foreground">
-                      {t("ai.noSessions")}
-                    </div>
-                  ) : (
-                    sessions.map((s) => (
-                      <DropdownMenuItem
-                        key={s.id}
-                        className={cn(
-                          "gap-1.5",
-                          s.id === activeId && "bg-accent/70",
-                        )}
-                        onSelect={() => void openSession(s.id)}
+                  <Tooltip content={t("ai.history")}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className={PANEL_HEADER_ACTION_CLASS}
                       >
-                        <span className="min-w-0 flex-1 truncate">
-                          {s.title || t("ai.untitledChat")}
-                        </span>
-                        <button
-                          type="button"
+                        <History className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </Tooltip>
+                  <DropdownMenuContent
+                    align="end"
+                    className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto overscroll-contain"
+                  >
+                    {sessions.length === 0 ? (
+                      <div className="px-2 py-3 text-center text-xs text-muted-foreground">
+                        {t("ai.noSessions")}
+                      </div>
+                    ) : (
+                      sessions.map((s) => (
+                        <DropdownMenuItem
+                          key={s.id}
                           className={cn(
-                            "rounded text-muted-foreground hover:bg-accent hover:text-danger",
-                            deleteTargetId === s.id
-                              ? "px-2 py-1 text-xs font-medium text-danger"
-                              : "p-1",
+                            "gap-1.5",
+                            s.id === activeId && "bg-accent/70",
                           )}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (deleteTargetId === s.id) {
-                              setDeleteTargetId(null);
-                              void deleteSession(s.id);
-                            } else {
-                              setDeleteTargetId(s.id);
-                            }
-                          }}
+                          onSelect={() => void openSession(s.id)}
                         >
-                          {deleteTargetId === s.id ? (
-                            t("common.confirm")
-                          ) : (
-                            <Trash2 className="size-3.5" />
-                          )}
-                        </button>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          )}
-          <Tooltip content={t("ai.hidePanel")}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6"
-              onClick={toggleAux}
-            >
-              <X className="size-4" />
-            </Button>
-          </Tooltip>
-        </div>
-      </div>
+                          <span className="min-w-0 flex-1 truncate">
+                            {s.title || t("ai.untitledChat")}
+                          </span>
+                          <button
+                            type="button"
+                            className={cn(
+                              "rounded text-muted-foreground hover:bg-accent hover:text-danger",
+                              deleteTargetId === s.id
+                                ? "px-2 py-1 text-xs font-medium text-danger"
+                                : "p-1",
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (deleteTargetId === s.id) {
+                                setDeleteTargetId(null);
+                                void deleteSession(s.id);
+                              } else {
+                                setDeleteTargetId(s.id);
+                              }
+                            }}
+                          >
+                            {deleteTargetId === s.id ? (
+                              t("common.confirm")
+                            ) : (
+                              <Trash2 className="size-3.5" />
+                            )}
+                          </button>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+            <Tooltip content={t("ai.hidePanel")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={PANEL_HEADER_ACTION_CLASS}
+                onClick={toggleAux}
+              >
+                <X className="size-4" />
+              </Button>
+            </Tooltip>
+          </>
+        }
+      />
 
       {!configured ? (
         <EmptyState
@@ -343,7 +352,7 @@ export function AssistantPanel({ width }: { width: number }) {
                         type="button"
                         disabled={pending || !model}
                         onClick={() => void sendPrompt(t(suggestion.key))}
-                        className="rounded-md border border-input px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                        className="rounded-lg border border-border bg-card/45 px-3 py-2.5 text-left text-xs leading-relaxed text-muted-foreground shadow-sm transition-[background-color,border-color,color] hover:border-input hover:bg-card hover:text-foreground disabled:opacity-50"
                       >
                         {t(suggestion.key)}
                       </button>
@@ -368,8 +377,8 @@ export function AssistantPanel({ width }: { width: number }) {
             </div>
           </div>
 
-          <div className="p-2.5">
-            <div className="rounded-md border border-input bg-surface transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+          <div className="border-t border-border bg-surface/35 p-3">
+            <div className="overflow-hidden rounded-xl border border-input bg-card shadow-sm transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
               <Textarea
                 ref={inputRef}
                 rows={1}
@@ -382,7 +391,7 @@ export function AssistantPanel({ width }: { width: number }) {
                   }
                 }}
                 placeholder={t("ai.inputPlaceholder")}
-                className="max-h-40 min-h-0 resize-none border-0 focus-visible:ring-0"
+                className="max-h-40 min-h-0 resize-none rounded-none border-0 bg-transparent py-2.5 focus-visible:ring-0"
               />
               <div className="flex items-center gap-1.5 border-t border-border px-1.5 py-1.5">
                 <Select
@@ -461,7 +470,7 @@ function ContinueRun({
   const { t } = useI18n();
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-input bg-surface px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-3 py-2 shadow-sm">
       <span className="min-w-0 truncate text-xs text-muted-foreground">
         {t("ai.stepLimitReached")}
       </span>
@@ -551,7 +560,7 @@ function Bubble({
 }) {
   if (role === "user") {
     return (
-      <div className="rounded-lg bg-accent/60 px-3 py-2">
+      <div className="ml-auto max-w-[92%] rounded-xl rounded-br-sm border border-primary/15 bg-primary/12 px-3 py-2 shadow-sm">
         <p className="select-text whitespace-pre-wrap break-words text-sm">
           {content}
         </p>
@@ -559,7 +568,7 @@ function Bubble({
     );
   }
   return (
-    <div className="min-w-0 select-text space-y-2">
+    <div className="min-w-0 select-text space-y-2 px-0.5">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={MARKDOWN_COMPONENTS}
@@ -691,7 +700,7 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-md border border-input bg-terminal-background">
+    <div className="overflow-hidden rounded-lg border border-border bg-terminal-background shadow-sm">
       <div className="flex items-center justify-between border-b border-border px-2 py-1">
         <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
           {t("ai.commandLabel")}

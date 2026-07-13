@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Pencil,
   Play,
@@ -23,8 +23,16 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import type { Snippet } from "@/types/models";
+import {
+  PanelContent,
+  PANEL_HEADER_ACTION_CLASS,
+  PANEL_LIST_ACTION_CLASS,
+  PANEL_LIST_ITEM_CLASS,
+} from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
+import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { useTabsStore } from "@/workbench/tabs";
 import { useDeleteSnippet, useSnippets } from "./api";
 import { BatchRunDialog } from "./BatchRunDialog";
@@ -45,6 +53,18 @@ export function SnippetsView() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [runSnippet, setRunSnippet] = useState<Snippet | null>(null);
   const [batch, setBatch] = useState<Snippet | null>(null);
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
+
+  const filteredSnippets = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return snippets;
+    return snippets.filter((snippet) =>
+      [snippet.name, snippet.command, snippet.description ?? ""].some((value) =>
+        value.toLowerCase().includes(q),
+      ),
+    );
+  }, [query, snippets]);
 
   const send = (command: string) => {
     const result = sendToTerminal(command);
@@ -95,40 +115,58 @@ export function SnippetsView() {
           <Button
             size="icon"
             variant="ghost"
-            className="size-6"
+            className={PANEL_HEADER_ACTION_CLASS}
             onClick={() => setForm({ open: true, snippet: null })}
           >
             <Plus className="size-4" />
           </Button>
         </Tooltip>
       }
+      topContent={
+        <SideBarFilter
+          itemCount={snippets.length}
+          value={query}
+          onChange={setQuery}
+          placeholder={t("snippets.filterPlaceholder")}
+        />
+      }
     >
-      <div className="pb-4">
-        {snippets.length === 0 ? (
+      <PanelContent className="space-y-0.5">
+        {filteredSnippets.length === 0 ? (
           <EmptyState
             icon={SquareTerminal}
-            title={t("snippets.empty.title")}
-            description={t("snippets.empty.description")}
+            title={
+              searching ? t("snippets.noMatches") : t("snippets.empty.title")
+            }
+            description={
+              searching ? undefined : t("snippets.empty.description")
+            }
             action={
-              <Button
-                size="sm"
-                onClick={() => setForm({ open: true, snippet: null })}
-              >
-                <Plus /> {t("snippets.new")}
-              </Button>
+              !searching && (
+                <Button
+                  size="sm"
+                  onClick={() => setForm({ open: true, snippet: null })}
+                >
+                  <Plus /> {t("snippets.new")}
+                </Button>
+              )
             }
           />
         ) : (
-          snippets.map((snippet) => (
+          filteredSnippets.map((snippet) => (
             <ContextMenu key={snippet.id}>
               <ContextMenuTrigger asChild>
                 <div
                   onDoubleClick={() => run(snippet)}
-                  className="group flex cursor-pointer items-center gap-2 px-2 py-1.5 hover:bg-list-hover"
+                  className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
                 >
-                  <Terminal className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm">
+                    <Terminal className="size-4" strokeWidth={1.7} />
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">{snippet.name}</p>
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {snippet.name}
+                    </p>
                     <p className="truncate font-mono text-2xs text-muted-foreground">
                       {snippet.command}
                     </p>
@@ -136,7 +174,7 @@ export function SnippetsView() {
                   <Tooltip content={t("snippets.run")}>
                     <button
                       onClick={() => run(snippet)}
-                      className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover:opacity-100"
+                      className={PANEL_LIST_ACTION_CLASS}
                     >
                       <Play className="size-3.5" />
                     </button>
@@ -166,7 +204,7 @@ export function SnippetsView() {
             </ContextMenu>
           ))
         )}
-      </div>
+      </PanelContent>
 
       <SnippetFormDialog
         open={form.open}

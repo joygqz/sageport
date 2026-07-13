@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_THEME_ID, getTheme, THEMES } from "./themes";
+import {
+  DEFAULT_THEME_ID,
+  getTheme,
+  resolveTheme,
+  THEME_FAMILIES,
+  THEMES,
+} from "./themes";
 
 function relativeLuminance(hex: string): number {
   const channels = hex
@@ -20,10 +26,18 @@ function contrast(a: string, b: string): number {
 }
 
 describe("themes", () => {
-  it("provides six unique, valid theme definitions", () => {
+  it("provides three complete, paired theme families", () => {
+    expect(THEME_FAMILIES).toHaveLength(3);
     expect(THEMES).toHaveLength(6);
     expect(new Set(THEMES.map((theme) => theme.id)).size).toBe(THEMES.length);
     expect(getTheme(DEFAULT_THEME_ID).id).toBe(DEFAULT_THEME_ID);
+
+    for (const family of THEME_FAMILIES) {
+      expect(family.themes.light.familyId).toBe(family.id);
+      expect(family.themes.light.appearance).toBe("light");
+      expect(family.themes.dark.familyId).toBe(family.id);
+      expect(family.themes.dark.appearance).toBe("dark");
+    }
 
     for (const theme of THEMES) {
       for (const value of [
@@ -79,10 +93,20 @@ describe("themes", () => {
     }
   });
 
-  it("maps retired theme ids to the closest current palette", () => {
-    expect(getTheme("dark-modern").id).toBe("github-dark");
-    expect(getTheme("one-dark").id).toBe("one-dark-pro");
-    expect(getTheme("light-modern").id).toBe("github-light");
-    expect(getTheme("solarized-light").id).toBe("catppuccin-latte");
+  it("resolves system mode without changing the selected family", () => {
+    expect(
+      resolveTheme({ familyId: "midnight", mode: "system" }, "light").id,
+    ).toBe("midnight-light");
+    expect(
+      resolveTheme({ familyId: "midnight", mode: "system" }, "dark").id,
+    ).toBe("midnight-dark");
+  });
+
+  it("maps retired theme ids to the closest new family", () => {
+    expect(getTheme("dark-modern").id).toBe("midnight-dark");
+    expect(getTheme("one-dark").id).toBe("graphite-dark");
+    expect(getTheme("light-modern").id).toBe("midnight-light");
+    expect(getTheme("dracula").id).toBe("dracula-dark");
+    expect(getTheme("solarized-light").id).toBe("dracula-light");
   });
 });

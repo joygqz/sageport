@@ -61,8 +61,9 @@ try {
     cwd: root,
   });
 
-  if (pngPath.toLowerCase().endsWith(".png")) {
-    copyFileSync(pngPath, join(root, "public", "app-icon.png"));
+  const generatedPngPath = join(outDir, "icon.png");
+  if (existsSync(generatedPngPath)) {
+    copyFileSync(generatedPngPath, join(root, "public", "app-icon.png"));
     log("copied → public/app-icon.png");
   }
 } catch {

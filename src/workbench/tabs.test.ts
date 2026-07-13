@@ -14,7 +14,6 @@ vi.mock("@/lib/ipc", () => ({
 }));
 
 import {
-  SETTINGS_TAB_ID,
   isFileDirty,
   targetTerminalId,
   terminalTabs,
@@ -157,24 +156,11 @@ describe("moveTab", () => {
   });
 });
 
-describe("openSettings", () => {
-  it("creates one settings tab and refocuses it with a new section", () => {
-    useTabsStore.getState().openSettings();
-    useTabsStore.getState().openTerminal(host("a"));
-    useTabsStore.getState().openSettings("sync");
-    const s = useTabsStore.getState();
-    expect(s.tabs.filter((t) => t.kind === "settings")).toHaveLength(1);
-    expect(s.activeId).toBe(SETTINGS_TAB_ID);
-    const settings = s.tabs.find((t) => t.kind === "settings");
-    expect(settings?.kind === "settings" && settings.section).toBe("sync");
-  });
-});
-
 describe("selectors", () => {
   it("targetTerminalId prefers the active terminal, else the last one", () => {
     const store = useTabsStore.getState();
     const a = store.openTerminal(host("a"));
-    useTabsStore.getState().openSettings();
+    store.openFile({ connectionId: null, path: "/tmp/a", name: "a" });
     expect(targetTerminalId(useTabsStore.getState())).toBe(a);
     useTabsStore.getState().setActive(a);
     expect(targetTerminalId(useTabsStore.getState())).toBe(a);
@@ -183,7 +169,7 @@ describe("selectors", () => {
   it("terminalTabs filters non-terminal tabs", () => {
     const store = useTabsStore.getState();
     store.openTerminal(host("a"));
-    useTabsStore.getState().openSettings();
+    store.openFile({ connectionId: null, path: "/tmp/a", name: "a" });
     expect(terminalTabs(useTabsStore.getState().tabs)).toHaveLength(1);
   });
 

@@ -34,7 +34,7 @@ export function SideBar({ width }: { width: number }) {
   return (
     <aside
       style={{ width }}
-      className="flex shrink-0 flex-col overflow-hidden bg-surface"
+      className="flex shrink-0 flex-col overflow-hidden bg-surface/80"
     >
       <Suspense
         fallback={

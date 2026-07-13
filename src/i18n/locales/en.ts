@@ -2,6 +2,7 @@ export const en = {
   common: {
     add: "Add",
     cancel: "Cancel",
+    close: "Close",
     copy: "Copy",
     copied: "Copied",
     confirm: "Confirm",
@@ -57,6 +58,8 @@ export const en = {
 
   monitor: {
     viewTitle: "Monitor",
+    filterPlaceholder: "Filter active hosts",
+    noMatches: "No matching active hosts",
     cpu: "CPU",
     memory: "Memory",
     disk: "Disk",
@@ -76,6 +79,8 @@ export const en = {
 
   forwards: {
     viewTitle: "Port Forwarding",
+    filterPlaceholder: "Filter port forwards",
+    noMatches: "No matching port forwards",
     new: "New Forward",
     start: "Start",
     stop: "Stop",
@@ -345,6 +350,8 @@ export const en = {
 
   credentials: {
     viewTitle: "Credentials",
+    filterPlaceholder: "Filter credentials",
+    noMatches: "No matching credentials",
     keys: {
       sectionTitle: "SSH Keys",
       add: "Add Key",
@@ -414,6 +421,8 @@ export const en = {
 
   snippets: {
     viewTitle: "Snippets",
+    filterPlaceholder: "Filter snippets",
+    noMatches: "No matching snippets",
     new: "New Snippet",
     batch: {
       action: "Run on Hosts…",
@@ -472,7 +481,6 @@ export const en = {
     },
     emptyDir: "This folder is empty",
     fileList: "Files",
-    selectFile: "Select {name}",
     deleteManyConfirm:
       "This will permanently delete {count} selected items. This action cannot be undone.",
     noTabTitle: "No location open",
@@ -668,7 +676,15 @@ export const en = {
     appearance: {
       themeTitle: "Theme",
       themeDescription:
-        "Choose how Sageport looks. Each theme styles the whole interface, including the terminal.",
+        "Choose a coordinated color family and how it responds to your system appearance.",
+      colorMode: "Color mode",
+      modeSystem: "System",
+      modeLight: "Light",
+      modeDark: "Dark",
+      themeFamily: "Color family",
+      familyMidnight: "Focused navy for terminal work",
+      familyGraphite: "Neutral gray with crisp hierarchy",
+      familyDracula: "Deep purple with vivid terminal accents",
       darkThemes: "Dark themes",
       lightThemes: "Light themes",
       language: "Language",

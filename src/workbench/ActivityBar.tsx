@@ -12,7 +12,7 @@ import { Tooltip } from "@/components/ui";
 import { useI18n, type TKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type Activity } from "./layout";
-import { useTabsStore } from "./tabs";
+import { useOverlayStore } from "./overlays";
 
 const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "hosts", icon: Server, labelKey: "activityBar.hosts" },
@@ -27,14 +27,12 @@ export function ActivityBar() {
   const activity = useLayoutStore((s) => s.activity);
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
   const selectActivity = useLayoutStore((s) => s.selectActivity);
-  const openSettings = useTabsStore((s) => s.openSettings);
-  const settingsActive = useTabsStore(
-    (s) => s.activeId === "settings" && s.tabs.some((x) => x.id === "settings"),
-  );
+  const openSettings = useOverlayStore((s) => s.openSettings);
+  const settingsActive = useOverlayStore((s) => s.overlay?.type === "settings");
 
   return (
-    <nav className="flex w-12 shrink-0 flex-col items-center justify-between border-r border-border bg-surface py-1">
-      <div className="flex flex-col items-center gap-1">
+    <nav className="flex w-[var(--activitybar-width)] shrink-0 flex-col items-center justify-between border-r border-border bg-surface/95 py-2">
+      <div className="flex flex-col items-center gap-1.5">
         {ACTIVITIES.map((item) => {
           const Icon = item.icon;
           const active = sidebarVisible && activity === item.id;
@@ -42,21 +40,22 @@ export function ActivityBar() {
             <Tooltip key={item.id} content={t(item.labelKey)} side="right">
               <button
                 onClick={() => selectActivity(item.id)}
+                aria-label={t(item.labelKey)}
                 aria-pressed={active}
                 className={cn(
-                  "relative flex size-10 items-center justify-center rounded-md transition-colors",
+                  "relative flex size-9 items-center justify-center rounded-lg outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
                   active
-                    ? "text-foreground"
-                    : "text-muted-foreground/75 hover:text-foreground",
+                    ? "bg-list-active text-list-active-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
                 )}
               >
                 <span
                   className={cn(
-                    "absolute inset-y-1.5 -left-1 w-[3px] bg-foreground transition-opacity",
+                    "absolute inset-y-2 -left-2 w-0.5 rounded-r-full bg-primary transition-opacity",
                     active ? "opacity-100" : "opacity-0",
                   )}
                 />
-                <Icon className="size-6" strokeWidth={1.5} />
+                <Icon className="size-5" strokeWidth={1.75} />
               </button>
             </Tooltip>
           );
@@ -66,14 +65,16 @@ export function ActivityBar() {
       <Tooltip content={t("activityBar.settings")} side="right">
         <button
           onClick={() => openSettings()}
+          aria-label={t("activityBar.settings")}
+          aria-pressed={settingsActive}
           className={cn(
-            "flex size-10 items-center justify-center rounded-md transition-colors",
+            "flex size-9 items-center justify-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
             settingsActive
-              ? "text-foreground"
-              : "text-muted-foreground/75 hover:text-foreground",
+              ? "bg-list-active text-list-active-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
           )}
         >
-          <Settings className="size-6" strokeWidth={1.5} />
+          <Settings className="size-5" strokeWidth={1.75} />
         </button>
       </Tooltip>
     </nav>

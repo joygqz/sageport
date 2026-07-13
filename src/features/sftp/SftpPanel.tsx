@@ -5,6 +5,10 @@ import { Button, ResizeHandle, Tooltip } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 import { useLayoutStore } from "@/workbench/layout";
+import {
+  PanelHeader,
+  PANEL_HEADER_ACTION_CLASS,
+} from "@/workbench/PanelHeader";
 import { useZoomStore, zoomFactor } from "@/workbench/zoom";
 import { FilePane } from "./FilePane";
 import { useSftpStore } from "./store";
@@ -54,47 +58,51 @@ export function SftpPanel({ height }: { height: number }) {
       className="flex shrink-0 flex-col overflow-hidden border-t border-border bg-background"
       style={{ height }}
     >
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-surface pl-4 pr-2">
-        <h2 className="truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t("sftp.panelTitle")}
-        </h2>
-        <div className="flex items-center gap-0.5">
-          <Tooltip content={t("sftp.toggleHidden")}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className={cn("size-6", showHidden && "text-foreground")}
-              onClick={toggleHidden}
-            >
-              {showHidden ? (
-                <Eye className="size-4" />
-              ) : (
-                <EyeOff className="size-4" />
-              )}
-            </Button>
-          </Tooltip>
-          <Tooltip content={t("sftp.history.title")}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6"
-              onClick={() => setHistoryOpen(true)}
-            >
-              <History className="size-4" />
-            </Button>
-          </Tooltip>
-          <Tooltip content={t("sftp.hidePanel")}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6"
-              onClick={() => setPanelVisible(false)}
-            >
-              <X className="size-4" />
-            </Button>
-          </Tooltip>
-        </div>
-      </div>
+      <PanelHeader
+        title={t("sftp.panelTitle")}
+        className="bg-surface/70"
+        actions={
+          <>
+            <Tooltip content={t("sftp.toggleHidden")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  PANEL_HEADER_ACTION_CLASS,
+                  showHidden && "text-foreground",
+                )}
+                onClick={toggleHidden}
+              >
+                {showHidden ? (
+                  <Eye className="size-4" />
+                ) : (
+                  <EyeOff className="size-4" />
+                )}
+              </Button>
+            </Tooltip>
+            <Tooltip content={t("sftp.history.title")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={PANEL_HEADER_ACTION_CLASS}
+                onClick={() => setHistoryOpen(true)}
+              >
+                <History className="size-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content={t("sftp.hidePanel")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={PANEL_HEADER_ACTION_CLASS}
+                onClick={() => setPanelVisible(false)}
+              >
+                <X className="size-4" />
+              </Button>
+            </Tooltip>
+          </>
+        }
+      />
 
       <div ref={bodyRef} className="flex min-h-0 flex-1">
         <div style={{ width: `${ratio * 100}%` }} className="flex min-w-0">
@@ -127,7 +135,7 @@ function TransferStrip() {
   if (active.length === 0) return null;
 
   return (
-    <div className="flex max-h-24 flex-col overflow-y-auto border-t border-border bg-surface px-2">
+    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border bg-surface/80 px-2.5 py-1">
       {active.map((tx) => {
         const pct =
           tx.total > 0
@@ -148,7 +156,7 @@ function TransferStrip() {
         return (
           <div
             key={tx.transferId}
-            className="flex h-7 items-center gap-2 text-xs"
+            className="flex h-8 items-center gap-2 rounded-md px-1 text-xs hover:bg-list-hover"
           >
             <span className="min-w-0 shrink truncate" title={tx.file}>
               {tx.file}
@@ -171,13 +179,13 @@ function TransferStrip() {
                 style={{ width: `${indeterminate ? 100 : pct}%` }}
               />
             </div>
-            <span className="w-9 shrink-0 text-right tabular-nums text-muted-foreground">
+            <span className="shrink-0 tabular-nums text-muted-foreground">
               {indeterminate ? "…" : `${pct}%`}
             </span>
-            <span className="w-18 shrink-0 text-right tabular-nums text-muted-foreground">
+            <span className="shrink-0 tabular-nums text-muted-foreground">
               {speed}
             </span>
-            <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">
+            <span className="shrink-0 tabular-nums text-muted-foreground">
               {tx.etaSeconds !== null && tx.speedBps > 0
                 ? t("sftp.remaining", { time: formatEta(tx.etaSeconds) })
                 : ""}

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -20,7 +20,9 @@ import {
 import { useI18n, type TFunction, type TKey } from "@/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 import type { Host, HostStats } from "@/types/models";
+import { PanelContent } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
+import { SideBarFilter } from "@/workbench/SideBarFilter";
 import {
   terminalTabs,
   useTabsStore,
@@ -40,6 +42,8 @@ export function MonitorView() {
   const { t } = useI18n();
   const tabs = useTabsStore((s) => s.tabs);
   const { data: hosts = [] } = useHosts();
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
 
   useEffect(() => {
     bridgeMonitorEvents();
@@ -51,26 +55,55 @@ export function MonitorView() {
     ),
   );
   const hostById = new Map(hosts.map((host) => [host.id, host]));
+  const q = query.trim().toLowerCase();
+  const filteredGroups = q
+    ? groups.filter((group) => {
+        const host = hostById.get(group.sessions[0].hostId);
+        return [
+          group.key,
+          host?.label ?? "",
+          host?.address ?? "",
+          ...group.sessions.flatMap((session) => [
+            session.title,
+            session.adhoc?.host ?? "",
+            session.adhoc?.username ?? "",
+          ]),
+        ].some((value) => value.toLowerCase().includes(q));
+      })
+    : groups;
 
   return (
-    <SideBarView title={t("monitor.viewTitle")}>
-      {groups.length === 0 ? (
-        <EmptyState
-          icon={Gauge}
-          title={t("monitor.empty.title")}
-          description={t("monitor.empty.description")}
+    <SideBarView
+      title={t("monitor.viewTitle")}
+      topContent={
+        <SideBarFilter
+          itemCount={groups.length}
+          value={query}
+          onChange={setQuery}
+          placeholder={t("monitor.filterPlaceholder")}
+          threshold={3}
         />
-      ) : (
-        <div className="flex flex-col gap-2 px-2 pb-4 pt-1">
-          {groups.map((group) => (
+      }
+    >
+      <PanelContent className="flex flex-col gap-2.5">
+        {filteredGroups.length === 0 ? (
+          <EmptyState
+            icon={Gauge}
+            title={
+              searching ? t("monitor.noMatches") : t("monitor.empty.title")
+            }
+            description={searching ? undefined : t("monitor.empty.description")}
+          />
+        ) : (
+          filteredGroups.map((group) => (
             <HostCard
               key={group.key}
               sessions={group.sessions}
               host={hostById.get(group.sessions[0].hostId)}
             />
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </PanelContent>
     </SideBarView>
   );
 }
@@ -141,6 +174,7 @@ function HostCard({
     sessions.find((session) => session.id === activeId) ??
     sessions.find((session) => session.status === "connected") ??
     sessions[0];
+  const active = sessions.some((session) => session.id === activeId);
   const connected = sessions.some((session) => session.status === "connected");
 
   const address = hostAddress(primary, host);
@@ -160,34 +194,41 @@ function HostCard({
     <button
       onClick={() => setActive(primary.id)}
       className={cn(
-        "flex flex-col gap-2.5 rounded-md border border-input p-2.5 text-left transition-colors hover:bg-list-hover",
-        sessions.some((session) => session.id === activeId) && "border-ring",
+        "flex flex-col gap-3 rounded-xl border border-border bg-card/55 p-3 text-left shadow-sm outline-none transition-[background-color,border-color,box-shadow] hover:bg-card focus-visible:ring-2 focus-visible:ring-ring/35",
+        active
+          ? "border-ring/70 bg-card ring-1 ring-ring/20"
+          : "hover:border-input",
       )}
     >
       <div className="flex w-full flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              "size-1.5 shrink-0 rounded-full",
-              statusDot[connected ? "connected" : primary.status],
+          <div className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-link">
+            <Gauge className="size-4" strokeWidth={1.7} />
+            <span
+              className={cn(
+                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card",
+                statusDot[connected ? "connected" : primary.status],
+              )}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-card-foreground">
+              {primary.title}
+            </p>
+            {address && (
+              <p className="truncate font-mono text-2xs text-muted-foreground">
+                {address}
+              </p>
             )}
-          />
-          <span className="min-w-0 flex-1 truncate text-sm">
-            {primary.title}
-          </span>
+          </div>
           {sessions.length > 1 && (
-            <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
+            <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-2xs tabular-nums text-muted-foreground">
               ×{sessions.length}
             </span>
           )}
         </div>
-        {address && (
-          <p className="truncate pl-3.5 font-mono text-2xs text-muted-foreground">
-            {address}
-          </p>
-        )}
         {system && (
-          <p className="truncate pl-3.5 text-2xs text-muted-foreground">
+          <p className="mt-1 truncate pl-10 text-2xs text-muted-foreground">
             {system}
           </p>
         )}
@@ -279,7 +320,7 @@ function Meter({
         </span>
         <span className="tabular-nums">{percent}%</span>
       </div>
-      <div className="h-1 overflow-hidden rounded-full bg-muted">
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
         <div
           className={cn(
             "h-full rounded-full transition-[width] duration-500",

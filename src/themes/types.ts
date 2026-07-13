@@ -1,4 +1,5 @@
 export type ThemeAppearance = "light" | "dark";
+export type ThemeMode = ThemeAppearance | "system";
 
 export interface ThemeColors {
   background: string;
@@ -68,9 +69,21 @@ export interface TerminalPalette {
 
 export interface ThemeDefinition {
   id: string;
-
+  familyId: string;
   name: string;
   appearance: ThemeAppearance;
   colors: ThemeColors;
   terminal: TerminalPalette;
+}
+
+export interface ThemeFamilyDefinition {
+  id: string;
+  name: string;
+  description: string;
+  themes: Record<ThemeAppearance, ThemeDefinition>;
+}
+
+export interface ThemePreference {
+  familyId: string;
+  mode: ThemeMode;
 }

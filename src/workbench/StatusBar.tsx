@@ -17,6 +17,7 @@ import { useSyncStatus } from "@/features/sync/api";
 import { useSftpStore } from "@/features/sftp/store";
 import { useUpdateStatus } from "@/features/updates/api";
 import { useLayoutStore } from "./layout";
+import { useOverlayStore } from "./overlays";
 import {
   targetTerminalId,
   terminalTabs,
@@ -36,7 +37,7 @@ export function StatusBar() {
   const { t } = useI18n();
 
   return (
-    <footer className="flex h-6 shrink-0 items-center justify-between border-t border-border bg-surface px-1 text-2xs text-muted-foreground">
+    <footer className="flex h-[var(--statusbar-height)] shrink-0 items-center justify-between border-t border-border bg-surface/95 px-1 text-2xs text-muted-foreground">
       <div className="flex h-full items-center">
         <SessionItem />
         <MonitorItem />
@@ -176,7 +177,7 @@ function TransfersItem() {
 function SyncItem() {
   const { t } = useI18n();
   const { data: status } = useSyncStatus();
-  const openSettings = useTabsStore((s) => s.openSettings);
+  const openSettings = useOverlayStore((s) => s.openSettings);
 
   const connected = Boolean(status?.provider);
   return (
@@ -208,7 +209,7 @@ function SyncItem() {
 function UpdateItem() {
   const { t } = useI18n();
   const status = useUpdateStatus();
-  const openSettings = useTabsStore((s) => s.openSettings);
+  const openSettings = useOverlayStore((s) => s.openSettings);
 
   if (
     status.status !== "available" &&

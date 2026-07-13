@@ -27,7 +27,7 @@ export function useKeybindings() {
       } else if (key === "n" && !e.shiftKey) {
         run(() => overlays.openHostForm());
       } else if (key === ",") {
-        run(() => tabs.openSettings());
+        run(() => overlays.openSettings());
       } else if (key === "b" && !e.shiftKey) {
         run(() => layout.toggleSidebar());
       } else if (key === "b" && e.shiftKey) {
@@ -40,7 +40,8 @@ export function useKeybindings() {
         run(() => layout.toggleAux());
       } else if (key === "w" && !e.shiftKey) {
         run(() => {
-          if (tabs.activeId) tabs.close(tabs.activeId);
+          if (overlays.overlay) overlays.close();
+          else if (tabs.activeId) tabs.close(tabs.activeId);
         });
       } else if (e.shiftKey && (key === "[" || key === "]")) {
         run(() => tabs.activateNext(key === "]" ? 1 : -1));

@@ -1,8 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Check,
-  ChevronDown,
-  ChevronRight,
   Copy,
   KeyRound,
   Pencil,
@@ -20,13 +18,22 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  EmptyState,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import type { Identity, SshKey } from "@/types/models";
+import {
+  PanelContent,
+  PanelSectionHeader,
+  PANEL_LIST_ACTION_CLASS,
+  PANEL_LIST_ITEM_CLASS,
+} from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
+import { SideBarFilter } from "@/workbench/SideBarFilter";
 import {
   useDeleteIdentity,
   useDeleteSshKey,
@@ -38,33 +45,91 @@ import { KeyFormDialog } from "./KeyFormDialog";
 
 export function CredentialsView() {
   const { t } = useI18n();
+  const { data: keys = [] } = useSshKeys();
+  const { data: identities = [] } = useIdentities();
   const [keyFormOpen, setKeyFormOpen] = useState(false);
   const [identityForm, setIdentityForm] = useState<{
     open: boolean;
     identity: Identity | null;
   }>({ open: false, identity: null });
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
+
+  const filteredKeys = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return keys;
+    return keys.filter((key) =>
+      [key.name, algorithmTag(key.publicKey) ?? ""].some((value) =>
+        value.toLowerCase().includes(q),
+      ),
+    );
+  }, [keys, query]);
+
+  const filteredIdentities = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return identities;
+    return identities.filter((identity) =>
+      [identity.name, identity.username, identity.authType].some((value) =>
+        value.toLowerCase().includes(q),
+      ),
+    );
+  }, [identities, query]);
+
+  const noMatches =
+    searching && filteredKeys.length === 0 && filteredIdentities.length === 0;
 
   return (
-    <SideBarView title={t("credentials.viewTitle")}>
-      <Section
-        title={t("credentials.keys.sectionTitle")}
-        onAdd={() => setKeyFormOpen(true)}
-        addLabel={t("credentials.keys.add")}
-      >
-        <KeyList setConfirmState={setConfirmState} />
-      </Section>
-
-      <Section
-        title={t("credentials.identities.sectionTitle")}
-        onAdd={() => setIdentityForm({ open: true, identity: null })}
-        addLabel={t("credentials.identities.add")}
-      >
-        <IdentityList
-          setConfirmState={setConfirmState}
-          onEdit={(identity) => setIdentityForm({ open: true, identity })}
+    <SideBarView
+      title={t("credentials.viewTitle")}
+      topContent={
+        <SideBarFilter
+          itemCount={keys.length + identities.length}
+          value={query}
+          onChange={setQuery}
+          placeholder={t("credentials.filterPlaceholder")}
+          threshold={6}
         />
-      </Section>
+      }
+    >
+      <PanelContent className="space-y-[var(--panel-gutter)]">
+        {noMatches ? (
+          <EmptyState icon={KeyRound} title={t("credentials.noMatches")} />
+        ) : (
+          <>
+            {(!searching || filteredKeys.length > 0) && (
+              <Section
+                title={t("credentials.keys.sectionTitle")}
+                onAdd={() => setKeyFormOpen(true)}
+                addLabel={t("credentials.keys.add")}
+                forceExpanded={searching}
+              >
+                <KeyList
+                  keys={filteredKeys}
+                  setConfirmState={setConfirmState}
+                />
+              </Section>
+            )}
+
+            {(!searching || filteredIdentities.length > 0) && (
+              <Section
+                title={t("credentials.identities.sectionTitle")}
+                onAdd={() => setIdentityForm({ open: true, identity: null })}
+                addLabel={t("credentials.identities.add")}
+                forceExpanded={searching}
+              >
+                <IdentityList
+                  identities={filteredIdentities}
+                  setConfirmState={setConfirmState}
+                  onEdit={(identity) =>
+                    setIdentityForm({ open: true, identity })
+                  }
+                />
+              </Section>
+            )}
+          </>
+        )}
+      </PanelContent>
 
       <KeyFormDialog open={keyFormOpen} onClose={() => setKeyFormOpen(false)} />
       <IdentityFormDialog
@@ -84,42 +149,39 @@ function Section({
   title,
   addLabel,
   onAdd,
+  forceExpanded = false,
   children,
 }: {
   title: string;
   addLabel: string;
   onAdd: () => void;
+  forceExpanded?: boolean;
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const isCollapsed = collapsed && !forceExpanded;
 
   return (
-    <div className="mb-1">
-      <div className="group flex items-center">
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          className="flex min-w-0 flex-1 items-center gap-1 px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-list-hover hover:text-foreground"
-        >
-          {collapsed ? (
-            <ChevronRight className="size-3.5 shrink-0" />
-          ) : (
-            <ChevronDown className="size-3.5 shrink-0" />
-          )}
-          <span className="truncate">{title}</span>
-        </button>
-        <Tooltip content={addLabel}>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-6 opacity-0 group-hover:opacity-100"
-            onClick={onAdd}
-          >
-            <Plus className="size-4" />
-          </Button>
-        </Tooltip>
-      </div>
-      {!collapsed && children}
-    </div>
+    <section>
+      <PanelSectionHeader
+        title={title}
+        collapsed={isCollapsed}
+        onToggle={() => setCollapsed((c) => !c)}
+        trailing={
+          <Tooltip content={addLabel}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+              onClick={onAdd}
+            >
+              <Plus className="size-4" />
+            </Button>
+          </Tooltip>
+        }
+      />
+      {!isCollapsed && children}
+    </section>
   );
 }
 
@@ -130,12 +192,13 @@ function algorithmTag(publicKey: string | null): string | null {
 }
 
 function KeyList({
+  keys,
   setConfirmState,
 }: {
+  keys: SshKey[];
   setConfirmState: (state: ConfirmState) => void;
 }) {
   const { t } = useI18n();
-  const { data: keys = [] } = useSshKeys();
   const deleteKey = useDeleteSshKey();
 
   const requestDelete = (key: SshKey) => {
@@ -166,7 +229,7 @@ function KeyList({
   }
 
   return (
-    <div className="pb-2">
+    <div className="pt-[var(--panel-gutter)]">
       {keys.map((key) => (
         <KeyRow key={key.id} sshKey={key} onDelete={() => requestDelete(key)} />
       ))}
@@ -195,10 +258,22 @@ function KeyRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group flex cursor-pointer items-center gap-2 py-1 pl-6 pr-2 hover:bg-list-hover">
-          <KeyRound className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate text-sm">{sshKey.name}</span>
-          {tag && <Badge className="font-mono text-2xs uppercase">{tag}</Badge>}
+        <div className={cn(PANEL_LIST_ITEM_CLASS, "mb-0.5 cursor-pointer")}>
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm">
+            <KeyRound className="size-4" strokeWidth={1.7} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">
+              {sshKey.name}
+            </p>
+            <p className="text-2xs text-muted-foreground">
+              {tag ? (
+                <Badge className="font-mono uppercase">{tag}</Badge>
+              ) : (
+                t("credentials.keys.sectionTitle")
+              )}
+            </p>
+          </div>
           {sshKey.publicKey && (
             <Tooltip
               content={
@@ -209,7 +284,7 @@ function KeyRow({
             >
               <button
                 onClick={copyPublicKey}
-                className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover:opacity-100"
+                className={cn(PANEL_LIST_ACTION_CLASS, "ml-auto")}
               >
                 {copied ? (
                   <Check className="size-3.5" />
@@ -239,14 +314,15 @@ function KeyRow({
 }
 
 function IdentityList({
+  identities,
   setConfirmState,
   onEdit,
 }: {
+  identities: Identity[];
   setConfirmState: (state: ConfirmState) => void;
   onEdit: (identity: Identity) => void;
 }) {
   const { t } = useI18n();
-  const { data: identities = [] } = useIdentities();
   const deleteIdentity = useDeleteIdentity();
 
   const requestDelete = (identity: Identity) => {
@@ -277,19 +353,25 @@ function IdentityList({
   }
 
   return (
-    <div className="pb-2">
+    <div className="pt-[var(--panel-gutter)]">
       {identities.map((identity) => (
         <ContextMenu key={identity.id}>
           <ContextMenuTrigger asChild>
             <div
               onDoubleClick={() => onEdit(identity)}
-              className="group flex cursor-pointer items-center gap-2 py-1 pl-6 pr-2 hover:bg-list-hover"
+              className={cn(PANEL_LIST_ITEM_CLASS, "mb-0.5 cursor-pointer")}
             >
-              <User className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate text-sm">{identity.name}</span>
-              <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
-                {identity.username} · {t(`common.auth.${identity.authType}`)}
-              </span>
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm">
+                <User className="size-4" strokeWidth={1.7} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">
+                  {identity.name}
+                </p>
+                <p className="truncate text-2xs text-muted-foreground">
+                  {identity.username} · {t(`common.auth.${identity.authType}`)}
+                </p>
+              </div>
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent>
@@ -312,7 +394,7 @@ function IdentityList({
 
 function SectionEmpty({ text }: { text: string }) {
   return (
-    <p className="px-6 py-2 text-xs leading-relaxed text-muted-foreground">
+    <p className="mt-[var(--panel-gutter)] rounded-lg border border-dashed border-border px-3 py-3 text-xs leading-relaxed text-muted-foreground">
       {text}
     </p>
   );

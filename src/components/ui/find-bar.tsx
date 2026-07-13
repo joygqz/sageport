@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { Input, type InputProps } from "./input";
 
-const findButtonClass = "size-6 shrink-0 rounded-sm [&_svg]:size-3.5";
+const findButtonClass = "size-6 shrink-0 rounded-lg [&_svg]:size-3.5";
 
 export function FindBar({
   label,
@@ -30,7 +30,7 @@ export function FindBar({
         onDismiss();
       }}
       className={cn(
-        "absolute right-3 top-2 z-30 rounded-md border border-border bg-popover p-1 shadow-md",
+        "absolute right-3 top-2 z-30 rounded-lg border border-border bg-popover p-1 shadow-md",
         className,
       )}
     >
@@ -49,10 +49,7 @@ export function FindInput({
       ref={ref}
       autoComplete="off"
       spellCheck={false}
-      className={cn(
-        "h-7 rounded-sm px-2 py-0 text-xs focus-visible:ring-1",
-        className,
-      )}
+      className={cn("h-7 rounded-lg px-2 py-0 text-xs", className)}
       {...props}
     />
   );

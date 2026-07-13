@@ -6,8 +6,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
-  ChevronDown,
-  ChevronRight,
   FileInput,
   FolderPlus,
   FolderSync,
@@ -28,7 +26,6 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   EmptyState,
-  Input,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -38,7 +35,15 @@ import { errorMessage, toast } from "@/lib/toast";
 import type { Host, HostHealthCheck } from "@/types/models";
 import { useLayoutStore } from "@/workbench/layout";
 import { useOverlayStore } from "@/workbench/overlays";
+import {
+  PanelContent,
+  PANEL_HEADER_ACTION_CLASS,
+  PANEL_LIST_ACTION_CLASS,
+  PANEL_LIST_ITEM_CLASS,
+  PanelSectionHeader,
+} from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
+import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 import { useSftpStore } from "@/features/sftp/store";
 import {
@@ -312,7 +317,7 @@ export function HostsView() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className={PANEL_HEADER_ACTION_CLASS}
               onClick={() => openHostForm()}
             >
               <Plus className="size-4" />
@@ -322,7 +327,7 @@ export function HostsView() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className={PANEL_HEADER_ACTION_CLASS}
               onClick={() => openGroupForm()}
             >
               <FolderPlus className="size-4" />
@@ -332,7 +337,7 @@ export function HostsView() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className={PANEL_HEADER_ACTION_CLASS}
               onClick={() => setImportOpen(true)}
             >
               <FileInput className="size-4" />
@@ -342,7 +347,7 @@ export function HostsView() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className={PANEL_HEADER_ACTION_CLASS}
               disabled={hosts.length === 0 || checkingAll}
               onClick={() => runHealthCheck()}
             >
@@ -354,17 +359,15 @@ export function HostsView() {
         </>
       }
       topContent={
-        <div className="relative z-10 px-2 pb-1">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("hosts.filterPlaceholder")}
-            className="h-6.5 bg-background text-xs"
-          />
-        </div>
+        <SideBarFilter
+          itemCount={hosts.length}
+          value={query}
+          onChange={setQuery}
+          placeholder={t("hosts.filterPlaceholder")}
+        />
       }
     >
-      <div className="pb-4">
+      <PanelContent className="space-y-1">
         {isLoading ? null : sections.length === 0 ? (
           <EmptyState
             icon={Server}
@@ -412,7 +415,7 @@ export function HostsView() {
             </GroupSection>
           ))
         )}
-      </div>
+      </PanelContent>
 
       <ConfirmDialog
         state={confirmState}
@@ -453,24 +456,25 @@ function GroupSection({
   const { t } = useI18n();
 
   const header = (
-    <button
-      onClick={onToggle}
-      className="flex w-full items-center gap-1 px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-list-hover hover:text-foreground"
-    >
-      {collapsed ? (
-        <ChevronRight className="size-3.5 shrink-0" />
-      ) : (
-        <ChevronDown className="size-3.5 shrink-0" />
-      )}
-      <span className="truncate">{name}</span>
-      <span className="ml-auto pr-1 font-normal tabular-nums">{count}</span>
-    </button>
+    <PanelSectionHeader
+      title={name}
+      collapsed={collapsed}
+      onToggle={onToggle}
+      trailing={
+        <span className="min-w-6 rounded-full bg-muted px-1.5 py-0.5 text-center text-2xs font-normal tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      }
+    />
   );
 
   return (
     <div
       data-host-group-id={id}
-      className={cn(isDropTarget && "bg-list-hover")}
+      className={cn(
+        "rounded-lg transition-[background-color,box-shadow]",
+        isDropTarget && "bg-list-hover ring-1 ring-inset ring-ring/50",
+      )}
     >
       {isGroup ? (
         <ContextMenu>
@@ -604,27 +608,35 @@ function HostRow({
           onPointerCancel={finishPointerDrag}
           onDoubleClick={() => openTerminal(host)}
           className={cn(
-            "group flex cursor-pointer touch-none select-none items-center gap-2 py-1 pl-6 pr-2 hover:bg-list-hover",
+            PANEL_LIST_ITEM_CLASS,
+            "mx-0.5 mb-0.5 cursor-pointer touch-none select-none outline-none",
             dragging && "opacity-50",
           )}
         >
-          <Tooltip content={healthTooltip}>
-            <span
-              className={cn(
-                "size-1.5 shrink-0 rounded-full",
-                connected || health?.status === "online"
-                  ? "bg-success"
-                  : health?.status === "offline"
-                    ? "bg-destructive"
-                    : "bg-muted-foreground/40",
-              )}
-            />
-          </Tooltip>
-          <span className="truncate text-sm">{host.label}</span>
-          <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
-            {host.username ? `${host.username}@` : ""}
-            {host.address}
-          </span>
+          <div className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm">
+            <Server className="size-4" strokeWidth={1.7} />
+            <Tooltip content={healthTooltip}>
+              <span
+                className={cn(
+                  "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface",
+                  connected || health?.status === "online"
+                    ? "bg-success"
+                    : health?.status === "offline"
+                      ? "bg-destructive"
+                      : "bg-muted-foreground/55",
+                )}
+              />
+            </Tooltip>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">
+              {host.label}
+            </p>
+            <p className="truncate font-mono text-2xs text-muted-foreground">
+              {host.username ? `${host.username}@` : ""}
+              {host.address}
+            </p>
+          </div>
           <div className="flex shrink-0 items-center gap-0.5">
             <Tooltip content={t("hosts.health.check")}>
               <button
@@ -633,7 +645,7 @@ function HostRow({
                   event.stopPropagation();
                   onCheckHealth();
                 }}
-                className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground disabled:opacity-40 group-hover:opacity-100"
+                className={cn(PANEL_LIST_ACTION_CLASS, "disabled:opacity-40")}
               >
                 <RefreshCw
                   className={cn("size-3.5", checking && "animate-spin")}
@@ -646,7 +658,7 @@ function HostRow({
                   event.stopPropagation();
                   openTerminal(host);
                 }}
-                className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover:opacity-100"
+                className={PANEL_LIST_ACTION_CLASS}
               >
                 <Plug className="size-3.5" />
               </button>
@@ -682,7 +694,7 @@ function HostDragGhost({ dragState }: { dragState: HostDragState }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[100] flex items-center gap-2 border border-border bg-background py-1 pl-6 pr-2 text-sm text-foreground opacity-90 shadow-lg"
+      className="pointer-events-none fixed z-[100] flex items-center gap-2 rounded-lg border border-border bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95 shadow-md"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -690,12 +702,16 @@ function HostDragGhost({ dragState }: { dragState: HostDragState }) {
         height: dragState.rect.height,
       }}
     >
-      <span className="size-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-      <span className="truncate">{host.label}</span>
-      <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
-        {host.username ? `${host.username}@` : ""}
-        {host.address}
-      </span>
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-link">
+        <Server className="size-3.5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate">{host.label}</p>
+        <p className="truncate font-mono text-2xs text-muted-foreground">
+          {host.username ? `${host.username}@` : ""}
+          {host.address}
+        </p>
+      </div>
     </div>
   );
 }

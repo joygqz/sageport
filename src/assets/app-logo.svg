@@ -1,18 +1,18 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="tunnel" x1="736" y1="268" x2="288" y2="756" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#50C8FF"/>
-      <stop offset="0.5" stop-color="#1F9CF0"/>
-      <stop offset="1" stop-color="#007ACC"/>
+      <stop offset="0" stop-color="#83B5F4"/>
+      <stop offset="0.5" stop-color="#80AEF5"/>
+      <stop offset="1" stop-color="#2D6FC5"/>
     </linearGradient>
     <clipPath id="frontHalf"><rect x="0" y="512" width="512" height="512"/></clipPath>
   </defs>
 
-  <rect width="1024" height="1024" fill="#0A1220"/>
+  <rect width="1024" height="1024" fill="#1B1E2E"/>
 
   <path d="M 288 756 C 528 678, 496 346, 736 268"
         stroke="url(#tunnel)" stroke-width="72" stroke-linecap="round"/>
-  <circle cx="512" cy="512" r="216" stroke="#435870" stroke-width="60"/>
+  <circle cx="512" cy="512" r="216" stroke="#3B4058" stroke-width="60"/>
   <g clip-path="url(#frontHalf)">
     <path d="M 288 756 C 528 678, 496 346, 736 268"
           stroke="url(#tunnel)" stroke-width="72" stroke-linecap="round"/>

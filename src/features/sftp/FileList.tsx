@@ -17,6 +17,7 @@ import {
   ScrollArea,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { layoutDragPreview } from "@/lib/dragPreview";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
@@ -153,18 +154,6 @@ export function FileList({
     setSelected(side, tab.id, next.selected);
   };
 
-  const toggleEntry = (entry: FileEntry) => {
-    const next = nextFileSelection({
-      paths: visiblePaths,
-      selected: tab.selected,
-      target: entry.path,
-      anchor: selectionAnchorRef.current,
-      toggle: true,
-    });
-    selectionAnchorRef.current = next.anchor;
-    setSelected(side, tab.id, next.selected);
-  };
-
   const handlePointerDown = (
     e: ReactPointerEvent<HTMLTableRowElement>,
     entry: FileEntry,
@@ -283,7 +272,6 @@ export function FileList({
         className="w-full table-fixed border-collapse text-xs outline-none"
       >
         <colgroup>
-          <col className="w-7" />
           <col />
           <col className="w-14" />
           <col className="w-30" />
@@ -294,10 +282,13 @@ export function FileList({
               onDoubleClick={() =>
                 void navigate(side, tab.id, parentPath(tab.cwd))
               }
-              className="cursor-pointer select-none hover:bg-accent"
+              className="h-7 cursor-pointer select-none transition-colors hover:bg-list-hover"
             >
-              <td colSpan={4} className="px-2 py-1 text-muted-foreground">
-                <span className="inline-flex items-center gap-2">
+              <td
+                colSpan={3}
+                className="h-7 px-2.5 align-middle text-muted-foreground"
+              >
+                <span className="flex h-7 items-center gap-2">
                   <Folder className="size-4 shrink-0" /> ..
                 </span>
               </td>
@@ -306,7 +297,7 @@ export function FileList({
 
           {entries.length === 0 ? (
             <tr>
-              <td colSpan={4}>
+              <td colSpan={3}>
                 <EmptyState
                   className="py-8"
                   icon={Folder}
@@ -348,34 +339,39 @@ export function FileList({
                       }}
                       onDoubleClick={() => open(entry)}
                       className={cn(
-                        "cursor-pointer touch-none select-none",
-                        selected ? "bg-primary/15" : "hover:bg-accent",
-                        dragState?.entry.path === entry.path && "opacity-50",
+                        "h-7 cursor-pointer touch-none select-none transition-colors",
+                        selected
+                          ? "bg-list-active text-list-active-foreground"
+                          : "hover:bg-list-hover",
+                        dragState?.entries.some(
+                          (draggedEntry) => draggedEntry.path === entry.path,
+                        ) && "opacity-50",
                       )}
                     >
-                      <td className="py-1 pl-2">
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          aria-label={t("sftp.selectFile", {
-                            name: entry.name,
-                          })}
-                          onPointerDown={(event) => event.stopPropagation()}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={() => toggleEntry(entry)}
-                          className="block size-3 cursor-pointer accent-primary"
-                        />
-                      </td>
-                      <td className="truncate py-1 pl-2 pr-1">
-                        <span className="inline-flex max-w-full items-center gap-2">
+                      <td className="h-7 truncate pl-2.5 pr-1 align-middle">
+                        <span className="flex h-7 max-w-full items-center gap-2">
                           <EntryIcon entry={entry} />
                           <span className="truncate">{entry.name}</span>
                         </span>
                       </td>
-                      <td className="truncate px-1 py-1 text-right text-muted-foreground">
+                      <td
+                        className={cn(
+                          "h-7 truncate px-1 text-right align-middle leading-none",
+                          selected
+                            ? "text-list-active-foreground/70"
+                            : "text-muted-foreground",
+                        )}
+                      >
                         {entry.kind === "dir" ? "" : formatSize(entry.size)}
                       </td>
-                      <td className="truncate py-1 pl-1 pr-2 text-right text-muted-foreground">
+                      <td
+                        className={cn(
+                          "h-7 truncate pl-1 pr-2.5 text-right align-middle leading-none",
+                          selected
+                            ? "text-list-active-foreground/70"
+                            : "text-muted-foreground",
+                        )}
+                      >
                         {formatTime(entry.modified)}
                       </td>
                     </tr>
@@ -430,29 +426,45 @@ export function FileList({
 }
 
 function FileDragGhost({ dragState }: { dragState: FileDragState }) {
-  const { entry, entries } = dragState;
+  const previewEntries = dragState.entries.slice(0, 5);
+  const remainingCount = dragState.entries.length - previewEntries.length;
+  const rowGap = 4;
+  const previewHeight =
+    previewEntries.length * dragState.rect.height +
+    Math.max(0, previewEntries.length - 1) * rowGap;
+  const layout = layoutDragPreview({
+    pointerX: dragState.clientX,
+    pointerY: dragState.clientY,
+    sourceWidth: dragState.rect.width,
+    sourceHeight: previewHeight,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+  });
 
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[100] flex items-center gap-2 border border-border bg-background px-2 text-xs text-foreground opacity-90 shadow-lg"
-      style={{
-        left: dragState.clientX,
-        top: dragState.clientY,
-        width: dragState.rect.width,
-        height: dragState.rect.height,
-      }}
+      className="pointer-events-none fixed z-[100] flex flex-col gap-1"
+      style={layout}
     >
-      <EntryIcon entry={entry} />
-      <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-      {entries.length > 1 && (
-        <span className="shrink-0 text-muted-foreground">
-          +{entries.length - 1}
-        </span>
-      )}
-      <span className="shrink-0 text-muted-foreground">
-        {entry.kind === "dir" ? "" : formatSize(entry.size)}
-      </span>
+      {previewEntries.map((entry, index) => (
+        <div
+          key={entry.path}
+          className="flex w-full items-center gap-2 rounded-lg border border-border bg-popover px-2 text-xs text-popover-foreground opacity-95 shadow-md"
+          style={{ height: dragState.rect.height }}
+        >
+          <EntryIcon entry={entry} />
+          <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+          {index === previewEntries.length - 1 && remainingCount > 0 && (
+            <span className="shrink-0 text-muted-foreground">
+              +{remainingCount}
+            </span>
+          )}
+          <span className="shrink-0 text-muted-foreground">
+            {entry.kind === "dir" ? "" : formatSize(entry.size)}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

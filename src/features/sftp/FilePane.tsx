@@ -158,7 +158,7 @@ export function FilePane({ side }: { side: PaneSide }) {
           if (!el || el.scrollWidth <= el.clientWidth) return;
           el.scrollLeft += e.deltaX + e.deltaY;
         }}
-        className="scrollbar-none flex h-8 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface px-1.5"
+        className="scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface/65 px-1.5"
       >
         {pane.tabs.map((tab) => (
           <div
@@ -173,10 +173,10 @@ export function FilePane({ side }: { side: PaneSide }) {
               if (host) addRemoteTab(side, host);
             }}
             className={cn(
-              "group flex h-6 cursor-pointer items-center gap-1.5 rounded px-2 text-xs",
+              "group flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs outline-none transition-[background-color,color,box-shadow]",
               tab.id === pane.activeTabId
-                ? "bg-background text-foreground"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-card text-card-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
             )}
           >
             <span
@@ -229,7 +229,7 @@ export function FilePane({ side }: { side: PaneSide }) {
 
       {active ? (
         <>
-          <div className="flex h-8 shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-background px-1.5">
+          <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-background px-1.5">
             <Tooltip content={t("sftp.up")}>
               <Button
                 size="icon"
@@ -366,7 +366,7 @@ function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
         setValue(tab.cwd);
         scrollToEnd();
       }}
-      className="ml-1 h-6 min-w-0 flex-1 rounded border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:border-input focus-visible:bg-surface focus-visible:text-foreground"
+      className="ml-1 h-7 min-w-0 flex-1 rounded-lg border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:border-input hover:bg-surface/50 focus-visible:bg-surface focus-visible:text-foreground"
     />
   );
 }

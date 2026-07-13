@@ -1,17 +1,59 @@
-import type { ThemeColors, ThemeDefinition } from "./types";
+import {
+  DEFAULT_THEME_FAMILY_ID,
+  DEFAULT_THEME_MODE,
+  getThemeFamily,
+  preferenceFromThemeId,
+} from "./themes";
+import type {
+  ThemeColors,
+  ThemeDefinition,
+  ThemeMode,
+  ThemePreference,
+} from "./types";
 
 export const THEME_STORAGE_KEY = "sageport.theme";
 const BOOTSTRAP_BG_KEY = "sageport.theme.bg";
 const BOOTSTRAP_SCHEME_KEY = "sageport.theme.scheme";
 
-export function readStoredThemeId(): string | null {
-  return localStorage.getItem(THEME_STORAGE_KEY);
+export function parseThemePreference(value: string | null): ThemePreference {
+  if (!value) {
+    return {
+      familyId: DEFAULT_THEME_FAMILY_ID,
+      mode: DEFAULT_THEME_MODE,
+    };
+  }
+
+  const [familyId, mode] = value.split(":");
+  if (
+    familyId &&
+    getThemeFamily(familyId).id === familyId &&
+    isThemeMode(mode)
+  ) {
+    return { familyId, mode };
+  }
+
+  return preferenceFromThemeId(value);
 }
 
-export function storeThemeId(theme: ThemeDefinition): void {
-  localStorage.setItem(THEME_STORAGE_KEY, theme.id);
+export function readStoredThemePreference(): ThemePreference {
+  return parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY));
+}
+
+export function serializeThemePreference(preference: ThemePreference): string {
+  return `${preference.familyId}:${preference.mode}`;
+}
+
+export function storeThemePreference(
+  preference: ThemePreference,
+  theme: ThemeDefinition,
+): void {
+  localStorage.setItem(THEME_STORAGE_KEY, serializeThemePreference(preference));
   localStorage.setItem(BOOTSTRAP_BG_KEY, theme.colors.background);
   localStorage.setItem(BOOTSTRAP_SCHEME_KEY, theme.appearance);
+}
+
+function isThemeMode(value: string | undefined): value is ThemeMode {
+  return value === "system" || value === "light" || value === "dark";
 }
 
 function cssVarName(token: string): string {
@@ -40,7 +82,7 @@ function suppressTransitionsForFrame(): void {
     suppressor = document.createElement("style");
     suppressor.appendChild(
       document.createTextNode(
-        "*,*::before,*::after{transition:none!important;animation:none!important}",
+        "*,*::before,*::after{transition:none!important}",
       ),
     );
     document.head.appendChild(suppressor);

@@ -1,5 +1,13 @@
-import { useEffect, useState } from "react";
-import { Circle, Network, Play, Plus, Square } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Circle,
+  Network,
+  Pencil,
+  Play,
+  Plus,
+  Square,
+  Trash2,
+} from "lucide-react";
 
 import { useHostKeyStore } from "@/features/terminal/host-key";
 
@@ -20,7 +28,14 @@ import { ipc } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
 import type { PortForward } from "@/types/models";
+import {
+  PanelContent,
+  PANEL_HEADER_ACTION_CLASS,
+  PANEL_LIST_ACTION_CLASS,
+  PANEL_LIST_ITEM_CLASS,
+} from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
+import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { useForwards, useDeleteForward } from "./api";
 import { ForwardFormDialog } from "./ForwardFormDialog";
 import { bridgeForwardEvents, useForwardStore } from "./store";
@@ -36,6 +51,8 @@ export function ForwardsView() {
     forward: PortForward | null;
   }>({ open: false, forward: null });
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
 
   useEffect(() => {
     bridgeForwardEvents();
@@ -82,6 +99,16 @@ export function ForwardsView() {
     return `${forward.bindHost}:${forward.bindPort} → ${forward.targetHost}:${forward.targetPort}`;
   };
 
+  const filteredForwards = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return forwards;
+    return forwards.filter((forward) =>
+      [forward.label, forward.kind, describe(forward)].some((value) =>
+        value.toLowerCase().includes(q),
+      ),
+    );
+  }, [forwards, query]);
+
   return (
     <SideBarView
       title={t("forwards.viewTitle")}
@@ -90,31 +117,45 @@ export function ForwardsView() {
           <Button
             size="icon"
             variant="ghost"
-            className="size-6"
+            className={PANEL_HEADER_ACTION_CLASS}
             onClick={() => setForm({ open: true, forward: null })}
           >
             <Plus className="size-4" />
           </Button>
         </Tooltip>
       }
+      topContent={
+        <SideBarFilter
+          itemCount={forwards.length}
+          value={query}
+          onChange={setQuery}
+          placeholder={t("forwards.filterPlaceholder")}
+        />
+      }
     >
-      <div className="pb-4">
-        {forwards.length === 0 ? (
+      <PanelContent className="space-y-0.5">
+        {filteredForwards.length === 0 ? (
           <EmptyState
             icon={Network}
-            title={t("forwards.empty.title")}
-            description={t("forwards.empty.description")}
+            title={
+              searching ? t("forwards.noMatches") : t("forwards.empty.title")
+            }
+            description={
+              searching ? undefined : t("forwards.empty.description")
+            }
             action={
-              <Button
-                size="sm"
-                onClick={() => setForm({ open: true, forward: null })}
-              >
-                <Plus /> {t("forwards.new")}
-              </Button>
+              !searching && (
+                <Button
+                  size="sm"
+                  onClick={() => setForm({ open: true, forward: null })}
+                >
+                  <Plus /> {t("forwards.new")}
+                </Button>
+              )
             }
           />
         ) : (
-          forwards.map((forward) => {
+          filteredForwards.map((forward) => {
             const active = isActive(forward.id);
             const errored = runtime[forward.id]?.status === "error";
             const statusMessage = errored
@@ -123,22 +164,30 @@ export function ForwardsView() {
             return (
               <ContextMenu key={forward.id}>
                 <ContextMenuTrigger asChild>
-                  <div
-                    className="group flex items-center gap-2 px-2 py-1.5 hover:bg-list-hover"
-                    title={statusMessage}
-                  >
-                    <Circle
+                  <div className={PANEL_LIST_ITEM_CLASS} title={statusMessage}>
+                    <div
                       className={cn(
-                        "size-2 shrink-0 fill-current",
-                        active
-                          ? "text-success"
-                          : errored
-                            ? "text-danger"
-                            : "text-muted-foreground/40",
+                        "relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm",
+                        active && "bg-success/10 text-success",
+                        errored && "bg-danger/10 text-danger",
                       )}
-                    />
+                    >
+                      <Network className="size-4" strokeWidth={1.7} />
+                      <Circle
+                        className={cn(
+                          "absolute -bottom-0.5 -right-0.5 size-2 fill-current ring-2 ring-surface",
+                          active
+                            ? "text-success"
+                            : errored
+                              ? "text-danger"
+                              : "text-muted-foreground/55",
+                        )}
+                      />
+                    </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">{forward.label}</p>
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {forward.label}
+                      </p>
                       <p className="truncate font-mono text-2xs text-muted-foreground">
                         {describe(forward)}
                       </p>
@@ -150,7 +199,7 @@ export function ForwardsView() {
                     >
                       <button
                         onClick={() => toggle(forward)}
-                        className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover:opacity-100"
+                        className={PANEL_LIST_ACTION_CLASS}
                       >
                         {active ? (
                           <Square className="size-3.5" />
@@ -163,11 +212,13 @@ export function ForwardsView() {
                 </ContextMenuTrigger>
                 <ContextMenuContent>
                   <ContextMenuItem onSelect={() => toggle(forward)}>
+                    {active ? <Square /> : <Play />}
                     {active ? t("forwards.stop") : t("forwards.start")}
                   </ContextMenuItem>
                   <ContextMenuItem
                     onSelect={() => setForm({ open: true, forward })}
                   >
+                    <Pencil />
                     {t("common.edit")}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
@@ -175,6 +226,7 @@ export function ForwardsView() {
                     destructive
                     onSelect={() => requestDelete(forward)}
                   >
+                    <Trash2 />
                     {t("common.delete")}
                   </ContextMenuItem>
                 </ContextMenuContent>
@@ -182,7 +234,7 @@ export function ForwardsView() {
             );
           })
         )}
-      </div>
+      </PanelContent>
 
       <ForwardFormDialog
         open={form.open}

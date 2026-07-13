@@ -25,7 +25,7 @@ export function terminalFontSize(): number {
   );
 }
 
-const TITLE_BAR_REM = 2.25;
+const TITLE_BAR_REM = 2.5;
 
 const TRAFFIC_LIGHT_X = 13;
 

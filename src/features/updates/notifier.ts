@@ -5,7 +5,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { useToastStore } from "@/lib/toast";
-import { useTabsStore } from "@/workbench/tabs";
+import { useOverlayStore } from "@/workbench/overlays";
 import { RELEASES_URL, useCanSelfUpdate, useUpdateStatus } from "./api";
 
 const notified = new Set<string>();
@@ -43,7 +43,7 @@ export function useUpdateNotifier() {
             },
             {
               label: t("settings.about.update.details"),
-              onClick: () => useTabsStore.getState().openSettings("about"),
+              onClick: () => useOverlayStore.getState().openSettings("about"),
             },
           ],
         });

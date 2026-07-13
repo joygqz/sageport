@@ -4,10 +4,10 @@
     "windows": [
       {
         "title": "Sageport",
-        "width": 1200,
+        "width": 1280,
         "height": 800,
-        "minWidth": 880,
-        "minHeight": 560,
+        "minWidth": 960,
+        "minHeight": 600,
         "decorations": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,

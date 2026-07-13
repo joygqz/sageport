@@ -83,7 +83,7 @@ export function useCommands(): WorkbenchCommand[] {
         categoryKey: "commands.category.preferences",
         label: t("commands.settings.open"),
         shortcut: ["mod", ","],
-        run: () => tabs().openSettings(),
+        run: () => overlays().openSettings(),
       },
       ...THEMES.map((theme) => ({
         id: `theme.${theme.id}`,

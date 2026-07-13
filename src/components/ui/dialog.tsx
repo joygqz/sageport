@@ -2,6 +2,7 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -38,7 +39,7 @@ function DialogOverlay({
       ref={ref}
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50",
+        "fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px]",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         className,
       )}
@@ -59,6 +60,7 @@ function DialogContent({
   showClose?: boolean;
   ref?: React.Ref<React.ComponentRef<typeof DialogPrimitive.Content>>;
 }) {
+  const { t } = useI18n();
   const contentRef = React.useRef<HTMLDivElement | null>(null);
 
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
@@ -128,7 +130,7 @@ function DialogContent({
         }}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100vh-4rem)] w-full max-w-lg gap-4 overflow-y-auto",
-          "rounded-lg border border-border bg-popover p-6 text-popover-foreground shadow-md",
+          "rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-md",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           className,
@@ -139,7 +141,7 @@ function DialogContent({
         {showClose && (
           <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
             <X className="size-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{t("common.close")}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -162,19 +164,20 @@ function DialogToolbar({
   children,
   ...props
 }: React.ComponentProps<"div">) {
+  const { t } = useI18n();
   return (
     <div
       data-slot="dialog-toolbar"
       className={cn(
-        "flex shrink-0 items-center justify-between gap-2 border-b border-border px-5 py-3",
+        "flex h-[var(--workbench-bar-height)] shrink-0 items-center justify-between gap-2 border-b border-border bg-surface/45 pl-4 pr-2",
         className,
       )}
       {...props}
     >
       <DialogTitle className="truncate">{children}</DialogTitle>
-      <DialogPrimitive.Close className="shrink-0 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
+      <DialogPrimitive.Close className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-70 transition-[background-color,opacity] hover:bg-accent hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
         <X className="size-4" />
-        <span className="sr-only">Close</span>
+        <span className="sr-only">{t("common.close")}</span>
       </DialogPrimitive.Close>
     </div>
   );

@@ -2,20 +2,29 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { useZoomStore, zoomFactor } from "./zoom";
+import {
+  AUX_DEFAULT,
+  AUX_MIN,
+  PANEL_DEFAULT,
+  PANEL_MIN,
+  SIDEBAR_DEFAULT,
+  SIDEBAR_MIN,
+  bottomPanelLimits,
+  horizontalPanelLimits,
+  type SashLimits,
+} from "./layout-sizing";
+
+export {
+  AUX_DEFAULT,
+  AUX_MIN,
+  PANEL_DEFAULT,
+  PANEL_MIN,
+  SIDEBAR_DEFAULT,
+  SIDEBAR_MIN,
+} from "./layout-sizing";
 
 export type Activity =
   "hosts" | "credentials" | "snippets" | "forwards" | "monitor";
-
-export const SIDEBAR_MIN = 150;
-export const PANEL_MIN = 100;
-export const AUX_MIN = 150;
-
-const ACTIVITY_BAR_W = 45;
-const TITLE_BAR_H = 33.75;
-const STATUS_BAR_H = 22.5;
-
-const EDITOR_MIN_W = 70;
-const EDITOR_MIN_H = 70;
 
 const uiScale = () => zoomFactor(useZoomStore.getState().level);
 
@@ -45,26 +54,17 @@ interface LayoutState {
   clampToViewport: () => void;
 }
 
-function maxWidthFor(other: number): number {
-  return Math.max(
-    0,
-    window.innerWidth - (ACTIVITY_BAR_W + EDITOR_MIN_W) * uiScale() - other,
-  );
-}
-
-export interface SashLimits {
-  min: number;
-  max: number;
-}
-
 export function sidebarLimits(
   s: Pick<LayoutState, "auxVisible" | "auxWidth"> = useLayoutStore.getState(),
+  viewportWidth = window.innerWidth,
+  scale = uiScale(),
 ): SashLimits {
-  const min = SIDEBAR_MIN * uiScale();
-  return {
-    min,
-    max: Math.max(min, maxWidthFor(s.auxVisible ? s.auxWidth : 0)),
-  };
+  return horizontalPanelLimits(
+    SIDEBAR_MIN,
+    s.auxVisible ? s.auxWidth : 0,
+    viewportWidth,
+    scale,
+  );
 }
 
 export function auxLimits(
@@ -72,20 +72,22 @@ export function auxLimits(
     LayoutState,
     "sidebarVisible" | "sidebarWidth"
   > = useLayoutStore.getState(),
+  viewportWidth = window.innerWidth,
+  scale = uiScale(),
 ): SashLimits {
-  const min = AUX_MIN * uiScale();
-  return {
-    min,
-    max: Math.max(min, maxWidthFor(s.sidebarVisible ? s.sidebarWidth : 0)),
-  };
+  return horizontalPanelLimits(
+    AUX_MIN,
+    s.sidebarVisible ? s.sidebarWidth : 0,
+    viewportWidth,
+    scale,
+  );
 }
 
-export function panelLimits(): SashLimits {
-  const min = PANEL_MIN * uiScale();
-  const roomMax =
-    window.innerHeight -
-    (TITLE_BAR_H + STATUS_BAR_H + EDITOR_MIN_H) * uiScale();
-  return { min, max: Math.max(min, roomMax) };
+export function panelLimits(
+  viewportHeight = window.innerHeight,
+  scale = uiScale(),
+): SashLimits {
+  return bottomPanelLimits(viewportHeight, scale);
 }
 
 function clampSidebar(
@@ -114,11 +116,11 @@ export const useLayoutStore = create<LayoutState>()(
     (set, get) => ({
       activity: "hosts",
       sidebarVisible: true,
-      sidebarWidth: 250,
+      sidebarWidth: SIDEBAR_DEFAULT,
       panelVisible: false,
-      panelHeight: 250,
+      panelHeight: PANEL_DEFAULT,
       auxVisible: false,
-      auxWidth: 250,
+      auxWidth: AUX_DEFAULT,
 
       selectActivity: (activity) =>
         set((s) =>

@@ -24,8 +24,6 @@ export interface AdhocTarget {
   username: string;
 }
 
-export type SettingsSection = "appearance" | "ai" | "sync" | "about";
-
 export interface TerminalTab {
   kind: "terminal";
 
@@ -38,12 +36,6 @@ export interface TerminalTab {
   error?: string;
 
   attempt: number;
-}
-
-export interface SettingsTab {
-  kind: "settings";
-  id: typeof SETTINGS_TAB_ID;
-  section: SettingsSection;
 }
 
 export interface FileTab {
@@ -62,13 +54,11 @@ export interface FileTab {
   saving: boolean;
 }
 
-export type EditorTab = TerminalTab | SettingsTab | FileTab;
+export type EditorTab = TerminalTab | FileTab;
 
 export function isFileDirty(tab: FileTab): boolean {
   return tab.content !== null && tab.content !== tab.savedContent;
 }
-
-export const SETTINGS_TAB_ID = "settings";
 
 interface TabsState {
   tabs: EditorTab[];
@@ -94,8 +84,6 @@ interface TabsState {
   pendingCloseId: string | null;
   clearPendingClose: () => void;
 
-  openSettings: (section?: SettingsSection) => void;
-  setSettingsSection: (section: SettingsSection) => void;
   close: (id: string, opts?: { force?: boolean }) => void;
   moveTab: (id: string, toIndex: number) => void;
   setActive: (id: string) => void;
@@ -275,32 +263,6 @@ export const useTabsStore = create<TabsState>((set, get) => {
         return false;
       }
     },
-
-    openSettings: (section) => {
-      const existing = get().tabs.find((t) => t.kind === "settings");
-      if (existing) {
-        set((s) => ({
-          activeId: SETTINGS_TAB_ID,
-          tabs: section
-            ? s.tabs.map((t) => (t.kind === "settings" ? { ...t, section } : t))
-            : s.tabs,
-        }));
-        return;
-      }
-      const tab: SettingsTab = {
-        kind: "settings",
-        id: SETTINGS_TAB_ID,
-        section: section ?? "appearance",
-      };
-      set((s) => ({ tabs: [...s.tabs, tab], activeId: SETTINGS_TAB_ID }));
-    },
-
-    setSettingsSection: (section) =>
-      set((s) => ({
-        tabs: s.tabs.map((t) =>
-          t.kind === "settings" ? { ...t, section } : t,
-        ),
-      })),
 
     close: (id, opts) => {
       const tab = get().tabs.find((t) => t.id === id);

@@ -3,15 +3,21 @@ import {
   Check,
   ChevronRight,
   Info,
+  Laptop,
   Minus,
+  Moon,
   Palette,
   Plus,
   RefreshCw,
   Sparkles,
+  Sun,
 } from "lucide-react";
 
 import {
   Button,
+  Dialog,
+  DialogContent,
+  DialogToolbar,
   Field,
   Input,
   Kbd,
@@ -26,9 +32,15 @@ import {
 import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { THEMES, useTheme, type ThemeDefinition } from "@/themes";
+import {
+  THEME_FAMILIES,
+  useTheme,
+  type ThemeAppearance,
+  type ThemeFamilyDefinition,
+  type ThemeMode,
+} from "@/themes";
 import { useFontStore } from "@/workbench/font";
-import { useTabsStore, type SettingsSection } from "@/workbench/tabs";
+import type { SettingsSection } from "@/workbench/overlays";
 import {
   useZoomStore,
   zoomFactor,
@@ -57,41 +69,88 @@ const NAV: { id: SettingsSection; labelKey: TKey; icon: typeof Palette }[] = [
   { id: "about", labelKey: "settings.nav.about", icon: Info },
 ];
 
-export function SettingsPage({ section }: { section: SettingsSection }) {
+const THEME_DESCRIPTION_KEYS: Record<string, TKey> = {
+  midnight: "settings.appearance.familyMidnight",
+  graphite: "settings.appearance.familyGraphite",
+  dracula: "settings.appearance.familyDracula",
+};
+
+export function SettingsDialog({
+  open,
+  section,
+  onSectionChange,
+  onClose,
+}: {
+  open: boolean;
+  section: SettingsSection;
+  onSectionChange: (section: SettingsSection) => void;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
-  const setSection = useTabsStore((s) => s.setSettingsSection);
 
   return (
-    <div className="settings-page h-full overflow-x-auto overflow-y-hidden bg-background">
-      <div className="flex h-full min-w-xl flex-col">
-        <div className="shrink-0 border-b border-border">
-          <div className="w-full max-w-2xl px-6 py-3">
-            <SegmentedControl
-              value={section}
-              onChange={setSection}
-              options={NAV.map((item) => {
-                const Icon = item.icon;
-                return {
-                  value: item.id,
-                  label: (
-                    <span className="flex items-center justify-center gap-2">
-                      <Icon className="size-4 shrink-0" />
-                      <span className="truncate">{t(item.labelKey)}</span>
-                    </span>
-                  ),
-                };
-              })}
-            />
-          </div>
-        </div>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        showClose={false}
+        className="flex h-[min(44rem,calc(100vh-4rem))] w-[min(58rem,calc(100vw-4rem))] max-w-none flex-col gap-0 overflow-hidden p-0"
+      >
+        <DialogToolbar>{t("settings.title")}</DialogToolbar>
+        <SettingsPage section={section} onSectionChange={onSectionChange} />
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="settings-content flex w-full max-w-2xl flex-col gap-6 p-6">
+function SettingsPage({
+  section,
+  onSectionChange,
+}: {
+  section: SettingsSection;
+  onSectionChange: (section: SettingsSection) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="settings-page min-h-0 flex-1 overflow-x-auto overflow-y-hidden bg-background">
+      <div className="flex h-full min-w-[40rem]">
+        <aside className="flex w-48 shrink-0 flex-col border-r border-border bg-surface/65 px-3 py-4">
+          <nav className="flex flex-col gap-1" aria-label={t("settings.title")}>
+            {NAV.map((item) => {
+              const Icon = item.icon;
+              const active = section === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => onSectionChange(item.id)}
+                  className={cn(
+                    "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40",
+                    active
+                      ? "bg-list-active font-medium text-list-active-foreground"
+                      : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span className="truncate">{t(item.labelKey)}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <ScrollArea className="min-h-0 min-w-0 flex-1">
+          <main className="settings-content flex w-full max-w-3xl flex-col gap-7 px-8 py-7">
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-foreground">
+                {t(NAV.find((item) => item.id === section)!.labelKey)}
+              </h1>
+            </div>
             {section === "appearance" && <AppearanceSection />}
             {section === "ai" && <AiSection />}
             {section === "sync" && <SyncSection />}
             {section === "about" && <AboutSection />}
-          </div>
+          </main>
         </ScrollArea>
       </div>
     </div>
@@ -100,43 +159,75 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
 
 function AppearanceSection() {
   const { t, locale, setLocale } = useI18n();
-  const { theme, setTheme } = useTheme();
+  const { theme, preference, setFamily, setMode } = useTheme();
 
-  const groups = [
+  const modes: { value: ThemeMode; label: React.ReactNode }[] = [
     {
-      labelKey: "settings.appearance.darkThemes" as TKey,
-      themes: THEMES.filter((candidate) => candidate.appearance === "dark"),
+      value: "system",
+      label: (
+        <span className="flex items-center justify-center gap-2">
+          <Laptop className="size-3.5" />
+          {t("settings.appearance.modeSystem")}
+        </span>
+      ),
     },
     {
-      labelKey: "settings.appearance.lightThemes" as TKey,
-      themes: THEMES.filter((candidate) => candidate.appearance === "light"),
+      value: "light",
+      label: (
+        <span className="flex items-center justify-center gap-2">
+          <Sun className="size-3.5" />
+          {t("settings.appearance.modeLight")}
+        </span>
+      ),
+    },
+    {
+      value: "dark",
+      label: (
+        <span className="flex items-center justify-center gap-2">
+          <Moon className="size-3.5" />
+          {t("settings.appearance.modeDark")}
+        </span>
+      ),
     },
   ];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <SectionHeader
         title={t("settings.appearance.themeTitle")}
         description={t("settings.appearance.themeDescription")}
       />
 
-      {groups.map((group) => (
-        <div key={group.labelKey} className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            {t(group.labelKey)}
-          </p>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-3">
-            {group.themes.map((candidate) => (
-              <ThemeCard
-                key={candidate.id}
-                theme={candidate}
-                active={candidate.id === theme.id}
-                onSelect={() => setTheme(candidate.id)}
-              />
-            ))}
-          </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-medium text-muted-foreground">
+          {t("settings.appearance.colorMode")}
+        </p>
+        <SegmentedControl
+          value={preference.mode}
+          onChange={setMode}
+          options={modes}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-medium text-muted-foreground">
+          {t("settings.appearance.themeFamily")}
+        </p>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3">
+          {THEME_FAMILIES.map((family) => (
+            <ThemeFamilyCard
+              key={family.id}
+              family={family}
+              active={family.id === preference.familyId}
+              activeAppearance={theme.appearance}
+              description={t(THEME_DESCRIPTION_KEYS[family.id])}
+              onSelect={() => setFamily(family.id)}
+            />
+          ))}
         </div>
-      ))}
+      </div>
+
+      <div className="h-px bg-border" />
 
       <Field
         label={t("settings.appearance.language")}
@@ -251,105 +342,121 @@ function ZoomField() {
   );
 }
 
-function ThemeCard({
-  theme,
+function ThemeFamilyCard({
+  family,
   active,
+  activeAppearance,
+  description,
   onSelect,
 }: {
-  theme: ThemeDefinition;
+  family: ThemeFamilyDefinition;
   active: boolean;
+  activeAppearance: ThemeAppearance;
+  description: string;
   onSelect: () => void;
 }) {
-  const { colors, terminal } = theme;
-
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "flex min-w-0 flex-col overflow-hidden rounded-lg border text-left outline-none transition-[border-color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring/40",
+        "group flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card text-left outline-none transition-[border-color,box-shadow,transform] focus-visible:ring-2 focus-visible:ring-ring/40",
         active
-          ? "border-primary ring-2 ring-primary/40"
-          : "border-input hover:border-ring",
+          ? "border-primary shadow-sm ring-2 ring-primary/25"
+          : "border-border hover:-translate-y-0.5 hover:border-input hover:shadow-sm",
       )}
     >
-      <div
-        className="flex h-20"
-        style={{
-          backgroundColor: terminal.background,
-          color: terminal.foreground,
-        }}
-      >
-        <div
-          className="flex w-1/4 flex-col gap-1 border-r p-1.5"
-          style={{
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          }}
-        >
-          <span
-            className="h-1 w-3/4 rounded-full"
-            style={{ backgroundColor: colors.primary }}
+      <div className="grid h-24 grid-cols-2">
+        {(["light", "dark"] as const).map((appearance) => (
+          <ThemePreview
+            key={appearance}
+            theme={family.themes[appearance]}
+            emphasized={active && activeAppearance === appearance}
           />
-          <span
-            className="h-1 w-full rounded-full opacity-70"
-            style={{ backgroundColor: colors.mutedForeground }}
-          />
-          <span
-            className="h-1 w-2/3 rounded-full opacity-70"
-            style={{ backgroundColor: colors.mutedForeground }}
-          />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-2 font-mono">
-          <div
-            className="flex h-5 items-center gap-1 rounded px-1.5"
-            style={{ backgroundColor: colors.listActive }}
-          >
-            <span
-              className="size-1.5 rounded-full"
-              style={{ backgroundColor: terminal.green }}
-            />
-            <span
-              className="h-1 w-1/2 rounded-full"
-              style={{ backgroundColor: colors.listActiveForeground }}
-            />
-          </div>
-          <div className="mt-auto flex items-center gap-1 text-[8px] leading-none">
-            <span style={{ color: terminal.green }}>$</span>
-            <span style={{ color: terminal.blue }}>ssh</span>
-            <span style={{ color: terminal.foreground }}>sageport</span>
-            <span
-              className="h-2 w-px"
-              style={{ backgroundColor: terminal.cursor }}
-            />
-          </div>
-        </div>
+        ))}
       </div>
-      <div
-        className="flex w-full items-center gap-1.5 border-t px-2 py-1.5"
-        style={{
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          color: colors.surfaceForeground,
-        }}
-      >
-        <p className="min-w-0 flex-1 truncate text-xs font-medium">
-          {theme.name}
-        </p>
+      <div className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-semibold text-card-foreground">
+            {family.name}
+          </p>
+          <p className="mt-0.5 truncate text-2xs text-muted-foreground">
+            {description}
+          </p>
+        </div>
         {active && (
-          <span
-            className="flex size-4 shrink-0 items-center justify-center rounded-full"
-            style={{
-              backgroundColor: colors.primary,
-              color: colors.primaryForeground,
-            }}
-          >
-            <Check className="size-2.5" strokeWidth={3} />
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Check className="size-3" strokeWidth={3} />
           </span>
         )}
       </div>
     </button>
+  );
+}
+
+function ThemePreview({
+  theme,
+  emphasized,
+}: {
+  theme: ThemeFamilyDefinition["themes"][ThemeAppearance];
+  emphasized: boolean;
+}) {
+  const { colors, terminal } = theme;
+  return (
+    <div
+      className="relative flex min-w-0 border-r last:border-r-0"
+      style={{
+        backgroundColor: terminal.background,
+        borderColor: colors.border,
+        color: terminal.foreground,
+      }}
+    >
+      <div
+        className="flex w-1/3 flex-col gap-1 border-r p-1.5"
+        style={{
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+        }}
+      >
+        <span
+          className="h-1 w-2/3 rounded-full"
+          style={{ backgroundColor: colors.primary }}
+        />
+        <span
+          className="h-1 w-full rounded-full opacity-55"
+          style={{ backgroundColor: colors.mutedForeground }}
+        />
+        <span
+          className="h-1 w-3/4 rounded-full opacity-55"
+          style={{ backgroundColor: colors.mutedForeground }}
+        />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-1.5">
+        <span
+          className="h-3 rounded-sm"
+          style={{ backgroundColor: colors.listActive }}
+        />
+        <span
+          className="h-1 w-3/4 rounded-full"
+          style={{ backgroundColor: terminal.blue }}
+        />
+        <span
+          className="h-1 w-1/2 rounded-full"
+          style={{ backgroundColor: terminal.green }}
+        />
+        <span
+          className="mt-auto h-1 w-5/6 rounded-full opacity-60"
+          style={{ backgroundColor: terminal.foreground }}
+        />
+      </div>
+      {emphasized && (
+        <span
+          className="pointer-events-none absolute inset-x-1 bottom-1 h-0.5 rounded-full"
+          style={{ backgroundColor: colors.primary }}
+        />
+      )}
+    </div>
   );
 }
 
