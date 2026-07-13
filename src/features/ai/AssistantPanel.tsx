@@ -333,10 +333,11 @@ export function AssistantPanel({ width }: { width: number }) {
             onScroll={onLogScroll}
             className="flex-1 overflow-y-auto"
           >
-            <div className="flex flex-col gap-3 p-3">
+            <div className="flex min-h-full flex-col gap-3 p-3">
               {log.length === 0 ? (
-                <div className="mt-10 flex flex-col gap-4">
+                <div className="my-auto flex w-full max-w-md self-center flex-col gap-3 py-4">
                   <EmptyState
+                    className="gap-3 px-4 py-4"
                     icon={Sparkles}
                     title={t("ai.empty.title")}
                     description={t(
@@ -345,14 +346,14 @@ export function AssistantPanel({ width }: { width: number }) {
                         : "ai.empty.description",
                     )}
                   />
-                  <div className="flex flex-col gap-1.5 px-2">
+                  <div className="flex flex-col gap-1.5 px-1">
                     {suggestions.map((suggestion) => (
                       <button
                         key={suggestion.key}
                         type="button"
                         disabled={pending || !model}
                         onClick={() => void sendPrompt(t(suggestion.key))}
-                        className="rounded-lg border border-border bg-card/45 px-3 py-2.5 text-left text-xs leading-relaxed text-muted-foreground shadow-sm transition-[background-color,border-color,color] hover:border-input hover:bg-card hover:text-foreground disabled:opacity-50"
+                        className="rounded-lg border border-border bg-card/45 px-3 py-2 text-left text-xs leading-normal text-muted-foreground shadow-sm transition-[background-color,border-color,color] hover:border-input hover:bg-card hover:text-foreground disabled:opacity-50"
                       >
                         {t(suggestion.key)}
                       </button>

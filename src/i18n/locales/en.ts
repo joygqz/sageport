@@ -547,9 +547,9 @@ export const en = {
     empty: {
       title: "Ask the assistant",
       description:
-        "It can inspect terminals and run commands, plus use any additional tools enabled in AI settings. Anything that changes a server or your setup needs your approval first.",
+        "It can inspect terminals, run commands, and use enabled tools. Changes require your approval.",
       descriptionAutonomous:
-        "Autonomous mode is on. The assistant can run operations without asking for each approval; stop it at any time.",
+        "Autonomous mode is on. Operations run without individual approval; stop them at any time.",
     },
     suggestion: {
       core: {
