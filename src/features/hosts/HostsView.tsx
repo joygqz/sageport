@@ -39,6 +39,7 @@ import {
   PanelContent,
   PANEL_HEADER_ACTION_CLASS,
   PANEL_LIST_ACTION_CLASS,
+  PANEL_LIST_CLASS,
   PANEL_LIST_ITEM_CLASS,
   PanelSectionHeader,
 } from "@/workbench/PanelHeader";
@@ -397,21 +398,23 @@ export function HostsView() {
               onDelete={() => requestDeleteGroup(section)}
               isDropTarget={dropTarget === section.id}
             >
-              {section.hosts.map((host) => (
-                <HostRow
-                  key={host.id}
-                  host={host}
-                  health={healthByHost[host.id]}
-                  checking={(checkingHosts[host.id] ?? 0) > 0}
-                  dragging={dragState?.host.id === host.id}
-                  onDragStart={(pointer) => beginHostDrag(host, pointer)}
-                  onDragMove={updateHostDrag}
-                  onDragEnd={endHostDrag}
-                  onCheckHealth={() => runHealthCheck([host.id])}
-                  onEdit={() => openHostForm(host.id)}
-                  onDelete={() => requestDeleteHost(host)}
-                />
-              ))}
+              <div className={PANEL_LIST_CLASS}>
+                {section.hosts.map((host) => (
+                  <HostRow
+                    key={host.id}
+                    host={host}
+                    health={healthByHost[host.id]}
+                    checking={(checkingHosts[host.id] ?? 0) > 0}
+                    dragging={dragState?.host.id === host.id}
+                    onDragStart={(pointer) => beginHostDrag(host, pointer)}
+                    onDragMove={updateHostDrag}
+                    onDragEnd={endHostDrag}
+                    onCheckHealth={() => runHealthCheck([host.id])}
+                    onEdit={() => openHostForm(host.id)}
+                    onDelete={() => requestDeleteHost(host)}
+                  />
+                ))}
+              </div>
             </GroupSection>
           ))
         )}
@@ -609,7 +612,7 @@ function HostRow({
           onDoubleClick={() => openTerminal(host)}
           className={cn(
             PANEL_LIST_ITEM_CLASS,
-            "mx-0.5 mb-0.5 cursor-pointer touch-none select-none outline-none",
+            "cursor-pointer touch-none select-none outline-none",
             dragging && "opacity-50",
           )}
         >

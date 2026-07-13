@@ -30,6 +30,7 @@ import {
   PanelContent,
   PanelSectionHeader,
   PANEL_LIST_ACTION_CLASS,
+  PANEL_LIST_CLASS,
   PANEL_LIST_ITEM_CLASS,
 } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
@@ -229,7 +230,7 @@ function KeyList({
   }
 
   return (
-    <div className="pt-[var(--panel-gutter)]">
+    <div className={PANEL_LIST_CLASS}>
       {keys.map((key) => (
         <KeyRow key={key.id} sshKey={key} onDelete={() => requestDelete(key)} />
       ))}
@@ -258,7 +259,7 @@ function KeyRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className={cn(PANEL_LIST_ITEM_CLASS, "mb-0.5 cursor-pointer")}>
+        <div className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}>
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm">
             <KeyRound className="size-4" strokeWidth={1.7} />
           </div>
@@ -268,7 +269,7 @@ function KeyRow({
             </p>
             <p className="text-2xs text-muted-foreground">
               {tag ? (
-                <Badge className="font-mono uppercase">{tag}</Badge>
+                <Badge className="h-4 py-0 font-mono uppercase">{tag}</Badge>
               ) : (
                 t("credentials.keys.sectionTitle")
               )}
@@ -353,13 +354,13 @@ function IdentityList({
   }
 
   return (
-    <div className="pt-[var(--panel-gutter)]">
+    <div className={PANEL_LIST_CLASS}>
       {identities.map((identity) => (
         <ContextMenu key={identity.id}>
           <ContextMenuTrigger asChild>
             <div
               onDoubleClick={() => onEdit(identity)}
-              className={cn(PANEL_LIST_ITEM_CLASS, "mb-0.5 cursor-pointer")}
+              className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
             >
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm">
                 <User className="size-4" strokeWidth={1.7} />

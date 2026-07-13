@@ -29,6 +29,7 @@ import {
   PanelContent,
   PANEL_HEADER_ACTION_CLASS,
   PANEL_LIST_ACTION_CLASS,
+  PANEL_LIST_CLASS,
   PANEL_LIST_ITEM_CLASS,
 } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
@@ -131,7 +132,7 @@ export function SnippetsView() {
         />
       }
     >
-      <PanelContent className="space-y-0.5">
+      <PanelContent className={PANEL_LIST_CLASS}>
         {filteredSnippets.length === 0 ? (
           <EmptyState
             icon={SquareTerminal}

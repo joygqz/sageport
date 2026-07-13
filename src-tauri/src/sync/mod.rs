@@ -4,6 +4,7 @@ pub mod oauth;
 mod onedrive;
 mod provider;
 mod s3;
+mod settings_compat;
 mod webdav;
 
 pub use provider::{make_provider, ProviderConfig, ProviderKind, SyncVersion};
@@ -118,10 +119,12 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     let settings = settings_repo::all_excluding_prefixes(pool, EXCLUDED_SETTINGS_PREFIXES)
         .await?
         .into_iter()
-        .map(|(key, value, updated_at)| SettingEntry {
-            key,
-            value,
-            updated_at,
+        .filter_map(|(key, value, updated_at)| {
+            settings_compat::sanitize(&SettingEntry {
+                key,
+                value,
+                updated_at,
+            })
         })
         .collect();
 
@@ -432,20 +435,17 @@ async fn merge_setting<'e, E>(executor: E, entry: &SettingEntry) -> AppResult<()
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    if EXCLUDED_SETTINGS_PREFIXES
-        .iter()
-        .any(|prefix| entry.key.starts_with(prefix))
-    {
+    let Some(entry) = settings_compat::sanitize(entry) else {
         return Ok(());
-    }
+    };
     sqlx::query(
         "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
          WHERE excluded.updated_at > settings.updated_at",
     )
-    .bind(&entry.key)
-    .bind(&entry.value)
-    .bind(&entry.updated_at)
+    .bind(entry.key)
+    .bind(entry.value)
+    .bind(entry.updated_at)
     .execute(executor)
     .await?;
     Ok(())
@@ -474,4 +474,98 @@ where
     }
     query.execute(executor).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    use super::*;
+
+    const BACKUP_TIMESTAMP: &str = "2099-01-01T00:00:00+00:00";
+
+    async fn test_pool() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        pool
+    }
+
+    fn empty_snapshot(settings: Vec<SettingEntry>) -> VaultSnapshot {
+        VaultSnapshot {
+            exported_at: BACKUP_TIMESTAMP.to_string(),
+            groups: Vec::new(),
+            hosts: Vec::new(),
+            identities: Vec::new(),
+            keys: Vec::new(),
+            snippets: Vec::new(),
+            settings,
+            port_forwards: Vec::new(),
+            sftp_bookmarks: Vec::new(),
+        }
+    }
+
+    fn setting(key: &str, value: &str) -> SettingEntry {
+        SettingEntry {
+            key: key.to_string(),
+            value: value.to_string(),
+            updated_at: BACKUP_TIMESTAMP.to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn restore_drops_invalid_settings_and_keeps_internal_local_settings() {
+        let pool = test_pool().await;
+        settings_repo::set(&pool, "appearance.theme", "graphite:dark")
+            .await
+            .unwrap();
+        settings_repo::set(&pool, "sync.connection", "local-connection")
+            .await
+            .unwrap();
+
+        let snapshot = empty_snapshot(vec![
+            setting("appearance.theme", "removed-theme"),
+            setting("appearance.locale", "en"),
+            setting("sync.connection", "backup-connection"),
+        ]);
+        restore_snapshot(&pool, &snapshot).await.unwrap();
+
+        assert_eq!(
+            settings_repo::get(&pool, "appearance.theme").await.unwrap(),
+            None
+        );
+        assert_eq!(
+            settings_repo::get(&pool, "appearance.locale")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("en")
+        );
+        assert_eq!(
+            settings_repo::get(&pool, "sync.connection")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("local-connection")
+        );
+    }
+
+    #[tokio::test]
+    async fn import_migrates_compatible_legacy_settings() {
+        let pool = test_pool().await;
+        let snapshot = empty_snapshot(vec![setting("appearance.theme", "dark-modern")]);
+
+        import_snapshot(&pool, &snapshot).await.unwrap();
+
+        assert_eq!(
+            settings_repo::get(&pool, "appearance.theme")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("midnight:dark")
+        );
+    }
 }

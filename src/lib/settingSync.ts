@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
@@ -15,6 +15,7 @@ export function useSettingSync(
     queryKey,
     queryFn: () => ipc.settings.get(key),
   });
+  const applyRemote = useEffectEvent(onRemote);
 
   useEffect(() => {
     if (data === undefined || data === current) return;
@@ -23,8 +24,8 @@ export function useSettingSync(
       qc.setQueryData(queryKey, current);
       return;
     }
-    onRemote(data);
-  }, [data, current, key, onRemote, qc, queryKey]);
+    applyRemote(data);
+  }, [data, current, key, qc, queryKey]);
 
   return useCallback(
     (value: string) => {

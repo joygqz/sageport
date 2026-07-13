@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 
 export const PANEL_HEADER_ACTION_CLASS = "size-[var(--toolbar-control-size)]";
 
+export const PANEL_LIST_CLASS = "space-y-0.5";
+
 export const PANEL_LIST_ITEM_CLASS =
   "group flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-list-hover focus-within:bg-list-hover";
 
