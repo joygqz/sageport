@@ -5,7 +5,26 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { File, Folder, FolderSymlink, Loader2, WifiOff } from "lucide-react";
+import {
+  AudioLines,
+  Database,
+  File,
+  FileArchive,
+  FileCode,
+  FileCog,
+  FileImage,
+  FileKey,
+  FileSpreadsheet,
+  FileSymlink,
+  FileText,
+  FileVideo,
+  Folder,
+  FolderSymlink,
+  Loader2,
+  Package,
+  WifiOff,
+  type LucideIcon,
+} from "lucide-react";
 
 import {
   Button,
@@ -23,6 +42,7 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { useTabsStore } from "@/workbench/tabs";
+import { fileIconKind, type FileIconKind } from "./file-icon";
 import { nextFileSelection } from "./selection";
 import {
   MAX_EDIT_BYTES,
@@ -62,12 +82,38 @@ function formatTime(secs: number | null): string {
   });
 }
 
+const FILE_ICONS: Record<
+  FileIconKind,
+  { icon: LucideIcon; className: string }
+> = {
+  archive: { icon: FileArchive, className: "text-warning" },
+  audio: { icon: AudioLines, className: "text-primary" },
+  code: { icon: FileCode, className: "text-info" },
+  config: { icon: FileCog, className: "text-muted-foreground" },
+  database: { icon: Database, className: "text-info" },
+  file: { icon: File, className: "text-muted-foreground" },
+  image: { icon: FileImage, className: "text-success" },
+  key: { icon: FileKey, className: "text-warning" },
+  package: { icon: Package, className: "text-primary" },
+  spreadsheet: { icon: FileSpreadsheet, className: "text-success" },
+  text: { icon: FileText, className: "text-muted-foreground" },
+  video: { icon: FileVideo, className: "text-primary" },
+};
+
 function EntryIcon({ entry }: { entry: FileEntry }) {
-  if (entry.kind === "dir")
-    return <Folder className="size-4 shrink-0 text-info" />;
-  if (entry.isSymlink)
-    return <FolderSymlink className="size-4 shrink-0 text-muted-foreground" />;
-  return <File className="size-4 shrink-0 text-muted-foreground" />;
+  const className = "size-4 shrink-0";
+  if (entry.isSymlink || entry.kind === "symlink") {
+    const Icon = entry.kind === "dir" ? FolderSymlink : FileSymlink;
+    return <Icon aria-hidden="true" className={cn(className, "text-info")} />;
+  }
+  if (entry.kind === "dir") {
+    return (
+      <Folder aria-hidden="true" className={cn(className, "text-warning")} />
+    );
+  }
+
+  const { icon: Icon, className: color } = FILE_ICONS[fileIconKind(entry.name)];
+  return <Icon aria-hidden="true" className={cn(className, color)} />;
 }
 
 export function FileList({
