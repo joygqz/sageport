@@ -4,9 +4,10 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { File, Folder, FolderSymlink, Loader2 } from "lucide-react";
+import { File, Folder, FolderSymlink, Loader2, WifiOff } from "lucide-react";
 
 import {
+  Button,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -20,6 +21,7 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { useTabsStore } from "@/workbench/tabs";
+import { nextFileSelection } from "./selection";
 import {
   MAX_EDIT_BYTES,
   parentPath,
@@ -77,13 +79,14 @@ export function FileList({
   side: PaneSide;
   tab: SftpTab;
   onRename: (entry: FileEntry) => void;
-  onDelete: (entry: FileEntry) => void;
+  onDelete: (entries: FileEntry[]) => void;
   onPermissions: (entry: FileEntry) => void;
 }) {
   const { t } = useI18n();
   const navigate = useSftpStore((s) => s.navigate);
   const setSelected = useSftpStore((s) => s.setSelected);
   const transfer = useSftpStore((s) => s.transfer);
+  const reconnectTab = useSftpStore((s) => s.reconnectTab);
   const showHidden = useSftpStore((s) => s.showHidden);
   const openFile = useTabsStore((s) => s.openFile);
   const [dragState, setDragState] = useState<FileDragState | null>(null);
@@ -96,6 +99,16 @@ export function FileList({
     active: boolean;
   } | null>(null);
   const suppressClickRef = useRef<string | null>(null);
+  const selectionAnchorRef = useRef<string | null>(null);
+
+  const entries = showHidden
+    ? tab.entries
+    : tab.entries.filter((entry) => !entry.name.startsWith("."));
+  const visiblePaths = entries.map((entry) => entry.path);
+
+  useEffect(() => {
+    selectionAnchorRef.current = null;
+  }, [tab.id, tab.cwd]);
 
   useEffect(() => {
     if (!dragState) return;
@@ -128,15 +141,28 @@ export function FileList({
       suppressClickRef.current = null;
       return;
     }
-    const multi = e.metaKey || e.ctrlKey;
-    if (multi) {
-      const next = tab.selected.includes(entry.path)
-        ? tab.selected.filter((p) => p !== entry.path)
-        : [...tab.selected, entry.path];
-      setSelected(side, tab.id, next);
-    } else {
-      setSelected(side, tab.id, [entry.path]);
-    }
+    const next = nextFileSelection({
+      paths: visiblePaths,
+      selected: tab.selected,
+      target: entry.path,
+      anchor: selectionAnchorRef.current,
+      toggle: e.metaKey || e.ctrlKey,
+      range: e.shiftKey,
+    });
+    selectionAnchorRef.current = next.anchor;
+    setSelected(side, tab.id, next.selected);
+  };
+
+  const toggleEntry = (entry: FileEntry) => {
+    const next = nextFileSelection({
+      paths: visiblePaths,
+      selected: tab.selected,
+      target: entry.path,
+      anchor: selectionAnchorRef.current,
+      toggle: true,
+    });
+    selectionAnchorRef.current = next.anchor;
+    setSelected(side, tab.id, next.selected);
   };
 
   const handlePointerDown = (
@@ -145,6 +171,7 @@ export function FileList({
     entries: FileEntry[],
   ) => {
     if (e.button !== 0) return;
+    e.currentTarget.closest("table")?.focus();
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -222,26 +249,41 @@ export function FileList({
   if (tab.error) {
     return (
       <div className="flex flex-1 items-center justify-center p-4">
-        <p className="text-center text-xs text-danger">{tab.error}</p>
+        <div className="flex max-w-sm flex-col items-center gap-3 text-center">
+          {tab.kind === "remote" && <WifiOff className="size-6 text-danger" />}
+          <p className="text-xs text-danger">{tab.error}</p>
+          {tab.kind === "remote" && tab.status === "error" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => reconnectTab(side, tab.id)}
+            >
+              {t("terminal.reconnect")}
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
 
-  const entries = showHidden
-    ? tab.entries
-    : tab.entries.filter((e) => !e.name.startsWith("."));
-
   const canGoUp = !!tab.cwd && parentPath(tab.cwd) !== tab.cwd;
   const sendLabel = side === "left" ? t("sftp.sendRight") : t("sftp.sendLeft");
-  const compressedLabel =
-    side === "left"
-      ? t("sftp.sendRightCompressed")
-      : t("sftp.sendLeftCompressed");
 
   return (
     <ScrollArea className="min-h-0 flex-1">
-      <table className="w-full table-fixed border-collapse text-xs">
+      <table
+        tabIndex={0}
+        aria-label={t("sftp.fileList")}
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === "a") {
+            event.preventDefault();
+            setSelected(side, tab.id, visiblePaths);
+          }
+        }}
+        className="w-full table-fixed border-collapse text-xs outline-none"
+      >
         <colgroup>
+          <col className="w-7" />
           <col />
           <col className="w-14" />
           <col className="w-30" />
@@ -254,7 +296,7 @@ export function FileList({
               }
               className="cursor-pointer select-none hover:bg-accent"
             >
-              <td colSpan={3} className="px-2 py-1 text-muted-foreground">
+              <td colSpan={4} className="px-2 py-1 text-muted-foreground">
                 <span className="inline-flex items-center gap-2">
                   <Folder className="size-4 shrink-0" /> ..
                 </span>
@@ -264,7 +306,7 @@ export function FileList({
 
           {entries.length === 0 ? (
             <tr>
-              <td colSpan={3}>
+              <td colSpan={4}>
                 <EmptyState
                   className="py-8"
                   icon={Folder}
@@ -275,6 +317,10 @@ export function FileList({
           ) : (
             entries.map((entry) => {
               const selected = tab.selected.includes(entry.path);
+              const actionEntries = selected
+                ? entries.filter((item) => tab.selected.includes(item.path))
+                : [entry];
+              const single = actionEntries.length === 1;
               return (
                 <ContextMenu key={entry.path}>
                   <ContextMenuTrigger asChild>
@@ -294,6 +340,12 @@ export function FileList({
                       onPointerUp={finishPointerDrag}
                       onPointerCancel={finishPointerDrag}
                       onClick={(e) => onRowClick(e, entry)}
+                      onContextMenu={() => {
+                        if (!selected) {
+                          selectionAnchorRef.current = entry.path;
+                          setSelected(side, tab.id, [entry.path]);
+                        }
+                      }}
                       onDoubleClick={() => open(entry)}
                       className={cn(
                         "cursor-pointer touch-none select-none",
@@ -301,6 +353,19 @@ export function FileList({
                         dragState?.entry.path === entry.path && "opacity-50",
                       )}
                     >
+                      <td className="py-1 pl-2">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          aria-label={t("sftp.selectFile", {
+                            name: entry.name,
+                          })}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => toggleEntry(entry)}
+                          className="block size-3 cursor-pointer accent-primary"
+                        />
+                      </td>
                       <td className="truncate py-1 pl-2 pr-1">
                         <span className="inline-flex max-w-full items-center gap-2">
                           <EntryIcon entry={entry} />
@@ -317,43 +382,38 @@ export function FileList({
                   </ContextMenuTrigger>
                   <ContextMenuContent>
                     <ContextMenuItem
-                      onSelect={() => void transfer(side, [entry])}
+                      onSelect={() => void transfer(side, actionEntries)}
                     >
                       {sendLabel}
                     </ContextMenuItem>
-                    {entry.kind === "dir" && (
-                      <ContextMenuItem
-                        onSelect={() =>
-                          void transfer(side, [entry], { compress: true })
-                        }
-                      >
-                        {compressedLabel}
-                      </ContextMenuItem>
-                    )}
-                    {entry.kind === "dir" && (
+                    {single && entry.kind === "dir" && (
                       <ContextMenuItem
                         onSelect={() => void navigate(side, tab.id, entry.path)}
                       >
                         {t("sftp.open")}
                       </ContextMenuItem>
                     )}
-                    {entry.kind === "file" && (
+                    {single && entry.kind === "file" && (
                       <ContextMenuItem onSelect={() => openEditor(entry)}>
                         {t("common.edit")}
                       </ContextMenuItem>
                     )}
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onSelect={() => onRename(entry)}>
-                      {t("sftp.rename")}
-                    </ContextMenuItem>
-                    {entry.permissions !== null && !entry.isSymlink && (
-                      <ContextMenuItem onSelect={() => onPermissions(entry)}>
-                        {t("sftp.permissions.action")}
+                    {single && <ContextMenuSeparator />}
+                    {single && (
+                      <ContextMenuItem onSelect={() => onRename(entry)}>
+                        {t("sftp.rename")}
                       </ContextMenuItem>
                     )}
+                    {single &&
+                      entry.permissions !== null &&
+                      !entry.isSymlink && (
+                        <ContextMenuItem onSelect={() => onPermissions(entry)}>
+                          {t("sftp.permissions.action")}
+                        </ContextMenuItem>
+                      )}
                     <ContextMenuItem
                       destructive
-                      onSelect={() => onDelete(entry)}
+                      onSelect={() => onDelete(actionEntries)}
                     >
                       {t("common.delete")}
                     </ContextMenuItem>

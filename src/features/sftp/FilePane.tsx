@@ -107,25 +107,39 @@ export function FilePane({ side }: { side: PaneSide }) {
       },
     });
 
-  const onDelete = async (tab: SftpTab, entry: FileEntry) => {
+  const onDelete = async (tab: SftpTab, entries: FileEntry[]) => {
+    let changed = false;
     try {
-      await ipc.sftp.remove(tab.connectionId, entry.path, entry.kind === "dir");
-      await refresh(side, tab.id);
+      for (const entry of entries) {
+        await ipc.sftp.remove(
+          tab.connectionId,
+          entry.path,
+          entry.kind === "dir",
+        );
+        changed = true;
+      }
     } catch (err) {
       toast.error(t("sftp.deleteError"), errorMessage(err));
+    } finally {
+      if (changed) await refresh(side, tab.id);
     }
   };
 
-  const confirmDelete = (tab: SftpTab, entry: FileEntry) => {
+  const confirmDelete = (tab: SftpTab, entries: FileEntry[]) => {
+    const [entry] = entries;
+    if (!entry) return;
     setConfirmState({
       title: t("common.delete"),
-      description: t("common.deleteConfirm", { name: entry.name }),
+      description:
+        entries.length === 1
+          ? t("common.deleteConfirm", { name: entry.name })
+          : t("sftp.deleteManyConfirm", { count: entries.length }),
       cancelLabel: t("common.cancel"),
       actions: [
         {
           label: t("common.delete"),
           variant: "destructive",
-          onSelect: () => void onDelete(tab, entry),
+          onSelect: () => void onDelete(tab, entries),
         },
       ],
     });
@@ -259,7 +273,7 @@ export function FilePane({ side }: { side: PaneSide }) {
             side={side}
             tab={active}
             onRename={(entry) => onRename(active, entry)}
-            onDelete={(entry) => confirmDelete(active, entry)}
+            onDelete={(entries) => confirmDelete(active, entries)}
             onPermissions={(entry) => setPermTarget({ tab: active, entry })}
           />
         </>

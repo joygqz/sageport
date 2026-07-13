@@ -1,8 +1,9 @@
-use std::io;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
+use parking_lot::Mutex;
 use tauri::AppHandle;
 use tokio::fs;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -11,11 +12,13 @@ use super::path::{
     base_name, clean_local_path, dest_join, join_remote, normalize_local_path,
     normalize_remote_path, parent_remote, remote_is_child_path, sh_quote,
 };
-use super::{emit_transfer_event, ops, SftpManager};
+use super::{emit_transfer_event, ops, SftpManager, TransferCancel};
 use crate::error::{connection_lost, AppError, AppResult};
 
 const CHUNK_SIZE: usize = 64 * 1024;
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 const PHASE_COMPRESS: &str = "compressing";
+const PHASE_PREPARE: &str = "preparing";
 const PHASE_TRANSFER: &str = "transferring";
 const PHASE_EXTRACT: &str = "extracting";
 
@@ -39,7 +42,8 @@ struct ProgressCtx {
     label: String,
     silent: bool,
     phase: Option<String>,
-    cancel: Arc<AtomicBool>,
+    cancel: Arc<TransferCancel>,
+    last_emit: Arc<Mutex<Instant>>,
 }
 
 fn map_stream_error(e: io::Error, remote: bool) -> AppError {
@@ -67,7 +71,21 @@ fn emit(app: &AppHandle, p: &ProgressCtx, done: u64, status: &str, message: Opti
         status,
         p.phase.clone(),
         message,
+        None,
     );
+}
+
+fn should_emit_progress(p: &ProgressCtx, done: u64) -> bool {
+    if p.total > 0 && done >= p.total {
+        return true;
+    }
+    let now = Instant::now();
+    let mut last = p.last_emit.lock();
+    if now.duration_since(*last) < PROGRESS_INTERVAL {
+        return false;
+    }
+    *last = now;
+    true
 }
 
 pub async fn transfer(
@@ -76,42 +94,86 @@ pub async fn transfer(
     transfer_id: &str,
     source: &Endpoint,
     dest_dir: &Endpoint,
-    compress: bool,
-    cancel: Arc<AtomicBool>,
+    cancel: Arc<TransferCancel>,
 ) -> TransferOutcome {
     let name = base_name(&source.path);
-    if let Err(e) = validate_transfer_target(mgr, source, dest_dir, &name).await {
+    emit_transfer_event(
+        app,
+        transfer_id,
+        0,
+        0,
+        &name,
+        "active",
+        Some(PHASE_PREPARE.into()),
+        None,
+        None,
+    );
+    let validation = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => Err(AppError::Cancelled),
+        result = validate_transfer_target(mgr, source, dest_dir, &name) => result,
+    };
+    if let Err(e) = validation {
+        let is_cancelled = matches!(&e, AppError::Cancelled);
+        let status = if is_cancelled { "cancelled" } else { "error" };
+        let message = (!is_cancelled).then(|| e.to_string());
+        let code = (status == "error").then(|| e.code().to_string());
         emit_transfer_event(
             app,
             transfer_id,
             0,
             0,
             &name,
-            "error",
+            status,
             None,
-            Some(e.to_string()),
+            message.clone(),
+            code,
         );
-        return outcome(0, 0, "error", Some(e.to_string()));
+        return outcome(0, 0, status, message);
     }
 
     let crosses_network = source.connection_id.is_some() || dest_dir.connection_id.is_some();
-    if compress && crosses_network && is_dir(mgr, source).await.unwrap_or(false) {
+    let source_is_dir = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return cancelled(app, transfer_id, &name, 0, 0),
+        result = is_dir(mgr, source) => result.unwrap_or(false),
+    };
+    let compress = if crosses_network && source_is_dir {
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return cancelled(app, transfer_id, &name, 0, 0),
+            available = compression_available(mgr, source, dest_dir) => available,
+        }
+    } else {
+        false
+    };
+    if compress {
         return transfer_compressed(app, mgr, transfer_id, source, dest_dir, cancel).await;
     }
 
-    let total = source_size(mgr, source).await.unwrap_or(0);
+    let total = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return cancelled(app, transfer_id, &name, 0, 0),
+        result = source_size(mgr, source) => result.unwrap_or(0),
+    };
     let progress = ProgressCtx {
         transfer_id: transfer_id.to_string(),
         base: 0,
         total,
         label: name.clone(),
         silent: false,
-        phase: None,
+        phase: Some(PHASE_TRANSFER.to_string()),
         cancel,
+        last_emit: Arc::new(Mutex::new(Instant::now())),
     };
 
     let mut done = 0u64;
-    match transfer_node(app, mgr, source, dest_dir, &name, &progress, &mut done).await {
+    let result = tokio::select! {
+        biased;
+        _ = progress.cancel.cancelled() => Err(AppError::Cancelled),
+        result = transfer_node(app, mgr, source, dest_dir, &name, &progress, &mut done) => result,
+    };
+    match result {
         Ok(()) => {
             emit(app, &at(&progress, &name), total, "done", None);
             outcome(total, total, "done", None)
@@ -121,16 +183,56 @@ pub async fn transfer(
             outcome(done, total, "cancelled", None)
         }
         Err(e) => {
-            emit(
+            let message = e.to_string();
+            emit_transfer_event(
                 app,
-                &at(&progress, &name),
+                transfer_id,
                 done,
+                total,
+                &name,
                 "error",
-                Some(e.to_string()),
+                progress.phase.clone(),
+                Some(message.clone()),
+                Some(e.code().to_string()),
             );
-            outcome(done, total, "error", Some(e.to_string()))
+            outcome(done, total, "error", Some(message))
         }
     }
+}
+
+async fn compression_available(mgr: &SftpManager, source: &Endpoint, dest_dir: &Endpoint) -> bool {
+    let source_ready = match &source.connection_id {
+        Some(id) => mgr.supports_tar(id).await,
+        None => true,
+    };
+    if !source_ready {
+        return false;
+    }
+    match &dest_dir.connection_id {
+        Some(id) => mgr.supports_tar(id).await,
+        None => true,
+    }
+}
+
+fn cancelled(
+    app: &AppHandle,
+    transfer_id: &str,
+    name: &str,
+    transferred: u64,
+    total: u64,
+) -> TransferOutcome {
+    emit_transfer_event(
+        app,
+        transfer_id,
+        transferred,
+        total,
+        name,
+        "cancelled",
+        None,
+        None,
+        None,
+    );
+    outcome(transferred, total, "cancelled", None)
 }
 
 fn outcome(
@@ -163,7 +265,7 @@ async fn transfer_node(
     progress: &ProgressCtx,
     done: &mut u64,
 ) -> AppResult<()> {
-    if progress.cancel.load(Ordering::Relaxed) {
+    if progress.cancel.is_cancelled() {
         return Err(AppError::Cancelled);
     }
     let dest_path = dest_join(dest_dir.connection_id.as_deref(), &dest_dir.path, name);
@@ -264,29 +366,32 @@ where
     let mut buf = vec![0u8; CHUNK_SIZE];
     let mut done = progress.base;
     loop {
-        if progress.cancel.load(Ordering::Relaxed) {
+        if progress.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let n = reader
-            .read(&mut buf)
-            .await
-            .map_err(|e| map_stream_error(e, remote_read))?;
+        let n = tokio::select! {
+            biased;
+            _ = progress.cancel.cancelled() => return Err(AppError::Cancelled),
+            result = reader.read(&mut buf) => result.map_err(|e| map_stream_error(e, remote_read))?,
+        };
         if n == 0 {
             break;
         }
-        writer
-            .write_all(&buf[..n])
-            .await
-            .map_err(|e| map_stream_error(e, remote_write))?;
+        tokio::select! {
+            biased;
+            _ = progress.cancel.cancelled() => return Err(AppError::Cancelled),
+            result = writer.write_all(&buf[..n]) => result.map_err(|e| map_stream_error(e, remote_write))?,
+        };
         done += n as u64;
-        if !progress.silent {
+        if !progress.silent && should_emit_progress(progress, done) {
             emit(app, progress, done, "active", None);
         }
     }
-    writer
-        .flush()
-        .await
-        .map_err(|e| map_stream_error(e, remote_write))?;
+    tokio::select! {
+        biased;
+        _ = progress.cancel.cancelled() => return Err(AppError::Cancelled),
+        result = writer.flush() => result.map_err(|e| map_stream_error(e, remote_write))?,
+    };
     Ok(())
 }
 
@@ -424,7 +529,7 @@ async fn transfer_compressed(
     transfer_id: &str,
     source: &Endpoint,
     dest_dir: &Endpoint,
-    cancel: Arc<AtomicBool>,
+    cancel: Arc<TransferCancel>,
 ) -> TransferOutcome {
     let name = base_name(&source.path);
     let notify =
@@ -438,10 +543,11 @@ async fn transfer_compressed(
                 status,
                 phase.map(str::to_string),
                 msg,
+                None,
             );
         };
 
-    if cancel.load(Ordering::Relaxed) {
+    if cancel.is_cancelled() {
         notify(0, 0, "cancelled", None, None);
         return outcome(0, 0, "cancelled", None);
     }
@@ -501,8 +607,19 @@ async fn transfer_compressed(
             outcome(0, 0, "cancelled", None)
         }
         Err(e) => {
-            notify(0, 0, "error", None, Some(e.to_string()));
-            outcome(0, 0, "error", Some(e.to_string()))
+            let message = e.to_string();
+            emit_transfer_event(
+                app,
+                transfer_id,
+                0,
+                0,
+                &name,
+                "error",
+                None,
+                Some(message.clone()),
+                Some(e.code().to_string()),
+            );
+            outcome(0, 0, "error", Some(message))
         }
     }
 }
@@ -512,7 +629,7 @@ fn xfer_ctx(
     label: &str,
     total: u64,
     silent: bool,
-    cancel: Arc<AtomicBool>,
+    cancel: Arc<TransferCancel>,
 ) -> ProgressCtx {
     ProgressCtx {
         transfer_id: transfer_id.to_string(),
@@ -522,6 +639,7 @@ fn xfer_ctx(
         silent,
         phase: Some(PHASE_TRANSFER.to_string()),
         cancel,
+        last_emit: Arc::new(Mutex::new(Instant::now())),
     }
 }
 
@@ -535,9 +653,17 @@ async fn upload_archive(
 ) -> AppResult<()> {
     let mut reader = fs::File::open(local).await?;
     let conn = mgr.get(dst_id)?;
-    let mut writer = conn.session().create(remote).await?;
+    let mut writer = tokio::select! {
+        biased;
+        _ = ctx.cancel.cancelled() => return Err(AppError::Cancelled),
+        result = conn.session().create(remote) => result?,
+    };
     copy_stream(app, &mut reader, false, &mut writer, true, ctx).await?;
-    writer.sync_all().await?;
+    tokio::select! {
+        biased;
+        _ = ctx.cancel.cancelled() => return Err(AppError::Cancelled),
+        result = writer.sync_all() => result?,
+    }
     Ok(())
 }
 
@@ -550,7 +676,11 @@ async fn download_archive(
     ctx: &ProgressCtx,
 ) -> AppResult<()> {
     let conn = mgr.get(src_id)?;
-    let mut reader = conn.session().open(remote).await?;
+    let mut reader = tokio::select! {
+        biased;
+        _ = ctx.cancel.cancelled() => return Err(AppError::Cancelled),
+        result = conn.session().open(remote) => result?,
+    };
     let mut writer = fs::File::create(local).await?;
     copy_stream(app, &mut reader, true, &mut writer, false, ctx).await?;
     Ok(())
@@ -565,25 +695,26 @@ async fn compressed_local_to_remote(
     src_path: &str,
     dst_id: &str,
     dst_dir: &str,
-    cancel: Arc<AtomicBool>,
+    cancel: Arc<TransferCancel>,
 ) -> AppResult<u64> {
     let tmp = local_temp_archive();
     let src = PathBuf::from(src_path);
     let archive = tmp.clone();
-    tokio::task::spawn_blocking(move || create_local_archive(&src, &archive))
+    let archive_cancel = cancel.clone();
+    tokio::task::spawn_blocking(move || create_local_archive(&src, &archive, &archive_cancel))
         .await
         .map_err(|e| AppError::Other(format!("task join error: {e}")))??;
     let size = fs::metadata(&tmp).await?.len();
 
     let remote_archive = join_remote(dst_dir, &remote_archive_name());
     let res = async {
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         let ctx = xfer_ctx(transfer_id, name, size, false, cancel.clone());
         upload_archive(app, mgr, dst_id, &tmp, &remote_archive, &ctx).await?;
 
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         emit_transfer_event(
@@ -595,23 +726,24 @@ async fn compressed_local_to_remote(
             "active",
             Some(PHASE_EXTRACT.into()),
             None,
+            None,
         );
-        mgr.exec(
+        exec_with_cancel(
+            mgr,
             dst_id,
             &format!(
                 "tar -xzf {} -C {}",
                 sh_quote(&remote_archive),
                 sh_quote(dst_dir)
             ),
+            &cancel,
         )
         .await?;
         Ok(())
     }
     .await;
 
-    let _ = mgr
-        .exec(dst_id, &format!("rm -f {}", sh_quote(&remote_archive)))
-        .await;
+    cleanup_remote(mgr, dst_id, &remote_archive).await;
     let _ = fs::remove_file(&tmp).await;
     res.map(|()| size)
 }
@@ -625,11 +757,12 @@ async fn compressed_remote_to_local(
     src_id: &str,
     src_path: &str,
     dst_dir: &str,
-    cancel: Arc<AtomicBool>,
+    cancel: Arc<TransferCancel>,
 ) -> AppResult<u64> {
     let parent = parent_remote(src_path);
     let remote_archive = remote_temp_archive();
-    mgr.exec(
+    exec_with_cancel(
+        mgr,
         src_id,
         &format!(
             "tar -czf {} -C {} {}",
@@ -637,21 +770,26 @@ async fn compressed_remote_to_local(
             sh_quote(&parent),
             sh_quote(name)
         ),
+        &cancel,
     )
     .await?;
 
     let tmp = local_temp_archive();
     let dst = PathBuf::from(dst_dir);
     let res = async {
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         let src_conn = mgr.get(src_id)?;
-        let size = ops::remote_file_size(src_conn.session(), &remote_archive).await?;
+        let size = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Err(AppError::Cancelled),
+            result = ops::remote_file_size(src_conn.session(), &remote_archive) => result?,
+        };
         let ctx = xfer_ctx(transfer_id, name, size, false, cancel.clone());
         download_archive(app, mgr, src_id, &remote_archive, &tmp, &ctx).await?;
 
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         emit_transfer_event(
@@ -663,18 +801,18 @@ async fn compressed_remote_to_local(
             "active",
             Some(PHASE_EXTRACT.into()),
             None,
+            None,
         );
         let archive = tmp.clone();
-        tokio::task::spawn_blocking(move || extract_local_archive(&archive, &dst))
+        let extract_cancel = cancel.clone();
+        tokio::task::spawn_blocking(move || extract_local_archive(&archive, &dst, &extract_cancel))
             .await
             .map_err(|e| AppError::Other(format!("task join error: {e}")))??;
         Ok(size)
     }
     .await;
 
-    let _ = mgr
-        .exec(src_id, &format!("rm -f {}", sh_quote(&remote_archive)))
-        .await;
+    cleanup_remote(mgr, src_id, &remote_archive).await;
     let _ = fs::remove_file(&tmp).await;
     res
 }
@@ -689,11 +827,12 @@ async fn compressed_remote_to_remote(
     src_path: &str,
     dst_id: &str,
     dst_dir: &str,
-    cancel: Arc<AtomicBool>,
+    cancel: Arc<TransferCancel>,
 ) -> AppResult<u64> {
     let parent = parent_remote(src_path);
     let src_archive = remote_temp_archive();
-    mgr.exec(
+    exec_with_cancel(
+        mgr,
         src_id,
         &format!(
             "tar -czf {} -C {} {}",
@@ -701,17 +840,22 @@ async fn compressed_remote_to_remote(
             sh_quote(&parent),
             sh_quote(name)
         ),
+        &cancel,
     )
     .await?;
 
     let tmp = local_temp_archive();
     let dst_archive = join_remote(dst_dir, &remote_archive_name());
     let res = async {
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         let src_conn = mgr.get(src_id)?;
-        let size = ops::remote_file_size(src_conn.session(), &src_archive).await?;
+        let size = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Err(AppError::Cancelled),
+            result = ops::remote_file_size(src_conn.session(), &src_archive) => result?,
+        };
         download_archive(
             app,
             mgr,
@@ -731,7 +875,7 @@ async fn compressed_remote_to_remote(
         )
         .await?;
 
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         emit_transfer_event(
@@ -743,48 +887,130 @@ async fn compressed_remote_to_remote(
             "active",
             Some(PHASE_EXTRACT.into()),
             None,
+            None,
         );
-        mgr.exec(
+        exec_with_cancel(
+            mgr,
             dst_id,
             &format!(
                 "tar -xzf {} -C {}",
                 sh_quote(&dst_archive),
                 sh_quote(dst_dir)
             ),
+            &cancel,
         )
         .await?;
         Ok(size)
     }
     .await;
 
-    let _ = mgr
-        .exec(src_id, &format!("rm -f {}", sh_quote(&src_archive)))
-        .await;
-    let _ = mgr
-        .exec(dst_id, &format!("rm -f {}", sh_quote(&dst_archive)))
-        .await;
+    tokio::join!(
+        cleanup_remote(mgr, src_id, &src_archive),
+        cleanup_remote(mgr, dst_id, &dst_archive),
+    );
     let _ = fs::remove_file(&tmp).await;
     res
 }
 
-fn create_local_archive(src_dir: &Path, archive: &Path) -> AppResult<()> {
+async fn exec_with_cancel(
+    mgr: &SftpManager,
+    connection_id: &str,
+    command: &str,
+    cancel: &TransferCancel,
+) -> AppResult<String> {
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => Err(AppError::Cancelled),
+        result = mgr.exec(connection_id, command) => result,
+    }
+}
+
+async fn cleanup_remote(mgr: &SftpManager, connection_id: &str, path: &str) {
+    let command = format!("rm -f {}", sh_quote(path));
+    let _ = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        mgr.exec(connection_id, &command),
+    )
+    .await;
+}
+
+struct CancelReader<R> {
+    inner: R,
+    cancel: Arc<TransferCancel>,
+}
+
+impl<R: Read> Read for CancelReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.cancel.is_cancelled() {
+            return Err(io::Error::new(io::ErrorKind::Interrupted, "cancelled"));
+        }
+        self.inner.read(buf)
+    }
+}
+
+struct CancelWriter<W> {
+    inner: W,
+    cancel: Arc<TransferCancel>,
+}
+
+impl<W: Write> Write for CancelWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if self.cancel.is_cancelled() {
+            return Err(io::Error::new(io::ErrorKind::Interrupted, "cancelled"));
+        }
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+fn create_local_archive(
+    src_dir: &Path,
+    archive: &Path,
+    cancel: &Arc<TransferCancel>,
+) -> AppResult<()> {
     let name = src_dir
         .file_name()
         .map(|n| n.to_owned())
         .ok_or_else(|| AppError::Other("source has no directory name".into()))?;
     let file = std::fs::File::create(archive)?;
     let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::fast());
-    let mut builder = tar::Builder::new(encoder);
-    builder.append_dir_all(&name, src_dir)?;
-    builder.into_inner()?.finish()?;
+    let writer = CancelWriter {
+        inner: encoder,
+        cancel: cancel.clone(),
+    };
+    let result = (|| -> io::Result<()> {
+        let mut builder = tar::Builder::new(writer);
+        builder.append_dir_all(&name, src_dir)?;
+        builder.into_inner()?.inner.finish()?;
+        Ok(())
+    })();
+    if cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
+    }
+    result?;
     Ok(())
 }
 
-fn extract_local_archive(archive: &Path, dest_dir: &Path) -> AppResult<()> {
+fn extract_local_archive(
+    archive: &Path,
+    dest_dir: &Path,
+    cancel: &Arc<TransferCancel>,
+) -> AppResult<()> {
     std::fs::create_dir_all(dest_dir)?;
     let file = std::fs::File::open(archive)?;
-    let decoder = flate2::read::GzDecoder::new(file);
-    tar::Archive::new(decoder).unpack(dest_dir)?;
+    let reader = CancelReader {
+        inner: file,
+        cancel: cancel.clone(),
+    };
+    let decoder = flate2::read::GzDecoder::new(reader);
+    let result = tar::Archive::new(decoder).unpack(dest_dir);
+    if cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
+    }
+    result?;
     Ok(())
 }
 

@@ -11,6 +11,11 @@ import type {
   SftpStatusKind,
   TransferEvent,
 } from "@/types/models";
+import {
+  pendingTransfer,
+  updateTransferProgress,
+  type ActiveTransfer,
+} from "./transfer-progress";
 
 function t(key: Parameters<typeof translate>[1]): string {
   return translate(detectLocale(), key);
@@ -20,6 +25,7 @@ function describeConnectError(code?: string | null, message?: string) {
   if (code === "invalid") return t("ssh.credentialsMissing");
   if (code === "auth") return t("ssh.authFailed");
   if (code === "host_key") return t("ssh.hostKeyRejected");
+  if (code === "network") return t("sftp.connectionLost");
   return message;
 }
 
@@ -53,7 +59,7 @@ interface SftpState {
   ratio: number;
   panes: Record<PaneSide, PaneState>;
 
-  transfers: Record<string, TransferEvent>;
+  transfers: Record<string, ActiveTransfer>;
 
   showHidden: boolean;
 
@@ -62,6 +68,7 @@ interface SftpState {
 
   addLocalTab: (side: PaneSide) => Promise<void>;
   addRemoteTab: (side: PaneSide, host: Host) => void;
+  reconnectTab: (side: PaneSide, tabId: string) => void;
   closeTab: (side: PaneSide, tabId: string) => void;
   setActive: (side: PaneSide, tabId: string) => void;
 
@@ -80,11 +87,7 @@ interface SftpState {
 
   cancelTransfer: (transferId: string) => void;
 
-  transfer: (
-    fromSide: PaneSide,
-    entries?: FileEntry[],
-    opts?: { compress?: boolean },
-  ) => Promise<void>;
+  transfer: (fromSide: PaneSide, entries?: FileEntry[]) => Promise<void>;
 }
 
 const otherSide = (side: PaneSide): PaneSide =>
@@ -167,7 +170,14 @@ export const useSftpStore = create<SftpState>((set, get) => {
         loading: false,
       });
     } catch (err) {
-      patchTab(side, tabId, { loading: false, error: errorMessage(err) });
+      const code = errorCode(err);
+      patchTab(side, tabId, {
+        loading: false,
+        ...(tab.kind === "remote" && code === "network"
+          ? { status: "error" as const }
+          : null),
+        error: describeConnectError(code, errorMessage(err)),
+      });
     }
   };
 
@@ -238,10 +248,43 @@ export const useSftpStore = create<SftpState>((set, get) => {
       });
     },
 
+    reconnectTab: (side, tabId) => {
+      const tab = get().panes[side].tabs.find((item) => item.id === tabId);
+      if (!tab || tab.kind !== "remote" || !tab.connectionId || !tab.hostId)
+        return;
+      patchTab(side, tabId, {
+        status: "connecting",
+        loading: true,
+        error: undefined,
+        cwd: "",
+        entries: [],
+        selected: [],
+      });
+      void ipc.sftp
+        .disconnect(tab.connectionId)
+        .catch(() => {})
+        .then(() => ipc.sftp.connect(tab.connectionId!, tab.hostId!))
+        .catch((err) => {
+          patchTab(side, tabId, {
+            status: "error",
+            loading: false,
+            error: describeConnectError(errorCode(err), errorMessage(err)),
+          });
+        });
+    },
+
     closeTab: (side, tabId) => {
       const pane = get().panes[side];
       const tab = pane.tabs.find((t) => t.id === tabId);
       if (tab?.kind === "remote" && tab.connectionId) {
+        for (const transfer of Object.values(get().transfers)) {
+          if (
+            transfer.sourceConnectionId === tab.connectionId ||
+            transfer.destConnectionId === tab.connectionId
+          ) {
+            get().cancelTransfer(transfer.transferId);
+          }
+        }
         void ipc.sftp.disconnect(tab.connectionId).catch(() => {});
         useHostKeyStore.getState().rejectSession(tab.connectionId);
       }
@@ -310,17 +353,56 @@ export const useSftpStore = create<SftpState>((set, get) => {
 
     applyTransfer: (e) => {
       if (e.status === "active") {
-        set((s) => ({ transfers: { ...s.transfers, [e.transferId]: e } }));
+        set((s) => ({
+          transfers: {
+            ...s.transfers,
+            [e.transferId]: updateTransferProgress(
+              s.transfers[e.transferId],
+              e,
+            ),
+          },
+        }));
         return;
       }
 
+      const completed = get().transfers[e.transferId];
       set((s) => {
         const rest = { ...s.transfers };
         delete rest[e.transferId];
         return { transfers: rest };
       });
       if (e.status === "error") {
-        toast.error(t("sftp.transferFailed"), e.message);
+        toast.error(
+          t("sftp.transferFailed"),
+          e.code === "network" ? t("sftp.connectionLost") : e.message,
+        );
+        if (e.code === "network" && completed) {
+          const affected = new Set(
+            [completed.sourceConnectionId, completed.destConnectionId].filter(
+              (id): id is string => Boolean(id),
+            ),
+          );
+          set((s) => ({
+            panes: Object.fromEntries(
+              Object.entries(s.panes).map(([side, pane]) => [
+                side,
+                {
+                  ...pane,
+                  tabs: pane.tabs.map((tab) =>
+                    tab.connectionId && affected.has(tab.connectionId)
+                      ? {
+                          ...tab,
+                          status: "error" as const,
+                          loading: false,
+                          error: t("sftp.connectionLost"),
+                        }
+                      : tab,
+                  ),
+                },
+              ]),
+            ) as Record<PaneSide, PaneState>,
+          }));
+        }
       }
 
       void get().refresh("left", get().panes.left.activeTabId ?? "");
@@ -328,10 +410,32 @@ export const useSftpStore = create<SftpState>((set, get) => {
     },
 
     cancelTransfer: (transferId) => {
-      void ipc.sftp.cancelTransfer(transferId).catch(() => {});
+      set((s) => {
+        const transfer = s.transfers[transferId];
+        if (!transfer) return s;
+        return {
+          transfers: {
+            ...s.transfers,
+            [transferId]: { ...transfer, cancelRequested: true },
+          },
+        };
+      });
+      void ipc.sftp.cancelTransfer(transferId).catch((err) => {
+        set((s) => {
+          const transfer = s.transfers[transferId];
+          if (!transfer) return s;
+          return {
+            transfers: {
+              ...s.transfers,
+              [transferId]: { ...transfer, cancelRequested: false },
+            },
+          };
+        });
+        toast.error(t("sftp.cancelError"), errorMessage(err));
+      });
     },
 
-    transfer: async (fromSide, entries, opts) => {
+    transfer: async (fromSide, entries) => {
       const dstSide = otherSide(fromSide);
       const src = get().panes[fromSide];
       const dst = get().panes[dstSide];
@@ -349,17 +453,37 @@ export const useSftpStore = create<SftpState>((set, get) => {
         srcTab.entries.filter((e) => srcTab.selected.includes(e.path));
       if (items.length === 0) return;
 
-      const compress = opts?.compress ?? false;
       for (const item of items) {
         const transferId = crypto.randomUUID();
+        set((s) => ({
+          transfers: {
+            ...s.transfers,
+            [transferId]: pendingTransfer(
+              {
+                transferId,
+                transferred: 0,
+                total: item.kind === "file" ? item.size : 0,
+                file: item.name,
+                status: "active",
+                phase: "preparing",
+              },
+              srcTab.connectionId,
+              dstTab.connectionId,
+            ),
+          },
+        }));
         await ipc.sftp
           .transfer(
             transferId,
             { connectionId: srcTab.connectionId, path: item.path },
             { connectionId: dstTab.connectionId, path: dstTab.cwd },
-            compress,
           )
           .catch((err) => {
+            set((s) => {
+              const rest = { ...s.transfers };
+              delete rest[transferId];
+              return { transfers: rest };
+            });
             toast.error(t("sftp.transferError"), errorMessage(err));
           });
       }

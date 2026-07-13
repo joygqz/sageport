@@ -222,7 +222,6 @@ pub async fn fs_transfer(
     transfer_id: String,
     source: EndpointInput,
     dest: EndpointInput,
-    compress: bool,
 ) -> AppResult<()> {
     let mgr = state.sftp.clone();
     let pool = state.db.clone();
@@ -241,8 +240,7 @@ pub async fn fs_transfer(
 
     let cancel = mgr.register_transfer(&transfer_id);
     tokio::spawn(async move {
-        let outcome =
-            sftp::transfer(&app, &mgr, &transfer_id, &source, &dest, compress, cancel).await;
+        let outcome = sftp::transfer(&app, &mgr, &transfer_id, &source, &dest, cancel).await;
         mgr.unregister_transfer(&transfer_id);
         let _ = transfer_repo::finish(
             &pool,

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, History, X } from "lucide-react";
+import { Eye, EyeOff, History, Loader2, X } from "lucide-react";
 
 import { Button, ResizeHandle, Tooltip } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import { useLayoutStore } from "@/workbench/layout";
 import { useZoomStore, zoomFactor } from "@/workbench/zoom";
 import { FilePane } from "./FilePane";
 import { useSftpStore } from "./store";
 import { TransferHistoryDialog } from "./TransferHistoryDialog";
+import { formatEta } from "./transfer-progress";
 
 const PANE_MIN_W = 200;
 
@@ -129,11 +130,21 @@ function TransferStrip() {
     <div className="flex max-h-24 flex-col overflow-y-auto border-t border-border bg-surface px-2">
       {active.map((tx) => {
         const pct =
-          tx.total > 0 ? Math.round((tx.transferred / tx.total) * 100) : 0;
+          tx.total > 0
+            ? Math.max(
+                0,
+                Math.min(100, Math.round((tx.transferred / tx.total) * 100)),
+              )
+            : 0;
 
         const indeterminate =
-          tx.total === 0 &&
-          (tx.phase === "compressing" || tx.phase === "extracting");
+          tx.phase === "preparing" ||
+          tx.phase === "compressing" ||
+          tx.phase === "extracting";
+        const speed =
+          tx.phase === "transferring" && tx.speedBps > 0
+            ? `${formatBytes(tx.speedBps)}/s`
+            : "—";
         return (
           <div
             key={tx.transferId}
@@ -142,11 +153,15 @@ function TransferStrip() {
             <span className="min-w-0 shrink truncate" title={tx.file}>
               {tx.file}
             </span>
-            {tx.phase && (
+            {tx.cancelRequested ? (
+              <span className="shrink-0 text-2xs text-warning">
+                {t("sftp.cancelling")}
+              </span>
+            ) : tx.phase ? (
               <span className="shrink-0 text-2xs text-muted-foreground">
                 {t(`sftp.phase.${tx.phase}`)}
               </span>
-            )}
+            ) : null}
             <div className="h-1 min-w-16 flex-1 overflow-hidden rounded-full bg-muted">
               <div
                 className={cn(
@@ -159,14 +174,28 @@ function TransferStrip() {
             <span className="w-9 shrink-0 text-right tabular-nums text-muted-foreground">
               {indeterminate ? "…" : `${pct}%`}
             </span>
+            <span className="w-18 shrink-0 text-right tabular-nums text-muted-foreground">
+              {speed}
+            </span>
+            <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">
+              {tx.etaSeconds !== null && tx.speedBps > 0
+                ? t("sftp.remaining", { time: formatEta(tx.etaSeconds) })
+                : ""}
+            </span>
             <Tooltip content={t("sftp.cancelTransfer")}>
               <Button
                 size="icon"
                 variant="ghost"
                 className="size-5 shrink-0 text-muted-foreground hover:text-danger"
+                disabled={tx.cancelRequested}
+                aria-label={t("sftp.cancelTransfer")}
                 onClick={() => cancelTransfer(tx.transferId)}
               >
-                <X className="size-3" />
+                {tx.cancelRequested ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <X className="size-3" />
+                )}
               </Button>
             </Tooltip>
           </div>

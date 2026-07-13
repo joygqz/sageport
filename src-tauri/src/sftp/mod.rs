@@ -10,6 +10,8 @@ use parking_lot::Mutex;
 use russh_sftp::client::SftpSession;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+use tokio::sync::Notify;
+use tokio::sync::OnceCell;
 
 use crate::error::{AppError, AppResult};
 use crate::ssh::{establish, exec_capture, Hop, HostKeyPrompts, SshConnection};
@@ -61,6 +63,41 @@ pub struct TransferEvent {
     pub phase: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+
+/// A cancellation signal that can both be polled from blocking work and wake
+/// async I/O immediately. An atomic flag alone cannot interrupt a stalled
+/// network read, which made transfer cancellation appear unresponsive.
+pub struct TransferCancel {
+    cancelled: AtomicBool,
+    notify: Notify,
+}
+
+impl TransferCancel {
+    fn new() -> Self {
+        Self {
+            cancelled: AtomicBool::new(false),
+            notify: Notify::new(),
+        }
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        self.notify.notify_one();
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Relaxed)
+    }
+
+    pub async fn cancelled(&self) {
+        if self.is_cancelled() {
+            return;
+        }
+        self.notify.notified().await;
+    }
 }
 
 pub struct SftpConnectParams {
@@ -71,6 +108,7 @@ pub struct SftpConnectParams {
 pub struct Conn {
     ssh: SshConnection,
     session: SftpSession,
+    tar_available: OnceCell<bool>,
 }
 
 impl Conn {
@@ -94,12 +132,24 @@ impl Conn {
         }
         Ok(out.stdout)
     }
+
+    async fn supports_tar(&self) -> bool {
+        *self
+            .tar_available
+            .get_or_init(|| async {
+                self.exec("command -v tar >/dev/null 2>&1 && printf yes")
+                    .await
+                    .is_ok()
+            })
+            .await
+    }
 }
 
 #[derive(Default)]
 pub struct SftpManager {
     conns: Arc<Mutex<HashMap<String, Arc<Conn>>>>,
-    cancel_flags: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    connect_cancels: Arc<Mutex<HashMap<String, Arc<TransferCancel>>>>,
+    cancel_flags: Mutex<HashMap<String, Arc<TransferCancel>>>,
 }
 
 impl SftpManager {
@@ -107,8 +157,8 @@ impl SftpManager {
         Self::default()
     }
 
-    pub fn register_transfer(&self, transfer_id: &str) -> Arc<AtomicBool> {
-        let flag = Arc::new(AtomicBool::new(false));
+    pub fn register_transfer(&self, transfer_id: &str) -> Arc<TransferCancel> {
+        let flag = Arc::new(TransferCancel::new());
         self.cancel_flags
             .lock()
             .insert(transfer_id.to_string(), flag.clone());
@@ -117,7 +167,7 @@ impl SftpManager {
 
     pub fn cancel_transfer(&self, transfer_id: &str) {
         if let Some(flag) = self.cancel_flags.lock().get(transfer_id) {
-            flag.store(true, Ordering::SeqCst);
+            flag.cancel();
         }
     }
 
@@ -127,32 +177,75 @@ impl SftpManager {
 
     pub fn connect(&self, app: AppHandle, prompts: HostKeyPrompts, params: SftpConnectParams) {
         let id = params.connection_id.clone();
-        if self.conns.lock().contains_key(&id) {
-            return;
+        let cancel = Arc::new(TransferCancel::new());
+        {
+            let mut pending = self.connect_cancels.lock();
+            if self.conns.lock().contains_key(&id) || pending.contains_key(&id) {
+                return;
+            }
+            pending.insert(id.clone(), cancel.clone());
         }
         let conns = self.conns.clone();
+        let connect_cancels = self.connect_cancels.clone();
         tokio::spawn(async move {
             emit_status(&app, &id, "connecting", None);
-            match open(&app, &prompts, &params).await {
+            let result = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => Err(AppError::Cancelled),
+                result = open(&app, &prompts, &params) => result,
+            };
+            match result {
                 Ok(conn) => {
-                    conns.lock().insert(id.clone(), Arc::new(conn));
-                    emit_status(&app, &id, "connected", None);
+                    let mut pending = connect_cancels.lock();
+                    let is_current = pending
+                        .get(&id)
+                        .is_some_and(|current| Arc::ptr_eq(current, &cancel));
+                    if is_current && !cancel.is_cancelled() {
+                        conns.lock().insert(id.clone(), Arc::new(conn));
+                        emit_status(&app, &id, "connected", None);
+                        pending.remove(&id);
+                    }
                 }
-                Err(e) => emit_status(&app, &id, "error", Some(&e)),
+                Err(AppError::Cancelled) => {}
+                Err(e) => {
+                    let mut pending = connect_cancels.lock();
+                    let is_current = pending
+                        .get(&id)
+                        .is_some_and(|current| Arc::ptr_eq(current, &cancel));
+                    if is_current {
+                        emit_status(&app, &id, "error", Some(&e));
+                        pending.remove(&id);
+                    }
+                }
+            }
+            let mut pending = connect_cancels.lock();
+            if pending
+                .get(&id)
+                .is_some_and(|current| Arc::ptr_eq(current, &cancel))
+            {
+                pending.remove(&id);
             }
         });
     }
 
     pub fn disconnect(&self, app: &AppHandle, connection_id: &str) {
-        if self.conns.lock().remove(connection_id).is_some() {
+        let connecting = self.connect_cancels.lock().remove(connection_id);
+        if let Some(cancel) = &connecting {
+            cancel.cancel();
+        }
+        if connecting.is_some() || self.conns.lock().remove(connection_id).is_some() {
             emit_status(app, connection_id, "closed", None);
         }
     }
 
     pub fn disconnect_all(&self) {
         for flag in self.cancel_flags.lock().values() {
-            flag.store(true, Ordering::SeqCst);
+            flag.cancel();
         }
+        for cancel in self.connect_cancels.lock().values() {
+            cancel.cancel();
+        }
+        self.connect_cancels.lock().clear();
         self.conns.lock().clear();
     }
 
@@ -199,6 +292,13 @@ impl SftpManager {
     pub async fn exec(&self, id: &str, command: &str) -> AppResult<String> {
         self.get(id)?.exec(command).await
     }
+
+    pub async fn supports_tar(&self, id: &str) -> bool {
+        match self.get(id) {
+            Ok(conn) => conn.supports_tar().await,
+            Err(_) => false,
+        }
+    }
 }
 
 async fn open(
@@ -210,7 +310,11 @@ async fn open(
     let channel = ssh.handle.channel_open_session().await?;
     channel.request_subsystem(true, "sftp").await?;
     let session = SftpSession::new(channel.into_stream()).await?;
-    Ok(Conn { ssh, session })
+    Ok(Conn {
+        ssh,
+        session,
+        tar_available: OnceCell::new(),
+    })
 }
 
 pub(crate) fn emit_status(app: &AppHandle, id: &str, status: &str, err: Option<&AppError>) {
@@ -235,6 +339,7 @@ pub(crate) fn emit_transfer_event(
     status: &str,
     phase: Option<String>,
     message: Option<String>,
+    code: Option<String>,
 ) {
     let _ = app.emit(
         EVENT_TRANSFER,
@@ -246,6 +351,28 @@ pub(crate) fn emit_transfer_event(
             status: status.to_string(),
             phase,
             message,
+            code,
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TransferCancel;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn cancellation_wakes_a_waiting_io_task() {
+        let cancel = Arc::new(TransferCancel::new());
+        let waiting = cancel.clone();
+        let task = tokio::spawn(async move { waiting.cancelled().await });
+
+        cancel.cancel();
+
+        tokio::time::timeout(Duration::from_millis(100), task)
+            .await
+            .expect("cancellation should wake immediately")
+            .expect("wait task should finish");
+    }
 }

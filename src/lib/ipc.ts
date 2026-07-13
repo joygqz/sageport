@@ -200,12 +200,8 @@ export const ipc = {
       invoke<void>("fs_write_text", { connectionId, path, content }),
     chmod: (connectionId: string | null, path: string, mode: number) =>
       invoke<void>("fs_chmod", { connectionId, path, mode }),
-    transfer: (
-      transferId: string,
-      source: FsEndpoint,
-      dest: FsEndpoint,
-      compress = false,
-    ) => invoke<void>("fs_transfer", { transferId, source, dest, compress }),
+    transfer: (transferId: string, source: FsEndpoint, dest: FsEndpoint) =>
+      invoke<void>("fs_transfer", { transferId, source, dest }),
     cancelTransfer: (transferId: string) =>
       invoke<void>("fs_transfer_cancel", { transferId }),
     historyList: (limit?: number) =>

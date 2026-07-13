@@ -27,6 +27,7 @@ export const zhCN: Dictionary = {
     authFailed:
       "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
     connectTimedOut: "连接超时，请检查网络、防火墙或服务器上的 SSH 服务。",
+    connectionInterrupted: "连接已中断，请检查网络后重新连接以继续。",
     hostKeyRejected: "已取消连接：未信任该主机的密钥。",
   },
 
@@ -453,20 +454,23 @@ export const zhCN: Dictionary = {
     open: "打开",
     sendLeft: "复制到左侧窗格",
     sendRight: "复制到右侧窗格",
-    sendLeftCompressed: "压缩后复制到左侧窗格",
-    sendRightCompressed: "压缩后复制到右侧窗格",
     phase: {
+      preparing: "准备中",
       compressing: "压缩中",
       transferring: "传输中",
       extracting: "解压中",
     },
     emptyDir: "此文件夹为空",
+    fileList: "文件列表",
+    selectFile: "选择 {name}",
+    deleteManyConfirm: "将永久删除选中的 {count} 个项目，此操作无法撤销。",
     noTabTitle: "未打开任何位置",
     mkdirError: "创建文件夹失败",
     renameError: "重命名失败",
     deleteError: "删除失败",
     transferError: "启动传输失败",
     transferFailed: "传输失败",
+    connectionLost: "远程连接已中断，请检查网络后重新连接。",
     notConnected: "请先连接后再传输文件",
     toggleHidden: "显示隐藏文件",
     bookmarks: {
@@ -491,6 +495,9 @@ export const zhCN: Dictionary = {
       saveError: "保存文件失败",
     },
     cancelTransfer: "取消传输",
+    cancelling: "正在取消…",
+    cancelError: "取消传输失败",
+    remaining: "剩余 {time}",
     history: {
       title: "传输历史",
       empty: "暂无传输记录",

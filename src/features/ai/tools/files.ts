@@ -338,7 +338,6 @@ async function transferFile(
       transferId,
       resolvedSource.endpoint,
       resolvedDestination.endpoint,
-      bool(args, "compress"),
     );
     const event = await waiter.completion;
     if (event.status === "done") {
@@ -478,7 +477,7 @@ export const fileTools: AiTool[] = [
     spec: {
       name: "transfer_file",
       description:
-        "Transfer a file or directory between the local computer and an SFTP host, or between two SFTP hosts. The destination path must be an existing directory. Use absolute paths for local endpoints. Set compress for directories with many small files.",
+        "Transfer a file or directory between the local computer and an SFTP host, or between two SFTP hosts. The destination path must be an existing directory. Use absolute paths for local endpoints. Directories are automatically compressed in transit when supported.",
       parameters: {
         type: "object",
         properties: {
@@ -515,11 +514,6 @@ export const fileTools: AiTool[] = [
             },
             required: ["kind", "path"],
             additionalProperties: false,
-          },
-          compress: {
-            type: "boolean",
-            description:
-              "Compress directory transfers in transit; useful for many small files. Defaults to false.",
           },
         },
         required: ["source", "destination"],

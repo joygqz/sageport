@@ -78,6 +78,7 @@ export function TerminalView({
       if (code === "auth") return translate("ssh.authFailed");
       if (code === "host_key") return translate("ssh.hostKeyRejected");
       if (code === "timeout") return translate("ssh.connectTimedOut");
+      if (code === "network") return translate("ssh.connectionInterrupted");
       return message;
     };
 

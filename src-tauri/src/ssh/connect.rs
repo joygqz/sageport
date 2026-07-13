@@ -12,7 +12,9 @@ use super::{AuthMethod, Hop, HostKeyPrompts, JUMP_DEPTH_LIMIT};
 use crate::error::{AppError, AppResult};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
+// Detect a vanished network in roughly 30 seconds instead of leaving the UI
+// looking connected for up to a minute and a half.
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
 pub struct SshConnection {
     pub handle: Handle<ClientHandler>,
@@ -23,7 +25,7 @@ fn client_config() -> Arc<Config> {
     Arc::new(Config {
         inactivity_timeout: None,
         keepalive_interval: Some(KEEPALIVE_INTERVAL),
-        keepalive_max: 3,
+        keepalive_max: 2,
         ..Default::default()
     })
 }

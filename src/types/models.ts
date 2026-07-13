@@ -427,7 +427,8 @@ export interface SftpStatusEvent {
 
 export type TransferStatus = "active" | "done" | "error" | "cancelled";
 
-export type TransferPhase = "compressing" | "transferring" | "extracting";
+export type TransferPhase =
+  "preparing" | "compressing" | "transferring" | "extracting";
 
 export interface TransferEvent {
   transferId: string;
@@ -437,6 +438,7 @@ export interface TransferEvent {
   status: TransferStatus;
   phase?: TransferPhase;
   message?: string;
+  code?: string;
 }
 
 export interface FsEndpoint {

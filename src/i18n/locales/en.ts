@@ -27,6 +27,8 @@ export const en = {
       "The server rejected the credentials. Check the username, password, or key for this host.",
     connectTimedOut:
       "The connection timed out. Check your network, firewall, and the SSH service on the server.",
+    connectionInterrupted:
+      "The connection was interrupted. Check your network, then reconnect to continue.",
     hostKeyRejected:
       "The connection was cancelled because the host key was not trusted.",
   },
@@ -462,20 +464,25 @@ export const en = {
     open: "Open",
     sendLeft: "Copy to Left Pane",
     sendRight: "Copy to Right Pane",
-    sendLeftCompressed: "Compress and Copy to Left Pane",
-    sendRightCompressed: "Compress and Copy to Right Pane",
     phase: {
+      preparing: "preparing",
       compressing: "compressing",
       transferring: "transferring",
       extracting: "extracting",
     },
     emptyDir: "This folder is empty",
+    fileList: "Files",
+    selectFile: "Select {name}",
+    deleteManyConfirm:
+      "This will permanently delete {count} selected items. This action cannot be undone.",
     noTabTitle: "No location open",
     mkdirError: "Failed to create folder",
     renameError: "Failed to rename",
     deleteError: "Failed to delete",
     transferError: "Failed to start transfer",
     transferFailed: "Transfer failed",
+    connectionLost:
+      "The remote connection was interrupted. Check your network and reconnect.",
     notConnected: "Connect before transferring files",
     toggleHidden: "Show Hidden Files",
     bookmarks: {
@@ -500,6 +507,9 @@ export const en = {
       saveError: "Failed to save file",
     },
     cancelTransfer: "Cancel Transfer",
+    cancelling: "cancelling…",
+    cancelError: "Failed to cancel transfer",
+    remaining: "{time} left",
     history: {
       title: "Transfer History",
       empty: "No transfers yet",

@@ -53,9 +53,39 @@ impl AppError {
         match self {
             AppError::Database(_) | AppError::Migration(_) => "database",
             AppError::Ssh(russh::Error::UnknownKey) => "host_key",
+            AppError::Ssh(
+                russh::Error::Disconnect
+                | russh::Error::HUP
+                | russh::Error::ConnectionTimeout
+                | russh::Error::KeepaliveTimeout
+                | russh::Error::InactivityTimeout
+                | russh::Error::SendError
+                | russh::Error::RecvError
+                | russh::Error::IO(_),
+            ) => "network",
             AppError::Ssh(_) => "ssh",
+            AppError::Sftp(
+                russh_sftp::client::error::Error::IO(_)
+                | russh_sftp::client::error::Error::Timeout
+                | russh_sftp::client::error::Error::UnexpectedBehavior(_),
+            ) => "network",
             AppError::Sftp(_) => "sftp",
             AppError::Auth(_) => "auth",
+            AppError::Io(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::ConnectionAborted
+                        | std::io::ErrorKind::ConnectionRefused
+                        | std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::NotConnected
+                        | std::io::ErrorKind::AddrNotAvailable
+                        | std::io::ErrorKind::BrokenPipe
+                        | std::io::ErrorKind::UnexpectedEof
+                ) =>
+            {
+                "network"
+            }
             AppError::Io(_) => "io",
             AppError::Serde(_) => "serde",
             AppError::Crypto(_) => "crypto",
@@ -71,7 +101,7 @@ impl AppError {
 }
 
 pub fn connection_lost(e: impl std::fmt::Display) -> AppError {
-    AppError::Other(format!("connection lost: {e}"))
+    AppError::Network(format!("connection lost: {e}"))
 }
 
 impl Serialize for AppError {
@@ -88,3 +118,28 @@ impl Serialize for AppError {
 }
 
 pub type AppResult<T> = Result<T, AppError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classifies_transport_failures_as_network_errors() {
+        let io = AppError::Io(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
+        assert_eq!(io.code(), "network");
+        assert_eq!(
+            AppError::Ssh(russh::Error::KeepaliveTimeout).code(),
+            "network"
+        );
+        assert_eq!(
+            AppError::Sftp(russh_sftp::client::error::Error::Timeout).code(),
+            "network"
+        );
+    }
+
+    #[test]
+    fn keeps_local_file_errors_separate_from_network_errors() {
+        let io = AppError::Io(std::io::Error::from(std::io::ErrorKind::NotFound));
+        assert_eq!(io.code(), "io");
+    }
+}
