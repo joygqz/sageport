@@ -461,6 +461,8 @@ export const zhCN: Dictionary = {
     up: "上级文件夹",
     refresh: "刷新",
     pathPlaceholder: "输入路径后按回车",
+    loading: "正在加载…",
+    pathNotFound: "路径不存在：{path}",
     newFolder: "新建文件夹",
     rename: "重命名",
     open: "打开",

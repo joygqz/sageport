@@ -18,8 +18,11 @@ import {
 } from "./transfer-progress";
 import { pushNavigationHistory } from "./navigation-history";
 
-function t(key: Parameters<typeof translate>[1]): string {
-  return translate(detectLocale(), key);
+function t(
+  key: Parameters<typeof translate>[1],
+  params?: Parameters<typeof translate>[2],
+): string {
+  return translate(detectLocale(), key, params);
 }
 
 function describeConnectError(code?: string | null, message?: string) {
@@ -27,6 +30,15 @@ function describeConnectError(code?: string | null, message?: string) {
   if (code === "auth") return t("ssh.authFailed");
   if (code === "host_key") return t("ssh.hostKeyRejected");
   if (code === "network") return t("sftp.connectionLost");
+  return message;
+}
+
+function describeNavigationError(
+  code: string | null,
+  path: string,
+  message: string,
+) {
+  if (code === "not_found") return t("sftp.pathNotFound", { path });
   return message;
 }
 
@@ -44,6 +56,7 @@ export interface SftpTab {
   hostId?: string;
   title: string;
   cwd: string;
+  navigationPath?: string;
   status: TabStatus;
   entries: FileEntry[];
   selected: string[];
@@ -81,6 +94,7 @@ interface SftpState {
     tabId: string,
     historyIndex: number,
   ) => Promise<void>;
+  restoreLoadedPath: (side: PaneSide, tabId: string) => void;
   refresh: (side: PaneSide, tabId: string) => Promise<void>;
   setSelected: (side: PaneSide, tabId: string, selected: string[]) => void;
 
@@ -173,11 +187,16 @@ export const useSftpStore = create<SftpState>((set, get) => {
     ) {
       return;
     }
-    patchTab(side, tabId, { loading: true, error: undefined });
+    patchTab(side, tabId, {
+      loading: true,
+      error: undefined,
+      navigationPath: path,
+    });
     try {
       const entries = await ipc.sftp.list(tab.connectionId, path);
       patchTab(side, tabId, (current) => ({
         cwd: path,
+        navigationPath: undefined,
         entries,
         selected: [],
         loading: false,
@@ -194,7 +213,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
         ...(tab.kind === "remote" && code === "network"
           ? { status: "error" as const }
           : null),
-        error: describeConnectError(code, errorMessage(err)),
+        error: describeNavigationError(code, path, errorMessage(err)),
       });
     }
   };
@@ -335,6 +354,12 @@ export const useSftpStore = create<SftpState>((set, get) => {
       }
       return loadEntries(side, tabId, path, historyIndex);
     },
+
+    restoreLoadedPath: (side, tabId) =>
+      patchTab(side, tabId, {
+        navigationPath: undefined,
+        error: undefined,
+      }),
 
     refresh: (side, tabId) => {
       const tab = get().panes[side].tabs.find((t) => t.id === tabId);

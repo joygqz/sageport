@@ -63,6 +63,7 @@ export function FilePane({ side }: { side: PaneSide }) {
   const setActive = useSftpStore((s) => s.setActive);
   const navigate = useSftpStore((s) => s.navigate);
   const navigateToHistory = useSftpStore((s) => s.navigateToHistory);
+  const restoreLoadedPath = useSftpStore((s) => s.restoreLoadedPath);
   const refresh = useSftpStore((s) => s.refresh);
   const { data: hosts = [] } = useHosts();
 
@@ -74,6 +75,7 @@ export function FilePane({ side }: { side: PaneSide }) {
     entry: FileEntry;
   } | null>(null);
   const active = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
+  const activePath = active?.navigationPath ?? active?.cwd ?? "";
   const activeReady =
     !!active?.cwd &&
     !active.loading &&
@@ -241,14 +243,21 @@ export function FilePane({ side }: { side: PaneSide }) {
                 size="icon"
                 variant="ghost"
                 className="size-6"
-                disabled={!activeReady || active.historyIndex <= 0}
-                onClick={() =>
+                disabled={
+                  !activeReady ||
+                  (!active.navigationPath && active.historyIndex <= 0)
+                }
+                onClick={() => {
+                  if (active.navigationPath) {
+                    restoreLoadedPath(side, active.id);
+                    return;
+                  }
                   void navigateToHistory(
                     side,
                     active.id,
                     active.historyIndex - 1,
-                  )
-                }
+                  );
+                }}
               >
                 <ChevronLeft className="size-3.5" />
               </Button>
@@ -260,6 +269,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 className="size-6"
                 disabled={
                   !activeReady ||
+                  !!active.navigationPath ||
                   active.historyIndex >= active.history.length - 1
                 }
                 onClick={() =>
@@ -319,9 +329,9 @@ export function FilePane({ side }: { side: PaneSide }) {
                 size="icon"
                 variant="ghost"
                 className="size-6"
-                disabled={!active.cwd || parentPath(active.cwd) === active.cwd}
+                disabled={!activePath || parentPath(activePath) === activePath}
                 onClick={() =>
-                  void navigate(side, active.id, parentPath(active.cwd))
+                  void navigate(side, active.id, parentPath(activePath))
                 }
               >
                 <ArrowUp className="size-3.5" />
@@ -350,7 +360,11 @@ export function FilePane({ side }: { side: PaneSide }) {
               </Button>
             </Tooltip>
             <BookmarkMenu side={side} tab={active} />
-            <PathBar key={active.cwd} side={side} tab={active} />
+            <PathBar
+              key={active.navigationPath ?? active.cwd}
+              side={side}
+              tab={active}
+            />
           </div>
 
           <FileList
@@ -417,7 +431,9 @@ export function FilePane({ side }: { side: PaneSide }) {
 function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
   const { t } = useI18n();
   const navigate = useSftpStore((s) => s.navigate);
-  const [value, setValue] = useState(tab.cwd);
+  const restoreLoadedPath = useSftpStore((s) => s.restoreLoadedPath);
+  const displayedPath = tab.navigationPath ?? tab.cwd;
+  const [value, setValue] = useState(displayedPath);
   const ref = useRef<HTMLInputElement>(null);
 
   const scrollToEnd = () => {
@@ -433,21 +449,24 @@ function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
       spellCheck={false}
       autoComplete="off"
       placeholder={t("sftp.pathPlaceholder")}
-      title={tab.cwd}
+      title={displayedPath}
       onChange={(e) => setValue(e.target.value)}
       onFocus={(e) => e.currentTarget.select()}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           const next = value.trim();
-          if (next && next !== tab.cwd) void navigate(side, tab.id, next);
+          if (next && next !== tab.cwd) {
+            void navigate(side, tab.id, next);
+          }
           e.currentTarget.blur();
         } else if (e.key === "Escape") {
+          if (tab.navigationPath) restoreLoadedPath(side, tab.id);
           setValue(tab.cwd);
           e.currentTarget.blur();
         }
       }}
       onBlur={() => {
-        setValue(tab.cwd);
+        setValue(displayedPath);
         scrollToEnd();
       }}
       className="ml-1 h-7 min-w-0 flex-1 rounded-lg border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:border-input hover:bg-surface/50 focus-visible:bg-surface focus-visible:text-foreground"

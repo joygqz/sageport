@@ -471,6 +471,8 @@ export const en = {
     up: "Parent Folder",
     refresh: "Refresh",
     pathPlaceholder: "Type a path and press Enter",
+    loading: "Loading…",
+    pathNotFound: "Path does not exist: {path}",
     newFolder: "New Folder",
     rename: "Rename",
     open: "Open",

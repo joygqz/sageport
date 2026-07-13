@@ -69,6 +69,11 @@ impl AppError {
                 | russh_sftp::client::error::Error::Timeout
                 | russh_sftp::client::error::Error::UnexpectedBehavior(_),
             ) => "network",
+            AppError::Sftp(russh_sftp::client::error::Error::Status(status))
+                if status.status_code == russh_sftp::protocol::StatusCode::NoSuchFile =>
+            {
+                "not_found"
+            }
             AppError::Sftp(_) => "sftp",
             AppError::Auth(_) => "auth",
             AppError::Io(e)
@@ -86,6 +91,7 @@ impl AppError {
             {
                 "network"
             }
+            AppError::Io(e) if e.kind() == std::io::ErrorKind::NotFound => "not_found",
             AppError::Io(_) => "io",
             AppError::Serde(_) => "serde",
             AppError::Crypto(_) => "crypto",
@@ -138,8 +144,18 @@ mod tests {
     }
 
     #[test]
-    fn keeps_local_file_errors_separate_from_network_errors() {
+    fn classifies_missing_paths_as_not_found_errors() {
         let io = AppError::Io(std::io::Error::from(std::io::ErrorKind::NotFound));
-        assert_eq!(io.code(), "io");
+        assert_eq!(io.code(), "not_found");
+
+        let sftp = AppError::Sftp(russh_sftp::client::error::Error::Status(
+            russh_sftp::protocol::Status {
+                id: 1,
+                status_code: russh_sftp::protocol::StatusCode::NoSuchFile,
+                error_message: "missing".into(),
+                language_tag: "en".into(),
+            },
+        ));
+        assert_eq!(sftp.code(), "not_found");
     }
 }

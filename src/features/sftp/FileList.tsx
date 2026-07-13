@@ -227,10 +227,14 @@ export function FileList({
     setDragState(null);
   };
 
-  if (tab.loading && tab.entries.length === 0) {
+  if (tab.loading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
+      <div
+        role="status"
+        className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground"
+      >
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <span className="text-xs">{t("sftp.loading")}</span>
       </div>
     );
   }
