@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowUp,
-  Check,
   ChevronLeft,
   ChevronRight,
+  FilePlus,
   FolderPlus,
   HardDrive,
-  History,
   Plus,
   RefreshCw,
   Server,
@@ -19,7 +17,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
@@ -61,7 +58,6 @@ export function FilePane({ side }: { side: PaneSide }) {
   const addRemoteTab = useSftpStore((s) => s.addRemoteTab);
   const closeTab = useSftpStore((s) => s.closeTab);
   const setActive = useSftpStore((s) => s.setActive);
-  const navigate = useSftpStore((s) => s.navigate);
   const navigateToHistory = useSftpStore((s) => s.navigateToHistory);
   const restoreLoadedPath = useSftpStore((s) => s.restoreLoadedPath);
   const refresh = useSftpStore((s) => s.refresh);
@@ -69,32 +65,52 @@ export function FilePane({ side }: { side: PaneSide }) {
 
   const tabStripRef = useRef<HTMLDivElement>(null);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
+  const [creation, setCreation] = useState<{
+    kind: "file" | "folder";
+    tabId: string;
+    cwd: string;
+  } | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [permTarget, setPermTarget] = useState<{
     tab: SftpTab;
     entry: FileEntry;
   } | null>(null);
   const active = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
-  const activePath = active?.navigationPath ?? active?.cwd ?? "";
   const activeReady =
     !!active?.cwd &&
     !active.loading &&
     (active.kind === "local" || active.status === "connected");
+  const creating =
+    creation &&
+    active &&
+    creation.tabId === active.id &&
+    creation.cwd === active.cwd
+      ? creation.kind
+      : null;
 
-  const onMkdir = (tab: SftpTab) =>
-    setPrompt({
-      title: t("sftp.newFolder"),
-      initial: "",
-      confirmLabel: t("common.add"),
-      onConfirm: async (name) => {
-        try {
-          await ipc.sftp.mkdir(tab.connectionId, joinPath(tab.cwd, name));
-          await refresh(side, tab.id);
-        } catch (err) {
-          toast.error(t("sftp.mkdirError"), errorMessage(err));
-        }
-      },
-    });
+  const onCreate = async (
+    tab: SftpTab,
+    kind: "file" | "folder",
+    name: string,
+  ) => {
+    try {
+      const path = joinPath(tab.cwd, name);
+      if (kind === "folder") {
+        await ipc.sftp.mkdir(tab.connectionId, path);
+      } else {
+        await ipc.sftp.writeText(tab.connectionId, path, "");
+      }
+      setCreation(null);
+      await refresh(side, tab.id);
+      return true;
+    } catch (err) {
+      toast.error(
+        t(kind === "folder" ? "sftp.mkdirError" : "sftp.createFileError"),
+        errorMessage(err),
+      );
+      return false;
+    }
+  };
 
   const onRename = (tab: SftpTab, entry: FileEntry) =>
     setPrompt({
@@ -283,60 +299,6 @@ export function FilePane({ side }: { side: PaneSide }) {
                 <ChevronRight className="size-3.5" />
               </Button>
             </Tooltip>
-            <DropdownMenu>
-              <Tooltip content={t("sftp.navigationHistory")}>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6"
-                    disabled={!activeReady || active.history.length <= 1}
-                  >
-                    <History className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </Tooltip>
-              <DropdownMenuContent
-                align="start"
-                className="max-h-80 w-72 max-w-[calc(100vw-1rem)] overflow-y-auto"
-              >
-                <DropdownMenuLabel>
-                  {t("sftp.navigationHistory")}
-                </DropdownMenuLabel>
-                {[...active.history].reverse().map((path, reverseIndex) => {
-                  const historyIndex = active.history.length - reverseIndex - 1;
-                  const current = historyIndex === active.historyIndex;
-                  return (
-                    <DropdownMenuItem
-                      key={`${historyIndex}:${path}`}
-                      disabled={current}
-                      title={path}
-                      onSelect={() =>
-                        void navigateToHistory(side, active.id, historyIndex)
-                      }
-                    >
-                      <Check
-                        className={cn("size-3.5", !current && "invisible")}
-                      />
-                      <span className="truncate">{path}</span>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Tooltip content={t("sftp.up")}>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-6"
-                disabled={!activePath || parentPath(activePath) === activePath}
-                onClick={() =>
-                  void navigate(side, active.id, parentPath(activePath))
-                }
-              >
-                <ArrowUp className="size-3.5" />
-              </Button>
-            </Tooltip>
             <Tooltip content={t("sftp.refresh")}>
               <Button
                 size="icon"
@@ -354,9 +316,32 @@ export function FilePane({ side }: { side: PaneSide }) {
                 variant="ghost"
                 className="size-6"
                 disabled={!activeReady}
-                onClick={() => onMkdir(active)}
+                onClick={() =>
+                  setCreation({
+                    kind: "folder",
+                    tabId: active.id,
+                    cwd: active.cwd,
+                  })
+                }
               >
                 <FolderPlus className="size-3.5" />
+              </Button>
+            </Tooltip>
+            <Tooltip content={t("sftp.newFile")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-6"
+                disabled={!activeReady}
+                onClick={() =>
+                  setCreation({
+                    kind: "file",
+                    tabId: active.id,
+                    cwd: active.cwd,
+                  })
+                }
+              >
+                <FilePlus className="size-3.5" />
               </Button>
             </Tooltip>
             <BookmarkMenu side={side} tab={active} />
@@ -370,6 +355,9 @@ export function FilePane({ side }: { side: PaneSide }) {
           <FileList
             side={side}
             tab={active}
+            creating={creating}
+            onCreate={(name) => onCreate(active, creating!, name)}
+            onCancelCreate={() => setCreation(null)}
             onRename={(entry) => onRename(active, entry)}
             onDelete={(entries) => confirmDelete(active, entries)}
             onPermissions={(entry) => setPermTarget({ tab: active, entry })}

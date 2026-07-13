@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { File, Folder, FolderSymlink, Loader2, WifiOff } from "lucide-react";
@@ -25,7 +26,6 @@ import { useTabsStore } from "@/workbench/tabs";
 import { nextFileSelection } from "./selection";
 import {
   MAX_EDIT_BYTES,
-  parentPath,
   useSftpStore,
   type PaneSide,
   type SftpTab,
@@ -73,12 +73,18 @@ function EntryIcon({ entry }: { entry: FileEntry }) {
 export function FileList({
   side,
   tab,
+  creating,
+  onCreate,
+  onCancelCreate,
   onRename,
   onDelete,
   onPermissions,
 }: {
   side: PaneSide;
   tab: SftpTab;
+  creating: "file" | "folder" | null;
+  onCreate: (name: string) => Promise<boolean>;
+  onCancelCreate: () => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entries: FileEntry[]) => void;
   onPermissions: (entry: FileEntry) => void;
@@ -259,7 +265,6 @@ export function FileList({
     );
   }
 
-  const canGoUp = !!tab.cwd && parentPath(tab.cwd) !== tab.cwd;
   const sendLabel = side === "left" ? t("sftp.sendRight") : t("sftp.sendLeft");
 
   return (
@@ -281,25 +286,15 @@ export function FileList({
           <col className="w-30" />
         </colgroup>
         <tbody>
-          {canGoUp && (
-            <tr
-              onDoubleClick={() =>
-                void navigate(side, tab.id, parentPath(tab.cwd))
-              }
-              className="h-7 cursor-pointer select-none transition-colors hover:bg-list-hover"
-            >
-              <td
-                colSpan={3}
-                className="h-7 px-2.5 align-middle text-muted-foreground"
-              >
-                <span className="flex h-7 items-center gap-2">
-                  <Folder className="size-4 shrink-0" /> ..
-                </span>
-              </td>
-            </tr>
+          {creating && (
+            <InlineCreateRow
+              kind={creating}
+              onCreate={onCreate}
+              onCancel={onCancelCreate}
+            />
           )}
 
-          {entries.length === 0 ? (
+          {entries.length === 0 && !creating ? (
             <tr>
               <td colSpan={3}>
                 <EmptyState
@@ -426,6 +421,75 @@ export function FileList({
       </table>
       {dragState && <FileDragGhost dragState={dragState} />}
     </ScrollArea>
+  );
+}
+
+function InlineCreateRow({
+  kind,
+  onCreate,
+  onCancel,
+}: {
+  kind: "file" | "folder";
+  onCreate: (name: string) => Promise<boolean>;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const [value, setValue] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const commit = async () => {
+    const name = value.trim();
+    if (!name || submitting) return;
+    setSubmitting(true);
+    const created = await onCreate(name);
+    if (!created) {
+      setSubmitting(false);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commit();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      onCancel();
+    }
+  };
+
+  return (
+    <tr className="h-7 bg-list-hover">
+      <td className="h-7 pl-2.5 pr-1 align-middle">
+        <span className="flex h-7 items-center gap-2">
+          {kind === "folder" ? (
+            <Folder className="size-4 shrink-0 text-info" />
+          ) : (
+            <File className="size-4 shrink-0 text-muted-foreground" />
+          )}
+          <input
+            ref={inputRef}
+            value={value}
+            disabled={submitting}
+            aria-label={
+              kind === "folder" ? t("sftp.newFolder") : t("sftp.newFile")
+            }
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={onKeyDown}
+            onBlur={() => {
+              if (!submitting) onCancel();
+            }}
+            className="h-5 min-w-0 flex-1 rounded-sm border border-ring bg-background px-1 text-xs text-foreground outline-none"
+          />
+        </span>
+      </td>
+      <td colSpan={2} />
+    </tr>
   );
 }
 
