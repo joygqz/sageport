@@ -1,10 +1,19 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { CheckCircle2, RotateCw, Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  CheckCircle2,
+  CircleAlert,
+  Download,
+  ExternalLink,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 
-import { Badge, Button, Spinner } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
+import { cn } from "@/lib/utils";
 import type { UpdateStatus } from "@/types/models";
 import {
   RELEASES_URL,
@@ -46,127 +55,153 @@ export function AboutSection() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-input p-4">
-        <UpdateStatusView state={state} />
-
-        {state.status !== "checking" && (
-          <div className="flex items-center gap-2">
-            {(state.status === "idle" ||
-              state.status === "up-to-date" ||
-              state.status === "error") && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void ipc.update.check()}
-              >
-                <RotateCw />
-                {t("settings.about.update.check")}
-              </Button>
-            )}
-
-            {state.status === "available" &&
-              (canSelfUpdate ? (
-                <Button size="sm" onClick={() => void ipc.update.install()}>
-                  {t("settings.about.update.install")}
-                </Button>
-              ) : (
-                <Button size="sm" onClick={() => void openUrl(RELEASES_URL)}>
-                  {t("settings.about.update.viewRelease")}
-                </Button>
-              ))}
-
-            {state.status === "downloading" && (
-              <Button variant="secondary" size="sm" disabled loading>
-                {state.total
-                  ? t("settings.about.update.downloadingProgress", {
-                      percent: Math.round(
-                        (state.downloaded / state.total) * 100,
-                      ),
-                    })
-                  : t("settings.about.update.downloading")}
-              </Button>
-            )}
-
-            {state.status === "ready" && (
-              <Button size="sm" onClick={() => void relaunch()}>
-                {t("settings.about.update.restart")}
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+      <UpdateStatusCard state={state} canSelfUpdate={canSelfUpdate} />
     </div>
   );
 }
 
-function UpdateStatusView({ state }: { state: UpdateStatus }) {
+function UpdateStatusCard({
+  state,
+  canSelfUpdate,
+}: {
+  state: UpdateStatus;
+  canSelfUpdate: boolean;
+}) {
   const { t } = useI18n();
+  const progress =
+    state.status === "downloading" && state.total
+      ? Math.min(100, Math.round((state.downloaded / state.total) * 100))
+      : null;
 
-  if (state.status === "idle") {
-    return null;
-  }
+  let title = t("settings.about.update.title");
+  let description = t("settings.about.update.idle");
+  let icon = <RefreshCw />;
+  let iconClassName = "bg-secondary text-muted-foreground";
+  let action: ReactNode = (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => void ipc.update.check()}
+    >
+      <RefreshCw />
+      {t("settings.about.update.check")}
+    </Button>
+  );
+
   if (state.status === "checking") {
-    return (
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Spinner />
-        {t("settings.about.update.checking")}
-      </p>
+    title = t("settings.about.update.checking");
+    description = t("settings.about.update.currentVersion", {
+      version: __APP_VERSION__,
+    });
+    icon = <RefreshCw className="animate-spin" />;
+    iconClassName = "bg-primary/15 text-link";
+    action = null;
+  } else if (state.status === "up-to-date") {
+    title = t("settings.about.update.upToDate");
+    description = t("settings.about.update.currentVersion", {
+      version: __APP_VERSION__,
+    });
+    icon = <CheckCircle2 />;
+    iconClassName = "bg-success/15 text-success";
+  } else if (state.status === "available") {
+    title = t("settings.about.update.available", { version: state.version });
+    description =
+      state.body ??
+      t("settings.about.update.currentVersion", { version: __APP_VERSION__ });
+    icon = <Sparkles />;
+    iconClassName = "bg-primary/15 text-link";
+    action = canSelfUpdate ? (
+      <Button size="sm" onClick={() => void ipc.update.install()}>
+        <Download />
+        {t("settings.about.update.install")}
+      </Button>
+    ) : (
+      <Button size="sm" onClick={() => void openUrl(RELEASES_URL)}>
+        <ExternalLink />
+        {t("settings.about.update.viewRelease")}
+      </Button>
     );
-  }
-  if (state.status === "up-to-date") {
-    return (
-      <p className="flex items-center gap-2 text-sm text-foreground">
-        <CheckCircle2 className="size-4 text-success" />
-        {t("settings.about.update.upToDate")}
-      </p>
+  } else if (state.status === "downloading") {
+    title = t("settings.about.update.downloadingVersion", {
+      version: state.version,
+    });
+    description =
+      progress === null
+        ? t("settings.about.update.downloading")
+        : t("settings.about.update.downloadingProgress", {
+            percent: progress,
+          });
+    icon = <Download />;
+    iconClassName = "bg-primary/15 text-link";
+    action = null;
+  } else if (state.status === "ready") {
+    title = t("settings.about.update.ready", { version: state.version });
+    description = t("settings.about.update.restartHint");
+    icon = <CheckCircle2 />;
+    iconClassName = "bg-success/15 text-success";
+    action = (
+      <Button size="sm" onClick={() => void relaunch()}>
+        <RefreshCw />
+        {t("settings.about.update.restart")}
+      </Button>
     );
+  } else if (state.status === "error") {
+    title = t("settings.about.update.errorTitle");
+    description = state.message;
+    icon = <CircleAlert />;
+    iconClassName = "bg-danger/15 text-danger";
   }
-  if (state.status === "available") {
-    return (
-      <div className="flex flex-col gap-1.5">
-        <p className="flex items-center gap-2 text-sm text-foreground">
-          <Sparkles className="size-4 text-link" />
-          {t("settings.about.update.available", { version: state.version })}
-        </p>
-        {state.body && (
-          <p className="whitespace-pre-line text-xs text-muted-foreground">
-            {state.body}
-          </p>
-        )}
-      </div>
-    );
-  }
-  if (state.status === "downloading") {
-    return (
-      <div className="flex flex-col gap-1.5">
-        <p className="flex items-center gap-2 text-sm text-foreground">
-          <Spinner />
-          {t("settings.about.update.available", { version: state.version })}
-        </p>
-        {state.total && (
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-            <div
-              className="h-full rounded-full bg-primary transition-[width]"
-              style={{
-                width: `${Math.min(100, Math.round((state.downloaded / state.total) * 100))}%`,
-              }}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-  if (state.status === "ready") {
-    return (
-      <p className="flex items-center gap-2 text-sm text-foreground">
-        <Badge variant="success">{t("settings.about.update.readyBadge")}</Badge>
-        {t("settings.about.update.ready", { version: state.version })}
-      </p>
-    );
-  }
+
   return (
-    <p className="text-sm text-danger">
-      {t("settings.about.update.error", { message: state.message })}
-    </p>
+    <section className="rounded-xl border border-input bg-card/35 p-4">
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-lg [&_svg]:size-[1.125rem]",
+            iconClassName,
+          )}
+          aria-hidden="true"
+        >
+          {icon}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-h-9 items-center justify-between gap-4">
+            <div className="min-w-0 pt-0.5">
+              <h4 className="text-sm font-medium text-foreground">{title}</h4>
+              <p
+                className={cn(
+                  "mt-0.5 whitespace-pre-line text-xs leading-relaxed text-muted-foreground",
+                  state.status === "error" && "select-text text-danger",
+                )}
+              >
+                {description}
+              </p>
+            </div>
+            {action && <div className="shrink-0">{action}</div>}
+          </div>
+
+          {state.status === "downloading" && (
+            <div
+              className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress ?? undefined}
+            >
+              <div
+                className={cn(
+                  "h-full rounded-full bg-primary transition-[width] duration-300",
+                  progress === null && "w-1/3 animate-pulse",
+                )}
+                style={
+                  progress === null ? undefined : { width: `${progress}%` }
+                }
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
