@@ -33,7 +33,6 @@ import { useHosts } from "@/features/hosts/api";
 import { FileList } from "./FileList";
 import { BookmarkMenu } from "./BookmarkMenu";
 import { PermissionsDialog } from "./PermissionsDialog";
-import { PromptDialog, type PromptState } from "./PromptDialog";
 import {
   joinPath,
   parentPath,
@@ -64,7 +63,6 @@ export function FilePane({ side }: { side: PaneSide }) {
   const { data: hosts = [] } = useHosts();
 
   const tabStripRef = useRef<HTMLDivElement>(null);
-  const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [creation, setCreation] = useState<{
     kind: "file" | "folder";
     tabId: string;
@@ -112,24 +110,21 @@ export function FilePane({ side }: { side: PaneSide }) {
     }
   };
 
-  const onRename = (tab: SftpTab, entry: FileEntry) =>
-    setPrompt({
-      title: t("sftp.rename"),
-      initial: entry.name,
-      confirmLabel: t("common.save"),
-      onConfirm: async (name) => {
-        try {
-          await ipc.sftp.rename(
-            tab.connectionId,
-            entry.path,
-            joinPath(parentPath(entry.path), name),
-          );
-          await refresh(side, tab.id);
-        } catch (err) {
-          toast.error(t("sftp.renameError"), errorMessage(err));
-        }
-      },
-    });
+  const onRename = async (tab: SftpTab, entry: FileEntry, name: string) => {
+    if (name === entry.name) return true;
+    try {
+      await ipc.sftp.rename(
+        tab.connectionId,
+        entry.path,
+        joinPath(parentPath(entry.path), name),
+      );
+      await refresh(side, tab.id);
+      return true;
+    } catch (err) {
+      toast.error(t("sftp.renameError"), errorMessage(err));
+      return false;
+    }
+  };
 
   const onDelete = async (tab: SftpTab, entries: FileEntry[]) => {
     let changed = false;
@@ -358,7 +353,7 @@ export function FilePane({ side }: { side: PaneSide }) {
             creating={creating}
             onCreate={(name) => onCreate(active, creating!, name)}
             onCancelCreate={() => setCreation(null)}
-            onRename={(entry) => onRename(active, entry)}
+            onRename={(entry, name) => onRename(active, entry, name)}
             onDelete={(entries) => confirmDelete(active, entries)}
             onPermissions={(entry) => setPermTarget({ tab: active, entry })}
           />
@@ -399,7 +394,6 @@ export function FilePane({ side }: { side: PaneSide }) {
         </div>
       )}
 
-      <PromptDialog state={prompt} onClose={() => setPrompt(null)} />
       <ConfirmDialog
         state={confirmState}
         onClose={() => setConfirmState(null)}

@@ -43,6 +43,10 @@ import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { useTabsStore } from "@/workbench/tabs";
 import { fileIconKind, type FileIconKind } from "./file-icon";
+import {
+  inlineCreateBlurAction,
+  inlineCreateRowIndex,
+} from "./file-list-layout";
 import { nextFileSelection } from "./selection";
 import {
   MAX_EDIT_BYTES,
@@ -131,7 +135,7 @@ export function FileList({
   creating: "file" | "folder" | null;
   onCreate: (name: string) => Promise<boolean>;
   onCancelCreate: () => void;
-  onRename: (entry: FileEntry) => void;
+  onRename: (entry: FileEntry, name: string) => Promise<boolean>;
   onDelete: (entries: FileEntry[]) => void;
   onPermissions: (entry: FileEntry) => void;
 }) {
@@ -143,6 +147,16 @@ export function FileList({
   const showHidden = useSftpStore((s) => s.showHidden);
   const openFile = useTabsStore((s) => s.openFile);
   const [dragState, setDragState] = useState<FileDragState | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{
+    tabId: string;
+    cwd: string;
+    path: string;
+  } | null>(null);
+  const pendingContextMenuRenameRef = useRef<{
+    tabId: string;
+    cwd: string;
+    path: string;
+  } | null>(null);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -158,6 +172,20 @@ export function FileList({
     ? tab.entries
     : tab.entries.filter((entry) => !entry.name.startsWith("."));
   const visiblePaths = entries.map((entry) => entry.path);
+  const renamingPath =
+    renameTarget?.tabId === tab.id && renameTarget.cwd === tab.cwd
+      ? renameTarget.path
+      : null;
+  const inlineCreateIndex = creating
+    ? inlineCreateRowIndex(entries, creating)
+    : 0;
+  const rows: Array<
+    | { type: "entry"; entry: FileEntry }
+    | { type: "create"; kind: "file" | "folder" }
+  > = entries.map((entry) => ({ type: "entry", entry }));
+  if (creating) {
+    rows.splice(inlineCreateIndex, 0, { type: "create", kind: creating });
+  }
 
   useEffect(() => {
     selectionAnchorRef.current = null;
@@ -187,6 +215,10 @@ export function FileList({
   const open = (entry: FileEntry) => {
     if (entry.kind === "dir") void navigate(side, tab.id, entry.path);
     else openEditor(entry);
+  };
+
+  const startRenaming = (entry: FileEntry) => {
+    setRenameTarget({ tabId: tab.id, cwd: tab.cwd, path: entry.path });
   };
 
   const onRowClick = (e: React.MouseEvent, entry: FileEntry) => {
@@ -319,9 +351,33 @@ export function FileList({
         tabIndex={0}
         aria-label={t("sftp.fileList")}
         onKeyDown={(event) => {
+          const target = event.target as HTMLElement;
+          const isEditing =
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            target.isContentEditable;
+          if (isEditing) return;
+
           if ((event.metaKey || event.ctrlKey) && event.key === "a") {
             event.preventDefault();
             setSelected(side, tab.id, visiblePaths);
+          } else if (event.key === "Delete" && !event.repeat) {
+            const selectedEntries = entries.filter((entry) =>
+              tab.selected.includes(entry.path),
+            );
+            if (selectedEntries.length > 0) {
+              event.preventDefault();
+              onDelete(selectedEntries);
+            }
+          } else if (event.key === "F2" && !event.repeat) {
+            const selectedEntries = entries.filter((entry) =>
+              tab.selected.includes(entry.path),
+            );
+            const [selectedEntry] = selectedEntries;
+            if (selectedEntries.length === 1 && selectedEntry) {
+              event.preventDefault();
+              startRenaming(selectedEntry);
+            }
           }
         }}
         className="w-full table-fixed border-collapse text-xs outline-none"
@@ -332,14 +388,6 @@ export function FileList({
           <col className="w-30" />
         </colgroup>
         <tbody>
-          {creating && (
-            <InlineCreateRow
-              kind={creating}
-              onCreate={onCreate}
-              onCancel={onCancelCreate}
-            />
-          )}
-
           {entries.length === 0 && !creating ? (
             <tr>
               <td colSpan={3}>
@@ -351,7 +399,19 @@ export function FileList({
               </td>
             </tr>
           ) : (
-            entries.map((entry) => {
+            rows.map((row) => {
+              if (row.type === "create") {
+                return (
+                  <InlineCreateRow
+                    key="create"
+                    kind={row.kind}
+                    onCreate={onCreate}
+                    onCancel={onCancelCreate}
+                  />
+                );
+              }
+
+              const { entry } = row;
               const selected = tab.selected.includes(entry.path);
               const actionEntries = selected
                 ? entries.filter((item) => tab.selected.includes(item.path))
@@ -396,7 +456,20 @@ export function FileList({
                       <td className="h-7 truncate pl-2.5 pr-1 align-middle">
                         <span className="flex h-7 max-w-full items-center gap-2">
                           <EntryIcon entry={entry} />
-                          <span className="truncate">{entry.name}</span>
+                          {renamingPath === entry.path ? (
+                            <InlineNameInput
+                              initialValue={entry.name}
+                              ariaLabel={t("sftp.rename")}
+                              onSubmit={async (name) => {
+                                const renamed = await onRename(entry, name);
+                                if (renamed) setRenameTarget(null);
+                                return renamed;
+                              }}
+                              onCancel={() => setRenameTarget(null)}
+                            />
+                          ) : (
+                            <span className="truncate">{entry.name}</span>
+                          )}
                         </span>
                       </td>
                       <td
@@ -421,7 +494,15 @@ export function FileList({
                       </td>
                     </tr>
                   </ContextMenuTrigger>
-                  <ContextMenuContent>
+                  <ContextMenuContent
+                    onCloseAutoFocus={(event) => {
+                      const pendingRename = pendingContextMenuRenameRef.current;
+                      if (!pendingRename) return;
+                      event.preventDefault();
+                      pendingContextMenuRenameRef.current = null;
+                      setRenameTarget(pendingRename);
+                    }}
+                  >
                     <ContextMenuItem
                       onSelect={() => void transfer(side, actionEntries)}
                     >
@@ -441,7 +522,15 @@ export function FileList({
                     )}
                     {single && <ContextMenuSeparator />}
                     {single && (
-                      <ContextMenuItem onSelect={() => onRename(entry)}>
+                      <ContextMenuItem
+                        onSelect={() => {
+                          pendingContextMenuRenameRef.current = {
+                            tabId: tab.id,
+                            cwd: tab.cwd,
+                            path: entry.path,
+                          };
+                        }}
+                      >
                         {t("sftp.rename")}
                       </ContextMenuItem>
                     )}
@@ -480,34 +569,6 @@ function InlineCreateRow({
   onCancel: () => void;
 }) {
   const { t } = useI18n();
-  const [value, setValue] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const commit = async () => {
-    const name = value.trim();
-    if (!name || submitting) return;
-    setSubmitting(true);
-    const created = await onCreate(name);
-    if (!created) {
-      setSubmitting(false);
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      void commit();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      onCancel();
-    }
-  };
 
   return (
     <tr className="h-7 bg-list-hover">
@@ -518,24 +579,89 @@ function InlineCreateRow({
           ) : (
             <File className="size-4 shrink-0 text-muted-foreground" />
           )}
-          <input
-            ref={inputRef}
-            value={value}
-            disabled={submitting}
-            aria-label={
+          <InlineNameInput
+            initialValue=""
+            ariaLabel={
               kind === "folder" ? t("sftp.newFolder") : t("sftp.newFile")
             }
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={onKeyDown}
-            onBlur={() => {
-              if (!submitting) onCancel();
-            }}
-            className="h-5 min-w-0 flex-1 rounded-sm border border-ring bg-background px-1 text-xs text-foreground outline-none"
+            onSubmit={onCreate}
+            onCancel={onCancel}
           />
         </span>
       </td>
       <td colSpan={2} />
     </tr>
+  );
+}
+
+function InlineNameInput({
+  initialValue,
+  ariaLabel,
+  onSubmit,
+  onCancel,
+}: {
+  initialValue: string;
+  ariaLabel: string;
+  onSubmit: (name: string) => Promise<boolean>;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initialValue);
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const submittingRef = useRef(false);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const commit = async () => {
+    const name = value.trim();
+    if (!name || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    const succeeded = await onSubmit(name);
+    if (!succeeded) {
+      submittingRef.current = false;
+      setSubmitting(false);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commit();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      cancelledRef.current = true;
+      onCancel();
+    }
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      value={value}
+      disabled={submitting}
+      aria-label={ariaLabel}
+      onChange={(event) => setValue(event.target.value)}
+      onKeyDown={onKeyDown}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onBlur={() => {
+        if (submittingRef.current || cancelledRef.current) return;
+        if (inlineCreateBlurAction(value) === "create") void commit();
+        else onCancel();
+      }}
+      className="h-5 min-w-0 flex-1 rounded-sm border border-ring bg-background px-1 text-xs text-foreground outline-none"
+    />
   );
 }
 
