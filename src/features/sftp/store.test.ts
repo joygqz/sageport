@@ -1,6 +1,20 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/ipc", () => ({
+  ipc: {
+    sftp: {
+      list: vi.fn(() => Promise.resolve([])),
+      transfer: vi.fn(() => Promise.resolve()),
+      cancelTransfer: vi.fn(() => Promise.resolve()),
+    },
+  },
+}));
+
+import { ipc } from "@/lib/ipc";
+import type { FileEntry, TransferEvent } from "@/types/models";
 import { useSftpStore, type SftpTab } from "./store";
+
+const refreshDirectory = useSftpStore.getState().refresh;
 
 const loadedTab = (): SftpTab => ({
   id: "local-tab",
@@ -20,12 +34,15 @@ const loadedTab = (): SftpTab => ({
 
 describe("SFTP navigation state", () => {
   beforeEach(() => {
-    useSftpStore.setState((state) => ({
+    vi.clearAllMocks();
+    useSftpStore.setState({
       panes: {
-        ...state.panes,
         left: { tabs: [loadedTab()], activeTabId: "local-tab" },
+        right: { tabs: [], activeTabId: null },
       },
-    }));
+      transfers: {},
+      refresh: refreshDirectory,
+    });
   });
 
   it("returns from a failed path to the last loaded path before using history", () => {
@@ -39,5 +56,78 @@ describe("SFTP navigation state", () => {
     });
     expect(tab?.navigationPath).toBeUndefined();
     expect(tab?.error).toBeUndefined();
+  });
+});
+
+const transferTab = (
+  id: string,
+  connectionId: string | null,
+  cwd: string,
+): SftpTab => ({
+  id,
+  kind: connectionId ? "remote" : "local",
+  connectionId,
+  title: id,
+  cwd,
+  status: "connected",
+  entries: [],
+  selected: [],
+  history: [cwd],
+  historyIndex: 0,
+  loading: false,
+});
+
+describe("SFTP transfer refresh", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSftpStore.setState({
+      panes: {
+        left: {
+          tabs: [
+            transferTab("left-target", null, "/downloads"),
+            transferTab("left-other", null, "/documents"),
+          ],
+          activeTabId: "left-target",
+        },
+        right: {
+          tabs: [transferTab("right-source", "remote-1", "/uploads")],
+          activeTabId: "right-source",
+        },
+      },
+      transfers: {},
+      refresh: refreshDirectory,
+    });
+  });
+
+  it("refreshes only the original destination tab after a right-to-left transfer", async () => {
+    const entry: FileEntry = {
+      name: "report.pdf",
+      path: "/uploads/report.pdf",
+      kind: "file",
+      size: 42,
+      modified: null,
+      permissions: null,
+      isSymlink: false,
+    };
+
+    await useSftpStore.getState().transfer("right", [entry]);
+
+    expect(ipc.sftp.transfer).toHaveBeenCalledOnce();
+    const [transferId] = vi.mocked(ipc.sftp.transfer).mock.calls[0];
+    useSftpStore.getState().setActive("left", "left-other");
+    const refresh = vi.fn(() => Promise.resolve());
+    useSftpStore.setState({ refresh });
+
+    const completed: TransferEvent = {
+      transferId,
+      transferred: entry.size,
+      total: entry.size,
+      file: entry.name,
+      status: "done",
+    };
+    useSftpStore.getState().applyTransfer(completed);
+
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(refresh).toHaveBeenCalledWith("left", "left-target");
   });
 });

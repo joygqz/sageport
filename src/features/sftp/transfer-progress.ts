@@ -3,6 +3,8 @@ import type { TransferEvent } from "@/types/models";
 export interface ActiveTransfer extends TransferEvent {
   sourceConnectionId: string | null;
   destConnectionId: string | null;
+  destinationSide?: "left" | "right";
+  destinationTabId?: string;
   cancelRequested: boolean;
   rateStartedAt: number;
   rateStartedBytes: number;

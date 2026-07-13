@@ -461,8 +461,12 @@ export const useSftpStore = create<SftpState>((set, get) => {
         }
       }
 
-      void get().refresh("left", get().panes.left.activeTabId ?? "");
-      void get().refresh("right", get().panes.right.activeTabId ?? "");
+      if (completed?.destinationSide && completed.destinationTabId) {
+        void get().refresh(
+          completed.destinationSide,
+          completed.destinationTabId,
+        );
+      }
     },
 
     cancelTransfer: (transferId) => {
@@ -514,18 +518,22 @@ export const useSftpStore = create<SftpState>((set, get) => {
         set((s) => ({
           transfers: {
             ...s.transfers,
-            [transferId]: pendingTransfer(
-              {
-                transferId,
-                transferred: 0,
-                total: item.kind === "file" ? item.size : 0,
-                file: item.name,
-                status: "active",
-                phase: "preparing",
-              },
-              srcTab.connectionId,
-              dstTab.connectionId,
-            ),
+            [transferId]: {
+              ...pendingTransfer(
+                {
+                  transferId,
+                  transferred: 0,
+                  total: item.kind === "file" ? item.size : 0,
+                  file: item.name,
+                  status: "active",
+                  phase: "preparing",
+                },
+                srcTab.connectionId,
+                dstTab.connectionId,
+              ),
+              destinationSide: dstSide,
+              destinationTabId: dstTab.id,
+            },
           },
         }));
         await ipc.sftp
