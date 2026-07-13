@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
+  Check,
+  ChevronLeft,
+  ChevronRight,
   FolderPlus,
   HardDrive,
+  History,
   Plus,
   RefreshCw,
   Server,
@@ -15,6 +19,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
@@ -57,6 +62,7 @@ export function FilePane({ side }: { side: PaneSide }) {
   const closeTab = useSftpStore((s) => s.closeTab);
   const setActive = useSftpStore((s) => s.setActive);
   const navigate = useSftpStore((s) => s.navigate);
+  const navigateToHistory = useSftpStore((s) => s.navigateToHistory);
   const refresh = useSftpStore((s) => s.refresh);
   const { data: hosts = [] } = useHosts();
 
@@ -230,6 +236,84 @@ export function FilePane({ side }: { side: PaneSide }) {
       {active ? (
         <>
           <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-background px-1.5">
+            <Tooltip content={t("sftp.back")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-6"
+                disabled={!activeReady || active.historyIndex <= 0}
+                onClick={() =>
+                  void navigateToHistory(
+                    side,
+                    active.id,
+                    active.historyIndex - 1,
+                  )
+                }
+              >
+                <ChevronLeft className="size-3.5" />
+              </Button>
+            </Tooltip>
+            <Tooltip content={t("sftp.forward")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-6"
+                disabled={
+                  !activeReady ||
+                  active.historyIndex >= active.history.length - 1
+                }
+                onClick={() =>
+                  void navigateToHistory(
+                    side,
+                    active.id,
+                    active.historyIndex + 1,
+                  )
+                }
+              >
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </Tooltip>
+            <DropdownMenu>
+              <Tooltip content={t("sftp.navigationHistory")}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-6"
+                    disabled={!activeReady || active.history.length <= 1}
+                  >
+                    <History className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </Tooltip>
+              <DropdownMenuContent
+                align="start"
+                className="max-h-80 w-72 max-w-[calc(100vw-1rem)] overflow-y-auto"
+              >
+                <DropdownMenuLabel>
+                  {t("sftp.navigationHistory")}
+                </DropdownMenuLabel>
+                {[...active.history].reverse().map((path, reverseIndex) => {
+                  const historyIndex = active.history.length - reverseIndex - 1;
+                  const current = historyIndex === active.historyIndex;
+                  return (
+                    <DropdownMenuItem
+                      key={`${historyIndex}:${path}`}
+                      disabled={current}
+                      title={path}
+                      onSelect={() =>
+                        void navigateToHistory(side, active.id, historyIndex)
+                      }
+                    >
+                      <Check
+                        className={cn("size-3.5", !current && "invisible")}
+                      />
+                      <span className="truncate">{path}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Tooltip content={t("sftp.up")}>
               <Button
                 size="icon"

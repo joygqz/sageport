@@ -45,6 +45,8 @@ function remoteTab(
     status: "connected",
     entries: [],
     selected: [],
+    history: cwd ? [cwd] : [],
+    historyIndex: cwd ? 0 : -1,
     loading: false,
   };
 }

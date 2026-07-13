@@ -16,6 +16,7 @@ import {
   updateTransferProgress,
   type ActiveTransfer,
 } from "./transfer-progress";
+import { pushNavigationHistory } from "./navigation-history";
 
 function t(key: Parameters<typeof translate>[1]): string {
   return translate(detectLocale(), key);
@@ -46,6 +47,8 @@ export interface SftpTab {
   status: TabStatus;
   entries: FileEntry[];
   selected: string[];
+  history: string[];
+  historyIndex: number;
   loading: boolean;
   error?: string;
 }
@@ -73,6 +76,11 @@ interface SftpState {
   setActive: (side: PaneSide, tabId: string) => void;
 
   navigate: (side: PaneSide, tabId: string, path: string) => Promise<void>;
+  navigateToHistory: (
+    side: PaneSide,
+    tabId: string,
+    historyIndex: number,
+  ) => Promise<void>;
   refresh: (side: PaneSide, tabId: string) => Promise<void>;
   setSelected: (side: PaneSide, tabId: string, selected: string[]) => void;
 
@@ -150,7 +158,12 @@ export const useSftpStore = create<SftpState>((set, get) => {
     return null;
   };
 
-  const loadEntries = async (side: PaneSide, tabId: string, path: string) => {
+  const loadEntries = async (
+    side: PaneSide,
+    tabId: string,
+    path: string,
+    historyIndex?: number | null,
+  ) => {
     const pane = get().panes[side];
     const tab = pane.tabs.find((t) => t.id === tabId);
     if (!tab) return;
@@ -163,12 +176,17 @@ export const useSftpStore = create<SftpState>((set, get) => {
     patchTab(side, tabId, { loading: true, error: undefined });
     try {
       const entries = await ipc.sftp.list(tab.connectionId, path);
-      patchTab(side, tabId, {
+      patchTab(side, tabId, (current) => ({
         cwd: path,
         entries,
         selected: [],
         loading: false,
-      });
+        ...(historyIndex === null
+          ? null
+          : historyIndex === undefined
+            ? pushNavigationHistory(current, path)
+            : { historyIndex }),
+      }));
     } catch (err) {
       const code = errorCode(err);
       patchTab(side, tabId, {
@@ -202,6 +220,8 @@ export const useSftpStore = create<SftpState>((set, get) => {
         status: "connected",
         entries: [],
         selected: [],
+        history: [],
+        historyIndex: -1,
         loading: true,
       };
       set((s) => ({
@@ -231,6 +251,8 @@ export const useSftpStore = create<SftpState>((set, get) => {
         status: "connecting",
         entries: [],
         selected: [],
+        history: [],
+        historyIndex: -1,
         loading: true,
       };
       set((s) => ({
@@ -305,12 +327,21 @@ export const useSftpStore = create<SftpState>((set, get) => {
 
     navigate: (side, tabId, path) => loadEntries(side, tabId, path),
 
+    navigateToHistory: (side, tabId, historyIndex) => {
+      const tab = get().panes[side].tabs.find((item) => item.id === tabId);
+      const path = tab?.history[historyIndex];
+      if (!tab || path === undefined || historyIndex === tab.historyIndex) {
+        return Promise.resolve();
+      }
+      return loadEntries(side, tabId, path, historyIndex);
+    },
+
     refresh: (side, tabId) => {
       const tab = get().panes[side].tabs.find((t) => t.id === tabId);
       if (tab?.kind === "remote" && (tab.status !== "connected" || !tab.cwd)) {
         return Promise.resolve();
       }
-      return tab ? loadEntries(side, tabId, tab.cwd) : Promise.resolve();
+      return tab ? loadEntries(side, tabId, tab.cwd, null) : Promise.resolve();
     },
 
     setSelected: (side, tabId, selected) => patchTab(side, tabId, { selected }),
