@@ -29,36 +29,38 @@ export function getTabDropTarget({
   const targetIndex = insertIndex === -1 ? tabRects.length : insertIndex;
   const previous = findPreviousRect(tabRects, targetIndex);
   const next = findNextRect(tabRects, targetIndex);
+  let indicatorX: number;
 
   if (previous && next) {
-    return {
-      insertIndex: targetIndex,
-      indicatorX: (previous.right + next.left) / 2,
-    };
-  }
-
-  if (next) {
-    return {
-      insertIndex: targetIndex,
-      indicatorX: (stripRect.left + next.left) / 2,
-    };
-  }
-
-  if (previous) {
+    indicatorX = (previous.right + next.left) / 2;
+  } else if (next) {
+    indicatorX = (stripRect.left + next.left) / 2;
+  } else if (previous) {
     const beforePrevious = findPreviousRect(tabRects, targetIndex - 1);
     const trailingGap = beforePrevious
       ? Math.max(0, previous.left - beforePrevious.right)
       : Math.max(0, previous.left - stripRect.left);
-    return {
-      insertIndex: targetIndex,
-      indicatorX: previous.right + trailingGap / 2,
-    };
+    indicatorX = previous.right + trailingGap / 2;
+  } else {
+    indicatorX = stripRect.left;
   }
 
   return {
     insertIndex: targetIndex,
-    indicatorX: stripRect.left,
+    indicatorX: clampIndicatorToStrip(indicatorX, stripRect),
   };
+}
+
+/** Keeps the two-pixel marker fully inside the visible tab strip. */
+function clampIndicatorToStrip(
+  indicatorX: number,
+  stripRect: HorizontalRect,
+): number {
+  const inset = Math.min(1, stripRect.width / 2);
+  return Math.min(
+    stripRect.right - inset,
+    Math.max(stripRect.left + inset, indicatorX),
+  );
 }
 
 function findPreviousRect(

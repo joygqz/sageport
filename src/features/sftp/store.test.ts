@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/ipc", () => ({
   ipc: {
     sftp: {
+      home: vi.fn(() => Promise.resolve("/home/test")),
       list: vi.fn(() => Promise.resolve([])),
       transfer: vi.fn(() => Promise.resolve()),
       cancelTransfer: vi.fn(() => Promise.resolve()),
@@ -10,9 +11,11 @@ vi.mock("@/lib/ipc", () => ({
   },
 }));
 
+vi.stubGlobal("localStorage", { getItem: vi.fn(() => "en") });
+
 import { ipc } from "@/lib/ipc";
 import type { FileEntry, TransferEvent } from "@/types/models";
-import { useSftpStore, type SftpTab } from "./store";
+import { MAX_SFTP_TABS, useSftpStore, type SftpTab } from "./store";
 
 const refreshDirectory = useSftpStore.getState().refresh;
 
@@ -104,6 +107,41 @@ describe("SFTP tab ordering", () => {
     expect(
       useSftpStore.getState().panes.left.tabs.map((tab) => tab.id),
     ).toEqual(["left-b", "left-c", "left-a"]);
+  });
+});
+
+describe("SFTP tab limit", () => {
+  beforeEach(() => {
+    useSftpStore.setState({
+      panes: {
+        left: {
+          tabs: Array.from({ length: MAX_SFTP_TABS - 1 }, (_, i) =>
+            transferTab(`left-${i}`, null, `/left-${i}`),
+          ),
+          activeTabId: "left-0",
+        },
+        right: {
+          tabs: [transferTab("right-0", "remote-0", "/right")],
+          activeTabId: "right-0",
+        },
+      },
+      transfers: {},
+    });
+  });
+
+  it("counts tabs across both panes and rejects tabs over the limit", async () => {
+    await useSftpStore.getState().addLocalTab("right");
+
+    const { left, right } = useSftpStore.getState().panes;
+    expect(left.tabs.length + right.tabs.length).toBe(MAX_SFTP_TABS);
+  });
+
+  it("allows another tab after one is closed", async () => {
+    useSftpStore.getState().closeTab("left", "left-0");
+    await useSftpStore.getState().addLocalTab("left");
+
+    const { left, right } = useSftpStore.getState().panes;
+    expect(left.tabs.length + right.tabs.length).toBe(MAX_SFTP_TABS);
   });
 });
 

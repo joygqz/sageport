@@ -15,6 +15,8 @@ import {
   Field,
   Input,
   PasswordInput,
+  RadioGroup,
+  RadioGroupItem,
   Spinner,
   Switch,
 } from "@/components/ui";
@@ -83,16 +85,19 @@ export function SetupView({ status }: { status: SyncStatus }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-2">
+      <RadioGroup
+        value={kind}
+        onValueChange={(value) => selectProvider(value as SyncProviderKind)}
+        aria-label={t("settings.sync.providerLabel")}
+        className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-2"
+      >
         {SYNC_PROVIDERS.map((p) => {
           const Icon = p.icon;
           const active = p.kind === kind;
           return (
-            <button
+            <RadioGroupItem
               key={p.kind}
-              type="button"
-              onClick={() => selectProvider(p.kind)}
-              aria-pressed={active}
+              value={p.kind}
               className={cn(
                 "flex min-w-0 flex-col gap-1.5 rounded-lg border bg-card p-3 text-left transition-colors",
                 CONTROL_FOCUS_CLASS,
@@ -108,10 +113,10 @@ export function SetupView({ status }: { status: SyncStatus }) {
               <span className="text-xs leading-snug text-muted-foreground">
                 {t(p.taglineKey)}
               </span>
-            </button>
+            </RadioGroupItem>
           );
         })}
-      </div>
+      </RadioGroup>
 
       {meta.oauth ? (
         oauthReady ? (

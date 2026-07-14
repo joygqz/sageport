@@ -17,6 +17,8 @@ export const zhCN: Dictionary = {
     saveChanges: "保存更改",
     loading: "正在加载…",
     loadError: "无法加载此内容",
+    notification: "通知",
+    notifications: "通知（{hotkey}）",
     showPassword: "显示密码",
     hidePassword: "隐藏密码",
     deleteConfirm: "将永久删除 {name}，此操作无法撤销。",
@@ -159,6 +161,7 @@ export const zhCN: Dictionary = {
     newSession: "新建会话",
     tabList: "已打开的会话",
     closeTab: "关闭标签页",
+    tabLimitReached: "最多可打开 {count} 个终端会话",
     unsavedTitle: "未保存的更改",
     unsavedDescription: "{name} 有未保存的更改，不保存将丢失这些更改。",
     discard: "不保存",
@@ -465,6 +468,7 @@ export const zhCN: Dictionary = {
     hidePanel: "隐藏面板",
     local: "本地",
     newTab: "新建标签页",
+    tabLimitReached: "最多可打开 {count} 个文件标签页",
     back: "后退",
     forward: "前进",
     navigationHistory: "位置历史",
@@ -732,6 +736,7 @@ export const zhCN: Dictionary = {
     sync: {
       description:
         "将主机、密钥、命令片段和设置备份到你选择的存储。所有数据在离开本设备前都会先用口令进行端到端加密。切换存储需先断开连接。",
+      providerLabel: "存储服务",
       corruptRemoteBackup:
         "从已连接存储获取的备份数据似乎已损坏，或来自不兼容的应用版本。",
       provider: {

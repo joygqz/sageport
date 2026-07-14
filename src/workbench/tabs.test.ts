@@ -13,8 +13,11 @@ vi.mock("@/lib/ipc", () => ({
   },
 }));
 
+vi.stubGlobal("localStorage", { getItem: vi.fn(() => "en") });
+
 import {
   isFileDirty,
+  MAX_TERMINAL_TABS,
   targetTerminalId,
   terminalTabs,
   useTabsStore,
@@ -22,6 +25,12 @@ import {
 import type { FileTab } from "./tabs";
 
 const host = (id: string) => ({ id, label: `host-${id}` });
+
+function openHost(id: string): string {
+  const tabId = useTabsStore.getState().openTerminal(host(id));
+  if (!tabId) throw new Error("Expected terminal tab to open");
+  return tabId;
+}
 
 beforeEach(() => {
   useTabsStore.setState({
@@ -34,20 +43,47 @@ beforeEach(() => {
 
 describe("openTerminal", () => {
   it("appends the tab, activates it, and tracks it as last terminal", () => {
-    const id = useTabsStore.getState().openTerminal(host("a"));
+    const id = openHost("a");
     const s = useTabsStore.getState();
     expect(s.tabs).toHaveLength(1);
     expect(s.activeId).toBe(id);
     expect(s.lastTerminalId).toBe(id);
   });
+
+  it("rejects new terminal tabs after reaching the limit", () => {
+    const store = useTabsStore.getState();
+    for (let i = 0; i < MAX_TERMINAL_TABS; i++) {
+      expect(store.openTerminal(host(String(i)))).not.toBeNull();
+    }
+
+    expect(store.openLocalTerminal()).toBeNull();
+    expect(useTabsStore.getState().tabs).toHaveLength(MAX_TERMINAL_TABS);
+  });
+
+  it("allows another terminal after one is closed", () => {
+    const store = useTabsStore.getState();
+    const ids = Array.from({ length: MAX_TERMINAL_TABS }, (_, i) =>
+      openHost(String(i)),
+    );
+
+    store.close(ids[0]!);
+
+    expect(
+      store.openAdhocTerminal({
+        host: "example.com",
+        port: 22,
+        username: "me",
+      }),
+    ).not.toBeNull();
+    expect(useTabsStore.getState().tabs).toHaveLength(MAX_TERMINAL_TABS);
+  });
 });
 
 describe("close", () => {
   it("activates the right neighbor, falling back left", () => {
-    const store = useTabsStore.getState();
-    const a = store.openTerminal(host("a"));
-    const b = store.openTerminal(host("b"));
-    const c = store.openTerminal(host("c"));
+    const a = openHost("a");
+    const b = openHost("b");
+    const c = openHost("c");
     useTabsStore.getState().setActive(b);
     useTabsStore.getState().close(b);
     expect(useTabsStore.getState().activeId).toBe(c);
@@ -56,18 +92,16 @@ describe("close", () => {
   });
 
   it("keeps the active tab when closing an inactive one", () => {
-    const store = useTabsStore.getState();
-    const a = store.openTerminal(host("a"));
-    const b = store.openTerminal(host("b"));
+    const a = openHost("a");
+    const b = openHost("b");
     useTabsStore.getState().setActive(b);
     useTabsStore.getState().close(a);
     expect(useTabsStore.getState().activeId).toBe(b);
   });
 
   it("repoints lastTerminalId to the nearest surviving terminal", () => {
-    const store = useTabsStore.getState();
-    const a = store.openTerminal(host("a"));
-    const b = store.openTerminal(host("b"));
+    const a = openHost("a");
+    const b = openHost("b");
     useTabsStore.getState().setActive(b);
     useTabsStore.getState().close(b);
     expect(useTabsStore.getState().lastTerminalId).toBe(a);
@@ -96,9 +130,8 @@ describe("close", () => {
 
 describe("activateNext", () => {
   it("cycles forward and backward with wraparound", () => {
-    const store = useTabsStore.getState();
-    const a = store.openTerminal(host("a"));
-    const b = store.openTerminal(host("b"));
+    const a = openHost("a");
+    const b = openHost("b");
     useTabsStore.getState().activateNext(1);
     expect(useTabsStore.getState().activeId).toBe(a);
     useTabsStore.getState().activateNext(-1);
@@ -108,10 +141,9 @@ describe("activateNext", () => {
 
 describe("moveTab", () => {
   it("reorders tabs without changing the active tab", () => {
-    const store = useTabsStore.getState();
-    const a = store.openTerminal(host("a"));
-    const b = store.openTerminal(host("b"));
-    const c = store.openTerminal(host("c"));
+    const a = openHost("a");
+    const b = openHost("b");
+    const c = openHost("c");
     useTabsStore.getState().setActive(b);
 
     useTabsStore.getState().moveTab(a, 2);
@@ -123,8 +155,8 @@ describe("moveTab", () => {
 
   it("retains terminal tab objects and their connection status", () => {
     const store = useTabsStore.getState();
-    const connected = store.openTerminal(host("connected"));
-    const connecting = store.openTerminal(host("connecting"));
+    const connected = openHost("connected");
+    const connecting = openHost("connecting");
     store.setTerminalStatus(connected, "connected");
     const connectedTab = useTabsStore
       .getState()
@@ -144,9 +176,8 @@ describe("moveTab", () => {
   });
 
   it("clamps the destination and ignores unknown tabs", () => {
-    const store = useTabsStore.getState();
-    const a = store.openTerminal(host("a"));
-    const b = store.openTerminal(host("b"));
+    const a = openHost("a");
+    const b = openHost("b");
 
     useTabsStore.getState().moveTab(a, 100);
     expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([b, a]);
@@ -159,7 +190,7 @@ describe("moveTab", () => {
 describe("selectors", () => {
   it("targetTerminalId prefers the active terminal, else the last one", () => {
     const store = useTabsStore.getState();
-    const a = store.openTerminal(host("a"));
+    const a = openHost("a");
     store.openFile({ connectionId: null, path: "/tmp/a", name: "a" });
     expect(targetTerminalId(useTabsStore.getState())).toBe(a);
     useTabsStore.getState().setActive(a);

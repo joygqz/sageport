@@ -39,4 +39,41 @@ describe("getTabDropTarget", () => {
       indicatorX: 212,
     });
   });
+
+  it("keeps the marker inside the leading edge when tabs are scrolled out", () => {
+    const scrolledTabRects = [
+      { left: -120, right: -20, width: 100 },
+      { left: -16, right: 84, width: 100 },
+      { left: 88, right: 188, width: 100 },
+    ];
+
+    expect(
+      getTabDropTarget({
+        pointerX: 90,
+        stripRect,
+        tabRects: scrolledTabRects,
+      }),
+    ).toEqual({
+      insertIndex: 2,
+      indicatorX: 101,
+    });
+  });
+
+  it("keeps the marker inside the trailing edge when tabs overflow", () => {
+    const overflowingTabRects = [
+      { left: 420, right: 520, width: 100 },
+      { left: 524, right: 624, width: 100 },
+    ];
+
+    expect(
+      getTabDropTarget({
+        pointerX: 640,
+        stripRect,
+        tabRects: overflowingTabRects,
+      }),
+    ).toEqual({
+      insertIndex: 2,
+      indicatorX: 499,
+    });
+  });
 });

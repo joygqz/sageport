@@ -20,59 +20,19 @@ interface ToastState {
   toasts: Toast[];
   push: (toast: Omit<Toast, "id">) => string;
   dismiss: (id: string) => void;
-  pause: (id: string) => void;
-  resume: (id: string) => void;
 }
 
-const DURATION = 4500;
-
-const timers = new Map<
-  string,
-  {
-    timeoutId: ReturnType<typeof setTimeout>;
-    remaining: number;
-    startedAt: number;
-  }
->();
-
-function scheduleDismiss(id: string, ms: number) {
-  const timeoutId = setTimeout(() => {
-    timers.delete(id);
-    useToastStore.getState().dismiss(id);
-  }, ms);
-  timers.set(id, { timeoutId, remaining: ms, startedAt: Date.now() });
-}
+export const TOAST_DURATION = 4500;
 
 export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
   push: (toast) => {
     const id = crypto.randomUUID();
     set((s) => ({ toasts: [...s.toasts, { ...toast, id }] }));
-    if (!toast.persistent) scheduleDismiss(id, DURATION);
     return id;
   },
-  dismiss: (id) => {
-    const timer = timers.get(id);
-    if (timer) {
-      clearTimeout(timer.timeoutId);
-      timers.delete(id);
-    }
-    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
-  },
-  pause: (id) => {
-    const timer = timers.get(id);
-    if (!timer) return;
-    clearTimeout(timer.timeoutId);
-    timer.remaining = Math.max(
-      timer.remaining - (Date.now() - timer.startedAt),
-      0,
-    );
-  },
-  resume: (id) => {
-    const timer = timers.get(id);
-    if (!timer) return;
-    scheduleDismiss(id, timer.remaining);
-  },
+  dismiss: (id) =>
+    set((s) => ({ toasts: s.toasts.filter((toast) => toast.id !== id) })),
 }));
 
 export const toast = {

@@ -14,6 +14,10 @@ import {
   ConfirmDialog,
   Kbd,
   Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -75,10 +79,10 @@ export function EditorArea() {
   const saveFile = useTabsStore((s) => s.saveFile);
   const openPalette = useOverlayStore((s) => s.openPalette);
   const stripRef = useRef<HTMLDivElement>(null);
+  const preserveTabFocusRef = useRef(false);
   const [dragState, setDragState] = useState<TabDragState | null>(null);
   const isDragging = dragState !== null;
   const dropIndexRef = useRef<number | null>(null);
-  const suppressClickRef = useRef<string | null>(null);
   const pendingCloseId = useTabsStore((s) => s.pendingCloseId);
   const clearPendingClose = useTabsStore((s) => s.clearPendingClose);
 
@@ -148,11 +152,6 @@ export function EditorArea() {
     if (!didDrag) return;
 
     if (dropIndex !== null) moveTab(id, dropIndex);
-
-    suppressClickRef.current = id;
-    window.setTimeout(() => {
-      if (suppressClickRef.current === id) suppressClickRef.current = null;
-    }, 0);
   };
 
   const handleTabKeyboardMove = (id: string, direction: -1 | 1) => {
@@ -204,6 +203,10 @@ export function EditorArea() {
     stripRef.current
       ?.querySelector(`[data-tab-id="${CSS.escape(activeId)}"]`)
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (preserveTabFocusRef.current) {
+      preserveTabFocusRef.current = false;
+      return;
+    }
     focusTerminal(activeId);
     focusFileEditor(activeId);
   }, [activeId]);
@@ -211,108 +214,111 @@ export function EditorArea() {
   if (tabs.length === 0) return <Watermark />;
 
   return (
-    <div className="isolate flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-      <div className="relative shrink-0 bg-surface">
-        <div
-          ref={stripRef}
-          onWheel={(e) => {
-            const el = stripRef.current;
-            if (!el || el.scrollWidth <= el.clientWidth || e.deltaX !== 0) {
-              return;
-            }
-            el.scrollLeft += e.deltaY;
-          }}
-          className={cn(
-            "scrollbar-none flex h-[var(--workbench-bar-height)] overflow-x-auto overflow-y-hidden",
-            WORKBENCH_TAB_STRIP_GUTTER_CLASS,
-          )}
-        >
+    <Tabs
+      value={activeId ?? undefined}
+      onValueChange={(id) => {
+        preserveTabFocusRef.current =
+          document.activeElement?.getAttribute("role") === "tab";
+        setActive(id);
+      }}
+      asChild
+    >
+      <div className="isolate flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+        <div className="relative shrink-0 bg-surface">
           <div
-            role="tablist"
-            aria-label={t("editor.tabList")}
-            className="flex h-full items-center gap-1"
-          >
-            {tabs.map((tab) => (
-              <TabItem
-                key={tab.id}
-                tab={tab}
-                active={tab.id === activeId}
-                dragged={dragState?.id === tab.id}
-                onSelect={() => {
-                  if (suppressClickRef.current === tab.id) {
-                    suppressClickRef.current = null;
-                    return;
-                  }
-                  setActive(tab.id);
-                }}
-                onClose={() => close(tab.id)}
-                onDragStart={(pointer) => handleTabDragStart(tab.id, pointer)}
-                onDragMove={(clientX, clientY) =>
-                  handleTabDragMove(tab.id, clientX, clientY)
-                }
-                onDragEnd={(didDrag) => handleTabDragEnd(tab.id, didDrag)}
-                onKeyboardMove={(direction) =>
-                  handleTabKeyboardMove(tab.id, direction)
-                }
-              />
-            ))}
-          </div>
-          <Tooltip content={t("editor.newSession")}>
-            <button
-              type="button"
-              onClick={() => openPalette("quick")}
-              className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
-            >
-              <Plus className="size-4" />
-            </button>
-          </Tooltip>
-        </div>
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border"
-        />
-        {dragState &&
-          draggedTab &&
-          createPortal(
-            <>
-              <span
-                aria-hidden="true"
-                className={WORKBENCH_TAB_DROP_INDICATOR_CLASS}
-                style={{
-                  left: Math.round(dragState.indicatorX - 1),
-                  top: dragState.indicatorTop,
-                  height: dragState.indicatorHeight,
-                }}
-              />
-              <TabDragGhost tab={draggedTab} dragState={dragState} />
-            </>,
-            document.body,
-          )}
-      </div>
-
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            inert={tab.id !== activeId}
+            ref={stripRef}
+            onWheel={(e) => {
+              const el = stripRef.current;
+              if (!el || el.scrollWidth <= el.clientWidth || e.deltaX !== 0) {
+                return;
+              }
+              el.scrollLeft += e.deltaY;
+            }}
             className={cn(
-              "absolute inset-0",
-              tab.id !== activeId && "invisible opacity-0",
+              "scrollbar-none flex h-[var(--workbench-bar-height)] overflow-x-auto overflow-y-hidden",
+              WORKBENCH_TAB_STRIP_GUTTER_CLASS,
             )}
           >
-            <Suspense fallback={<EditorLoading />}>
-              {tab.kind === "terminal" ? (
-                <TerminalEditor tab={tab} active={tab.id === activeId} />
-              ) : (
-                <FileEditor tab={tab} />
-              )}
-            </Suspense>
+            <TabsList
+              aria-label={t("editor.tabList")}
+              className="flex h-full items-center gap-1"
+            >
+              {tabs.map((tab) => (
+                <TabItem
+                  key={tab.id}
+                  tab={tab}
+                  active={tab.id === activeId}
+                  dragged={dragState?.id === tab.id}
+                  onClose={() => close(tab.id)}
+                  onDragStart={(pointer) => handleTabDragStart(tab.id, pointer)}
+                  onDragMove={(clientX, clientY) =>
+                    handleTabDragMove(tab.id, clientX, clientY)
+                  }
+                  onDragEnd={(didDrag) => handleTabDragEnd(tab.id, didDrag)}
+                  onKeyboardMove={(direction) =>
+                    handleTabKeyboardMove(tab.id, direction)
+                  }
+                />
+              ))}
+            </TabsList>
+            <Tooltip content={t("editor.newSession")}>
+              <button
+                type="button"
+                onClick={() => openPalette("quick")}
+                className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+              >
+                <Plus className="size-4" />
+              </button>
+            </Tooltip>
           </div>
-        ))}
-      </div>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border"
+          />
+          {dragState &&
+            draggedTab &&
+            createPortal(
+              <>
+                <span
+                  aria-hidden="true"
+                  className={WORKBENCH_TAB_DROP_INDICATOR_CLASS}
+                  style={{
+                    left: Math.round(dragState.indicatorX - 1),
+                    top: dragState.indicatorTop,
+                    height: dragState.indicatorHeight,
+                  }}
+                />
+                <TabDragGhost tab={draggedTab} dragState={dragState} />
+              </>,
+              document.body,
+            )}
+        </div>
 
-      <ConfirmDialog state={confirmState} onClose={clearPendingClose} />
-    </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          {tabs.map((tab) => (
+            <TabsContent key={tab.id} value={tab.id} forceMount asChild>
+              <div
+                inert={tab.id !== activeId}
+                className={cn(
+                  "absolute inset-0",
+                  tab.id !== activeId && "invisible opacity-0",
+                )}
+              >
+                <Suspense fallback={<EditorLoading />}>
+                  {tab.kind === "terminal" ? (
+                    <TerminalEditor tab={tab} active={tab.id === activeId} />
+                  ) : (
+                    <FileEditor tab={tab} />
+                  )}
+                </Suspense>
+              </div>
+            </TabsContent>
+          ))}
+        </div>
+
+        <ConfirmDialog state={confirmState} onClose={clearPendingClose} />
+      </div>
+    </Tabs>
   );
 }
 
@@ -328,7 +334,6 @@ function TabItem({
   tab,
   active,
   dragged,
-  onSelect,
   onClose,
   onDragStart,
   onDragMove,
@@ -338,7 +343,6 @@ function TabItem({
   tab: EditorTab;
   active: boolean;
   dragged: boolean;
-  onSelect: () => void;
   onClose: () => void;
   onDragStart: (pointer: TabDragPointer) => void;
   onDragMove: (clientX: number, clientY: number) => void;
@@ -366,7 +370,12 @@ function TabItem({
       : undefined;
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+    if (
+      e.button !== 0 ||
+      (e.target as HTMLElement).closest("[data-tab-close]")
+    ) {
+      return;
+    }
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -412,59 +421,64 @@ function TabItem({
   return (
     <div
       data-tab-id={tab.id}
-      role="tab"
-      aria-selected={active}
-      tabIndex={active ? 0 : -1}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={finishPointerDrag}
       onPointerCancel={finishPointerDrag}
-      onKeyDown={(e) => {
-        if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) {
-          return;
-        }
-        e.preventDefault();
-        onKeyboardMove(e.key === "ArrowLeft" ? -1 : 1);
+      onDoubleClick={(event) => {
+        if ((event.target as HTMLElement).closest("[data-tab-close]")) return;
+        reopen?.();
       }}
-      onClick={onSelect}
-      onDoubleClick={reopen}
       onAuxClick={(e) => {
         if (e.button === 1) onClose();
       }}
       className={cn(
         WORKBENCH_TAB_CLASS,
-        "h-full w-44 gap-2 px-3",
+        "h-full w-fit min-w-24 max-w-52 gap-2 px-3",
         dragged && "opacity-50",
         active
           ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
           : WORKBENCH_TAB_INACTIVE_CLASS,
       )}
     >
-      {tab.kind === "terminal" ? (
-        <span className="relative flex shrink-0 items-center justify-center">
-          <TerminalSquare className="size-3.5" />
+      <TabsTrigger
+        value={tab.id}
+        className="flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+        onKeyDown={(e) => {
+          if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) {
+            return;
+          }
+          e.preventDefault();
+          onKeyboardMove(e.key === "ArrowLeft" ? -1 : 1);
+        }}
+      >
+        {tab.kind === "terminal" ? (
+          <span className="relative flex shrink-0 items-center justify-center">
+            <TerminalSquare className="size-3.5" />
+            <span
+              className={cn(
+                "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2",
+                "ring-[var(--tab-background)]",
+                STATUS_DOT_CLASS[tab.status],
+              )}
+            />
+          </span>
+        ) : (
+          <FileText className="size-3.5 shrink-0" />
+        )}
+
+        <span className="min-w-0 max-w-36 truncate text-left">{title}</span>
+
+        {dirty && (
           <span
-            className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2",
-              "ring-[var(--tab-background)]",
-              STATUS_DOT_CLASS[tab.status],
-            )}
+            aria-label={t("editor.unsavedTitle")}
+            className="size-1.5 shrink-0 rounded-full bg-foreground/70"
           />
-        </span>
-      ) : (
-        <FileText className="size-3.5 shrink-0" />
-      )}
-
-      <span className="min-w-0 flex-1 truncate">{title}</span>
-
-      {dirty && (
-        <span
-          aria-label={t("editor.unsavedTitle")}
-          className="size-1.5 shrink-0 rounded-full bg-foreground/70"
-        />
-      )}
+        )}
+      </TabsTrigger>
 
       <button
+        data-tab-close
         type="button"
         onClick={(e) => {
           e.stopPropagation();

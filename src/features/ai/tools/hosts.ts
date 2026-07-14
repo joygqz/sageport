@@ -143,6 +143,11 @@ async function connectHost(
 
   const id =
     existing?.id ?? state.openTerminal({ id: host.id, label: host.label });
+  if (!id) {
+    return toolFailure(
+      `Error: the terminal tab limit has been reached. Close a terminal session before connecting to "${host.label}".`,
+    );
+  }
   if (existing) {
     state.setActive(existing.id);
     if (existing.status === "closed" || existing.status === "error") {

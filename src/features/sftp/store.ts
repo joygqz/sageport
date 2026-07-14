@@ -43,6 +43,7 @@ function describeNavigationError(
 }
 
 export const MAX_EDIT_BYTES = 2 * 1024 * 1024;
+export const MAX_SFTP_TABS = 10;
 
 export type PaneSide = "left" | "right";
 export type TabKind = "local" | "remote";
@@ -142,6 +143,13 @@ export function bridgeSftpEvents(): void {
 }
 
 export const useSftpStore = create<SftpState>((set, get) => {
+  const canAddTab = () => {
+    const { left, right } = get().panes;
+    if (left.tabs.length + right.tabs.length < MAX_SFTP_TABS) return true;
+    toast.warning(t("sftp.tabLimitReached", { count: MAX_SFTP_TABS }));
+    return false;
+  };
+
   const patchTab = (
     side: PaneSide,
     tabId: string,
@@ -230,6 +238,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
     toggleHidden: () => set((s) => ({ showHidden: !s.showHidden })),
 
     addLocalTab: async (side) => {
+      if (!canAddTab()) return;
       const id = crypto.randomUUID();
       const tab: SftpTab = {
         id,
@@ -260,6 +269,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
     },
 
     addRemoteTab: (side, host) => {
+      if (!canAddTab()) return;
       const id = crypto.randomUUID();
       const tab: SftpTab = {
         id,

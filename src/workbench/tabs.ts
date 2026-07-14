@@ -8,8 +8,11 @@ import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import type { Host, SshStatusKind } from "@/types/models";
 
-function t(key: Parameters<typeof translate>[1]): string {
-  return translate(detectLocale(), key);
+function t(
+  key: Parameters<typeof translate>[1],
+  params?: Parameters<typeof translate>[2],
+): string {
+  return translate(detectLocale(), key, params);
 }
 
 export type TerminalStatus = SshStatusKind | "idle";
@@ -17,6 +20,8 @@ export type TerminalStatus = SshStatusKind | "idle";
 export type TerminalTarget = "ssh" | "local" | "ssh-adhoc";
 
 export type SendToTerminalResult = "sent" | "no-terminal" | "not-connected";
+
+export const MAX_TERMINAL_TABS = 10;
 
 export interface AdhocTarget {
   host: string;
@@ -66,11 +71,11 @@ interface TabsState {
 
   lastTerminalId: string | null;
 
-  openTerminal: (host: Pick<Host, "id" | "label">) => string;
+  openTerminal: (host: Pick<Host, "id" | "label">) => string | null;
 
-  openLocalTerminal: () => string;
+  openLocalTerminal: () => string | null;
 
-  openAdhocTerminal: (target: AdhocTarget) => string;
+  openAdhocTerminal: (target: AdhocTarget) => string | null;
 
   openFile: (file: {
     connectionId: string | null;
@@ -136,6 +141,14 @@ export function targetTerminalId(state: {
 }
 
 export const useTabsStore = create<TabsState>((set, get) => {
+  const canOpenTerminal = () => {
+    if (terminalTabs(get().tabs).length < MAX_TERMINAL_TABS) return true;
+    toast.warning(
+      t("editor.tabLimitReached", { count: MAX_TERMINAL_TABS }),
+    );
+    return false;
+  };
+
   const patchFile = (id: string, patch: Partial<FileTab>) =>
     set((s) => ({
       tabs: s.tabs.map((t) =>
@@ -152,6 +165,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
     clearPendingClose: () => set({ pendingCloseId: null }),
 
     openTerminal: (host) => {
+      if (!canOpenTerminal()) return null;
       const id = crypto.randomUUID();
       const tab: TerminalTab = {
         kind: "terminal",
@@ -171,6 +185,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
     },
 
     openLocalTerminal: () => {
+      if (!canOpenTerminal()) return null;
       const id = crypto.randomUUID();
       const count = terminalTabs(get().tabs).filter(
         (t) => t.target === "local",
@@ -196,6 +211,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
     },
 
     openAdhocTerminal: (target) => {
+      if (!canOpenTerminal()) return null;
       const id = crypto.randomUUID();
       const tab: TerminalTab = {
         kind: "terminal",

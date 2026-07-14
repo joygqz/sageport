@@ -15,6 +15,9 @@ import {
 
 import {
   Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   CONTROL_BORDER_CLASS,
   CONTROL_FOCUS_CLASS,
   Dialog,
@@ -26,6 +29,8 @@ import {
   Kbd,
   LoadingState,
   PasswordInput,
+  RadioGroup,
+  RadioGroupItem,
   ScrollArea,
   SectionHeader,
   SegmentedControl,
@@ -236,17 +241,20 @@ function AppearanceSection() {
       </Field>
 
       <Field label={t("settings.appearance.themeFamily")}>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3">
+        <RadioGroup
+          value={preference.familyId}
+          onValueChange={setFamily}
+          className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3"
+        >
           {THEME_FAMILIES.map((family) => (
             <ThemeFamilyCard
               key={family.id}
               family={family}
               active={family.id === preference.familyId}
               description={t(THEME_DESCRIPTION_KEYS[family.id])}
-              onSelect={() => setFamily(family.id)}
             />
           ))}
-        </div>
+        </RadioGroup>
       </Field>
 
       <Separator />
@@ -366,24 +374,18 @@ function ThemeFamilyCard({
   family,
   active,
   description,
-  onSelect,
 }: {
   family: ThemeFamilyDefinition;
   active: boolean;
   description: string;
-  onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={active}
+    <RadioGroupItem
+      value={family.id}
       className={cn(
         "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left transition-[border-color,box-shadow]",
         CONTROL_FOCUS_CLASS,
-        active
-          ? "border-primary ring-2 ring-primary/25"
-          : CONTROL_BORDER_CLASS,
+        active ? "border-primary ring-2 ring-primary/25" : CONTROL_BORDER_CLASS,
       )}
     >
       <div className="grid h-24 grid-cols-2">
@@ -406,7 +408,7 @@ function ThemeFamilyCard({
           </span>
         )}
       </div>
-    </button>
+    </RadioGroupItem>
   );
 }
 
@@ -744,22 +746,22 @@ function ToolTreeGroup({
   const groupLabel = t(`settings.ai.tools.group.${group.id}`);
 
   return (
-    <div>
+    <Collapsible open={expanded} onOpenChange={onToggleExpanded}>
       <div className="flex min-h-8 items-center gap-1.5 px-2 py-1 hover:bg-list-hover">
-        <button
-          type="button"
-          onClick={onToggleExpanded}
-          aria-expanded={expanded}
-          aria-label={groupLabel}
-          className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
-        >
-          <ChevronRight
-            className={cn(
-              "size-3.5 text-muted-foreground transition-transform",
-              expanded && "rotate-90",
-            )}
-          />
-        </button>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            aria-label={groupLabel}
+            className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+          >
+            <ChevronRight
+              className={cn(
+                "size-3.5 text-muted-foreground transition-transform",
+                expanded && "rotate-90",
+              )}
+            />
+          </button>
+        </CollapsibleTrigger>
         <TreeCheckbox
           checked={allEnabled}
           indeterminate={partiallyEnabled}
@@ -767,27 +769,27 @@ function ToolTreeGroup({
           onChange={(event) => onToggleGroup(names, event.target.checked)}
           aria-label={groupLabel}
         />
-        <button
-          type="button"
-          onClick={onToggleExpanded}
-          aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
-        >
-          <span className="min-w-0 flex-1 truncate text-xs font-medium">
-            {groupLabel}
-          </span>
-          <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
-            {enabledCount}/{names.length}
-          </span>
-          {core && (
-            <span className="shrink-0 text-2xs text-muted-foreground">
-              {t("settings.ai.tools.required")}
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+          >
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">
+              {groupLabel}
             </span>
-          )}
-        </button>
+            <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
+              {enabledCount}/{names.length}
+            </span>
+            {core && (
+              <span className="shrink-0 text-2xs text-muted-foreground">
+                {t("settings.ai.tools.required")}
+              </span>
+            )}
+          </button>
+        </CollapsibleTrigger>
       </div>
 
-      {expanded && (
+      <CollapsibleContent>
         <div className="py-0.5 pl-5 pr-2">
           <div className="pl-5">
             {group.tools.map((tool) => {
@@ -819,8 +821,8 @@ function ToolTreeGroup({
             })}
           </div>
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

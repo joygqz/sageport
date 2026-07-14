@@ -15,6 +15,8 @@ export const en = {
     saveChanges: "Save Changes",
     loading: "Loading…",
     loadError: "Unable to load this content",
+    notification: "Notification",
+    notifications: "Notifications ({hotkey})",
     showPassword: "Show password",
     hidePassword: "Hide password",
     deleteConfirm:
@@ -161,6 +163,7 @@ export const en = {
     newSession: "New Session",
     tabList: "Open sessions",
     closeTab: "Close Tab",
+    tabLimitReached: "You can open up to {count} terminal sessions",
     unsavedTitle: "Unsaved Changes",
     unsavedDescription:
       "{name} has unsaved changes. Your changes will be lost if you don't save them.",
@@ -476,6 +479,7 @@ export const en = {
     hidePanel: "Hide Panel",
     local: "Local",
     newTab: "New Tab",
+    tabLimitReached: "You can open up to {count} file tabs",
     back: "Back",
     forward: "Forward",
     navigationHistory: "Location History",
@@ -756,6 +760,7 @@ export const en = {
     sync: {
       description:
         "Back up hosts, keys, snippets, and settings to a storage of your choice. Everything is end-to-end encrypted with your passphrase before it leaves this device. Disconnect first to switch storage.",
+      providerLabel: "Storage provider",
       corruptRemoteBackup:
         "The backup retrieved from the connected storage looks corrupted or from an incompatible app version.",
       provider: {

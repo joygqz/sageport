@@ -15,7 +15,9 @@ const initialAssets = [
   ),
 ];
 
-const INITIAL_JS_BUDGET = 650 * 1024;
+// The workbench shell includes accessible dialog, tabs, and toast primitives.
+// Keep roughly the same headroom as the previous 650 kB budget after adding them.
+const INITIAL_JS_BUDGET = 700 * 1024;
 const lazyOnlyPrefixes = [
   "AssistantPanel-",
   "FileEditor-",

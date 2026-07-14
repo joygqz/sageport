@@ -1,13 +1,14 @@
 import type { ButtonProps } from "./button";
-import { Button } from "./button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "./alert-dialog";
+import { Button } from "./button";
+import { DialogFooter, DialogHeader } from "./dialog";
 
 export interface ConfirmAction {
   label: string;
@@ -35,38 +36,48 @@ export function ConfirmDialog({
   const busy = state?.actions.some((action) => action.loading) ?? false;
 
   return (
-    <Dialog open={!!state} onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="max-w-sm">
+    <AlertDialog
+      open={!!state}
+      onOpenChange={(open) => !open && !busy && onClose()}
+    >
+      <AlertDialogContent className="max-w-sm">
         {state && (
           <>
             <DialogHeader>
-              <DialogTitle>{state.title}</DialogTitle>
+              <AlertDialogTitle>{state.title}</AlertDialogTitle>
               {state.description && (
-                <DialogDescription>{state.description}</DialogDescription>
+                <AlertDialogDescription>
+                  {state.description}
+                </AlertDialogDescription>
               )}
             </DialogHeader>
             <DialogFooter>
-              <Button variant="ghost" onClick={onClose} disabled={busy}>
-                {state.cancelLabel}
-              </Button>
-              {state.actions.map((action) => (
-                <Button
-                  key={action.label}
-                  variant={action.variant ?? "primary"}
-                  loading={action.loading}
-                  disabled={action.disabled || busy}
-                  onClick={async () => {
-                    await action.onSelect();
-                    onClose();
-                  }}
-                >
-                  {action.label}
+              <AlertDialogCancel asChild>
+                <Button type="button" variant="ghost" disabled={busy}>
+                  {state.cancelLabel}
                 </Button>
+              </AlertDialogCancel>
+              {state.actions.map((action) => (
+                <AlertDialogAction key={action.label} asChild>
+                  <Button
+                    type="button"
+                    variant={action.variant ?? "primary"}
+                    loading={action.loading}
+                    disabled={action.disabled || busy}
+                    onClick={async (event) => {
+                      event.preventDefault();
+                      await action.onSelect();
+                      onClose();
+                    }}
+                  >
+                    {action.label}
+                  </Button>
+                </AlertDialogAction>
               ))}
             </DialogFooter>
           </>
         )}
-      </DialogContent>
-    </Dialog>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

@@ -26,6 +26,11 @@ for (const file of sourceFiles.filter((file) => file.endsWith(".tsx"))) {
       `${file}: use the shared Select component instead of native select/option elements`,
     );
   }
+  if (/role=["'](?:alertdialog|radio|radiogroup|tab|tablist)["']/.test(text)) {
+    problems.push(
+      `${file}: use the shared Radix primitive instead of hand-written composite widget roles`,
+    );
+  }
 }
 
 for (const file of tracked("'src-tauri/src/**/*.rs'")) {

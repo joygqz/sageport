@@ -5,6 +5,12 @@ import { X } from "lucide-react";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
+export const DIALOG_OVERLAY_CLASS =
+  "fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] dark:bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
+
+export const DIALOG_CONTENT_CLASS =
+  "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-4 rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-md sm:p-6 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
+
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
@@ -38,11 +44,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       ref={ref}
       data-slot="dialog-overlay"
-      className={cn(
-        "fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] dark:bg-black/60",
-        "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
-        className,
-      )}
+      className={cn(DIALOG_OVERLAY_CLASS, className)}
       {...props}
     />
   );
@@ -128,13 +130,7 @@ function DialogContent({
         style={{
           translate: `calc(-50% + ${offset.x}px) calc(-50% + ${offset.y}px)`,
         }}
-        className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-4 overflow-y-auto",
-          "rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-md sm:p-6",
-          "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-          "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-          className,
-        )}
+        className={cn(DIALOG_CONTENT_CLASS, "overflow-y-auto", className)}
         {...props}
       >
         {children}

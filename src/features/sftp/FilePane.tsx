@@ -27,6 +27,10 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   Input,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -87,7 +91,6 @@ export function FilePane({ side }: { side: PaneSide }) {
   const tabStripRef = useRef<HTMLDivElement>(null);
   const [dragState, setDragState] = useState<SftpTabDragState | null>(null);
   const dropIndexRef = useRef<number | null>(null);
-  const suppressClickRef = useRef<string | null>(null);
   const [creation, setCreation] = useState<{
     kind: "file" | "folder";
     tabId: string;
@@ -186,11 +189,6 @@ export function FilePane({ side }: { side: PaneSide }) {
     if (!didDrag) return;
 
     if (dropIndex !== null) moveTab(side, tabId, dropIndex);
-
-    suppressClickRef.current = tabId;
-    window.setTimeout(() => {
-      if (suppressClickRef.current === tabId) suppressClickRef.current = null;
-    }, 0);
   };
 
   const handleTabKeyboardMove = (tabId: string, direction: -1 | 1) => {
@@ -287,264 +285,272 @@ export function FilePane({ side }: { side: PaneSide }) {
   };
 
   return (
-    <div
-      data-file-pane-side={side}
-      className="flex min-h-0 min-w-0 flex-1 flex-col"
+    <Tabs
+      value={pane.activeTabId ?? undefined}
+      onValueChange={(id) => setActive(side, id)}
+      asChild
     >
       <div
-        ref={tabStripRef}
-        role="tablist"
-        aria-label={t("sftp.panelTitle")}
-        onWheel={(e) => {
-          const el = tabStripRef.current;
-          if (!el || el.scrollWidth <= el.clientWidth || e.deltaX !== 0) {
-            return;
-          }
-          el.scrollLeft += e.deltaY;
-        }}
-        className={cn(
-          "scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface",
-          WORKBENCH_COMPACT_TAB_STRIP_GUTTER_CLASS,
-        )}
+        data-file-pane-side={side}
+        className="flex min-h-0 min-w-0 flex-1 flex-col"
       >
-        {pane.tabs.map((tab) => (
-          <SftpTabItem
-            key={tab.id}
-            tab={tab}
-            active={tab.id === pane.activeTabId}
-            dragged={dragState?.id === tab.id}
-            label={tab.kind === "local" ? t("sftp.local") : tab.title}
-            onSelect={() => {
-              if (suppressClickRef.current === tab.id) {
-                suppressClickRef.current = null;
-                return;
-              }
-              setActive(side, tab.id);
-            }}
-            onClose={() => closeTab(side, tab.id)}
-            onReopen={() => {
-              if (tab.kind === "local") {
-                void addLocalTab(side);
-                return;
-              }
-              const host = hosts.find((h) => h.id === tab.hostId);
-              if (host) addRemoteTab(side, host);
-            }}
-            onDragStart={(pointer) => handleTabDragStart(tab.id, pointer)}
-            onDragMove={(clientX, clientY) =>
-              handleTabDragMove(tab.id, clientX, clientY)
+        <div
+          ref={tabStripRef}
+          onWheel={(e) => {
+            const el = tabStripRef.current;
+            if (!el || el.scrollWidth <= el.clientWidth || e.deltaX !== 0) {
+              return;
             }
-            onDragEnd={(didDrag) => handleTabDragEnd(tab.id, didDrag)}
-            onKeyboardMove={(direction) =>
-              handleTabKeyboardMove(tab.id, direction)
-            }
-          />
-        ))}
-
-        <DropdownMenu>
-          <Tooltip content={t("sftp.newTab")}>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="size-6 shrink-0">
-                <Plus className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-          </Tooltip>
-          <DropdownMenuContent align="start" className="max-h-80 overflow-auto">
-            <DropdownMenuItem onSelect={() => void addLocalTab(side)}>
-              <HardDrive /> {t("sftp.local")}
-            </DropdownMenuItem>
-            {hosts.length > 0 && <DropdownMenuSeparator />}
-            {hosts.map((host) => (
-              <DropdownMenuItem
-                key={host.id}
-                onSelect={() => addRemoteTab(side, host)}
-              >
-                <Server /> {host.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {dragState &&
-        draggedTab &&
-        createPortal(
-          <>
-            <span
-              aria-hidden="true"
-              className={WORKBENCH_TAB_DROP_INDICATOR_CLASS}
-              style={{
-                left: Math.round(dragState.indicatorX - 1),
-                top: dragState.indicatorTop,
-                height: dragState.indicatorHeight,
-              }}
-            />
-            <SftpTabDragGhost tab={draggedTab} dragState={dragState} />
-          </>,
-          document.body,
-        )}
-
-      {active ? (
-        <>
-          <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-surface px-1.5">
-            <Tooltip content={t("sftp.back")}>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-6"
-                disabled={
-                  !activeReady ||
-                  (!active.navigationPath && active.historyIndex <= 0)
-                }
-                onClick={() => {
-                  if (active.navigationPath) {
-                    restoreLoadedPath(side, active.id);
+            el.scrollLeft += e.deltaY;
+          }}
+          className={cn(
+            "scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface",
+            WORKBENCH_COMPACT_TAB_STRIP_GUTTER_CLASS,
+          )}
+        >
+          <TabsList
+            aria-label={t("sftp.panelTitle")}
+            className="flex h-full items-center gap-1"
+          >
+            {pane.tabs.map((tab) => (
+              <SftpTabItem
+                key={tab.id}
+                tab={tab}
+                active={tab.id === pane.activeTabId}
+                dragged={dragState?.id === tab.id}
+                label={tab.kind === "local" ? t("sftp.local") : tab.title}
+                onClose={() => closeTab(side, tab.id)}
+                onReopen={() => {
+                  if (tab.kind === "local") {
+                    void addLocalTab(side);
                     return;
                   }
-                  void navigateToHistory(
-                    side,
-                    active.id,
-                    active.historyIndex - 1,
-                  );
+                  const host = hosts.find((h) => h.id === tab.hostId);
+                  if (host) addRemoteTab(side, host);
                 }}
-              >
-                <ChevronLeft className="size-3.5" />
-              </Button>
-            </Tooltip>
-            <Tooltip content={t("sftp.forward")}>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-6"
-                disabled={
-                  !activeReady ||
-                  !!active.navigationPath ||
-                  active.historyIndex >= active.history.length - 1
+                onDragStart={(pointer) => handleTabDragStart(tab.id, pointer)}
+                onDragMove={(clientX, clientY) =>
+                  handleTabDragMove(tab.id, clientX, clientY)
                 }
-                onClick={() =>
-                  void navigateToHistory(
-                    side,
-                    active.id,
-                    active.historyIndex + 1,
-                  )
+                onDragEnd={(didDrag) => handleTabDragEnd(tab.id, didDrag)}
+                onKeyboardMove={(direction) =>
+                  handleTabKeyboardMove(tab.id, direction)
                 }
-              >
-                <ChevronRight className="size-3.5" />
-              </Button>
+              />
+            ))}
+          </TabsList>
+
+          <DropdownMenu>
+            <Tooltip content={t("sftp.newTab")}>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="size-6 shrink-0">
+                  <Plus className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
             </Tooltip>
-            <Tooltip content={t("sftp.refresh")}>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-6"
-                disabled={!activeReady}
-                onClick={() => void refresh(side, active.id)}
-              >
-                <RefreshCw className="size-3.5" />
-              </Button>
-            </Tooltip>
-            <Tooltip content={t("sftp.newFolder")}>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-6"
-                disabled={!activeReady}
-                onClick={() =>
-                  setCreation({
-                    kind: "folder",
-                    tabId: active.id,
-                    cwd: active.cwd,
-                  })
-                }
-              >
-                <FolderPlus className="size-3.5" />
-              </Button>
-            </Tooltip>
-            <Tooltip content={t("sftp.newFile")}>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-6"
-                disabled={!activeReady}
-                onClick={() =>
-                  setCreation({
-                    kind: "file",
-                    tabId: active.id,
-                    cwd: active.cwd,
-                  })
-                }
-              >
-                <FilePlus className="size-3.5" />
-              </Button>
-            </Tooltip>
-            <BookmarkMenu side={side} tab={active} />
-            <PathBar
-              key={active.navigationPath ?? active.cwd}
+            <DropdownMenuContent
+              align="start"
+              className="max-h-80 overflow-auto"
+            >
+              <DropdownMenuItem onSelect={() => void addLocalTab(side)}>
+                <HardDrive /> {t("sftp.local")}
+              </DropdownMenuItem>
+              {hosts.length > 0 && <DropdownMenuSeparator />}
+              {hosts.map((host) => (
+                <DropdownMenuItem
+                  key={host.id}
+                  onSelect={() => addRemoteTab(side, host)}
+                >
+                  <Server /> {host.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {dragState &&
+          draggedTab &&
+          createPortal(
+            <>
+              <span
+                aria-hidden="true"
+                className={WORKBENCH_TAB_DROP_INDICATOR_CLASS}
+                style={{
+                  left: Math.round(dragState.indicatorX - 1),
+                  top: dragState.indicatorTop,
+                  height: dragState.indicatorHeight,
+                }}
+              />
+              <SftpTabDragGhost tab={draggedTab} dragState={dragState} />
+            </>,
+            document.body,
+          )}
+
+        {active ? (
+          <TabsContent
+            value={active.id}
+            className="flex min-h-0 flex-1 flex-col outline-none"
+          >
+            <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-surface px-1.5">
+              <Tooltip content={t("sftp.back")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6"
+                  disabled={
+                    !activeReady ||
+                    (!active.navigationPath && active.historyIndex <= 0)
+                  }
+                  onClick={() => {
+                    if (active.navigationPath) {
+                      restoreLoadedPath(side, active.id);
+                      return;
+                    }
+                    void navigateToHistory(
+                      side,
+                      active.id,
+                      active.historyIndex - 1,
+                    );
+                  }}
+                >
+                  <ChevronLeft className="size-3.5" />
+                </Button>
+              </Tooltip>
+              <Tooltip content={t("sftp.forward")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6"
+                  disabled={
+                    !activeReady ||
+                    !!active.navigationPath ||
+                    active.historyIndex >= active.history.length - 1
+                  }
+                  onClick={() =>
+                    void navigateToHistory(
+                      side,
+                      active.id,
+                      active.historyIndex + 1,
+                    )
+                  }
+                >
+                  <ChevronRight className="size-3.5" />
+                </Button>
+              </Tooltip>
+              <Tooltip content={t("sftp.refresh")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6"
+                  disabled={!activeReady}
+                  onClick={() => void refresh(side, active.id)}
+                >
+                  <RefreshCw className="size-3.5" />
+                </Button>
+              </Tooltip>
+              <Tooltip content={t("sftp.newFolder")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6"
+                  disabled={!activeReady}
+                  onClick={() =>
+                    setCreation({
+                      kind: "folder",
+                      tabId: active.id,
+                      cwd: active.cwd,
+                    })
+                  }
+                >
+                  <FolderPlus className="size-3.5" />
+                </Button>
+              </Tooltip>
+              <Tooltip content={t("sftp.newFile")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6"
+                  disabled={!activeReady}
+                  onClick={() =>
+                    setCreation({
+                      kind: "file",
+                      tabId: active.id,
+                      cwd: active.cwd,
+                    })
+                  }
+                >
+                  <FilePlus className="size-3.5" />
+                </Button>
+              </Tooltip>
+              <BookmarkMenu side={side} tab={active} />
+              <PathBar
+                key={active.navigationPath ?? active.cwd}
+                side={side}
+                tab={active}
+              />
+            </div>
+
+            <FileList
               side={side}
               tab={active}
+              creating={creating}
+              onCreate={(name) => onCreate(active, creating!, name)}
+              onCancelCreate={() => setCreation(null)}
+              onRename={(entry, name) => onRename(active, entry, name)}
+              onDelete={(entries) => confirmDelete(active, entries)}
+              onPermissions={(entry) => setPermTarget({ tab: active, entry })}
+            />
+          </TabsContent>
+        ) : (
+          <div className="flex flex-1 overflow-hidden">
+            <EmptyState
+              className="m-auto p-3"
+              icon={HardDrive}
+              title={t("sftp.noTabTitle")}
+              action={
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="secondary">
+                      <Plus /> {t("sftp.newTab")}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="center"
+                    className="max-h-80 overflow-auto"
+                  >
+                    <DropdownMenuItem onSelect={() => void addLocalTab(side)}>
+                      <HardDrive /> {t("sftp.local")}
+                    </DropdownMenuItem>
+                    {hosts.length > 0 && <DropdownMenuSeparator />}
+                    {hosts.map((host) => (
+                      <DropdownMenuItem
+                        key={host.id}
+                        onSelect={() => addRemoteTab(side, host)}
+                      >
+                        <Server /> {host.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              }
             />
           </div>
+        )}
 
-          <FileList
-            side={side}
-            tab={active}
-            creating={creating}
-            onCreate={(name) => onCreate(active, creating!, name)}
-            onCancelCreate={() => setCreation(null)}
-            onRename={(entry, name) => onRename(active, entry, name)}
-            onDelete={(entries) => confirmDelete(active, entries)}
-            onPermissions={(entry) => setPermTarget({ tab: active, entry })}
-          />
-        </>
-      ) : (
-        <div className="flex flex-1 overflow-hidden">
-          <EmptyState
-            className="m-auto p-3"
-            icon={HardDrive}
-            title={t("sftp.noTabTitle")}
-            action={
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="secondary">
-                    <Plus /> {t("sftp.newTab")}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="center"
-                  className="max-h-80 overflow-auto"
-                >
-                  <DropdownMenuItem onSelect={() => void addLocalTab(side)}>
-                    <HardDrive /> {t("sftp.local")}
-                  </DropdownMenuItem>
-                  {hosts.length > 0 && <DropdownMenuSeparator />}
-                  {hosts.map((host) => (
-                    <DropdownMenuItem
-                      key={host.id}
-                      onSelect={() => addRemoteTab(side, host)}
-                    >
-                      <Server /> {host.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            }
-          />
-        </div>
-      )}
-
-      <ConfirmDialog
-        state={confirmState}
-        onClose={() => setConfirmState(null)}
-      />
-      <PermissionsDialog
-        connectionId={permTarget?.tab.connectionId ?? null}
-        entry={permTarget?.entry ?? null}
-        onClose={() => setPermTarget(null)}
-        onSaved={() => {
-          if (permTarget) void refresh(side, permTarget.tab.id);
-        }}
-      />
-    </div>
+        <ConfirmDialog
+          state={confirmState}
+          onClose={() => setConfirmState(null)}
+        />
+        <PermissionsDialog
+          connectionId={permTarget?.tab.connectionId ?? null}
+          entry={permTarget?.entry ?? null}
+          onClose={() => setPermTarget(null)}
+          onSaved={() => {
+            if (permTarget) void refresh(side, permTarget.tab.id);
+          }}
+        />
+      </div>
+    </Tabs>
   );
 }
 
@@ -553,7 +559,6 @@ function SftpTabItem({
   active,
   dragged,
   label,
-  onSelect,
   onClose,
   onReopen,
   onDragStart,
@@ -565,7 +570,6 @@ function SftpTabItem({
   active: boolean;
   dragged: boolean;
   label: string;
-  onSelect: () => void;
   onClose: () => void;
   onReopen: () => void;
   onDragStart: (pointer: SftpTabDragPointer) => void;
@@ -582,7 +586,10 @@ function SftpTabItem({
   } | null>(null);
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest("button")) {
+    if (
+      event.button !== 0 ||
+      (event.target as HTMLElement).closest("[data-tab-close]")
+    ) {
       return;
     }
     dragRef.current = {
@@ -630,58 +637,56 @@ function SftpTabItem({
   return (
     <div
       data-sftp-tab-id={tab.id}
-      role="tab"
-      tabIndex={active ? 0 : -1}
-      aria-selected={active}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={finishPointerDrag}
       onPointerCancel={finishPointerDrag}
-      onClick={onSelect}
       onDoubleClick={(event) => {
-        if ((event.target as HTMLElement).closest("button")) return;
+        if ((event.target as HTMLElement).closest("[data-tab-close]")) return;
         onReopen();
       }}
       onAuxClick={(event) => {
         if (event.button === 1) onClose();
       }}
-      onKeyDown={(event) => {
-        if (
-          event.altKey &&
-          (event.key === "ArrowLeft" || event.key === "ArrowRight")
-        ) {
-          event.preventDefault();
-          onKeyboardMove(event.key === "ArrowLeft" ? -1 : 1);
-          return;
-        }
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        onSelect();
-      }}
       className={cn(
         WORKBENCH_TAB_CLASS,
-        "h-full w-40 gap-1.5 px-2",
+        "h-full w-fit min-w-24 max-w-44 gap-1.5 px-2",
         dragged && "opacity-50",
         active
           ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
           : WORKBENCH_TAB_INACTIVE_CLASS,
       )}
     >
-      <span className="relative flex shrink-0 items-center justify-center">
-        {tab.kind === "local" ? (
-          <HardDrive className="size-3" />
-        ) : (
-          <Server className="size-3" />
-        )}
-        <span
-          className={cn(
-            "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-[var(--tab-background)]",
-            STATUS_DOT_CLASS[tab.status],
+      <TabsTrigger
+        value={tab.id}
+        className="flex min-w-0 flex-1 items-center justify-start gap-1.5 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+        onKeyDown={(event) => {
+          if (
+            event.altKey &&
+            (event.key === "ArrowLeft" || event.key === "ArrowRight")
+          ) {
+            event.preventDefault();
+            onKeyboardMove(event.key === "ArrowLeft" ? -1 : 1);
+          }
+        }}
+      >
+        <span className="relative flex shrink-0 items-center justify-center">
+          {tab.kind === "local" ? (
+            <HardDrive className="size-3" />
+          ) : (
+            <Server className="size-3" />
           )}
-        />
-      </span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+          <span
+            className={cn(
+              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-[var(--tab-background)]",
+              STATUS_DOT_CLASS[tab.status],
+            )}
+          />
+        </span>
+        <span className="min-w-0 max-w-28 truncate text-left">{label}</span>
+      </TabsTrigger>
       <button
+        data-tab-close
         type="button"
         aria-label={t("editor.closeTab")}
         onClick={(event) => {

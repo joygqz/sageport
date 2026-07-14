@@ -1,15 +1,16 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type * as React from "react";
+import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 
 import { cn } from "@/lib/utils";
 import { CONTROL_BORDER_CLASS } from "./styles";
 
 type SegmentedControlProps<T extends string> = Omit<
-  HTMLAttributes<HTMLDivElement>,
-  "onChange"
+  React.ComponentProps<typeof RadioGroupPrimitive.Root>,
+  "value" | "defaultValue" | "onChange" | "onValueChange" | "children"
 > & {
   value: T;
   onChange: (value: T) => void;
-  options: { value: T; label: ReactNode }[];
+  options: { value: T; label: React.ReactNode }[];
 };
 
 export function SegmentedControl<T extends string>({
@@ -20,8 +21,9 @@ export function SegmentedControl<T extends string>({
   ...props
 }: SegmentedControlProps<T>) {
   return (
-    <div
-      role="radiogroup"
+    <RadioGroupPrimitive.Root
+      value={value}
+      onValueChange={(next) => onChange(next as T)}
       className={cn(
         "grid auto-cols-fr grid-flow-col gap-1 rounded-lg border bg-muted/65 p-1",
         CONTROL_BORDER_CLASS,
@@ -30,22 +32,18 @@ export function SegmentedControl<T extends string>({
       {...props}
     >
       {options.map((option) => (
-        <button
+        <RadioGroupPrimitive.Item
           key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={value === option.value}
-          onClick={() => onChange(option.value)}
+          value={option.value}
           className={cn(
             "min-h-8 rounded-md px-3 py-1.5 text-sm outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring/35",
-            value === option.value
-              ? "bg-list-active font-medium text-list-active-foreground"
-              : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
+            "text-muted-foreground hover:bg-list-hover hover:text-foreground",
+            "data-[state=checked]:bg-list-active data-[state=checked]:font-medium data-[state=checked]:text-list-active-foreground",
           )}
         >
           {option.label}
-        </button>
+        </RadioGroupPrimitive.Item>
       ))}
-    </div>
+    </RadioGroupPrimitive.Root>
   );
 }
