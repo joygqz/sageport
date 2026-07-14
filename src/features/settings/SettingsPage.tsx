@@ -25,6 +25,7 @@ import {
   ScrollArea,
   SectionHeader,
   SegmentedControl,
+  Separator,
   Select,
   Switch,
   Tooltip,
@@ -127,7 +128,7 @@ function SettingsPage({
                   aria-current={active ? "page" : undefined}
                   onClick={() => onSectionChange(item.id)}
                   className={cn(
-                    "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40",
+                    "flex h-[var(--control-height)] items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
                     active
                       ? "bg-list-active font-medium text-list-active-foreground"
                       : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
@@ -142,7 +143,7 @@ function SettingsPage({
         </aside>
 
         <ScrollArea className="min-h-0 min-w-0 flex-1">
-          <main className="settings-content flex w-full max-w-3xl flex-col gap-7 px-8 py-7">
+          <main className="settings-content flex w-full max-w-3xl flex-col gap-8 px-8 py-8">
             <div>
               <h1 className="text-lg font-semibold tracking-tight text-foreground">
                 {t(NAV.find((item) => item.id === section)!.labelKey)}
@@ -194,7 +195,7 @@ function AppearanceSection() {
   ];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <SectionHeader
         title={t("settings.appearance.themeTitle")}
         description={t("settings.appearance.themeDescription")}
@@ -229,7 +230,7 @@ function AppearanceSection() {
         </div>
       </div>
 
-      <div className="h-px bg-border" />
+      <Separator />
 
       <Field
         label={t("settings.appearance.language")}
@@ -363,7 +364,7 @@ function ThemeFamilyCard({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "group flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card text-left outline-none transition-[border-color,box-shadow,transform] focus-visible:ring-2 focus-visible:ring-ring/40",
+        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left outline-none transition-[border-color,box-shadow,transform] focus-visible:ring-2 focus-visible:ring-ring/40",
         active
           ? "border-primary shadow-sm ring-2 ring-primary/25"
           : "border-border hover:-translate-y-0.5 hover:border-input hover:shadow-sm",
@@ -632,7 +633,7 @@ function AiForm({ config }: { config: AiConfig }) {
         label={t("settings.ai.autonomousModeLabel")}
         hint={t("settings.ai.autonomousModeHint")}
       >
-        <div className="flex items-center justify-between gap-4 rounded-md border border-input px-3 py-2.5">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card/55 px-3 py-2.5">
           <div className="min-w-0">
             <p className="text-sm font-medium">
               {t("settings.ai.autonomousMode")}
@@ -687,7 +688,7 @@ function AiForm({ config }: { config: AiConfig }) {
 
         <div
           aria-label={t("settings.ai.tools.title")}
-          className="overflow-hidden rounded-md border border-input"
+          className="overflow-hidden rounded-lg border border-border bg-card/35"
         >
           {TOOL_GROUPS.map((group) => (
             <ToolTreeGroup
@@ -735,7 +736,7 @@ function ToolTreeGroup({
 
   return (
     <div>
-      <div className="flex min-h-7 items-center gap-1.5 px-2 py-1 hover:bg-accent/60">
+      <div className="flex min-h-8 items-center gap-1.5 px-2 py-1 hover:bg-list-hover">
         <button
           type="button"
           onClick={onToggleExpanded}
@@ -830,10 +831,7 @@ function TreeCheckbox({
       {...props}
       ref={ref}
       type="checkbox"
-      className={cn(
-        "size-4 shrink-0 accent-primary disabled:cursor-not-allowed",
-        className,
-      )}
+      className={cn("ui-checkbox", className)}
     />
   );
 }

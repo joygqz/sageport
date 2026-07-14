@@ -22,6 +22,9 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "monitor", icon: Gauge, labelKey: "activityBar.monitor" },
 ];
 
+const ACTIVITY_BUTTON_CLASS =
+  "flex size-9 items-center justify-center rounded-lg outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45";
+
 export function ActivityBar() {
   const { t } = useI18n();
   const activity = useLayoutStore((s) => s.activity);
@@ -39,11 +42,13 @@ export function ActivityBar() {
           return (
             <Tooltip key={item.id} content={t(item.labelKey)} side="right">
               <button
+                type="button"
                 onClick={() => selectActivity(item.id)}
                 aria-label={t(item.labelKey)}
                 aria-pressed={active}
                 className={cn(
-                  "relative flex size-9 items-center justify-center rounded-lg outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
+                  ACTIVITY_BUTTON_CLASS,
+                  "relative",
                   active
                     ? "bg-list-active text-list-active-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
@@ -58,11 +63,12 @@ export function ActivityBar() {
 
       <Tooltip content={t("activityBar.settings")} side="right">
         <button
+          type="button"
           onClick={() => openSettings()}
           aria-label={t("activityBar.settings")}
           aria-pressed={settingsActive}
           className={cn(
-            "flex size-9 items-center justify-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
+            ACTIVITY_BUTTON_CLASS,
             settingsActive
               ? "bg-list-active text-list-active-foreground shadow-sm"
               : "text-muted-foreground hover:bg-list-hover hover:text-foreground",

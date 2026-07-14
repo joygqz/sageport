@@ -18,10 +18,10 @@ export const buttonVariants = cva(
         link: "border-transparent text-link underline-offset-4 hover:underline",
       },
       size: {
-        sm: "h-8 px-3 text-xs",
-        md: "h-9 px-4",
-        lg: "h-10 px-6",
-        icon: "size-9",
+        sm: "h-[var(--control-height-sm)] px-3 text-xs",
+        md: "h-[var(--control-height)] px-4",
+        lg: "h-[var(--control-height-lg)] px-6",
+        icon: "size-[var(--control-height)]",
       },
     },
     compoundVariants: [

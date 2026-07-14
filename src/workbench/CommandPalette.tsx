@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronRight, Plug, Server } from "lucide-react";
 
-import { Kbd } from "@/components/ui";
+import { Input, Kbd } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
 import { parseQuickConnect } from "@/features/terminal/quick-connect";
 import { useI18n } from "@/i18n";
@@ -23,9 +23,9 @@ export function CommandPalette({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/20 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
         <DialogPrimitive.Content
-          className="fixed left-1/2 top-12 z-50 w-[36rem] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2"
+          className="fixed left-1/2 top-12 z-50 w-[36rem] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-xl border border-border/90 bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2"
           aria-describedby={undefined}
         >
           <DialogPrimitive.Title className="sr-only">
@@ -142,7 +142,7 @@ function PaletteBody({
   return (
     <div className="flex max-h-[24rem] flex-col">
       <div className="border-b border-border p-2">
-        <input
+        <Input
           autoFocus
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -155,7 +155,7 @@ function PaletteBody({
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-sm outline-none placeholder:text-muted-foreground focus:border-ring"
+          className="h-8 bg-background px-2.5"
         />
       </div>
 
@@ -205,7 +205,7 @@ function PaletteRow({
       onPointerMove={onHover}
       onClick={onSelect}
       className={cn(
-        "flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
+        "flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm outline-none",
         highlighted
           ? "bg-list-active text-list-active-foreground"
           : "text-foreground",

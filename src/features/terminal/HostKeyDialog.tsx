@@ -62,7 +62,7 @@ export function HostKeyDialog() {
                 )}
               </p>
 
-              <dl className="flex flex-col gap-2 rounded-md border border-input bg-surface p-3 text-xs">
+              <dl className="flex flex-col gap-2 rounded-lg border border-border bg-card/55 p-3 text-xs">
                 <div className="flex flex-col gap-1">
                   <dt className="text-muted-foreground">
                     {t("hostKey.keyType")}

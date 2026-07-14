@@ -30,6 +30,7 @@ import {
   PANEL_HEADER_ACTION_CLASS,
   PANEL_LIST_ACTION_CLASS,
   PANEL_LIST_CLASS,
+  PANEL_LIST_ICON_CLASS,
   PANEL_LIST_ITEM_CLASS,
 } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
@@ -161,7 +162,7 @@ export function SnippetsView() {
                   onDoubleClick={() => run(snippet)}
                   className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm">
+                  <div className={PANEL_LIST_ICON_CLASS}>
                     <Terminal className="size-4" strokeWidth={1.7} />
                   </div>
                   <div className="min-w-0 flex-1">

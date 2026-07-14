@@ -46,6 +46,9 @@
   --activitybar-width: 3.25rem;
   --panel-gutter: 0.5rem;
   --toolbar-control-size: 1.75rem;
+  --control-height-sm: 2rem;
+  --control-height: 2.25rem;
+  --control-height-lg: 2.5rem;
 
   --elevation-sm:
     0 1px 2px rgba(20, 30, 26, 0.08), 0 4px 12px rgba(20, 30, 26, 0.08);
@@ -148,7 +151,8 @@
   }
 
   :focus-visible {
-    outline: none;
+    outline: 2px solid color-mix(in oklch, var(--color-ring) 75%, transparent);
+    outline-offset: 2px;
   }
 
   :root {
@@ -189,8 +193,8 @@
   }
 
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-thumb {
     background-color: color-mix(
@@ -244,6 +248,66 @@
 }
 
 @layer components {
+  .ui-checkbox {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    border: 1px solid var(--color-input);
+    border-radius: calc(var(--radius) - 6px);
+    background: var(--color-surface);
+    color: var(--color-primary-foreground);
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  .ui-checkbox::before {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    background: currentColor;
+    clip-path: polygon(14% 44%, 0 59%, 38% 96%, 100% 24%, 84% 9%, 37% 72%);
+    transform: scale(0);
+    transition: transform 100ms ease;
+  }
+
+  .ui-checkbox:hover:not(:disabled) {
+    border-color: var(--color-ring);
+  }
+
+  .ui-checkbox:focus-visible {
+    outline: none;
+    border-color: var(--color-ring);
+    box-shadow: 0 0 0 3px
+      color-mix(in oklch, var(--color-ring) 30%, transparent);
+  }
+
+  .ui-checkbox:checked,
+  .ui-checkbox:indeterminate {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+  }
+
+  .ui-checkbox:checked::before {
+    transform: scale(1);
+  }
+
+  .ui-checkbox:indeterminate::before {
+    width: 0.55rem;
+    height: 0.125rem;
+    clip-path: none;
+    transform: scale(1);
+  }
+
+  .ui-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
   .ai-thinking-shimmer {
     display: inline-block;
     color: var(--color-muted-foreground);

@@ -2,19 +2,19 @@ import * as React from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { CONTROL_BASE_CLASS } from "./styles";
 
 export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement>;
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, ...props }, ref) => {
     return (
-      <div className="relative">
+      <div className="relative w-full">
         <select
           ref={ref}
           className={cn(
-            "flex h-9 w-full appearance-none rounded-lg border border-input bg-surface px-3 pr-8 text-sm transition-[border-color,box-shadow]",
-            "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
-            "disabled:cursor-not-allowed disabled:opacity-50",
+            CONTROL_BASE_CLASS,
+            "flex h-[var(--control-height)] appearance-none px-3 pr-8 text-sm",
             className,
           )}
           {...props}

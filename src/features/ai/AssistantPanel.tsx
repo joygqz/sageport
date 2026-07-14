@@ -379,7 +379,7 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
 
           <div className="border-t border-border bg-surface/35 p-3">
-            <div className="overflow-hidden rounded-xl border border-input bg-card shadow-sm transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+            <div className="overflow-hidden rounded-lg border border-input bg-card shadow-sm transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
               <Textarea
                 ref={inputRef}
                 rows={1}

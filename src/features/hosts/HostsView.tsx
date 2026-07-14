@@ -40,6 +40,7 @@ import {
   PANEL_HEADER_ACTION_CLASS,
   PANEL_LIST_ACTION_CLASS,
   PANEL_LIST_CLASS,
+  PANEL_LIST_ICON_CLASS,
   PANEL_LIST_ITEM_CLASS,
   PanelSectionHeader,
 } from "@/workbench/PanelHeader";
@@ -616,7 +617,7 @@ function HostRow({
             dragging && "opacity-50",
           )}
         >
-          <div className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm">
+          <div className={cn(PANEL_LIST_ICON_CLASS, "relative")}>
             <Server className="size-4" strokeWidth={1.7} />
             <Tooltip content={healthTooltip}>
               <span

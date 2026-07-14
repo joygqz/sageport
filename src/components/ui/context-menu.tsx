@@ -2,6 +2,7 @@ import type * as React from "react";
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
 
 import { cn } from "@/lib/utils";
+import { MENU_ITEM_CLASS, POPOVER_CONTENT_CLASS } from "./styles";
 
 function ContextMenu(
   props: React.ComponentProps<typeof ContextMenuPrimitive.Root>,
@@ -37,11 +38,7 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         ref={ref}
         data-slot="context-menu-content"
-        className={cn(
-          "z-50 min-w-[10rem] overflow-hidden rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-md",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          className,
-        )}
+        className={cn(POPOVER_CONTENT_CLASS, className)}
         {...props}
       />
     </ContextMenuPrimitive.Portal>
@@ -62,7 +59,7 @@ function ContextMenuItem({
       ref={ref}
       data-slot="context-menu-item"
       className={cn(
-        "relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+        MENU_ITEM_CLASS,
         destructive && "text-danger focus:bg-danger/10 focus:text-danger",
         className,
       )}

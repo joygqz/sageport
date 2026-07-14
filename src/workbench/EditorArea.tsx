@@ -256,6 +256,7 @@ export function EditorArea() {
           </div>
           <Tooltip content={t("editor.newSession")}>
             <button
+              type="button"
               onClick={() => openPalette("quick")}
               className="mx-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
             >

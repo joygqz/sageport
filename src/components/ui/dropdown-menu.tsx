@@ -3,6 +3,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { MENU_ITEM_CLASS, POPOVER_CONTENT_CLASS } from "./styles";
 
 function DropdownMenu(
   props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>,
@@ -54,9 +55,6 @@ function DropdownMenuRadioGroup(
   );
 }
 
-const contentClasses =
-  "z-50 min-w-[10rem] overflow-hidden rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0";
-
 function DropdownMenuContent({
   className,
   sideOffset = 4,
@@ -71,15 +69,12 @@ function DropdownMenuContent({
         ref={ref}
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
-        className={cn(contentClasses, className)}
+        className={cn(POPOVER_CONTENT_CLASS, className)}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>
   );
 }
-
-const itemClasses =
-  "relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
 
 function DropdownMenuItem({
   className,
@@ -95,7 +90,7 @@ function DropdownMenuItem({
       ref={ref}
       data-slot="dropdown-menu-item"
       className={cn(
-        itemClasses,
+        MENU_ITEM_CLASS,
         destructive && "text-danger focus:bg-danger/10 focus:text-danger",
         className,
       )}
@@ -119,7 +114,7 @@ function DropdownMenuCheckboxItem({
     <DropdownMenuPrimitive.CheckboxItem
       ref={ref}
       data-slot="dropdown-menu-checkbox-item"
-      className={cn(itemClasses, "pl-8", className)}
+      className={cn(MENU_ITEM_CLASS, "pl-8", className)}
       checked={checked}
       {...props}
     >
@@ -145,7 +140,7 @@ function DropdownMenuRadioItem({
     <DropdownMenuPrimitive.RadioItem
       ref={ref}
       data-slot="dropdown-menu-radio-item"
-      className={cn(itemClasses, "pl-8", className)}
+      className={cn(MENU_ITEM_CLASS, "pl-8", className)}
       {...props}
     >
       <span className="absolute left-2 flex size-4 items-center justify-center">
@@ -207,7 +202,7 @@ function DropdownMenuSubTrigger({
     <DropdownMenuPrimitive.SubTrigger
       ref={ref}
       data-slot="dropdown-menu-sub-trigger"
-      className={cn(itemClasses, className)}
+      className={cn(MENU_ITEM_CLASS, className)}
       {...props}
     >
       {children}
@@ -227,7 +222,7 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.SubContent
       ref={ref}
       data-slot="dropdown-menu-sub-content"
-      className={cn(contentClasses, className)}
+      className={cn(POPOVER_CONTENT_CLASS, className)}
       {...props}
     />
   );

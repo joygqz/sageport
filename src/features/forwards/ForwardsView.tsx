@@ -33,6 +33,7 @@ import {
   PANEL_HEADER_ACTION_CLASS,
   PANEL_LIST_ACTION_CLASS,
   PANEL_LIST_CLASS,
+  PANEL_LIST_ICON_CLASS,
   PANEL_LIST_ITEM_CLASS,
 } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
@@ -168,7 +169,8 @@ export function ForwardsView() {
                   <div className={PANEL_LIST_ITEM_CLASS} title={statusMessage}>
                     <div
                       className={cn(
-                        "relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm",
+                        PANEL_LIST_ICON_CLASS,
+                        "relative",
                         active && "bg-success/10 text-success",
                         errored && "bg-danger/10 text-danger",
                       )}

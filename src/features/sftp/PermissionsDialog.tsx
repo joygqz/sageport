@@ -89,7 +89,7 @@ function PermissionsBody({
       submitLabel={t("common.save")}
       pending={saving}
     >
-      <div className="overflow-hidden rounded-md border border-input">
+      <div className="overflow-hidden rounded-lg border border-border bg-card/35">
         <div className="grid grid-cols-[1fr_repeat(3,3.5rem)] items-center border-b border-border bg-surface px-3 py-1.5 text-2xs font-medium text-muted-foreground">
           <span />
           {BITS.map((bit) => (

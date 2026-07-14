@@ -153,7 +153,7 @@ function UpdateStatusCard({
   }
 
   return (
-    <section className="flex flex-wrap items-center gap-3 rounded-lg border border-input bg-surface px-4 py-3">
+    <section className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card/55 px-4 py-3">
       <span
         className={cn(
           "flex size-6 shrink-0 items-center justify-center [&_svg]:size-5",

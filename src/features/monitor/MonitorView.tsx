@@ -194,7 +194,7 @@ function HostCard({
     <button
       onClick={() => setActive(primary.id)}
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-border bg-card/55 p-3 text-left shadow-sm outline-none transition-[background-color,border-color,box-shadow] hover:bg-card focus-visible:ring-2 focus-visible:ring-ring/35",
+        "flex flex-col gap-3 rounded-lg border border-border bg-card/55 p-3 text-left shadow-sm outline-none transition-[background-color,border-color,box-shadow] hover:bg-card focus-visible:ring-2 focus-visible:ring-ring/35",
         active
           ? "border-ring/70 bg-card ring-1 ring-ring/20"
           : "hover:border-input",

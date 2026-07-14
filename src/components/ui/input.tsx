@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { CONTROL_BASE_CLASS } from "./styles";
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
@@ -14,11 +15,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         autoCorrect="off"
         spellCheck={false}
         className={cn(
-          "flex h-9 w-full rounded-lg border border-input bg-surface px-3 py-1 text-sm shadow-[inset_0_1px_1px_color-mix(in_oklch,var(--color-foreground)_4%,transparent)] transition-[border-color,box-shadow]",
-          "placeholder:text-muted-foreground",
-          "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          "aria-[invalid=true]:border-danger aria-[invalid=true]:focus-visible:ring-danger",
+          CONTROL_BASE_CLASS,
+          "flex h-[var(--control-height)] px-3 py-1 text-sm",
           className,
         )}
         {...props}
