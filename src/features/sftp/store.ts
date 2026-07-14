@@ -83,6 +83,7 @@ interface SftpState {
   setRatio: (r: number) => void;
   toggleHidden: () => void;
 
+  ensureLocalTab: (side: PaneSide) => Promise<void>;
   addLocalTab: (side: PaneSide) => Promise<void>;
   addRemoteTab: (side: PaneSide, host: Host) => void;
   reconnectTab: (side: PaneSide, tabId: string) => void;
@@ -143,10 +144,12 @@ export function bridgeSftpEvents(): void {
 }
 
 export const useSftpStore = create<SftpState>((set, get) => {
-  const canAddTab = () => {
+  const canAddTab = (notify = true) => {
     const { left, right } = get().panes;
     if (left.tabs.length + right.tabs.length < MAX_SFTP_TABS) return true;
-    toast.warning(t("sftp.tabLimitReached", { count: MAX_SFTP_TABS }));
+    if (notify) {
+      toast.warning(t("sftp.tabLimitReached", { count: MAX_SFTP_TABS }));
+    }
     return false;
   };
 
@@ -236,6 +239,11 @@ export const useSftpStore = create<SftpState>((set, get) => {
     setRatio: (r) => set({ ratio: Math.max(0, Math.min(r, 1)) }),
 
     toggleHidden: () => set((s) => ({ showHidden: !s.showHidden })),
+
+    ensureLocalTab: async (side) => {
+      if (get().panes[side].tabs.length > 0 || !canAddTab(false)) return;
+      await get().addLocalTab(side);
+    },
 
     addLocalTab: async (side) => {
       if (!canAddTab()) return;

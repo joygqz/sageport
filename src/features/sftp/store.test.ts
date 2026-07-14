@@ -14,6 +14,7 @@ vi.mock("@/lib/ipc", () => ({
 vi.stubGlobal("localStorage", { getItem: vi.fn(() => "en") });
 
 import { ipc } from "@/lib/ipc";
+import { useToastStore } from "@/lib/toast";
 import type { FileEntry, TransferEvent } from "@/types/models";
 import { MAX_SFTP_TABS, useSftpStore, type SftpTab } from "./store";
 
@@ -112,6 +113,8 @@ describe("SFTP tab ordering", () => {
 
 describe("SFTP tab limit", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    useToastStore.setState({ toasts: [] });
     useSftpStore.setState({
       panes: {
         left: {
@@ -134,6 +137,7 @@ describe("SFTP tab limit", () => {
 
     const { left, right } = useSftpStore.getState().panes;
     expect(left.tabs.length + right.tabs.length).toBe(MAX_SFTP_TABS);
+    expect(useToastStore.getState().toasts).toHaveLength(1);
   });
 
   it("allows another tab after one is closed", async () => {
@@ -142,6 +146,29 @@ describe("SFTP tab limit", () => {
 
     const { left, right } = useSftpStore.getState().panes;
     expect(left.tabs.length + right.tabs.length).toBe(MAX_SFTP_TABS);
+  });
+
+  it("silently skips repeated automatic initialization at the limit", async () => {
+    useSftpStore.setState({
+      panes: {
+        left: { tabs: [], activeTabId: null },
+        right: {
+          tabs: Array.from({ length: MAX_SFTP_TABS }, (_, i) =>
+            transferTab(`right-${i}`, `remote-${i}`, `/right-${i}`),
+          ),
+          activeTabId: "right-0",
+        },
+      },
+    });
+
+    await Promise.all([
+      useSftpStore.getState().ensureLocalTab("left"),
+      useSftpStore.getState().ensureLocalTab("left"),
+    ]);
+
+    expect(useSftpStore.getState().panes.left.tabs).toHaveLength(0);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+    expect(ipc.sftp.home).not.toHaveBeenCalled();
   });
 });
 

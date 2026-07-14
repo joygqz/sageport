@@ -21,7 +21,7 @@ export function SftpPanel({ height }: { height: number }) {
   const { t } = useI18n();
   const ratio = useSftpStore((s) => s.ratio);
   const setRatio = useSftpStore((s) => s.setRatio);
-  const addLocalTab = useSftpStore((s) => s.addLocalTab);
+  const ensureLocalTab = useSftpStore((s) => s.ensureLocalTab);
   const showHidden = useSftpStore((s) => s.showHidden);
   const toggleHidden = useSftpStore((s) => s.toggleHidden);
   const setPanelVisible = useLayoutStore((s) => s.setPanelVisible);
@@ -30,10 +30,8 @@ export function SftpPanel({ height }: { height: number }) {
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (useSftpStore.getState().panes.left.tabs.length === 0) {
-      void addLocalTab("left");
-    }
-  }, [addLocalTab]);
+    void ensureLocalTab("left");
+  }, [ensureLocalTab]);
 
   const bodyWidth = () => bodyRef.current?.getBoundingClientRect().width ?? 0;
 
