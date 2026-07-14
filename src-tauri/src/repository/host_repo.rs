@@ -183,6 +183,29 @@ pub async fn move_to_group(
     get(pool, id).await
 }
 
+pub async fn set_os_hint(pool: &SqlitePool, id: &str, os_hint: String) -> AppResult<Host> {
+    let os_hint = os_hint.trim();
+    if os_hint.is_empty() {
+        return Err(AppError::Invalid("host system is required".into()));
+    }
+
+    let ts = now();
+    let affected = sqlx::query(
+        "UPDATE hosts SET os_hint = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND deleted_at IS NULL",
+    )
+    .bind(os_hint)
+    .bind(&ts)
+    .bind(id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("host {id}")));
+    }
+    get(pool, id).await
+}
+
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let ts = now();
     let affected = sqlx::query(

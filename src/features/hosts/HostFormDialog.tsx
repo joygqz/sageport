@@ -134,6 +134,7 @@ function HostFormBody({
       port: values.port,
       groupId: values.groupId || null,
       jumpHostId: values.jumpHostId || null,
+      osHint: host?.osHint ?? null,
       startupCommand: values.startupCommand.trim() || null,
       notes: values.notes.trim() || null,
     };

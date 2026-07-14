@@ -78,6 +78,7 @@ pub fn run() {
             commands::hosts::hosts_get,
             commands::hosts::hosts_create,
             commands::hosts::hosts_update,
+            commands::hosts::hosts_set_os_hint,
             commands::hosts::hosts_move,
             commands::hosts::hosts_delete,
             commands::hosts::hosts_check_health,

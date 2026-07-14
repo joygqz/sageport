@@ -71,6 +71,15 @@ pub async fn hosts_update(
 }
 
 #[tauri::command]
+pub async fn hosts_set_os_hint(
+    state: State<'_, AppState>,
+    id: String,
+    os_hint: String,
+) -> AppResult<Host> {
+    host_repo::set_os_hint(&state.db, &id, os_hint).await
+}
+
+#[tauri::command]
 pub async fn hosts_move(
     state: State<'_, AppState>,
     id: String,

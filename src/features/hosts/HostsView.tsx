@@ -42,7 +42,6 @@ import {
   PANEL_HEADER_ACTION_CLASS,
   PANEL_LIST_ACTION_CLASS,
   PANEL_LIST_CLASS,
-  PANEL_LIST_ICON_CLASS,
   PANEL_LIST_ITEM_CLASS,
   PanelSectionHeader,
 } from "@/workbench/PanelHeader";
@@ -50,6 +49,7 @@ import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { terminalTabs, useTabsStore } from "@/workbench/tabs";
 import { useSftpStore } from "@/features/sftp/store";
+import { useMonitorStore } from "@/features/terminal/monitor";
 import {
   useCheckHostHealth,
   useDeleteGroup,
@@ -57,7 +57,9 @@ import {
   useGroups,
   useHosts,
   useMoveHost,
+  useSetHostOsHint,
 } from "./api";
+import { HostSystemIcon } from "./HostSystemIcon";
 import { SshConfigImportDialog } from "./SshConfigImportDialog";
 
 const UNGROUPED = "__ungrouped__";
@@ -552,11 +554,16 @@ function HostRow({
 }) {
   const { t } = useI18n();
   const openTerminal = useTabsStore((s) => s.openTerminal);
-  const connected = useTabsStore((s) =>
-    terminalTabs(s.tabs).some(
-      (x) => x.hostId === host.id && x.status === "connected",
-    ),
+  const tabs = useTabsStore((s) => s.tabs);
+  const hostSessions = terminalTabs(tabs).filter((x) => x.hostId === host.id);
+  const connected = hostSessions.some((x) => x.status === "connected");
+  const detectedOs = useMonitorStore((s) =>
+    hostSessions
+      .map((session) => s.bySession[session.id]?.stats?.os)
+      .find((os): os is string => Boolean(os)),
   );
+  const { mutate: setHostOsHint, isPending: settingHostOsHint } =
+    useSetHostOsHint();
   const addRemoteTab = useSftpStore((s) => s.addRemoteTab);
   const setPanelVisible = useLayoutStore((s) => s.setPanelVisible);
   const dragRef = useRef<{
@@ -565,6 +572,13 @@ function HostRow({
     startY: number;
     active: boolean;
   } | null>(null);
+
+  useEffect(() => {
+    if (!detectedOs || detectedOs === host.osHint || settingHostOsHint) {
+      return;
+    }
+    setHostOsHint({ id: host.id, osHint: detectedOs });
+  }, [detectedOs, host.id, host.osHint, setHostOsHint, settingHostOsHint]);
 
   const openSftp = () => {
     setPanelVisible(true);
@@ -615,17 +629,17 @@ function HostRow({
     onDragEnd(e.type !== "pointercancel" && drag.active);
   };
 
-  const healthTooltip = connected
-    ? t("hosts.health.connected")
-    : health
-      ? health.status === "online"
-        ? t("hosts.health.online", { ms: health.latencyMs ?? 0 })
-        : t("hosts.health.offline", {
-            reason: t(
-              HEALTH_REASON_KEYS[health.errorKind ?? "unknown"] ??
-                "hosts.health.reason.unknown",
-            ),
-          })
+  const healthTooltip = health
+    ? health.status === "online"
+      ? t("hosts.health.online", { ms: health.latencyMs ?? 0 })
+      : t("hosts.health.offline", {
+          reason: t(
+            HEALTH_REASON_KEYS[health.errorKind ?? "unknown"] ??
+              "hosts.health.reason.unknown",
+          ),
+        })
+    : connected
+      ? t("hosts.health.connected")
       : t("hosts.health.unknown");
 
   return (
@@ -646,9 +660,9 @@ function HostRow({
             dragging && "opacity-50",
           )}
         >
-          <div className={cn(PANEL_LIST_ICON_CLASS, "relative")}>
-            <Server className="size-4" strokeWidth={1.7} />
-            <Tooltip content={healthTooltip}>
+          <Tooltip content={healthTooltip}>
+            <div className="relative shrink-0">
+              <HostSystemIcon os={detectedOs ?? host.osHint} />
               <span
                 className={cn(
                   "absolute -bottom-0.5 -right-0.5 size-[8px] rounded-full ring-2 ring-surface",
@@ -659,8 +673,8 @@ function HostRow({
                       : "bg-muted-foreground/55",
                 )}
               />
-            </Tooltip>
-          </div>
+            </div>
+          </Tooltip>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-foreground">
               {host.label}
@@ -737,9 +751,7 @@ function HostDragGhost({ dragState }: { dragState: HostDragState }) {
         height: dragState.rect.height,
       }}
     >
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-link">
-        <Server className="size-3.5" />
-      </div>
+      <HostSystemIcon os={host.osHint} />
       <div className="min-w-0 flex-1">
         <p className="truncate">{host.label}</p>
         <p className="truncate font-mono text-2xs text-muted-foreground">

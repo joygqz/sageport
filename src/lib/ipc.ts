@@ -69,6 +69,8 @@ export const ipc = {
     create: (input: HostInput) => invoke<Host>("hosts_create", { input }),
     update: (id: string, input: HostInput) =>
       invoke<Host>("hosts_update", { id, input }),
+    setOsHint: (id: string, osHint: string) =>
+      invoke<Host>("hosts_set_os_hint", { id, osHint }),
     move: (id: string, groupId: string | null) =>
       invoke<Host>("hosts_move", { id, groupId }),
     remove: (id: string) => invoke<void>("hosts_delete", { id }),

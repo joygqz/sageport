@@ -76,6 +76,20 @@ export function useMoveHost() {
   });
 }
 
+export function useSetHostOsHint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, osHint }: { id: string; osHint: string }) =>
+      ipc.hosts.setOsHint(id, osHint),
+    onSuccess: (host) => {
+      qc.setQueryData<Host[]>(hostKeys.hosts, (current) =>
+        current?.map((item) => (item.id === host.id ? host : item)),
+      );
+      qc.setQueryData(hostKeys.detail(host.id), host);
+    },
+  });
+}
+
 export function useDeleteHost() {
   const qc = useQueryClient();
   return useMutation({
