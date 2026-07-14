@@ -52,7 +52,8 @@ Sageport brings every tool of routine server work — terminal, file transfer, k
 
 - Drag-and-drop transfer in both directions
 - In-transit archiving for directories with many small files
-- Permissions editor, path bookmarks, and a complete transfer history
+- Back/forward navigation history, path bookmarks, and inline file and folder creation
+- Permissions editor and a complete transfer history
 - Open text files in an editor tab with syntax highlighting and save straight back over SFTP
 
 **Monitoring** — A dedicated sidebar shows live CPU, memory, disk, and network statistics for connected hosts, with a compact summary for the active host in the status bar.
@@ -74,7 +75,7 @@ Sageport brings every tool of routine server work — terminal, file transfer, k
 - Automatic last-write-wins conflict resolution and revision history with restore
 - Encrypted export/import for offline backups
 
-**Interface** — Six full themes (terminal palette included), English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘</kbd> <kbd>P</kbd> / <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd>), and automatic updates.
+**Interface** — Three theme families (Midnight, Graphite, Dracula), each with light and dark variants and a matching terminal palette, switching automatically with the system if you like; English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘</kbd> <kbd>P</kbd> / <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd>), and automatic updates.
 
 ## Installation
 
@@ -117,6 +118,8 @@ pnpm tauri build    # build installers
 
 Additional scripts: `pnpm lint`, `pnpm typecheck`, `pnpm format`, `pnpm test`.
 
+The OAuth-based sync providers (GitHub Gist, Google Drive, OneDrive) require client IDs injected at build time via `SAGEPORT_*` environment variables — see [docs/sync-oauth-setup.md](docs/sync-oauth-setup.md). Without them the app builds and runs normally; those sign-in buttons are simply disabled.
+
 ### Project layout
 
 ```
@@ -144,4 +147,4 @@ Issues and pull requests are welcome.
 
 ## License
 
-[GPL-3.0](LICENSE)
+[GPL-3.0](LICENSE) · [Privacy policy](docs/privacy-policy.md) · [Terms of service](docs/terms-of-service.md)
