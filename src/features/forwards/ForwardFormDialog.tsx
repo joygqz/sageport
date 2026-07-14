@@ -114,14 +114,17 @@ function ForwardFormBody({
           />
         </Field>
         <Field label={t("forwards.host")} required>
-          <Select value={hostId} onChange={(e) => setHostId(e.target.value)}>
-            <option value="">{t("forwards.selectHost")}</option>
-            {hosts.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.label}
-              </option>
-            ))}
-          </Select>
+          <Select
+            value={hostId}
+            onValueChange={setHostId}
+            options={[
+              { value: "", label: t("forwards.selectHost") },
+              ...hosts.map((host) => ({
+                value: host.id,
+                label: host.label,
+              })),
+            ]}
+          />
         </Field>
       </div>
 

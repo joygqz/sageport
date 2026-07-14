@@ -1,6 +1,6 @@
-import { useEffect, type ChangeEvent } from "react";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
 import {
   Field,
@@ -100,6 +100,7 @@ function HostFormBody({
   });
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -197,14 +198,24 @@ function HostFormBody({
           />
         </Field>
         <Field label={t("hostForm.group")}>
-          <Select {...register("groupId")}>
-            <option value="">{t("hostForm.noGroup")}</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </Select>
+          <Controller
+            control={control}
+            name="groupId"
+            render={({ field }) => (
+              <Select
+                value={field.value}
+                onValueChange={field.onChange}
+                onBlur={field.onBlur}
+                options={[
+                  { value: "", label: t("hostForm.noGroup") },
+                  ...groups.map((group) => ({
+                    value: group.id,
+                    label: group.name,
+                  })),
+                ]}
+              />
+            )}
+          />
         </Field>
       </div>
 
@@ -244,24 +255,31 @@ function HostFormBody({
           label={t("hostForm.credentials")}
           hint={useIdentity ? t("hostForm.usingIdentityHint") : undefined}
         >
-          <Select
-            {...register("identityId", {
-              onChange: (e: ChangeEvent<HTMLSelectElement>) => {
-                if (!e.target.value) return;
-                resetField("username");
-                resetField("authType");
-                resetField("password");
-                resetField("keyId");
-              },
-            })}
-          >
-            <option value="">{t("hostForm.customCredentials")}</option>
-            {identities.map((id) => (
-              <option key={id.id} value={id.id}>
-                {id.name} ({id.username})
-              </option>
-            ))}
-          </Select>
+          <Controller
+            control={control}
+            name="identityId"
+            render={({ field }) => (
+              <Select
+                value={field.value}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  if (!value) return;
+                  resetField("username");
+                  resetField("authType");
+                  resetField("password");
+                  resetField("keyId");
+                }}
+                onBlur={field.onBlur}
+                options={[
+                  { value: "", label: t("hostForm.customCredentials") },
+                  ...identities.map((identity) => ({
+                    value: identity.id,
+                    label: `${identity.name} (${identity.username})`,
+                  })),
+                ]}
+              />
+            )}
+          />
         </Field>
       )}
 
@@ -274,11 +292,25 @@ function HostFormBody({
             />
           </Field>
           <Field label={t("hostForm.authentication")}>
-            <Select {...register("authType")}>
-              <option value="password">{t("common.auth.password")}</option>
-              <option value="key">{t("common.auth.key")}</option>
-              <option value="agent">{t("common.auth.agent")}</option>
-            </Select>
+            <Controller
+              control={control}
+              name="authType"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  options={[
+                    {
+                      value: "password",
+                      label: t("common.auth.password"),
+                    },
+                    { value: "key", label: t("common.auth.key") },
+                    { value: "agent", label: t("common.auth.agent") },
+                  ]}
+                />
+              )}
+            />
           </Field>
         </div>
       )}
@@ -301,28 +333,48 @@ function HostFormBody({
           label={t("hostForm.sshKey")}
           hint={keys.length === 0 ? t("hostForm.noKeysHint") : undefined}
         >
-          <Select {...register("keyId")}>
-            <option value="">{t("hostForm.selectKey")}</option>
-            {keys.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.name}
-              </option>
-            ))}
-          </Select>
+          <Controller
+            control={control}
+            name="keyId"
+            render={({ field }) => (
+              <Select
+                value={field.value}
+                onValueChange={field.onChange}
+                onBlur={field.onBlur}
+                options={[
+                  { value: "", label: t("hostForm.selectKey") },
+                  ...keys.map((key) => ({
+                    value: key.id,
+                    label: key.name,
+                  })),
+                ]}
+              />
+            )}
+          />
         </Field>
       )}
 
       <Field label={t("hostForm.jumpHost")} hint={t("hostForm.jumpHostHint")}>
-        <Select {...register("jumpHostId")}>
-          <option value="">{t("hostForm.noJumpHost")}</option>
-          {hosts
-            .filter((h) => h.id !== hostId)
-            .map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.label}
-              </option>
-            ))}
-        </Select>
+        <Controller
+          control={control}
+          name="jumpHostId"
+          render={({ field }) => (
+            <Select
+              value={field.value}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+              options={[
+                { value: "", label: t("hostForm.noJumpHost") },
+                ...hosts
+                  .filter((host) => host.id !== hostId)
+                  .map((host) => ({
+                    value: host.id,
+                    label: host.label,
+                  })),
+              ]}
+            />
+          )}
+        />
       </Field>
 
       <Field

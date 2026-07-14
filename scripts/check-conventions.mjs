@@ -10,13 +10,21 @@ function tracked(glob) {
     .filter(Boolean);
 }
 
-const ipcFiles = tracked("'src/**/*.ts' 'src/**/*.tsx'").filter(
-  (f) => f !== "src/lib/ipc.ts",
-);
+const sourceFiles = tracked("'src/**/*.ts' 'src/**/*.tsx'");
+const ipcFiles = sourceFiles.filter((f) => f !== "src/lib/ipc.ts");
 for (const file of ipcFiles) {
   const text = readFileSync(root + file, "utf8");
   if (/[^.\w]invoke\s*[<(]/.test(text)) {
     problems.push(`${file}: raw invoke() outside src/lib/ipc.ts`);
+  }
+}
+
+for (const file of sourceFiles.filter((file) => file.endsWith(".tsx"))) {
+  const text = readFileSync(root + file, "utf8");
+  if (/<(?:select|option)\b/.test(text)) {
+    problems.push(
+      `${file}: use the shared Select component instead of native select/option elements`,
+    );
   }
 }
 

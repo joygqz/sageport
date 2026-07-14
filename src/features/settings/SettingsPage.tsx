@@ -257,16 +257,14 @@ function AppearanceSection() {
       >
         <Select
           value={locale}
-          onChange={(e) =>
-            setLocale(e.target.value as (typeof LOCALES)[number])
+          onValueChange={(value) =>
+            setLocale(value as (typeof LOCALES)[number])
           }
-        >
-          {LOCALES.map((code) => (
-            <option key={code} value={code}>
-              {LOCALE_LABELS[code]}
-            </option>
-          ))}
-        </Select>
+          options={LOCALES.map((code) => ({
+            value: code,
+            label: LOCALE_LABELS[code],
+          }))}
+        />
       </Field>
 
       <FontField />
@@ -605,14 +603,12 @@ function AiForm({ config }: { config: AiConfig }) {
         <Field label={t("settings.ai.protocolLabel")}>
           <Select
             value={protocol}
-            onChange={(e) => changeProtocol(e.target.value as AiProtocol)}
-          >
-            {AI_PROTOCOLS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {t(`settings.ai.protocol.${p.value}`)}
-              </option>
-            ))}
-          </Select>
+            onValueChange={(value) => changeProtocol(value as AiProtocol)}
+            options={AI_PROTOCOLS.map((item) => ({
+              value: item.value,
+              label: t(`settings.ai.protocol.${item.value}`),
+            }))}
+          />
         </Field>
 
         <Field

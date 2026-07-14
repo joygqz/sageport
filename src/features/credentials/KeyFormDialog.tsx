@@ -141,14 +141,12 @@ function KeyFormBody({ onClose }: { onClose: () => void }) {
           <Field label={t("credentials.keys.algorithmLabel")}>
             <Select
               value={algorithm}
-              onChange={(e) => setAlgorithm(e.target.value as SshKeyAlgorithm)}
-            >
-              {ALGORITHMS.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {t(a.labelKey)}
-                </option>
-              ))}
-            </Select>
+              onValueChange={(value) => setAlgorithm(value as SshKeyAlgorithm)}
+              options={ALGORITHMS.map((item) => ({
+                value: item.value,
+                label: t(item.labelKey),
+              }))}
+            />
           </Field>
           <Field
             label={t("credentials.keys.passphrase")}

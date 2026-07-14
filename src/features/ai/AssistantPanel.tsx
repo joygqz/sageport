@@ -406,21 +406,19 @@ export function AssistantPanel({ width }: { width: number }) {
               />
               <div className="flex items-center gap-1.5 border-t border-input px-1.5 py-1.5">
                 <Select
-                  value={model}
-                  onChange={(e) => changeModel(e.target.value)}
-                  className="h-7 max-w-[10.5rem] border-0 bg-transparent pl-2 pr-7 text-xs hover:bg-accent focus-visible:ring-0"
+                  value={model || undefined}
+                  onValueChange={changeModel}
+                  options={models.map((item) => ({
+                    value: item,
+                    label: item,
+                  }))}
+                  placeholder={t("ai.modelLoading")}
                   title={t("ai.modelLabel")}
-                >
-                  {models.length === 0 ? (
-                    <option value="">{t("ai.modelLoading")}</option>
-                  ) : (
-                    models.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))
-                  )}
-                </Select>
+                  disabled={models.length === 0}
+                  showChevron={false}
+                  className="h-7 w-auto min-w-0 max-w-[70%] border-0 bg-transparent px-2 text-xs hover:bg-accent focus-visible:ring-0"
+                  contentClassName="max-w-[calc(100vw-1.5rem)]"
+                />
                 <div className="ml-auto flex items-center gap-1.5">
                   <ContextMeter
                     tokens={runtime?.contextTokens ?? null}

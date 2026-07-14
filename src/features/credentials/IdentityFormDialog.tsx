@@ -117,12 +117,13 @@ function IdentityFormBody({
       <Field label={t("credentials.identities.authentication")}>
         <Select
           value={authType}
-          onChange={(e) => setAuthType(e.target.value as AuthType)}
-        >
-          <option value="password">{t("common.auth.password")}</option>
-          <option value="key">{t("common.auth.key")}</option>
-          <option value="agent">{t("common.auth.agent")}</option>
-        </Select>
+          onValueChange={(value) => setAuthType(value as AuthType)}
+          options={[
+            { value: "password", label: t("common.auth.password") },
+            { value: "key", label: t("common.auth.key") },
+            { value: "agent", label: t("common.auth.agent") },
+          ]}
+        />
       </Field>
 
       {authType === "password" && (
@@ -149,14 +150,14 @@ function IdentityFormBody({
               : undefined
           }
         >
-          <Select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
-            <option value="">{t("hostForm.selectKey")}</option>
-            {keys.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.name}
-              </option>
-            ))}
-          </Select>
+          <Select
+            value={keyId}
+            onValueChange={setKeyId}
+            options={[
+              { value: "", label: t("hostForm.selectKey") },
+              ...keys.map((key) => ({ value: key.id, label: key.name })),
+            ]}
+          />
         </Field>
       )}
     </FormBody>
