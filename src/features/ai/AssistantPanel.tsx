@@ -18,6 +18,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 import {
   Button,
+  CONTROL_INTERACTION_CLASS,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -359,7 +360,10 @@ export function AssistantPanel({ width }: { width: number }) {
                         type="button"
                         disabled={pending || !model}
                         onClick={() => void sendPrompt(t(suggestion.key))}
-                        className="rounded-lg border border-border bg-card/45 px-3 py-2 text-left text-xs leading-normal text-muted-foreground transition-[background-color,border-color,color] hover:border-input hover:bg-card hover:text-foreground disabled:opacity-50"
+                        className={cn(
+                          "rounded-lg border bg-surface px-3 py-2 text-left text-xs leading-normal text-muted-foreground transition-[background-color,border-color,color] hover:bg-muted hover:text-foreground disabled:opacity-50",
+                          CONTROL_INTERACTION_CLASS,
+                        )}
                       >
                         {t(suggestion.key)}
                       </button>
@@ -385,7 +389,7 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
 
           <div className="border-t border-border bg-surface/35 p-3">
-            <div className="overflow-hidden rounded-lg border border-input bg-card transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+            <div className="overflow-hidden rounded-lg border border-input bg-surface transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
               <Textarea
                 ref={inputRef}
                 rows={1}
@@ -400,7 +404,7 @@ export function AssistantPanel({ width }: { width: number }) {
                 placeholder={t("ai.inputPlaceholder")}
                 className="max-h-40 min-h-0 resize-none rounded-none border-0 bg-transparent py-2.5 focus-visible:ring-0"
               />
-              <div className="flex items-center gap-1.5 border-t border-border px-1.5 py-1.5">
+              <div className="flex items-center gap-1.5 border-t border-input px-1.5 py-1.5">
                 <Select
                   value={model}
                   onChange={(e) => changeModel(e.target.value)}
@@ -478,7 +482,7 @@ function ContinueRun({
   const { t } = useI18n();
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
       <span className="min-w-0 truncate text-xs text-muted-foreground">
         {t("ai.stepLimitReached")}
       </span>

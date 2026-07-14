@@ -145,7 +145,7 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card/55 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
         <Icon className="size-6 shrink-0 text-foreground" />
         <div className="flex min-w-0 flex-1 basis-64 flex-col">
           <span className="text-sm font-medium text-foreground">
@@ -244,7 +244,7 @@ function VersionsCard() {
       )}
 
       {!!versions?.length && (
-        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-card/35">
+        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
           {versions.map((v, idx) => (
             <li
               key={v.id}

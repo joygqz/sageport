@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+import { CONTROL_BORDER_CLASS } from "./styles";
 
 type SegmentedControlProps<T extends string> = Omit<
   HTMLAttributes<HTMLDivElement>,
@@ -22,7 +23,8 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       className={cn(
-        "grid auto-cols-fr grid-flow-col gap-1 rounded-lg border border-border bg-muted/65 p-1",
+        "grid auto-cols-fr grid-flow-col gap-1 rounded-lg border bg-muted/65 p-1",
+        CONTROL_BORDER_CLASS,
         className,
       )}
       {...props}

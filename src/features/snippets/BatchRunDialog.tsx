@@ -110,7 +110,7 @@ function BatchBody({
       </Field>
 
       <Field label={t("snippets.batch.hosts")}>
-        <ScrollArea className="max-h-40 rounded-lg border border-border bg-card/35">
+        <ScrollArea className="max-h-40 rounded-lg border border-border bg-surface">
           {hosts.length === 0 ? (
             <p className="p-3 text-xs text-muted-foreground">
               {t("snippets.batch.noHosts")}
@@ -161,7 +161,7 @@ function ResultRow({ name, result }: { name: string; result: Result }) {
   const body = result.output ?? result.message ?? "";
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card/35">
+    <div className="overflow-hidden rounded-lg border border-border bg-surface">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

@@ -7,7 +7,7 @@
 **A modern SSH workbench — terminal, SFTP, key management, and an AI assistant in one desktop app**
 
 [![Latest release](https://img.shields.io/github/v/release/joygqz/sageport)](https://github.com/joygqz/sageport/releases/latest)
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+[![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB)](https://tauri.app)
 
 [Download](https://github.com/joygqz/sageport/releases/latest) · [Highlights](#highlights) · [Features](#features) · [Quick start](#quick-start) · [Security](#security)
@@ -147,4 +147,4 @@ Issues and pull requests are welcome.
 
 ## License
 
-[GPL-3.0](LICENSE) · [Privacy policy](docs/privacy-policy.md) · [Terms of service](docs/terms-of-service.md)
+[GPL-3.0-only](LICENSE) · [Privacy policy](docs/privacy-policy.md) · [Terms of service](docs/terms-of-service.md)

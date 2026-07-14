@@ -46,7 +46,7 @@ export function AboutSection() {
             {t("settings.about.author")}
             <button
               type="button"
-              className="text-link hover:opacity-80"
+              className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/35"
               onClick={() => void openUrl(AUTHOR_URL)}
             >
               {AUTHOR_NAME}
@@ -78,11 +78,7 @@ function UpdateStatusCard({
   let icon = <RefreshCw />;
   let iconClassName = "text-muted-foreground";
   let action: ReactNode = (
-    <Button
-      variant="secondary"
-      size="sm"
-      onClick={() => void ipc.update.check()}
-    >
+    <Button variant="outline" size="sm" onClick={() => void ipc.update.check()}>
       <RefreshCw />
       {t("settings.about.update.check")}
     </Button>
@@ -153,7 +149,7 @@ function UpdateStatusCard({
   }
 
   return (
-    <section className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card/55 px-4 py-3">
+    <section className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
       <span
         className={cn(
           "flex size-6 shrink-0 items-center justify-center [&_svg]:size-5",

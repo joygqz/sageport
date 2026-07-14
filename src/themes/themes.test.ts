@@ -83,11 +83,30 @@ describe("themes", () => {
         [theme.colors.warning, theme.colors.background, "warning status"],
         [theme.colors.info, theme.colors.background, "info status"],
         [
+          theme.colors.success,
+          theme.colors.surface,
+          "success status on surface",
+        ],
+        [
+          theme.colors.warning,
+          theme.colors.surface,
+          "warning status on surface",
+        ],
+        [theme.colors.info, theme.colors.surface, "info status on surface"],
+        [
           theme.colors.destructiveForeground,
           theme.colors.destructive,
           "destructive control",
         ],
         [theme.colors.danger, theme.colors.background, "danger text"],
+        [theme.colors.danger, theme.colors.surface, "danger text on surface"],
+        [theme.colors.link, theme.colors.surface, "link text on surface"],
+        [theme.colors.link, theme.colors.card, "link text on card"],
+        [
+          theme.colors.secondaryForeground,
+          theme.colors.accent,
+          "secondary control hover",
+        ],
         [
           theme.colors.listActiveForeground,
           theme.colors.listActive,
@@ -101,6 +120,22 @@ describe("themes", () => {
           contrast(foreground, background),
           `${theme.name} ${label}`,
         ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it("keeps interactive boundaries visible on every theme surface", () => {
+    for (const theme of THEMES) {
+      const pairs = [
+        [theme.colors.input, theme.colors.surface, "input boundary"],
+        [theme.colors.ring, theme.colors.surface, "focus indicator"],
+      ] as const;
+
+      for (const [indicator, surface, label] of pairs) {
+        expect(
+          contrast(indicator, surface),
+          `${theme.name} ${label}`,
+        ).toBeGreaterThanOrEqual(3);
       }
     }
   });

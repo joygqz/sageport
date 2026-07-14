@@ -15,6 +15,8 @@ import {
 
 import {
   Button,
+  CONTROL_BORDER_CLASS,
+  CONTROL_FOCUS_CLASS,
   Dialog,
   DialogContent,
   DialogToolbar,
@@ -191,7 +193,7 @@ function SettingsPage({
 
 function AppearanceSection() {
   const { t, locale, setLocale } = useI18n();
-  const { theme, preference, setFamily, setMode } = useTheme();
+  const { preference, setFamily, setMode } = useTheme();
 
   const modes: { value: ThemeMode; label: React.ReactNode }[] = [
     {
@@ -240,7 +242,6 @@ function AppearanceSection() {
               key={family.id}
               family={family}
               active={family.id === preference.familyId}
-              activeAppearance={theme.appearance}
               description={t(THEME_DESCRIPTION_KEYS[family.id])}
               onSelect={() => setFamily(family.id)}
             />
@@ -366,13 +367,11 @@ function ZoomField() {
 function ThemeFamilyCard({
   family,
   active,
-  activeAppearance,
   description,
   onSelect,
 }: {
   family: ThemeFamilyDefinition;
   active: boolean;
-  activeAppearance: ThemeAppearance;
   description: string;
   onSelect: () => void;
 }) {
@@ -382,19 +381,16 @@ function ThemeFamilyCard({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left outline-none transition-[border-color,box-shadow,transform] focus-visible:ring-2 focus-visible:ring-ring/35",
+        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left transition-[border-color,box-shadow,transform]",
+        CONTROL_FOCUS_CLASS,
         active
           ? "border-primary ring-2 ring-primary/25"
-          : "border-border hover:-translate-y-0.5 hover:border-input",
+          : cn(CONTROL_BORDER_CLASS, "hover:-translate-y-0.5"),
       )}
     >
       <div className="grid h-24 grid-cols-2">
         {(["light", "dark"] as const).map((appearance) => (
-          <ThemePreview
-            key={appearance}
-            theme={family.themes[appearance]}
-            emphasized={active && activeAppearance === appearance}
-          />
+          <ThemePreview key={appearance} theme={family.themes[appearance]} />
         ))}
       </div>
       <div className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5">
@@ -418,15 +414,13 @@ function ThemeFamilyCard({
 
 function ThemePreview({
   theme,
-  emphasized,
 }: {
   theme: ThemeFamilyDefinition["themes"][ThemeAppearance];
-  emphasized: boolean;
 }) {
   const { colors, terminal } = theme;
   return (
     <div
-      className="relative flex min-w-0 border-r last:border-r-0"
+      className="flex min-w-0 border-r last:border-r-0"
       style={{
         backgroundColor: terminal.background,
         borderColor: colors.border,
@@ -471,12 +465,6 @@ function ThemePreview({
           style={{ backgroundColor: terminal.foreground }}
         />
       </div>
-      {emphasized && (
-        <span
-          className="pointer-events-none absolute inset-x-1 bottom-1 h-0.5 rounded-full"
-          style={{ backgroundColor: colors.primary }}
-        />
-      )}
     </div>
   );
 }
@@ -657,7 +645,7 @@ function AiForm({ config }: { config: AiConfig }) {
           label={t("settings.ai.autonomousModeLabel")}
           hint={t("settings.ai.autonomousModeHint")}
         >
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card/55 px-3 py-2.5">
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-3 py-2.5">
             <div className="min-w-0">
               <p className="text-sm font-medium">
                 {t("settings.ai.autonomousMode")}
@@ -710,7 +698,7 @@ function AiForm({ config }: { config: AiConfig }) {
 
         <div
           aria-label={t("settings.ai.tools.title")}
-          className="overflow-hidden rounded-lg border border-border bg-card/35"
+          className="overflow-hidden rounded-lg border border-border bg-card"
         >
           {TOOL_GROUPS.map((group) => (
             <ToolTreeGroup

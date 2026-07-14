@@ -121,7 +121,7 @@ function ImportBody({ onClose }: { onClose: () => void }) {
       <p className="text-sm text-muted-foreground">
         {t("hosts.import.description")}
       </p>
-      <div className="overflow-hidden rounded-lg border border-border bg-card/35">
+      <div className="overflow-hidden rounded-lg border border-border bg-surface">
         {entries.map((entry, index) => {
           const on = selected.has(entry.alias);
           return (

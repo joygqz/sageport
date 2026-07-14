@@ -2,15 +2,19 @@ export type ThemeAppearance = "light" | "dark";
 export type ThemeMode = ThemeAppearance | "system";
 
 export interface ThemeColors {
+  /** Primary application canvas. */
   background: string;
   foreground: string;
 
+  /** Persistent chrome and inset control surfaces. */
   surface: string;
   surfaceForeground: string;
 
+  /** Floating menus, dialogs, and overlays. */
   popover: string;
   popoverForeground: string;
 
+  /** Grouped content elevated from the application canvas. */
   card: string;
   cardForeground: string;
 
@@ -35,8 +39,11 @@ export interface ThemeColors {
   warning: string;
   info: string;
 
+  /** Structural divider. */
   border: string;
+  /** Interactive-control boundary. */
   input: string;
+  /** Keyboard-focus indicator. */
   ring: string;
 
   listHover: string;

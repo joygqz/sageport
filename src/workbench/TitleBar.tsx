@@ -1,7 +1,7 @@
 import { PanelBottom, PanelRight, Search } from "lucide-react";
 
 import appLogo from "@/assets/app-logo.svg";
-import { Kbd, Tooltip } from "@/components/ui";
+import { CONTROL_INTERACTION_CLASS, Kbd, Tooltip } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { IS_MACOS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -42,7 +42,10 @@ export function TitleBar() {
       <button
         type="button"
         onClick={() => openPalette("quick")}
-        className="flex h-7 items-center justify-center gap-2 rounded-lg border border-border bg-background/65 px-2.5 text-xs text-muted-foreground outline-none transition-[background-color,border-color,color,box-shadow] hover:border-input hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+        className={cn(
+          "flex h-7 items-center justify-center gap-2 rounded-lg border bg-background/65 px-2.5 text-xs text-muted-foreground transition-[background-color,border-color,color,box-shadow] hover:bg-background hover:text-foreground",
+          CONTROL_INTERACTION_CLASS,
+        )}
       >
         <Search className="size-3.5 shrink-0" />
         <span className="truncate">{t("titleBar.commandCenter")}</span>

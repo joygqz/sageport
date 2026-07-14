@@ -782,7 +782,7 @@ function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
         setValue(displayedPath);
         scrollToEnd();
       }}
-      className="ml-1 h-7 min-w-0 flex-1 rounded-lg border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:border-input hover:bg-surface/50 focus-visible:bg-surface focus-visible:text-foreground"
+      className="ml-1 h-7 min-w-0 flex-1 rounded-lg border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-surface/50 focus-visible:bg-surface focus-visible:text-foreground"
     />
   );
 }

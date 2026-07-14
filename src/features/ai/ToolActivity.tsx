@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CONTROL_INTERACTION_CLASS } from "@/components/ui/styles";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { AgentLogItem, ToolStatus } from "./transcript";
@@ -115,7 +116,7 @@ export function ToolActivity({
   );
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card/55 text-xs">
+    <div className="overflow-hidden rounded-lg border border-border bg-card text-xs">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
@@ -216,7 +217,7 @@ export function QuestionPrompt({
   const selected = options.find((o) => item.result === selectionResult(o));
 
   return (
-    <div className="space-y-1.5 rounded-lg border border-border bg-card/55 p-2.5">
+    <div className="space-y-1.5 rounded-lg border border-border bg-card p-2.5">
       <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
         {question}
       </p>
@@ -230,7 +231,10 @@ export function QuestionPrompt({
             className={cn(
               "flex items-center gap-2 rounded-md border px-3 py-1.5 text-left text-xs transition-colors",
               awaiting
-                ? "border-input text-foreground hover:border-ring hover:bg-accent"
+                ? cn(
+                    CONTROL_INTERACTION_CLASS,
+                    "text-foreground hover:bg-accent",
+                  )
                 : option === selected
                   ? "border-primary/50 bg-accent/60 text-foreground"
                   : "border-input text-muted-foreground opacity-60",

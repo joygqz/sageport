@@ -10,7 +10,11 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/ui";
+import {
+  CONTROL_BORDER_CLASS,
+  CONTROL_FOCUS_CLASS,
+  EmptyState,
+} from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
 import {
   bridgeMonitorEvents,
@@ -184,10 +188,11 @@ function HostCard({
       type="button"
       onClick={() => setActive(primary.id)}
       className={cn(
-        "flex flex-col gap-3 rounded-lg border border-border bg-card/55 p-3 text-left outline-none transition-[background-color,border-color,box-shadow] hover:bg-card focus-visible:ring-2 focus-visible:ring-ring/35",
+        "flex flex-col gap-3 rounded-lg border bg-card p-3 text-left transition-[background-color,border-color,box-shadow] hover:bg-muted",
+        CONTROL_FOCUS_CLASS,
         active
           ? "border-ring/70 bg-card ring-1 ring-ring/20"
-          : "hover:border-input",
+          : CONTROL_BORDER_CLASS,
       )}
     >
       <div className="flex w-full flex-col gap-0.5">
@@ -310,7 +315,7 @@ function Meter({
         </span>
         <span className="tabular-nums">{percent}%</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted-foreground/15">
         <div
           className={cn(
             "h-full rounded-full transition-[width] duration-500",

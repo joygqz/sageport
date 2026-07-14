@@ -23,3 +23,4 @@ export * from "./section-header";
 export * from "./segmented-control";
 export * from "./select";
 export * from "./resize-handle";
+export * from "./styles";

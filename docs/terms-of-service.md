@@ -6,11 +6,11 @@ Please read these terms carefully before using Sageport. By installing, running,
 
 ## 1. About the Application
 
-Sageport is an open-source desktop SSH workbench that integrates a terminal, SFTP file transfer, host and credential management, command snippets, port forwarding, and an optional AI assistant. The Application is open source under [GPL-3.0](https://github.com/joygqz/sageport/blob/main/LICENSE); its source code is available for inspection and modification in the [GitHub repository](https://github.com/joygqz/sageport).
+Sageport is an open-source desktop SSH workbench that integrates a terminal, SFTP file transfer, host and credential management, command snippets, port forwarding, and an optional AI assistant. The Application is open source under [GPL-3.0-only](https://github.com/joygqz/sageport/blob/main/LICENSE); its source code is available for inspection and modification in the [GitHub repository](https://github.com/joygqz/sageport).
 
 ## 2. License to use
 
-Subject to the terms of the GPL-3.0 license, you may freely download, install, use, copy, modify, and distribute the Application. The specific terms of GPL-3.0 govern, as set out in the [LICENSE](https://github.com/joygqz/sageport/blob/main/LICENSE) file; in the event of any conflict between this document and the LICENSE file, the LICENSE file controls.
+Subject to the terms of the GPL-3.0-only license, you may freely download, install, use, copy, modify, and distribute the Application. The specific terms of GPL-3.0-only govern, as set out in the [LICENSE](https://github.com/joygqz/sageport/blob/main/LICENSE) file; in the event of any conflict between this document and the LICENSE file, the LICENSE file controls.
 
 ## 3. Your responsibilities
 

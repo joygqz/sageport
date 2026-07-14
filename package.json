@@ -3,6 +3,7 @@
   "private": true,
   "version": "2.1.2",
   "author": "Quincy Zhang",
+  "license": "GPL-3.0-only",
   "type": "module",
   "packageManager": "pnpm@11.9.0",
   "scripts": {

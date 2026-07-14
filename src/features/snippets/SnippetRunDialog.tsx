@@ -78,7 +78,7 @@ function RunBody({
           />
         </Field>
       ))}
-      <div className="rounded-lg border border-border bg-card/55 p-3">
+      <div className="rounded-lg border border-border bg-surface p-3">
         <p className="whitespace-pre-wrap break-all font-mono text-xs text-muted-foreground">
           {preview}
         </p>

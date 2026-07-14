@@ -121,7 +121,7 @@ export function TransferHistoryDialog({
 
         {!isLoading && !!entries?.length && (
           <ScrollArea className="min-h-0 flex-1">
-            <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-card/35">
+            <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
               {entries.map((e) => (
                 <li
                   key={e.id}
