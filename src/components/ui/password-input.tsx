@@ -28,7 +28,7 @@ export const PasswordInput = React.forwardRef<
         onClick={() => setVisible((v) => !v)}
         aria-label={t(visible ? "common.hidePassword" : "common.showPassword")}
         aria-pressed={visible}
-        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-lg text-muted-foreground outline-none transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+        className="absolute inset-y-px right-px flex w-9 items-center justify-center rounded-r-[calc(var(--radius)-1px)] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
       >
         <Icon className="size-4" />
       </button>
