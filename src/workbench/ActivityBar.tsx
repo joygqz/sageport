@@ -35,7 +35,6 @@ export function ActivityBar() {
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
   const selectActivity = useLayoutStore((s) => s.selectActivity);
   const openSettings = useOverlayStore((s) => s.openSettings);
-  const settingsActive = useOverlayStore((s) => s.overlay?.type === "settings");
 
   return (
     <nav className="flex w-[var(--activitybar-width)] shrink-0 flex-col items-center justify-between border-r border-border bg-surface/95 py-2">
@@ -70,13 +69,8 @@ export function ActivityBar() {
           type="button"
           onClick={() => openSettings()}
           aria-label={t("activityBar.settings")}
-          aria-pressed={settingsActive}
-          className={cn(
-            ACTIVITY_BUTTON_CLASS,
-            settingsActive
-              ? WORKBENCH_ITEM_ACTIVE_CLASS
-              : WORKBENCH_ITEM_INACTIVE_CLASS,
-          )}
+          aria-haspopup="dialog"
+          className={cn(ACTIVITY_BUTTON_CLASS, WORKBENCH_ITEM_INACTIVE_CLASS)}
         >
           <Settings className="size-5" strokeWidth={1.75} />
         </button>
