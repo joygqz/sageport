@@ -311,7 +311,7 @@ export function EditorArea() {
 
 function EditorLoading() {
   return (
-    <div className="flex h-full items-center justify-center bg-background">
+    <div className="flex h-full items-center justify-center bg-terminal-background">
       <Spinner />
     </div>
   );
@@ -429,8 +429,8 @@ function TabItem({
         "touch-none select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
         dragged && "opacity-50",
         active
-          ? "z-10 bg-background font-medium text-foreground before:absolute before:inset-x-2 before:top-0 before:h-0.5 before:rounded-b-full before:bg-primary after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-background"
-          : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
+          ? "z-10 bg-terminal-background font-medium text-foreground before:absolute before:inset-x-2 before:top-0 before:h-0.5 before:rounded-b-full before:bg-primary after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-terminal-background"
+          : "text-muted-foreground hover:bg-terminal-background/60 hover:text-foreground",
       )}
     >
       {tab.kind === "terminal" ? (
@@ -439,7 +439,7 @@ function TabItem({
           <span
             className={cn(
               "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2",
-              active ? "ring-background" : "ring-surface",
+              active ? "ring-terminal-background" : "ring-surface",
               statusDot[tab.status],
             )}
           />
@@ -489,7 +489,7 @@ function TabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[100] flex items-center gap-2 border border-border bg-background px-3 text-xs text-foreground opacity-90 shadow-lg"
+      className="pointer-events-none fixed z-[100] flex items-center gap-2 border border-border bg-terminal-background px-3 text-xs text-foreground opacity-90 shadow-lg"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -502,7 +502,7 @@ function TabDragGhost({
           <TerminalSquare className="size-3.5" />
           <span
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-background",
+              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-terminal-background",
               statusDot[tab.status],
             )}
           />

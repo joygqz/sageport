@@ -57,7 +57,7 @@ function selectionSearchText(editor: CodeEditorInstance) {
 
 export function FileEditor({ tab }: { tab: FileTab }) {
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-terminal-background">
       <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-2 border-b border-border px-3">
         {tab.connectionId ? (
           <Server className="size-3.5 shrink-0 text-muted-foreground" />
