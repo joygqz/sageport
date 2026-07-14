@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronRight, Plug, Server } from "lucide-react";
 
-import { Input, Kbd } from "@/components/ui";
+import { DialogOverlay, Input, Kbd } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
 import { parseQuickConnect } from "@/features/terminal/quick-connect";
 import { useI18n } from "@/i18n";
@@ -25,7 +25,7 @@ export function CommandPalette({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/35 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <DialogOverlay />
         <DialogPrimitive.Content
           className="fixed left-1/2 top-12 z-50 w-[36rem] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-xl border border-border/90 bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2"
           aria-describedby={undefined}

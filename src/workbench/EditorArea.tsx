@@ -25,6 +25,7 @@ import { focusTerminal } from "@/features/terminal/sessions";
 import { useOverlayStore } from "./overlays";
 import { getTabDropTarget } from "./tab-drag";
 import {
+  STATUS_DOT_CLASS,
   WORKBENCH_TAB_ACTIVE_CLASS,
   WORKBENCH_TAB_CLASS,
   WORKBENCH_TAB_CLOSE_CLASS,
@@ -37,7 +38,6 @@ import {
   useTabsStore,
   type EditorTab,
   type FileTab,
-  type TerminalStatus,
 } from "./tabs";
 
 const FileEditor = lazy(() =>
@@ -51,14 +51,6 @@ const TerminalEditor = lazy(() =>
     default: module.TerminalEditor,
   })),
 );
-
-const statusDot: Record<TerminalStatus, string> = {
-  idle: "bg-muted-foreground/40",
-  connecting: "bg-warning animate-pulse",
-  connected: "bg-success",
-  closed: "bg-muted-foreground/40",
-  error: "bg-destructive",
-};
 
 interface TabDragPointer {
   clientX: number;
@@ -269,7 +261,7 @@ export function EditorArea() {
             <button
               type="button"
               onClick={() => openPalette("quick")}
-              className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
             >
               <Plus className="size-4" />
             </button>
@@ -453,9 +445,9 @@ function TabItem({
           <TerminalSquare className="size-3.5" />
           <span
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2",
+              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2",
               "ring-[var(--tab-background)]",
-              statusDot[tab.status],
+              STATUS_DOT_CLASS[tab.status],
             )}
           />
         </span>
@@ -505,7 +497,7 @@ function TabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-lg border border-border bg-list-active px-2.5 text-xs text-list-active-foreground opacity-90 shadow-lg"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-lg border border-border bg-list-active px-2.5 text-xs text-list-active-foreground opacity-90 shadow-md"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -518,8 +510,8 @@ function TabDragGhost({
           <TerminalSquare className="size-3.5" />
           <span
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2 ring-list-active",
-              statusDot[tab.status],
+              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-list-active",
+              STATUS_DOT_CLASS[tab.status],
             )}
           />
         </span>

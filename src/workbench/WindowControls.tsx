@@ -25,7 +25,7 @@ export function WindowControls() {
   }, []);
 
   const buttonClass =
-    "flex h-full w-11 items-center justify-center text-surface-foreground/70 outline-none transition-colors hover:bg-black/[0.06] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 dark:hover:bg-white/10";
+    "flex h-full w-11 items-center justify-center text-surface-foreground/70 outline-none transition-colors hover:bg-black/[0.06] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35 dark:hover:bg-white/10";
 
   return (
     <div className="flex h-full items-center">

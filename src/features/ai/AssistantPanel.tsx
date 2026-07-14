@@ -261,15 +261,15 @@ export function AssistantPanel({ width }: { width: number }) {
                       sessions.map((s) => (
                         <DropdownMenuItem
                           key={s.id}
-                          className={cn(
-                            "gap-1.5",
-                            s.id === activeId && "bg-accent/70",
-                          )}
+                          className="gap-1.5"
                           onSelect={() => void openSession(s.id)}
                         >
                           <span className="min-w-0 flex-1 truncate">
                             {s.title || t("ai.untitledChat")}
                           </span>
+                          {s.id === activeId && (
+                            <Check className="size-3.5 shrink-0 text-link" />
+                          )}
                           <button
                             type="button"
                             aria-label={t(

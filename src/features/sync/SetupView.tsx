@@ -94,8 +94,8 @@ export function SetupView({ status }: { status: SyncStatus }) {
               className={cn(
                 "flex min-w-0 flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors",
                 active
-                  ? "border-primary bg-list-active/40 ring-1 ring-primary/40"
-                  : "border-input hover:border-ring hover:bg-list-hover",
+                  ? "border-primary bg-list-active/40 ring-2 ring-primary/25"
+                  : "border-border hover:border-input hover:bg-list-hover",
               )}
             >
               <Icon className="size-5 text-foreground" />

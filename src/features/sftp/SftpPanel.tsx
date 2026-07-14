@@ -172,7 +172,7 @@ function TransferStrip() {
             <div className="h-1 min-w-16 flex-1 overflow-hidden rounded-full bg-muted">
               <div
                 className={cn(
-                  "h-full rounded-full bg-primary transition-all",
+                  "h-full rounded-full bg-primary transition-[width]",
                   indeterminate && "animate-pulse",
                 )}
                 style={{ width: `${indeterminate ? 100 : pct}%` }}

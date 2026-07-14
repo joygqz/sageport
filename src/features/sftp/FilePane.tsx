@@ -39,6 +39,7 @@ import type { FileEntry } from "@/types/models";
 import { useHosts } from "@/features/hosts/api";
 import { getTabDropTarget } from "@/workbench/tab-drag";
 import {
+  STATUS_DOT_CLASS,
   WORKBENCH_COMPACT_TAB_STRIP_GUTTER_CLASS,
   WORKBENCH_TAB_ACTIVE_CLASS,
   WORKBENCH_TAB_CLASS,
@@ -55,16 +56,7 @@ import {
   useSftpStore,
   type PaneSide,
   type SftpTab,
-  type TabStatus,
 } from "./store";
-
-const statusColor: Record<TabStatus, string> = {
-  idle: "bg-muted-foreground/40",
-  connecting: "bg-warning animate-pulse",
-  connected: "bg-success",
-  closed: "bg-muted-foreground/40",
-  error: "bg-destructive",
-};
 
 interface SftpTabDragPointer {
   clientX: number;
@@ -683,8 +675,8 @@ function SftpTabItem({
         )}
         <span
           className={cn(
-            "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2 ring-[var(--tab-background)]",
-            statusColor[tab.status],
+            "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-[var(--tab-background)]",
+            STATUS_DOT_CLASS[tab.status],
           )}
         />
       </span>
@@ -722,7 +714,7 @@ function SftpTabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-1.5 rounded-lg border border-border bg-list-active px-2 text-xs text-list-active-foreground opacity-90 shadow-lg"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-1.5 rounded-lg border border-border bg-list-active px-2 text-xs text-list-active-foreground opacity-90 shadow-md"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -738,8 +730,8 @@ function SftpTabDragGhost({
         )}
         <span
           className={cn(
-            "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2 ring-list-active",
-            statusColor[tab.status],
+            "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-list-active",
+            STATUS_DOT_CLASS[tab.status],
           )}
         />
       </span>

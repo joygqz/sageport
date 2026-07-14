@@ -147,23 +147,23 @@ export function ToolActivity({
                   </span>
                 </div>
               )}
-              <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
+              <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
                 {command}
               </pre>
             </>
           )}
           {!command && transfer && (
-            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
+            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
               {transfer}
             </pre>
           )}
           {!command && !transfer && path && (
-            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-[0.7rem] text-terminal-foreground">
+            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
               {path}
             </pre>
           )}
           {details && (
-            <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap rounded bg-muted/60 p-1.5 font-mono text-[0.7rem] text-muted-foreground">
+            <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap rounded bg-muted/60 p-1.5 font-mono text-2xs text-muted-foreground">
               {details}
             </pre>
           )}
@@ -193,7 +193,7 @@ export function ToolActivity({
             </div>
           )}
           {item.result && (
-            <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap font-mono text-[0.7rem] text-muted-foreground">
+            <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap font-mono text-2xs text-muted-foreground">
               {item.result}
             </pre>
           )}

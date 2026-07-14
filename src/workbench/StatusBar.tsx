@@ -18,20 +18,8 @@ import { useSftpStore } from "@/features/sftp/store";
 import { useUpdateStatus } from "@/features/updates/api";
 import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
-import {
-  targetTerminalId,
-  terminalTabs,
-  useTabsStore,
-  type TerminalStatus,
-} from "./tabs";
-
-const statusDot: Record<TerminalStatus, string> = {
-  idle: "bg-muted-foreground/40",
-  connecting: "bg-warning animate-pulse",
-  connected: "bg-success",
-  closed: "bg-muted-foreground/40",
-  error: "bg-destructive",
-};
+import { STATUS_DOT_CLASS } from "./tab-styles";
+import { targetTerminalId, terminalTabs, useTabsStore } from "./tabs";
 
 export function StatusBar() {
   const { t } = useI18n();
@@ -91,8 +79,8 @@ function SessionItem() {
     <StatusBarItem onClick={() => setActive(session.id)}>
       <span
         className={cn(
-          "size-[6px] shrink-0 rounded-full",
-          statusDot[session.status],
+          "size-1.5 shrink-0 rounded-full",
+          STATUS_DOT_CLASS[session.status],
         )}
       />
       <span className="max-w-48 truncate">{session.title}</span>

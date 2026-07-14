@@ -150,7 +150,7 @@ function SettingsPage({
                   aria-current={active ? "page" : undefined}
                   onClick={() => onSectionChange(item.id)}
                   className={cn(
-                    "flex h-[var(--control-height)] shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:w-full",
+                    "flex h-[var(--control-height)] shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35 sm:w-full",
                     active
                       ? "bg-list-active font-medium text-list-active-foreground"
                       : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
@@ -382,7 +382,7 @@ function ThemeFamilyCard({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left outline-none transition-[border-color,box-shadow,transform] focus-visible:ring-2 focus-visible:ring-ring/40",
+        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left outline-none transition-[border-color,box-shadow,transform] focus-visible:ring-2 focus-visible:ring-ring/35",
         active
           ? "border-primary ring-2 ring-primary/25"
           : "border-border hover:-translate-y-0.5 hover:border-input",
@@ -767,7 +767,7 @@ function ToolTreeGroup({
           onClick={onToggleExpanded}
           aria-expanded={expanded}
           aria-label={groupLabel}
-          className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
         >
           <ChevronRight
             className={cn(
@@ -787,7 +787,7 @@ function ToolTreeGroup({
           type="button"
           onClick={onToggleExpanded}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
         >
           <span className="min-w-0 flex-1 truncate text-xs font-medium">
             {groupLabel}

@@ -23,20 +23,8 @@ import type { Host, HostStats } from "@/types/models";
 import { PanelContent } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
-import {
-  terminalTabs,
-  useTabsStore,
-  type TerminalStatus,
-  type TerminalTab,
-} from "@/workbench/tabs";
-
-const statusDot: Record<TerminalStatus, string> = {
-  idle: "bg-muted-foreground/40",
-  connecting: "bg-warning animate-pulse",
-  connected: "bg-success",
-  closed: "bg-muted-foreground/40",
-  error: "bg-destructive",
-};
+import { STATUS_DOT_CLASS } from "@/workbench/tab-styles";
+import { terminalTabs, useTabsStore, type TerminalTab } from "@/workbench/tabs";
 
 export function MonitorView() {
   const { t } = useI18n();
@@ -208,8 +196,8 @@ function HostCard({
             <Gauge className="size-4" strokeWidth={1.7} />
             <span
               className={cn(
-                "absolute -bottom-0.5 -right-0.5 size-[8px] rounded-full ring-2 ring-card",
-                statusDot[connected ? "connected" : primary.status],
+                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card",
+                STATUS_DOT_CLASS[connected ? "connected" : primary.status],
               )}
             />
           </div>

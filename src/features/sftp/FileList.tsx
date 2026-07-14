@@ -666,7 +666,7 @@ function FileDragGhost({ dragState }: { dragState: FileDragState }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[100] flex flex-col gap-1"
+      className="pointer-events-none fixed z-[1001] flex flex-col gap-1"
       style={layout}
     >
       {previewEntries.map((entry, index) => (

@@ -1,5 +1,16 @@
 export const WORKBENCH_TAB_CLASS =
-  "group relative flex shrink-0 cursor-pointer touch-none select-none items-center rounded-lg bg-[var(--tab-background)] text-xs outline-none [--tab-background:var(--color-surface)] transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45";
+  "group relative flex shrink-0 cursor-pointer touch-none select-none items-center rounded-lg bg-[var(--tab-background)] text-xs outline-none [--tab-background:var(--color-surface)] transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35";
+
+export const STATUS_DOT_CLASS: Record<
+  "idle" | "connecting" | "connected" | "closed" | "error",
+  string
+> = {
+  idle: "bg-muted-foreground/40",
+  connecting: "bg-warning animate-pulse",
+  connected: "bg-success",
+  closed: "bg-muted-foreground/40",
+  error: "bg-destructive",
+};
 
 export const WORKBENCH_TAB_STRIP_GUTTER_CLASS = "p-1.5";
 

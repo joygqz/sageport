@@ -96,7 +96,7 @@ export function FindToggleButton({
       variant="ghost"
       className={cn(
         findButtonClass,
-        active && "bg-accent text-accent-foreground",
+        active && "bg-list-active text-list-active-foreground",
       )}
       aria-label={label}
       aria-pressed={active}

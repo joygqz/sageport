@@ -27,7 +27,7 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
 ];
 
 const ACTIVITY_BUTTON_CLASS =
-  "flex size-9 items-center justify-center rounded-lg outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45";
+  "flex size-9 items-center justify-center rounded-lg outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35";
 
 export function ActivityBar() {
   const { t } = useI18n();
