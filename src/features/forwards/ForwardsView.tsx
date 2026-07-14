@@ -198,7 +198,7 @@ export function ForwardsView() {
                       <Network className="size-4" strokeWidth={1.7} />
                       <Circle
                         className={cn(
-                          "absolute -bottom-0.5 -right-0.5 size-2 fill-current ring-2 ring-surface",
+                          "absolute -bottom-0.5 -right-0.5 size-2 fill-current ring-2 ring-surface group-hover:ring-list-hover group-focus-within:ring-list-hover",
                           active
                             ? "text-success"
                             : errored
