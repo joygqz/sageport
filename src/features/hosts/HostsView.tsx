@@ -368,7 +368,7 @@ export function HostsView() {
         />
       }
     >
-      <PanelContent className="space-y-1">
+      <PanelContent className="space-y-[var(--panel-gutter)]">
         {isLoading ? null : sections.length === 0 ? (
           <EmptyState
             icon={Server}

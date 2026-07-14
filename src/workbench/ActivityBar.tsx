@@ -49,12 +49,6 @@ export function ActivityBar() {
                     : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
                 )}
               >
-                <span
-                  className={cn(
-                    "absolute inset-y-2 -left-2 w-0.5 rounded-r-full bg-primary transition-opacity",
-                    active ? "opacity-100" : "opacity-0",
-                  )}
-                />
                 <Icon className="size-5" strokeWidth={1.75} />
               </button>
             </Tooltip>

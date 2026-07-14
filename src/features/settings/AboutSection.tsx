@@ -76,7 +76,7 @@ function UpdateStatusCard({
   let title = t("settings.about.update.title");
   let description = t("settings.about.update.idle");
   let icon = <RefreshCw />;
-  let iconClassName = "bg-secondary text-muted-foreground";
+  let iconClassName = "text-muted-foreground";
   let action: ReactNode = (
     <Button
       variant="secondary"
@@ -94,7 +94,7 @@ function UpdateStatusCard({
       version: __APP_VERSION__,
     });
     icon = <RefreshCw className="animate-spin" />;
-    iconClassName = "bg-primary/15 text-link";
+    iconClassName = "text-link";
     action = null;
   } else if (state.status === "up-to-date") {
     title = t("settings.about.update.upToDate");
@@ -102,14 +102,14 @@ function UpdateStatusCard({
       version: __APP_VERSION__,
     });
     icon = <CheckCircle2 />;
-    iconClassName = "bg-success/15 text-success";
+    iconClassName = "text-success";
   } else if (state.status === "available") {
     title = t("settings.about.update.available", { version: state.version });
     description =
       state.body ??
       t("settings.about.update.currentVersion", { version: __APP_VERSION__ });
     icon = <Sparkles />;
-    iconClassName = "bg-primary/15 text-link";
+    iconClassName = "text-link";
     action = canSelfUpdate ? (
       <Button size="sm" onClick={() => void ipc.update.install()}>
         <Download />
@@ -132,13 +132,13 @@ function UpdateStatusCard({
             percent: progress,
           });
     icon = <Download />;
-    iconClassName = "bg-primary/15 text-link";
+    iconClassName = "text-link";
     action = null;
   } else if (state.status === "ready") {
     title = t("settings.about.update.ready", { version: state.version });
     description = t("settings.about.update.restartHint");
     icon = <CheckCircle2 />;
-    iconClassName = "bg-success/15 text-success";
+    iconClassName = "text-success";
     action = (
       <Button size="sm" onClick={() => void relaunch()}>
         <RefreshCw />
@@ -149,59 +149,52 @@ function UpdateStatusCard({
     title = t("settings.about.update.errorTitle");
     description = state.message;
     icon = <CircleAlert />;
-    iconClassName = "bg-danger/15 text-danger";
+    iconClassName = "text-danger";
   }
 
   return (
-    <section className="rounded-xl border border-input bg-card/35 p-4">
-      <div className="flex items-center gap-3">
-        <span
+    <section className="flex flex-wrap items-center gap-3 rounded-lg border border-input bg-surface px-4 py-3">
+      <span
+        className={cn(
+          "flex size-6 shrink-0 items-center justify-center [&_svg]:size-5",
+          iconClassName,
+        )}
+        aria-hidden="true"
+      >
+        {icon}
+      </span>
+
+      <div className="flex min-w-0 flex-1 basis-64 flex-col">
+        <h4 className="text-sm font-medium text-foreground">{title}</h4>
+        <p
           className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-lg [&_svg]:size-[1.125rem]",
-            iconClassName,
+            "mt-0.5 whitespace-pre-line text-xs leading-relaxed text-muted-foreground",
+            state.status === "error" && "select-text text-danger",
           )}
-          aria-hidden="true"
         >
-          {icon}
-        </span>
+          {description}
+        </p>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex min-h-9 items-center justify-between gap-4">
-            <div className="min-w-0 pt-0.5">
-              <h4 className="text-sm font-medium text-foreground">{title}</h4>
-              <p
-                className={cn(
-                  "mt-0.5 whitespace-pre-line text-xs leading-relaxed text-muted-foreground",
-                  state.status === "error" && "select-text text-danger",
-                )}
-              >
-                {description}
-              </p>
-            </div>
-            {action && <div className="shrink-0">{action}</div>}
-          </div>
-
-          {state.status === "downloading" && (
+        {state.status === "downloading" && (
+          <div
+            className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress ?? undefined}
+          >
             <div
-              className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progress ?? undefined}
-            >
-              <div
-                className={cn(
-                  "h-full rounded-full bg-primary transition-[width] duration-300",
-                  progress === null && "w-1/3 animate-pulse",
-                )}
-                style={
-                  progress === null ? undefined : { width: `${progress}%` }
-                }
-              />
-            </div>
-          )}
-        </div>
+              className={cn(
+                "h-full rounded-full bg-primary transition-[width] duration-300",
+                progress === null && "w-1/3 animate-pulse",
+              )}
+              style={progress === null ? undefined : { width: `${progress}%` }}
+            />
+          </div>
+        )}
       </div>
+
+      {action && <div className="shrink-0">{action}</div>}
     </section>
   );
 }

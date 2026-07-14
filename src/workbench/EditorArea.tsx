@@ -227,7 +227,7 @@ export function EditorArea() {
           <div
             role="tablist"
             aria-label={t("editor.tabList")}
-            className="flex h-full"
+            className="flex h-full items-center gap-1 px-1"
           >
             {tabs.map((tab) => (
               <TabItem
@@ -425,11 +425,11 @@ function TabItem({
         if (e.button === 1) onClose();
       }}
       className={cn(
-        "group relative flex h-full w-44 shrink-0 cursor-pointer items-center gap-2 border-r border-border px-3 text-xs transition-colors",
-        "touch-none select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+        "group relative flex h-[calc(var(--workbench-bar-height)-0.5rem)] w-44 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3 text-xs transition-[background-color,color,box-shadow]",
+        "touch-none select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
         dragged && "opacity-50",
         active
-          ? "z-10 bg-terminal-background font-medium text-foreground before:absolute before:inset-x-2 before:top-0 before:h-0.5 before:rounded-b-full before:bg-primary after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-terminal-background"
+          ? "z-10 bg-terminal-background font-medium text-foreground shadow-sm"
           : "text-muted-foreground hover:bg-terminal-background/60 hover:text-foreground",
       )}
     >
@@ -489,7 +489,7 @@ function TabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[100] flex items-center gap-2 border border-border bg-terminal-background px-3 text-xs text-foreground opacity-90 shadow-lg"
+      className="pointer-events-none fixed z-[100] flex items-center gap-2 rounded-lg border border-border bg-terminal-background px-3 text-xs text-foreground opacity-90 shadow-lg"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
