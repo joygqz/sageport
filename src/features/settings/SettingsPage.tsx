@@ -379,11 +379,11 @@ function ThemeFamilyCard({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left transition-[border-color,box-shadow,transform]",
+        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left transition-[border-color,box-shadow]",
         CONTROL_FOCUS_CLASS,
         active
           ? "border-primary ring-2 ring-primary/25"
-          : cn(CONTROL_BORDER_CLASS, "hover:-translate-y-0.5"),
+          : CONTROL_BORDER_CLASS,
       )}
     >
       <div className="grid h-24 grid-cols-2">
