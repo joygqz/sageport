@@ -18,6 +18,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { useDragCursor } from "@/lib/pointerDrag";
 import { cn } from "@/lib/utils";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
 import { focusTerminal } from "@/features/terminal/sessions";
@@ -89,14 +90,7 @@ export function EditorArea() {
   const pendingCloseId = useTabsStore((s) => s.pendingCloseId);
   const clearPendingClose = useTabsStore((s) => s.clearPendingClose);
 
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const style = document.createElement("style");
-    style.textContent = "* { cursor: default !important; }";
-    document.head.appendChild(style);
-    return () => style.remove();
-  }, [isDragging]);
+  useDragCursor(isDragging);
 
   const handleTabDragStart = (id: string, pointer: TabDragPointer) => {
     const sourceIndex = tabs.findIndex((tab) => tab.id === id);
@@ -231,9 +225,10 @@ export function EditorArea() {
           ref={stripRef}
           onWheel={(e) => {
             const el = stripRef.current;
-            if (!el || el.scrollWidth <= el.clientWidth) return;
-            e.preventDefault();
-            el.scrollLeft += e.deltaX || e.deltaY;
+            if (!el || el.scrollWidth <= el.clientWidth || e.deltaX !== 0) {
+              return;
+            }
+            el.scrollLeft += e.deltaY;
           }}
           className={cn(
             "scrollbar-none flex h-[var(--workbench-bar-height)] overflow-x-auto overflow-y-hidden",

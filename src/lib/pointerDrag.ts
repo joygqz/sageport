@@ -1,7 +1,20 @@
+import { useEffect } from "react";
+
 let dragCount = 0;
 
 export function isPointerDragActive() {
   return dragCount > 0;
+}
+
+export function useDragCursor(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+
+    const style = document.createElement("style");
+    style.textContent = "* { cursor: default !important; }";
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, [active]);
 }
 
 export function trackPointerDrag(

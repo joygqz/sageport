@@ -200,9 +200,9 @@ export function resolveEnabledToolNames(
   names: readonly string[] | null | undefined,
 ): string[] {
   if (!names) {
-    return ALL_TOOLS.filter(
-      (tool) => !CORE_TOOL_NAMES.has(tool.spec.name),
-    ).map((tool) => tool.spec.name);
+    return ALL_TOOLS.filter((tool) => !CORE_TOOL_NAMES.has(tool.spec.name)).map(
+      (tool) => tool.spec.name,
+    );
   }
   return normalizeEnabledToolNames(names);
 }

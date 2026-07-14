@@ -32,6 +32,7 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
+import { useDragCursor } from "@/lib/pointerDrag";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
@@ -121,14 +122,7 @@ export function FilePane({ side }: { side: PaneSide }) {
     ? pane.tabs.find((tab) => tab.id === dragState.id)
     : undefined;
 
-  useEffect(() => {
-    if (!dragState) return;
-
-    const style = document.createElement("style");
-    style.textContent = "* { cursor: default !important; }";
-    document.head.appendChild(style);
-    return () => style.remove();
-  }, [dragState]);
+  useDragCursor(dragState !== null);
 
   const handleTabDragStart = (tabId: string, pointer: SftpTabDragPointer) => {
     const sourceIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
@@ -311,8 +305,10 @@ export function FilePane({ side }: { side: PaneSide }) {
         aria-label={t("sftp.panelTitle")}
         onWheel={(e) => {
           const el = tabStripRef.current;
-          if (!el || el.scrollWidth <= el.clientWidth) return;
-          el.scrollLeft += e.deltaX + e.deltaY;
+          if (!el || el.scrollWidth <= el.clientWidth || e.deltaX !== 0) {
+            return;
+          }
+          el.scrollLeft += e.deltaY;
         }}
         className={cn(
           "scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface",

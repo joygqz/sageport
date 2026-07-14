@@ -38,8 +38,9 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { layoutDragPreview } from "@/lib/dragPreview";
+import { useDragCursor } from "@/lib/pointerDrag";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { useTabsStore } from "@/workbench/tabs";
 import { fileIconKind, type FileIconKind } from "./file-icon";
@@ -61,18 +62,6 @@ interface FileDragState {
   clientX: number;
   clientY: number;
   rect: DOMRect;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB", "TB"];
-  let size = bytes / 1024;
-  let i = 0;
-  while (size >= 1024 && i < units.length - 1) {
-    size /= 1024;
-    i++;
-  }
-  return `${size.toFixed(size >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 function formatTime(secs: number | null): string {
@@ -191,14 +180,7 @@ export function FileList({
     selectionAnchorRef.current = null;
   }, [tab.id, tab.cwd]);
 
-  useEffect(() => {
-    if (!dragState) return;
-
-    const style = document.createElement("style");
-    style.textContent = "* { cursor: default !important; }";
-    document.head.appendChild(style);
-    return () => style.remove();
-  }, [dragState]);
+  useDragCursor(dragState !== null);
 
   const openEditor = (entry: FileEntry) => {
     if (entry.size > MAX_EDIT_BYTES) {
@@ -480,7 +462,7 @@ export function FileList({
                             : "text-muted-foreground",
                         )}
                       >
-                        {entry.kind === "dir" ? "" : formatSize(entry.size)}
+                        {entry.kind === "dir" ? "" : formatBytes(entry.size)}
                       </td>
                       <td
                         className={cn(
@@ -575,7 +557,7 @@ function InlineCreateRow({
       <td className="h-7 pl-2.5 pr-1 align-middle">
         <span className="flex h-7 items-center gap-2">
           {kind === "folder" ? (
-            <Folder className="size-4 shrink-0 text-info" />
+            <Folder className="size-4 shrink-0 text-warning" />
           ) : (
             <File className="size-4 shrink-0 text-muted-foreground" />
           )}
@@ -701,7 +683,7 @@ function FileDragGhost({ dragState }: { dragState: FileDragState }) {
             </span>
           )}
           <span className="shrink-0 text-muted-foreground">
-            {entry.kind === "dir" ? "" : formatSize(entry.size)}
+            {entry.kind === "dir" ? "" : formatBytes(entry.size)}
           </span>
         </div>
       ))}

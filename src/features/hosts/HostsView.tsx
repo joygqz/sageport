@@ -32,6 +32,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { useDragCursor } from "@/lib/pointerDrag";
 import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
 import type { Host, HostHealthCheck } from "@/types/models";
@@ -124,14 +125,7 @@ export function HostsView() {
   const isLoading = hostsLoading || groupsLoading;
   const isError = hostsError || groupsError;
 
-  useEffect(() => {
-    if (!dragState) return;
-
-    const style = document.createElement("style");
-    style.textContent = "* { cursor: default !important; }";
-    document.head.appendChild(style);
-    return () => style.remove();
-  }, [dragState]);
+  useDragCursor(dragState !== null);
 
   const beginHostDrag = (host: Host, pointer: HostDragPointer) => {
     dragHostRef.current = { id: host.id, from: host.groupId ?? UNGROUPED };

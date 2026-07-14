@@ -23,6 +23,7 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
+import { formatBytes } from "@/lib/utils";
 import type { SyncStatus, SyncVersion } from "@/types/models";
 import {
   useSyncDisconnect,
@@ -187,12 +188,6 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
   );
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function VersionsCard() {
   const { t } = useI18n();
   const {
@@ -268,7 +263,7 @@ function VersionsCard() {
                 </div>
                 {v.sizeBytes != null && (
                   <span className="font-mono text-xs text-muted-foreground">
-                    {formatSize(v.sizeBytes)}
+                    {formatBytes(v.sizeBytes)}
                   </span>
                 )}
               </div>

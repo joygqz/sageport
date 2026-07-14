@@ -17,7 +17,13 @@ import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import type { AuthType, HostInput } from "@/types/models";
 import { useIdentities, useSshKeys } from "@/features/credentials/api";
-import { useCreateHost, useGroups, useHosts, useUpdateHost } from "./api";
+import {
+  hostKeys,
+  useCreateHost,
+  useGroups,
+  useHosts,
+  useUpdateHost,
+} from "./api";
 
 interface FormValues {
   label: string;
@@ -88,7 +94,7 @@ function HostFormBody({
   const updateHost = useUpdateHost();
 
   const { data: host, isLoading } = useQuery({
-    queryKey: ["host", hostId],
+    queryKey: hostKeys.detail(hostId ?? ""),
     queryFn: () => ipc.hosts.get(hostId!),
     enabled: Boolean(hostId),
   });
