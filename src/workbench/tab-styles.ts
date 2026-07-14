@@ -6,13 +6,13 @@ export const WORKBENCH_TAB_STRIP_GUTTER_CLASS = "p-1.5";
 export const WORKBENCH_COMPACT_TAB_STRIP_GUTTER_CLASS = "p-1";
 
 export const WORKBENCH_ITEM_ACTIVE_CLASS =
-  "bg-list-active text-list-active-foreground shadow-sm";
+  "bg-list-active text-list-active-foreground";
 
 export const WORKBENCH_ITEM_INACTIVE_CLASS =
   "text-muted-foreground hover:bg-list-hover hover:text-foreground";
 
 export const WORKBENCH_TAB_ACTIVE_CLASS =
-  "text-list-active-foreground shadow-sm [--tab-background:var(--color-tab-active)]";
+  "text-list-active-foreground [--tab-background:var(--color-tab-active)]";
 
 export const WORKBENCH_TAB_INACTIVE_CLASS =
   "text-muted-foreground hover:text-foreground hover:[--tab-background:var(--color-list-hover)]";

@@ -358,7 +358,7 @@ export function AssistantPanel({ width }: { width: number }) {
                         type="button"
                         disabled={pending || !model}
                         onClick={() => void sendPrompt(t(suggestion.key))}
-                        className="rounded-lg border border-border bg-card/45 px-3 py-2 text-left text-xs leading-normal text-muted-foreground shadow-sm transition-[background-color,border-color,color] hover:border-input hover:bg-card hover:text-foreground disabled:opacity-50"
+                        className="rounded-lg border border-border bg-card/45 px-3 py-2 text-left text-xs leading-normal text-muted-foreground transition-[background-color,border-color,color] hover:border-input hover:bg-card hover:text-foreground disabled:opacity-50"
                       >
                         {t(suggestion.key)}
                       </button>
@@ -384,7 +384,7 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
 
           <div className="border-t border-border bg-surface/35 p-3">
-            <div className="overflow-hidden rounded-lg border border-input bg-card shadow-sm transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+            <div className="overflow-hidden rounded-lg border border-input bg-card transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
               <Textarea
                 ref={inputRef}
                 rows={1}
@@ -477,7 +477,7 @@ function ContinueRun({
   const { t } = useI18n();
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-3 py-2 shadow-sm">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-3 py-2">
       <span className="min-w-0 truncate text-xs text-muted-foreground">
         {t("ai.stepLimitReached")}
       </span>
@@ -567,7 +567,7 @@ function Bubble({
 }) {
   if (role === "user") {
     return (
-      <div className="ml-auto max-w-[92%] rounded-xl rounded-br-sm border border-primary/15 bg-primary/12 px-3 py-2 shadow-sm">
+      <div className="ml-auto max-w-[92%] rounded-xl rounded-br-sm border border-primary/15 bg-primary/12 px-3 py-2">
         <p className="select-text whitespace-pre-wrap break-words text-sm">
           {content}
         </p>
@@ -707,7 +707,7 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-terminal-background shadow-sm">
+    <div className="overflow-hidden rounded-lg border border-border bg-terminal-background">
       <div className="flex items-center justify-between border-b border-border px-2 py-1">
         <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
           {t("ai.commandLabel")}

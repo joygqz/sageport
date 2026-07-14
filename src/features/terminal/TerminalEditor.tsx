@@ -94,7 +94,7 @@ function StickyCommand({ sessionId }: { sessionId: string }) {
         session?.term.scrollToLine(sticky.line);
         session?.focus();
       }}
-      className="absolute inset-x-0 top-0 z-10 block overflow-hidden text-ellipsis whitespace-pre border-b border-border bg-terminal-background text-left shadow-sm"
+      className="absolute inset-x-0 top-0 z-10 block overflow-hidden text-ellipsis whitespace-pre border-b border-border bg-terminal-background text-left"
       style={{
         color: "var(--terminal-foreground)",
         fontFamily: monoFontFamily(),

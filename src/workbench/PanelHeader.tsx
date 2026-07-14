@@ -11,7 +11,7 @@ export const PANEL_LIST_ITEM_CLASS =
   "group flex min-h-12 items-center gap-2 rounded-lg px-2 py-1.5 outline-none transition-colors hover:bg-list-hover focus-within:bg-list-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35";
 
 export const PANEL_LIST_ICON_CLASS =
-  "flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm";
+  "flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link";
 
 export const PANEL_LIST_ACTION_CLASS =
   "pointer-events-none -ml-2 flex h-6 w-0 shrink-0 items-center justify-center overflow-hidden rounded-md text-muted-foreground opacity-0 transition-[background-color,color,opacity] hover:bg-accent hover:text-accent-foreground group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100";

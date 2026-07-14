@@ -32,7 +32,7 @@ export function EmptyState({
       {Icon && (
         <div
           className={cn(
-            "flex size-12 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 text-link shadow-sm",
+            "flex size-12 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 text-link",
             iconClassName,
           )}
         >

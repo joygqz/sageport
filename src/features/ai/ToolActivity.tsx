@@ -115,7 +115,7 @@ export function ToolActivity({
   );
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card/55 text-xs shadow-sm">
+    <div className="overflow-hidden rounded-lg border border-border bg-card/55 text-xs">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
@@ -216,7 +216,7 @@ export function QuestionPrompt({
   const selected = options.find((o) => item.result === selectionResult(o));
 
   return (
-    <div className="space-y-1.5 rounded-lg border border-border bg-card/55 p-2.5 shadow-sm">
+    <div className="space-y-1.5 rounded-lg border border-border bg-card/55 p-2.5">
       <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
         {question}
       </p>

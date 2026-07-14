@@ -665,7 +665,7 @@ function HostRow({
               <HostSystemIcon os={detectedOs ?? host.osHint} />
               <span
                 className={cn(
-                  "absolute -bottom-0.5 -right-0.5 size-[8px] rounded-full ring-2 ring-surface",
+                  "absolute -bottom-0.5 -right-0.5 size-[8px] rounded-full ring-2 ring-surface group-hover:ring-list-hover group-focus-within:ring-list-hover",
                   connected || health?.status === "online"
                     ? "bg-success"
                     : health?.status === "offline"

@@ -371,8 +371,8 @@ function ThemeFamilyCard({
       className={cn(
         "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left outline-none transition-[border-color,box-shadow,transform] focus-visible:ring-2 focus-visible:ring-ring/40",
         active
-          ? "border-primary shadow-sm ring-2 ring-primary/25"
-          : "border-border hover:-translate-y-0.5 hover:border-input hover:shadow-sm",
+          ? "border-primary ring-2 ring-primary/25"
+          : "border-border hover:-translate-y-0.5 hover:border-input",
       )}
     >
       <div className="grid h-24 grid-cols-2">
