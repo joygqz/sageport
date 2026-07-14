@@ -202,7 +202,7 @@ export function FilePane({ side }: { side: PaneSide }) {
               if (host) addRemoteTab(side, host);
             }}
             className={cn(
-              "group flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs outline-none transition-[background-color,color,box-shadow]",
+              "group flex h-7 w-40 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs outline-none transition-[background-color,color,box-shadow]",
               tab.id === pane.activeTabId
                 ? "bg-card text-card-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
@@ -215,11 +215,11 @@ export function FilePane({ side }: { side: PaneSide }) {
               )}
             />
             {tab.kind === "local" ? (
-              <HardDrive className="size-3" />
+              <HardDrive className="size-3 shrink-0" />
             ) : (
-              <Server className="size-3" />
+              <Server className="size-3 shrink-0" />
             )}
-            <span className="max-w-32 truncate">
+            <span className="min-w-0 flex-1 truncate">
               {tab.kind === "local" ? t("sftp.local") : tab.title}
             </span>
             <button
@@ -229,7 +229,12 @@ export function FilePane({ side }: { side: PaneSide }) {
                 e.stopPropagation();
                 closeTab(side, tab.id);
               }}
-              className="rounded p-0.5 opacity-0 outline-none transition-[background-color,opacity] hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/35 group-hover:opacity-100 group-focus-within:opacity-100"
+              className={cn(
+                "flex h-4 shrink-0 items-center justify-center overflow-hidden rounded outline-none transition-[background-color,opacity] hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/35",
+                tab.id === pane.activeTabId
+                  ? "w-4 opacity-100"
+                  : "pointer-events-none -ml-1.5 w-0 opacity-0 group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-4 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-4 group-focus-within:opacity-100",
+              )}
             >
               <X className="size-3" />
             </button>

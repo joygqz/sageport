@@ -466,10 +466,10 @@ function TabItem({
         }}
         aria-label={t("editor.closeTab")}
         className={cn(
-          "flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          "flex h-5 shrink-0 items-center justify-center overflow-hidden rounded text-muted-foreground transition-[background-color,color,opacity] hover:bg-accent hover:text-foreground",
           active
-            ? "opacity-70"
-            : "opacity-0 group-hover:opacity-70 group-focus-within:opacity-70",
+            ? "w-5 opacity-70"
+            : "pointer-events-none -ml-2 w-0 opacity-0 group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-5 group-hover:opacity-70 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-5 group-focus-within:opacity-70",
         )}
       >
         <X className="size-3.5" />

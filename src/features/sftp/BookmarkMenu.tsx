@@ -78,7 +78,7 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
                 e.stopPropagation();
                 void deleteBookmark.mutateAsync(bookmark.id).catch(() => {});
               }}
-              className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 outline-none transition-[color,opacity] hover:text-danger focus-visible:ring-2 focus-visible:ring-ring/35 group-hover/bm:opacity-100 group-focus/bm:opacity-100"
+              className="pointer-events-none -ml-2 flex h-4 w-0 shrink-0 items-center justify-center overflow-hidden rounded text-muted-foreground opacity-0 outline-none transition-[color,opacity] hover:text-danger focus-visible:pointer-events-auto focus-visible:ml-0 focus-visible:w-4 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/35 group-hover/bm:pointer-events-auto group-hover/bm:ml-0 group-hover/bm:w-4 group-hover/bm:opacity-100 group-focus/bm:pointer-events-auto group-focus/bm:ml-0 group-focus/bm:w-4 group-focus/bm:opacity-100"
             >
               <Trash2 className="size-3" />
             </button>

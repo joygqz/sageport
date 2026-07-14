@@ -219,12 +219,13 @@ function Section({
         title={title}
         collapsed={isCollapsed}
         onToggle={() => setCollapsed((c) => !c)}
+        trailingClassName="pointer-events-none mr-0 w-0 min-w-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:mr-1 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:mr-1 group-focus-within:w-6 group-focus-within:opacity-100"
         trailing={
           <Tooltip content={addLabel}>
             <Button
               size="icon"
               variant="ghost"
-              className="size-6 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+              className="size-6 shrink-0"
               onClick={onAdd}
             >
               <Plus className="size-4" />
@@ -337,7 +338,7 @@ function KeyRow({
               <button
                 type="button"
                 onClick={copyPublicKey}
-                className={cn(PANEL_LIST_ACTION_CLASS, "ml-auto")}
+                className={PANEL_LIST_ACTION_CLASS}
               >
                 {copied ? (
                   <Check className="size-3.5" />

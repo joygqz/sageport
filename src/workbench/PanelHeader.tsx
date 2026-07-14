@@ -14,7 +14,7 @@ export const PANEL_LIST_ICON_CLASS =
   "flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link shadow-sm";
 
 export const PANEL_LIST_ACTION_CLASS =
-  "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[background-color,color,opacity] hover:bg-accent hover:text-accent-foreground group-hover:opacity-100 group-focus-within:opacity-100";
+  "pointer-events-none -ml-2 flex h-6 w-0 shrink-0 items-center justify-center overflow-hidden rounded-md text-muted-foreground opacity-0 transition-[background-color,color,opacity] hover:bg-accent hover:text-accent-foreground group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100";
 
 export function PanelHeader({
   title,
@@ -74,38 +74,57 @@ interface PanelSectionHeaderProps extends Omit<
   collapsed: boolean;
   onToggle: () => void;
   trailing?: ReactNode;
+  trailingClassName?: string;
 }
 
 export const PanelSectionHeader = forwardRef<
   HTMLDivElement,
   PanelSectionHeaderProps
->(({ title, collapsed, onToggle, trailing, className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "group flex h-8 items-center rounded-lg transition-colors hover:bg-list-hover focus-within:bg-list-hover",
+>(
+  (
+    {
+      title,
+      collapsed,
+      onToggle,
+      trailing,
+      trailingClassName,
       className,
-    )}
-    {...props}
-  >
-    <button
-      type="button"
-      aria-expanded={!collapsed}
-      onClick={onToggle}
-      className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
-    >
-      {collapsed ? (
-        <ChevronRight className="size-3.5 shrink-0" />
-      ) : (
-        <ChevronDown className="size-3.5 shrink-0" />
+      ...props
+    },
+    ref,
+  ) => (
+    <div
+      ref={ref}
+      className={cn(
+        "group flex h-8 items-center rounded-lg transition-colors hover:bg-list-hover focus-within:bg-list-hover",
+        className,
       )}
-      <span className="truncate">{title}</span>
-    </button>
-    {trailing && (
-      <div className="mr-1 flex min-w-6 shrink-0 items-center justify-center">
-        {trailing}
-      </div>
-    )}
-  </div>
-));
+      {...props}
+    >
+      <button
+        type="button"
+        aria-expanded={!collapsed}
+        onClick={onToggle}
+        className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+      >
+        {collapsed ? (
+          <ChevronRight className="size-3.5 shrink-0" />
+        ) : (
+          <ChevronDown className="size-3.5 shrink-0" />
+        )}
+        <span className="truncate">{title}</span>
+      </button>
+      {trailing && (
+        <div
+          className={cn(
+            "mr-1 flex min-w-6 shrink-0 items-center justify-center",
+            trailingClassName,
+          )}
+        >
+          {trailing}
+        </div>
+      )}
+    </div>
+  ),
+);
 PanelSectionHeader.displayName = "PanelSectionHeader";

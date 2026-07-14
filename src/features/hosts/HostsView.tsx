@@ -684,7 +684,7 @@ function HostRow({
               {host.address}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="pointer-events-none -ml-2 flex w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-[3.125rem] group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-[3.125rem] group-focus-within:opacity-100">
             <Tooltip content={t("hosts.health.check")}>
               <button
                 type="button"
