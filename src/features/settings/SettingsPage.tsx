@@ -18,9 +18,11 @@ import {
   Dialog,
   DialogContent,
   DialogToolbar,
+  ErrorState,
   Field,
   Input,
   Kbd,
+  LoadingState,
   PasswordInput,
   ScrollArea,
   SectionHeader,
@@ -93,7 +95,7 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showClose={false}
-        className="flex h-[min(44rem,calc(100vh-4rem))] w-[min(58rem,calc(100vw-4rem))] max-w-none flex-col gap-0 overflow-hidden bg-background p-0 text-foreground"
+        className="flex h-[min(44rem,calc(100dvh-2rem))] w-[min(58rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden bg-background p-0 text-foreground sm:h-[min(44rem,calc(100dvh-4rem))] sm:w-[min(58rem,calc(100vw-4rem))] sm:p-0"
       >
         <DialogToolbar className="bg-background">
           {t("settings.title")}
@@ -114,10 +116,13 @@ function SettingsPage({
   const { t } = useI18n();
 
   return (
-    <div className="settings-page min-h-0 flex-1 overflow-x-auto overflow-y-hidden bg-background">
-      <div className="flex h-full min-w-[40rem]">
-        <aside className="flex w-48 shrink-0 flex-col border-r border-border bg-surface/65 px-3 py-4">
-          <nav className="flex flex-col gap-1" aria-label={t("settings.title")}>
+    <div className="settings-page min-h-0 flex-1 overflow-hidden bg-background">
+      <div className="flex h-full min-w-0 flex-col sm:flex-row">
+        <aside className="flex shrink-0 flex-col border-b border-border bg-surface/65 px-2 py-2 sm:w-48 sm:border-b-0 sm:border-r sm:px-3 sm:py-4">
+          <nav
+            className="scrollbar-none flex gap-1 overflow-x-auto sm:flex-col sm:overflow-visible"
+            aria-label={t("settings.title")}
+          >
             {NAV.map((item) => {
               const Icon = item.icon;
               const active = section === item.id;
@@ -128,7 +133,7 @@ function SettingsPage({
                   aria-current={active ? "page" : undefined}
                   onClick={() => onSectionChange(item.id)}
                   className={cn(
-                    "flex h-[var(--control-height)] items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
+                    "flex h-[var(--control-height)] shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:w-full",
                     active
                       ? "bg-list-active font-medium text-list-active-foreground"
                       : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
@@ -143,7 +148,7 @@ function SettingsPage({
         </aside>
 
         <ScrollArea className="min-h-0 min-w-0 flex-1">
-          <main className="settings-content flex w-full max-w-3xl flex-col gap-8 px-8 py-8">
+          <main className="settings-content flex w-full max-w-3xl flex-col gap-6 px-5 py-6 sm:px-8 sm:py-8">
             <div>
               <h1 className="text-lg font-semibold tracking-tight text-foreground">
                 {t(NAV.find((item) => item.id === section)!.labelKey)}
@@ -464,9 +469,19 @@ function ThemePreview({
 }
 
 function AiSection() {
-  const { data: config } = useAiConfig();
+  const { t } = useI18n();
+  const { data: config, isLoading, isError, refetch } = useAiConfig();
 
-  if (!config) return null;
+  if (isLoading) return <LoadingState label={t("common.loading")} />;
+  if (isError || !config) {
+    return (
+      <ErrorState
+        title={t("common.loadError")}
+        retryLabel={t("common.retry")}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
   return <AiForm config={config} />;
 }
 
@@ -584,94 +599,96 @@ function AiForm({ config }: { config: AiConfig }) {
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <SectionHeader
         title={t("settings.ai.title")}
         description={t("settings.ai.description")}
       />
 
-      <Field label={t("settings.ai.protocolLabel")}>
-        <Select
-          value={protocol}
-          onChange={(e) => changeProtocol(e.target.value as AiProtocol)}
+      <div className="flex flex-col gap-4">
+        <Field label={t("settings.ai.protocolLabel")}>
+          <Select
+            value={protocol}
+            onChange={(e) => changeProtocol(e.target.value as AiProtocol)}
+          >
+            {AI_PROTOCOLS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {t(`settings.ai.protocol.${p.value}`)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field
+          label={t("settings.ai.baseUrlLabel")}
+          hint={t("settings.ai.baseUrlHint")}
         >
-          {AI_PROTOCOLS.map((p) => (
-            <option key={p.value} value={p.value}>
-              {t(`settings.ai.protocol.${p.value}`)}
-            </option>
-          ))}
-        </Select>
-      </Field>
-
-      <Field
-        label={t("settings.ai.baseUrlLabel")}
-        hint={t("settings.ai.baseUrlHint")}
-      >
-        <Input
-          value={baseUrl}
-          onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder={defaultBaseUrl(protocol)}
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </Field>
-
-      <Field
-        label={t("settings.ai.apiKeyLabel")}
-        hint={t("settings.ai.apiKeyHint")}
-      >
-        <PasswordInput
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="sk-…"
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </Field>
-
-      <Field
-        label={t("settings.ai.autonomousModeLabel")}
-        hint={t("settings.ai.autonomousModeHint")}
-      >
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card/55 px-3 py-2.5">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">
-              {t("settings.ai.autonomousMode")}
-            </p>
-            <p className="mt-0.5 text-xs text-danger">
-              {t("settings.ai.autonomousModeWarning")}
-            </p>
-          </div>
-          <Switch
-            checked={autoApprove}
-            onCheckedChange={setAutoApprove}
-            aria-label={t("settings.ai.autonomousMode")}
+          <Input
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder={defaultBaseUrl(protocol)}
+            autoComplete="off"
+            spellCheck={false}
           />
-        </div>
-      </Field>
+        </Field>
 
-      <Field
-        label={t("settings.ai.maxHistoryTokensLabel")}
-        hint={t("settings.ai.maxHistoryTokensHint")}
-      >
-        <Input
-          type="number"
-          min={0}
-          step={1000}
-          value={maxHistoryTokens ?? ""}
-          onChange={(e) => {
-            const parsed = Number.parseInt(e.target.value, 10);
-            setMaxHistoryTokens(
-              Number.isFinite(parsed) && parsed > 0 ? parsed : null,
-            );
-          }}
-          placeholder="200000"
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </Field>
+        <Field
+          label={t("settings.ai.apiKeyLabel")}
+          hint={t("settings.ai.apiKeyHint")}
+        >
+          <PasswordInput
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="sk-…"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </Field>
 
-      <div className="mt-2 flex flex-col gap-3">
+        <Field
+          label={t("settings.ai.autonomousModeLabel")}
+          hint={t("settings.ai.autonomousModeHint")}
+        >
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card/55 px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {t("settings.ai.autonomousMode")}
+              </p>
+              <p className="mt-0.5 text-xs text-danger">
+                {t("settings.ai.autonomousModeWarning")}
+              </p>
+            </div>
+            <Switch
+              checked={autoApprove}
+              onCheckedChange={setAutoApprove}
+              aria-label={t("settings.ai.autonomousMode")}
+            />
+          </div>
+        </Field>
+
+        <Field
+          label={t("settings.ai.maxHistoryTokensLabel")}
+          hint={t("settings.ai.maxHistoryTokensHint")}
+        >
+          <Input
+            type="number"
+            min={0}
+            step={1000}
+            value={maxHistoryTokens ?? ""}
+            onChange={(e) => {
+              const parsed = Number.parseInt(e.target.value, 10);
+              setMaxHistoryTokens(
+                Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+              );
+            }}
+            placeholder="200000"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </Field>
+      </div>
+
+      <div className="flex flex-col gap-3">
         <SectionHeader
           title={t("settings.ai.tools.title")}
           description={t("settings.ai.tools.description")}

@@ -171,19 +171,29 @@ export function FilePane({ side }: { side: PaneSide }) {
     >
       <div
         ref={tabStripRef}
-
+        role="tablist"
+        aria-label={t("sftp.panelTitle")}
         onWheel={(e) => {
           const el = tabStripRef.current;
           if (!el || el.scrollWidth <= el.clientWidth) return;
           el.scrollLeft += e.deltaX + e.deltaY;
         }}
-        className="scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface/65 px-1.5"
+        className="scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface px-1.5"
       >
         {pane.tabs.map((tab) => (
           <div
             key={tab.id}
+            role="tab"
+            tabIndex={tab.id === pane.activeTabId ? 0 : -1}
+            aria-selected={tab.id === pane.activeTabId}
             onClick={() => setActive(side, tab.id)}
-            onDoubleClick={() => {
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setActive(side, tab.id);
+            }}
+            onDoubleClick={(event) => {
+              if ((event.target as HTMLElement).closest("button")) return;
               if (tab.kind === "local") {
                 void addLocalTab(side);
                 return;
@@ -199,7 +209,10 @@ export function FilePane({ side }: { side: PaneSide }) {
             )}
           >
             <span
-              className={cn("size-1.5 rounded-full", statusColor[tab.status])}
+              className={cn(
+                "size-[6px] shrink-0 rounded-full",
+                statusColor[tab.status],
+              )}
             />
             {tab.kind === "local" ? (
               <HardDrive className="size-3" />
@@ -210,11 +223,13 @@ export function FilePane({ side }: { side: PaneSide }) {
               {tab.kind === "local" ? t("sftp.local") : tab.title}
             </span>
             <button
+              type="button"
+              aria-label={t("editor.closeTab")}
               onClick={(e) => {
                 e.stopPropagation();
                 closeTab(side, tab.id);
               }}
-              className="rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
+              className="rounded p-0.5 opacity-0 outline-none transition-[background-color,opacity] hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/35 group-hover:opacity-100 group-focus-within:opacity-100"
             >
               <X className="size-3" />
             </button>
@@ -248,7 +263,7 @@ export function FilePane({ side }: { side: PaneSide }) {
 
       {active ? (
         <>
-          <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-background px-1.5">
+          <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-surface px-1.5">
             <Tooltip content={t("sftp.back")}>
               <Button
                 size="icon"

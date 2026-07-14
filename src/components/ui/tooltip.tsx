@@ -1,3 +1,4 @@
+import { cloneElement, isValidElement, type ReactElement } from "react";
 import type * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
@@ -59,6 +60,16 @@ function Tooltip({
   delayDuration?: number;
 } & React.ComponentProps<typeof TooltipPrimitive.Content>) {
   if (content == null) return <>{children}</>;
+
+  const trigger =
+    typeof content === "string" && isValidElement(children)
+      ? cloneElement(children as ReactElement<{ "aria-label"?: string }>, {
+          "aria-label":
+            (children.props as { "aria-label"?: string })["aria-label"] ??
+            content,
+        })
+      : children;
+
   return (
     <TooltipRoot delayDuration={delayDuration}>
       <TooltipTrigger
@@ -67,7 +78,7 @@ function Tooltip({
           if (!e.currentTarget.matches(":focus-visible")) e.preventDefault();
         }}
       >
-        {children}
+        {trigger}
       </TooltipTrigger>
       <TooltipContent side={side} {...props}>
         {content}

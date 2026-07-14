@@ -81,7 +81,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <SectionHeader
         title={t("settings.sync.title")}
         description={t("settings.sync.description")}
@@ -94,6 +94,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
           return (
             <button
               key={p.kind}
+              type="button"
               onClick={() => selectProvider(p.kind)}
               aria-pressed={active}
               className={cn(
@@ -231,6 +232,7 @@ function OAuthPanel({
             size="icon"
             variant="outline"
             className="size-8"
+            aria-label={copied ? t("common.copied") : t("common.copy")}
             onClick={() => void copyCode(phase.userCode)}
           >
             {copied ? (

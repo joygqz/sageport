@@ -93,6 +93,7 @@ export function MonitorView() {
               searching ? t("monitor.noMatches") : t("monitor.empty.title")
             }
             description={searching ? undefined : t("monitor.empty.description")}
+            fill={!searching}
           />
         ) : (
           filteredGroups.map((group) => (
@@ -192,6 +193,7 @@ function HostCard({
 
   return (
     <button
+      type="button"
       onClick={() => setActive(primary.id)}
       className={cn(
         "flex flex-col gap-3 rounded-lg border border-border bg-card/55 p-3 text-left shadow-sm outline-none transition-[background-color,border-color,box-shadow] hover:bg-card focus-visible:ring-2 focus-visible:ring-ring/35",
@@ -206,7 +208,7 @@ function HostCard({
             <Gauge className="size-4" strokeWidth={1.7} />
             <span
               className={cn(
-                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card",
+                "absolute -bottom-0.5 -right-0.5 size-[8px] rounded-full ring-2 ring-card",
                 statusDot[connected ? "connected" : primary.status],
               )}
             />

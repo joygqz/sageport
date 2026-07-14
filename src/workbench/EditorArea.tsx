@@ -439,7 +439,7 @@ function TabItem({
           <TerminalSquare className="size-3.5" />
           <span
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2",
+              "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2",
               active ? "ring-terminal-background" : "ring-surface",
               statusDot[tab.status],
             )}
@@ -459,6 +459,7 @@ function TabItem({
       )}
 
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
@@ -503,7 +504,7 @@ function TabDragGhost({
           <TerminalSquare className="size-3.5" />
           <span
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-terminal-background",
+              "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2 ring-terminal-background",
               statusDot[tab.status],
             )}
           />

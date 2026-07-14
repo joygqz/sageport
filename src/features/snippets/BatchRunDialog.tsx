@@ -163,6 +163,7 @@ function ResultRow({ name, result }: { name: string; result: Result }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card/35">
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-list-hover"
       >

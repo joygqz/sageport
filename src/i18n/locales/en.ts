@@ -10,8 +10,13 @@ export const en = {
     delete: "Delete",
     edit: "Edit",
     rename: "Rename",
+    retry: "Retry",
     save: "Save",
     saveChanges: "Save Changes",
+    loading: "Loading…",
+    loadError: "Unable to load this content",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     deleteConfirm:
       "This will permanently delete {name}. This action cannot be undone.",
     auth: {
@@ -124,6 +129,7 @@ export const en = {
   },
 
   palette: {
+    title: "Command palette",
     quickPlaceholder: "Search hosts, or type user@host to connect",
     commandsPlaceholder: "Search commands",
     noHosts: "No matching hosts",
@@ -352,6 +358,11 @@ export const en = {
     viewTitle: "Credentials",
     filterPlaceholder: "Filter credentials",
     noMatches: "No matching credentials",
+    empty: {
+      title: "No credentials yet",
+      description:
+        "Add an SSH key or identity to reuse secure sign-in settings.",
+    },
     keys: {
       sectionTitle: "SSH Keys",
       add: "Add Key",
@@ -605,6 +616,7 @@ export const en = {
     stepLimitReached: "Paused at the step limit for this run.",
     continueRun: "Continue",
     inputPlaceholder: "Ask about your servers",
+    send: "Send message",
     commandLabel: "Command",
     commandTarget: "Target: {name}",
     error: "Assistant error",
@@ -761,7 +773,7 @@ export const en = {
       setup: {
         oauthSignIn: "Sign in with {name}",
         oauthUnavailable:
-          "This build has no OAuth client id for {name}, so sign-in is unavailable. See docs/sync-oauth-setup.md for how to register one.",
+          "This build has no OAuth client id for {name}, so sign-in is unavailable. ",
         oauthError: "Authorization failed",
         deviceCodeHint:
           "Enter this code on the GitHub page to authorize Sageport.",

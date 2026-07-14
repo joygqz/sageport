@@ -12,8 +12,13 @@ export const zhCN: Dictionary = {
     delete: "删除",
     edit: "编辑",
     rename: "重命名",
+    retry: "重试",
     save: "保存",
     saveChanges: "保存更改",
+    loading: "正在加载…",
+    loadError: "无法加载此内容",
+    showPassword: "显示密码",
+    hidePassword: "隐藏密码",
     deleteConfirm: "将永久删除 {name}，此操作无法撤销。",
     auth: {
       password: "密码",
@@ -122,6 +127,7 @@ export const zhCN: Dictionary = {
   },
 
   palette: {
+    title: "命令面板",
     quickPlaceholder: "搜索主机，或输入 user@host 直接连接",
     commandsPlaceholder: "搜索命令",
     noHosts: "没有匹配的主机",
@@ -346,6 +352,10 @@ export const zhCN: Dictionary = {
     viewTitle: "凭据",
     filterPlaceholder: "筛选凭据",
     noMatches: "没有匹配的凭据",
+    empty: {
+      title: "暂无凭据",
+      description: "添加 SSH 密钥或身份，以便安全地复用登录配置。",
+    },
     keys: {
       sectionTitle: "SSH 密钥",
       add: "添加密钥",
@@ -584,6 +594,7 @@ export const zhCN: Dictionary = {
     stepLimitReached: "本次运行已达到步骤上限。",
     continueRun: "继续",
     inputPlaceholder: "询问服务器相关问题",
+    send: "发送消息",
     commandLabel: "命令",
     commandTarget: "执行目标：{name}",
     error: "助手出错",
@@ -737,7 +748,7 @@ export const zhCN: Dictionary = {
       setup: {
         oauthSignIn: "使用 {name} 登录",
         oauthUnavailable:
-          "此构建未配置 {name} 的 OAuth Client ID，无法使用授权登录。注册方法见 docs/sync-oauth-setup.md。",
+          "此构建未配置 {name} 的 OAuth Client ID，无法使用授权登录。",
         oauthError: "授权失败",
         deviceCodeHint: "在打开的 GitHub 页面中输入此代码以完成授权。",
         openPageButton: "打开 GitHub",

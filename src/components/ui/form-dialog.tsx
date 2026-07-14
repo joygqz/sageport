@@ -25,7 +25,7 @@ export function FormDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         showClose={false}
-        className={cn("flex max-w-[92vw] flex-col gap-0 p-0", width)}
+        className={cn("flex max-w-[92vw] flex-col gap-0 p-0 sm:p-0", width)}
       >
         <DialogToolbar>{title}</DialogToolbar>
         {open && children}
@@ -60,10 +60,12 @@ export function FormBody({
         e.preventDefault();
         void onSubmit();
       }}
-      className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
     >
-      {children}
-      <div className="-mx-5 -mb-5 mt-2 flex items-center justify-end gap-2 border-t border-border bg-surface/30 px-5 py-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+        {children}
+      </div>
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface/30 px-5 py-3">
         {footerStart && <div className="mr-auto">{footerStart}</div>}
         <Button type="button" variant="ghost" onClick={onClose}>
           {t("common.cancel")}

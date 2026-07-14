@@ -66,6 +66,7 @@ function StatusBarItem({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
       className="flex h-full items-center gap-1.5 rounded-md px-2 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
@@ -89,7 +90,10 @@ function SessionItem() {
   return (
     <StatusBarItem onClick={() => setActive(session.id)}>
       <span
-        className={cn("size-1.5 rounded-full", statusDot[session.status])}
+        className={cn(
+          "size-[6px] shrink-0 rounded-full",
+          statusDot[session.status],
+        )}
       />
       <span className="max-w-48 truncate">{session.title}</span>
       <span>{t(`terminal.status.${session.status}`)}</span>

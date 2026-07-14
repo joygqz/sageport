@@ -12,6 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  ErrorState,
+  LoadingState,
   PasswordInput,
   SectionHeader,
   Separator,
@@ -35,9 +37,19 @@ import { providerMeta } from "./providers";
 import { SetupView } from "./SetupView";
 
 export function SyncSection() {
-  const { data: status } = useSyncStatus();
+  const { t } = useI18n();
+  const { data: status, isLoading, isError, refetch } = useSyncStatus();
 
-  if (!status) return null;
+  if (isLoading) return <LoadingState label={t("common.loading")} />;
+  if (isError || !status) {
+    return (
+      <ErrorState
+        title={t("common.loadError")}
+        retryLabel={t("common.retry")}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

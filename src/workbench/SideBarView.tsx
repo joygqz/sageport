@@ -18,7 +18,9 @@ export function SideBarView({
     <div className="flex min-h-0 flex-1 flex-col">
       <PanelHeader title={title} actions={actions} />
       {topContent}
-      <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="flex h-full flex-col">{children}</div>
+      </ScrollArea>
     </div>
   );
 }

@@ -6,22 +6,22 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #1b1e2e;
-  --foreground: #eef0f7;
-  --surface: #242739;
-  --surface-foreground: #eef0f7;
-  --popover: #303449;
-  --popover-foreground: #f5f6fb;
-  --card: #292c40;
-  --card-foreground: #eef0f7;
-  --primary: #2d6fc5;
+  --background: #171b28;
+  --foreground: #edf1f7;
+  --surface: #1e2332;
+  --surface-foreground: #edf1f7;
+  --popover: #2a3042;
+  --popover-foreground: #f5f7fb;
+  --card: #242a3b;
+  --card-foreground: #edf1f7;
+  --primary: #3472c7;
   --primary-foreground: #ffffff;
-  --link: #80aef5;
-  --secondary: #30344a;
+  --link: #86b6f8;
+  --secondary: #2d3448;
   --secondary-foreground: #e5e8f3;
-  --muted: #292d42;
-  --muted-foreground: #a6abbc;
-  --accent: #363b53;
+  --muted: #282e40;
+  --muted-foreground: #abb3c3;
+  --accent: #343c51;
   --accent-foreground: #f5f6fb;
   --destructive: #b94350;
   --destructive-foreground: #ffffff;
@@ -29,11 +29,11 @@
   --success: #73cf9b;
   --warning: #e7bd6d;
   --info: #83b5f4;
-  --border: #3b4058;
-  --input: #4b516b;
-  --ring: #80aef5;
-  --list-hover: #2a2e43;
-  --list-active: #3b4059;
+  --border: #394156;
+  --input: #525d76;
+  --ring: #79aaf0;
+  --list-hover: #272d3e;
+  --list-active: #344663;
   --list-active-foreground: #ffffff;
   --terminal-background: #12141f;
   --terminal-foreground: #e1e4ee;
@@ -51,14 +51,20 @@
   --control-height-lg: 2.5rem;
 
   --elevation-sm:
-    0 1px 2px rgba(20, 30, 26, 0.08), 0 4px 12px rgba(20, 30, 26, 0.08);
+    0 1px 2px color-mix(in oklch, var(--foreground) 8%, transparent),
+    0 4px 12px color-mix(in oklch, var(--foreground) 7%, transparent);
   --elevation-md:
-    0 2px 6px rgba(20, 30, 26, 0.08), 0 16px 40px rgba(20, 30, 26, 0.16);
+    0 2px 6px color-mix(in oklch, var(--foreground) 8%, transparent),
+    0 16px 40px color-mix(in oklch, var(--foreground) 14%, transparent);
 }
 
 .dark {
-  --elevation-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 6px 18px rgba(0, 0, 0, 0.22);
-  --elevation-md: 0 3px 8px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.38);
+  --elevation-sm:
+    0 1px 2px color-mix(in oklch, black 34%, transparent),
+    0 6px 18px color-mix(in oklch, black 26%, transparent);
+  --elevation-md:
+    0 3px 8px color-mix(in oklch, black 36%, transparent),
+    0 20px 48px color-mix(in oklch, black 44%, transparent);
 }
 
 @theme inline {

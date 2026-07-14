@@ -18,6 +18,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   EmptyState,
+  ErrorState,
+  LoadingState,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -44,7 +46,7 @@ import { parseVariables } from "./variables";
 
 export function SnippetsView() {
   const { t } = useI18n();
-  const { data: snippets = [] } = useSnippets();
+  const { data: snippets = [], isLoading, isError, refetch } = useSnippets();
   const deleteSnippet = useDeleteSnippet();
   const sendToTerminal = useTabsStore((s) => s.sendToTerminal);
 
@@ -134,7 +136,16 @@ export function SnippetsView() {
       }
     >
       <PanelContent className={PANEL_LIST_CLASS}>
-        {filteredSnippets.length === 0 ? (
+        {isLoading ? (
+          <LoadingState label={t("common.loading")} fill />
+        ) : isError ? (
+          <ErrorState
+            title={t("common.loadError")}
+            retryLabel={t("common.retry")}
+            onRetry={() => void refetch()}
+            fill
+          />
+        ) : filteredSnippets.length === 0 ? (
           <EmptyState
             icon={SquareTerminal}
             title={
@@ -153,13 +164,17 @@ export function SnippetsView() {
                 </Button>
               )
             }
+            fill={!searching}
           />
         ) : (
           filteredSnippets.map((snippet) => (
             <ContextMenu key={snippet.id}>
               <ContextMenuTrigger asChild>
                 <div
-                  onDoubleClick={() => run(snippet)}
+                  onDoubleClick={(event) => {
+                    if ((event.target as HTMLElement).closest("button")) return;
+                    run(snippet);
+                  }}
                   className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
                 >
                   <div className={PANEL_LIST_ICON_CLASS}>
@@ -175,6 +190,7 @@ export function SnippetsView() {
                   </div>
                   <Tooltip content={t("snippets.run")}>
                     <button
+                      type="button"
                       onClick={() => run(snippet)}
                       className={PANEL_LIST_ACTION_CLASS}
                     >

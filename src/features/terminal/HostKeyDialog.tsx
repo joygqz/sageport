@@ -40,7 +40,7 @@ export function HostKeyDialog() {
     >
       <DialogContent
         showClose={false}
-        className="flex w-[460px] max-w-[92vw] flex-col gap-0 p-0"
+        className="flex w-[460px] max-w-[92vw] flex-col gap-0 p-0 sm:p-0"
       >
         {current && (
           <>

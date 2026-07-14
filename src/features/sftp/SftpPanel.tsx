@@ -55,12 +55,11 @@ export function SftpPanel({ height }: { height: number }) {
 
   return (
     <div
-      className="flex shrink-0 flex-col overflow-hidden border-t border-border bg-background"
+      className="flex shrink-0 flex-col overflow-hidden border-t border-border bg-surface"
       style={{ height }}
     >
       <PanelHeader
         title={t("sftp.panelTitle")}
-        className="bg-surface/70"
         actions={
           <>
             <Tooltip content={t("sftp.toggleHidden")}>
@@ -135,7 +134,7 @@ function TransferStrip() {
   if (active.length === 0) return null;
 
   return (
-    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border bg-surface/80 px-2.5 py-1">
+    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border bg-surface px-2.5 py-1">
       {active.map((tx) => {
         const pct =
           tx.total > 0

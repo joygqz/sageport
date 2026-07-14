@@ -80,6 +80,38 @@ export function ResizeHandle({
   };
 
   const liveSize = () => getSize?.() ?? size;
+  const currentLimits = limits?.();
+
+  const moveWithKeyboard = (e: React.KeyboardEvent) => {
+    const horizontal = axis === "x";
+    const direction =
+      e.key === (horizontal ? "ArrowLeft" : "ArrowUp")
+        ? -1
+        : e.key === (horizontal ? "ArrowRight" : "ArrowDown")
+          ? 1
+          : 0;
+
+    if (e.key === "Home" && currentLimits) {
+      e.preventDefault();
+      onResize(currentLimits.min);
+      return;
+    }
+    if (e.key === "End" && currentLimits) {
+      e.preventDefault();
+      onResize(currentLimits.max);
+      return;
+    }
+    if (direction === 0) return;
+
+    e.preventDefault();
+    const step = e.shiftKey ? 24 : 8;
+    const delta = direction * step;
+    const raw = liveSize() + (reverse ? -delta : delta);
+    const next = currentLimits
+      ? Math.min(Math.max(raw, currentLimits.min), currentLimits.max)
+      : raw;
+    onResize(next);
+  };
 
   const highlightTransform =
     axis === "x"
@@ -127,7 +159,7 @@ export function ResizeHandle({
       )}
       <div
         className={cn(
-          "absolute z-20 bg-primary opacity-0 transition-opacity group-hover:opacity-100 group-hover:delay-300",
+          "absolute z-20 bg-primary opacity-0 transition-opacity group-hover:opacity-100 group-hover:delay-300 group-focus-within:opacity-100 group-focus-within:delay-0",
           axis === "x" ? "inset-y-0 left-1/2 w-1" : "inset-x-0 top-1/2 h-1",
         )}
 
@@ -137,12 +169,23 @@ export function ResizeHandle({
         }}
       />
       <div
+        role="separator"
+        tabIndex={0}
+        aria-orientation={axis === "x" ? "vertical" : "horizontal"}
+        aria-valuenow={Math.round(liveSize())}
+        aria-valuemin={
+          currentLimits ? Math.round(currentLimits.min) : undefined
+        }
+        aria-valuemax={
+          currentLimits ? Math.round(currentLimits.max) : undefined
+        }
         onPointerDown={onPointerDown}
+        onKeyDown={moveWithKeyboard}
         onPointerEnter={() => {
           if (!isPointerDragActive()) setHoverCursor(cursorAt(liveSize()));
         }}
         className={cn(
-          "absolute z-30",
+          "absolute z-30 outline-none",
           axis === "x"
             ? "inset-y-0 -left-1.5 -right-1.5"
             : "inset-x-0 -top-1.5 -bottom-1.5",

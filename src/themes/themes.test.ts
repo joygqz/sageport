@@ -62,11 +62,23 @@ describe("themes", () => {
         [theme.colors.popoverForeground, theme.colors.popover, "popover"],
         [theme.colors.cardForeground, theme.colors.card, "card"],
         [
+          theme.colors.mutedForeground,
+          theme.colors.surface,
+          "muted text on surface",
+        ],
+        [theme.colors.mutedForeground, theme.colors.card, "muted text on card"],
+        [
           theme.colors.primaryForeground,
           theme.colors.primary,
           "primary control",
         ],
         [theme.colors.link, theme.colors.background, "link text"],
+        [
+          theme.colors.secondaryForeground,
+          theme.colors.secondary,
+          "secondary control",
+        ],
+        [theme.colors.accentForeground, theme.colors.accent, "accent control"],
         [theme.colors.success, theme.colors.background, "success status"],
         [theme.colors.warning, theme.colors.background, "warning status"],
         [theme.colors.info, theme.colors.background, "info status"],

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronRight, Plug, Server } from "lucide-react";
 
@@ -20,16 +20,18 @@ export function CommandPalette({
   initialMode: "quick" | "commands";
   onClose: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/20 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/35 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
         <DialogPrimitive.Content
           className="fixed left-1/2 top-12 z-50 w-[36rem] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-xl border border-border/90 bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2"
           aria-describedby={undefined}
         >
           <DialogPrimitive.Title className="sr-only">
-            Command palette
+            {t("palette.title")}
           </DialogPrimitive.Title>
           {open && <PaletteBody initialMode={initialMode} onClose={onClose} />}
         </DialogPrimitive.Content>
@@ -65,6 +67,7 @@ function PaletteBody({
   const [input, setInput] = useState(initialMode === "commands" ? ">" : "");
   const [index, setIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
 
   const { data: hosts = [] } = useHosts();
   const commands = useCommands();
@@ -105,18 +108,13 @@ function PaletteBody({
     }
     return matches;
   }, [commandMode, query, commands, hosts, t]);
-
-  const [prevInput, setPrevInput] = useState(input);
-  if (prevInput !== input) {
-    setPrevInput(input);
-    setIndex(0);
-  }
+  const safeIndex = Math.min(index, Math.max(0, items.length - 1));
 
   useEffect(() => {
     listRef.current
       ?.querySelector('[data-highlighted="true"]')
       ?.scrollIntoView({ block: "nearest" });
-  }, [index]);
+  }, [safeIndex]);
 
   const run = (item: PaletteItem) => {
     onClose();
@@ -132,9 +130,15 @@ function PaletteBody({
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setIndex(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setIndex(Math.max(items.length - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const item = items[index];
+      const item = items[safeIndex];
       if (item) run(item);
     }
   };
@@ -145,8 +149,18 @@ function PaletteBody({
         <Input
           autoFocus
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            setIndex(0);
+          }}
           onKeyDown={onKeyDown}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="true"
+          aria-controls={listId}
+          aria-activedescendant={
+            items.length > 0 ? `${listId}-option-${safeIndex}` : undefined
+          }
           placeholder={
             commandMode
               ? t("palette.commandsPlaceholder")
@@ -159,7 +173,12 @@ function PaletteBody({
         />
       </div>
 
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-1">
+      <div
+        ref={listRef}
+        id={listId}
+        role="listbox"
+        className="min-h-0 flex-1 overflow-y-auto p-1"
+      >
         {items.length === 0 ? (
           <p className="px-3 py-6 text-center text-xs text-muted-foreground">
             {commandMode ? t("palette.noCommands") : t("palette.noHosts")}
@@ -175,7 +194,8 @@ function PaletteBody({
                     : item.command.id
               }
               item={item}
-              highlighted={i === index}
+              id={`${listId}-option-${i}`}
+              highlighted={i === safeIndex}
               onHover={() => setIndex(i)}
               onSelect={() => run(item)}
             />
@@ -188,11 +208,13 @@ function PaletteBody({
 
 function PaletteRow({
   item,
+  id,
   highlighted,
   onHover,
   onSelect,
 }: {
   item: PaletteItem;
+  id: string;
   highlighted: boolean;
   onHover: () => void;
   onSelect: () => void;
@@ -201,6 +223,9 @@ function PaletteRow({
 
   return (
     <div
+      id={id}
+      role="option"
+      aria-selected={highlighted}
       data-highlighted={highlighted}
       onPointerMove={onHover}
       onClick={onSelect}

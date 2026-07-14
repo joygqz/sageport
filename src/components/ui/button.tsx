@@ -33,9 +33,12 @@ export function Button({
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
     >
-      {loading && !asChild && <Loader2 className="animate-spin" />}
+      {loading && !asChild && (
+        <Loader2 aria-hidden="true" className="animate-spin" />
+      )}
       {children}
     </Comp>
   );

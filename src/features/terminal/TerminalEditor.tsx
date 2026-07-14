@@ -88,6 +88,7 @@ function StickyCommand({ sessionId }: { sessionId: string }) {
 
   return (
     <button
+      type="button"
       onClick={() => {
         const session = getSession(sessionId);
         session?.term.scrollToLine(sticky.line);

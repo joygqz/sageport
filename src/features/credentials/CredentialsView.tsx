@@ -19,6 +19,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   EmptyState,
+  ErrorState,
+  LoadingState,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -47,8 +49,18 @@ import { KeyFormDialog } from "./KeyFormDialog";
 
 export function CredentialsView() {
   const { t } = useI18n();
-  const { data: keys = [] } = useSshKeys();
-  const { data: identities = [] } = useIdentities();
+  const {
+    data: keys = [],
+    isLoading: keysLoading,
+    isError: keysError,
+    refetch: refetchKeys,
+  } = useSshKeys();
+  const {
+    data: identities = [],
+    isLoading: identitiesLoading,
+    isError: identitiesError,
+    refetch: refetchIdentities,
+  } = useIdentities();
   const [keyFormOpen, setKeyFormOpen] = useState(false);
   const [identityForm, setIdentityForm] = useState<{
     open: boolean;
@@ -57,6 +69,8 @@ export function CredentialsView() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [query, setQuery] = useState("");
   const searching = query.trim().length > 0;
+  const isLoading = keysLoading || identitiesLoading;
+  const isError = keysError || identitiesError;
 
   const filteredKeys = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -80,6 +94,8 @@ export function CredentialsView() {
 
   const noMatches =
     searching && filteredKeys.length === 0 && filteredIdentities.length === 0;
+  const completelyEmpty =
+    !searching && keys.length === 0 && identities.length === 0;
 
   return (
     <SideBarView
@@ -95,7 +111,41 @@ export function CredentialsView() {
       }
     >
       <PanelContent className="space-y-[var(--panel-gutter)]">
-        {noMatches ? (
+        {isLoading ? (
+          <LoadingState label={t("common.loading")} fill />
+        ) : isError ? (
+          <ErrorState
+            title={t("common.loadError")}
+            retryLabel={t("common.retry")}
+            onRetry={() => {
+              void Promise.all([refetchKeys(), refetchIdentities()]);
+            }}
+            fill
+          />
+        ) : completelyEmpty ? (
+          <EmptyState
+            icon={KeyRound}
+            title={t("credentials.empty.title")}
+            description={t("credentials.empty.description")}
+            fill
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button size="sm" onClick={() => setKeyFormOpen(true)}>
+                  <Plus /> {t("credentials.keys.add")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    setIdentityForm({ open: true, identity: null })
+                  }
+                >
+                  <Plus /> {t("credentials.identities.add")}
+                </Button>
+              </div>
+            }
+          />
+        ) : noMatches ? (
           <EmptyState icon={KeyRound} title={t("credentials.noMatches")} />
         ) : (
           <>
@@ -260,7 +310,7 @@ function KeyRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}>
+        <div className={PANEL_LIST_ITEM_CLASS}>
           <div className={PANEL_LIST_ICON_CLASS}>
             <KeyRound className="size-4" strokeWidth={1.7} />
           </div>
@@ -285,6 +335,7 @@ function KeyRow({
               }
             >
               <button
+                type="button"
                 onClick={copyPublicKey}
                 className={cn(PANEL_LIST_ACTION_CLASS, "ml-auto")}
               >
@@ -360,7 +411,10 @@ function IdentityList({
         <ContextMenu key={identity.id}>
           <ContextMenuTrigger asChild>
             <div
-              onDoubleClick={() => onEdit(identity)}
+              onDoubleClick={(event) => {
+                if ((event.target as HTMLElement).closest("button")) return;
+                onEdit(identity);
+              }}
               className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
             >
               <div className={PANEL_LIST_ICON_CLASS}>
@@ -374,6 +428,18 @@ function IdentityList({
                   {identity.username} · {t(`common.auth.${identity.authType}`)}
                 </p>
               </div>
+              <Tooltip content={t("common.edit")}>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEdit(identity);
+                  }}
+                  className={PANEL_LIST_ACTION_CLASS}
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+              </Tooltip>
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent>

@@ -72,11 +72,13 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
           >
             <span className="min-w-0 flex-1 truncate">{bookmark.label}</span>
             <button
+              type="button"
+              aria-label={t("common.delete")}
               onClick={(e) => {
                 e.stopPropagation();
                 void deleteBookmark.mutateAsync(bookmark.id).catch(() => {});
               }}
-              className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-danger group-hover/bm:opacity-100"
+              className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 outline-none transition-[color,opacity] hover:text-danger focus-visible:ring-2 focus-visible:ring-ring/35 group-hover/bm:opacity-100 group-focus/bm:opacity-100"
             >
               <Trash2 className="size-3" />
             </button>

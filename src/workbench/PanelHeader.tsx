@@ -57,7 +57,10 @@ export function PanelContent({
   return (
     <div
       data-slot="panel-content"
-      className={cn("p-[var(--panel-gutter)]", className)}
+      className={cn(
+        "flex min-h-0 flex-1 flex-col p-[var(--panel-gutter)]",
+        className,
+      )}
       {...props}
     />
   );

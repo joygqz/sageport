@@ -26,6 +26,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   EmptyState,
+  ErrorState,
+  LoadingState,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -80,8 +82,18 @@ const HEALTH_REASON_KEYS = {
 
 export function HostsView() {
   const { t } = useI18n();
-  const { data: hosts = [], isLoading } = useHosts();
-  const { data: groups = [] } = useGroups();
+  const {
+    data: hosts = [],
+    isLoading: hostsLoading,
+    isError: hostsError,
+    refetch: refetchHosts,
+  } = useHosts();
+  const {
+    data: groups = [],
+    isLoading: groupsLoading,
+    isError: groupsError,
+    refetch: refetchGroups,
+  } = useGroups();
   const deleteHost = useDeleteHost();
   const deleteGroup = useDeleteGroup();
   const moveHost = useMoveHost();
@@ -107,6 +119,8 @@ export function HostsView() {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   const searching = query.trim().length > 0;
+  const isLoading = hostsLoading || groupsLoading;
+  const isError = hostsError || groupsError;
 
   useEffect(() => {
     if (!dragState) return;
@@ -370,7 +384,18 @@ export function HostsView() {
       }
     >
       <PanelContent className="space-y-[var(--panel-gutter)]">
-        {isLoading ? null : sections.length === 0 ? (
+        {isLoading ? (
+          <LoadingState label={t("common.loading")} fill />
+        ) : isError ? (
+          <ErrorState
+            title={t("common.loadError")}
+            retryLabel={t("common.retry")}
+            onRetry={() => {
+              void Promise.all([refetchHosts(), refetchGroups()]);
+            }}
+            fill
+          />
+        ) : sections.length === 0 ? (
           <EmptyState
             icon={Server}
             title={searching ? t("hosts.noMatches") : t("hosts.empty.title")}
@@ -382,6 +407,7 @@ export function HostsView() {
                 </Button>
               )
             }
+            fill={!searching}
           />
         ) : (
           sections.map((section) => (
@@ -610,7 +636,10 @@ function HostRow({
           onPointerMove={handlePointerMove}
           onPointerUp={finishPointerDrag}
           onPointerCancel={finishPointerDrag}
-          onDoubleClick={() => openTerminal(host)}
+          onDoubleClick={(event) => {
+            if ((event.target as HTMLElement).closest("button")) return;
+            openTerminal(host);
+          }}
           className={cn(
             PANEL_LIST_ITEM_CLASS,
             "cursor-pointer touch-none select-none outline-none",
@@ -622,7 +651,7 @@ function HostRow({
             <Tooltip content={healthTooltip}>
               <span
                 className={cn(
-                  "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface",
+                  "absolute -bottom-0.5 -right-0.5 size-[8px] rounded-full ring-2 ring-surface",
                   connected || health?.status === "online"
                     ? "bg-success"
                     : health?.status === "offline"
@@ -644,6 +673,7 @@ function HostRow({
           <div className="flex shrink-0 items-center gap-0.5">
             <Tooltip content={t("hosts.health.check")}>
               <button
+                type="button"
                 disabled={checking}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -658,6 +688,7 @@ function HostRow({
             </Tooltip>
             <Tooltip content={t("hosts.connect")}>
               <button
+                type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   openTerminal(host);

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Eye, EyeOff } from "lucide-react";
 
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { Input, type InputProps } from "./input";
 
@@ -10,6 +11,7 @@ export const PasswordInput = React.forwardRef<
   HTMLInputElement,
   PasswordInputProps
 >(({ className, ...props }, ref) => {
+  const { t } = useI18n();
   const [visible, setVisible] = React.useState(false);
   const Icon = visible ? EyeOff : Eye;
 
@@ -23,10 +25,10 @@ export const PasswordInput = React.forwardRef<
       />
       <button
         type="button"
-        tabIndex={-1}
         onClick={() => setVisible((v) => !v)}
+        aria-label={t(visible ? "common.hidePassword" : "common.showPassword")}
         aria-pressed={visible}
-        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground"
+        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-lg text-muted-foreground outline-none transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
       >
         <Icon className="size-4" />
       </button>

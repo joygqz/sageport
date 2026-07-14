@@ -20,6 +20,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   EmptyState,
+  ErrorState,
+  LoadingState,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -44,7 +46,7 @@ import { bridgeForwardEvents, useForwardStore } from "./store";
 
 export function ForwardsView() {
   const { t } = useI18n();
-  const { data: forwards = [] } = useForwards();
+  const { data: forwards = [], isLoading, isError, refetch } = useForwards();
   const deleteForward = useDeleteForward();
   const runtime = useForwardStore((s) => s.runtime);
 
@@ -136,7 +138,16 @@ export function ForwardsView() {
       }
     >
       <PanelContent className={PANEL_LIST_CLASS}>
-        {filteredForwards.length === 0 ? (
+        {isLoading ? (
+          <LoadingState label={t("common.loading")} fill />
+        ) : isError ? (
+          <ErrorState
+            title={t("common.loadError")}
+            retryLabel={t("common.retry")}
+            onRetry={() => void refetch()}
+            fill
+          />
+        ) : filteredForwards.length === 0 ? (
           <EmptyState
             icon={Network}
             title={
@@ -155,6 +166,7 @@ export function ForwardsView() {
                 </Button>
               )
             }
+            fill={!searching}
           />
         ) : (
           filteredForwards.map((forward) => {
@@ -166,7 +178,15 @@ export function ForwardsView() {
             return (
               <ContextMenu key={forward.id}>
                 <ContextMenuTrigger asChild>
-                  <div className={PANEL_LIST_ITEM_CLASS} title={statusMessage}>
+                  <div
+                    className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
+                    title={statusMessage}
+                    onDoubleClick={(event) => {
+                      if ((event.target as HTMLElement).closest("button"))
+                        return;
+                      toggle(forward);
+                    }}
+                  >
                     <div
                       className={cn(
                         PANEL_LIST_ICON_CLASS,
@@ -201,6 +221,7 @@ export function ForwardsView() {
                       }
                     >
                       <button
+                        type="button"
                         onClick={() => toggle(forward)}
                         className={PANEL_LIST_ACTION_CLASS}
                       >

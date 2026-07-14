@@ -24,7 +24,11 @@ export function Toaster() {
   const { toasts, dismiss, pause, resume } = useToastStore();
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-80 flex-col gap-2">
+    <div
+      aria-live="polite"
+      aria-relevant="additions"
+      className="pointer-events-none fixed bottom-[calc(var(--statusbar-height)+0.75rem)] left-3 right-3 z-[100] flex w-auto flex-col gap-2 sm:bottom-[calc(var(--statusbar-height)+1rem)] sm:left-auto sm:right-4 sm:w-80"
+    >
       {toasts.map((t) => {
         const Icon = iconFor[t.kind];
         return (
@@ -64,7 +68,7 @@ export function Toaster() {
               type="button"
               aria-label={translate("common.close")}
               onClick={() => dismiss(t.id)}
-              className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+              className="-mr-1 -mt-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
             >
               <X className="size-4" />
             </button>

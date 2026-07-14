@@ -202,7 +202,7 @@ export function AssistantPanel({ width }: { width: number }) {
   return (
     <aside
       style={{ width }}
-      className="flex shrink-0 flex-col overflow-hidden bg-surface/80"
+      className="flex shrink-0 flex-col overflow-hidden bg-surface"
     >
       <PanelHeader
         title={activeTitle || t("ai.viewTitle")}
@@ -271,6 +271,11 @@ export function AssistantPanel({ width }: { width: number }) {
                           </span>
                           <button
                             type="button"
+                            aria-label={t(
+                              deleteTargetId === s.id
+                                ? "common.confirm"
+                                : "common.delete",
+                            )}
                             className={cn(
                               "rounded text-muted-foreground hover:bg-accent hover:text-danger",
                               deleteTargetId === s.id
@@ -431,6 +436,7 @@ export function AssistantPanel({ width }: { width: number }) {
                     <Button
                       size="icon"
                       className="size-7 shrink-0"
+                      aria-label={t("ai.send")}
                       disabled={!input.trim() || !model}
                       onClick={() => void submit()}
                     >

@@ -39,7 +39,7 @@ function DialogOverlay({
       ref={ref}
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px]",
+        "fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] dark:bg-black/60",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         className,
       )}
@@ -129,8 +129,8 @@ function DialogContent({
           translate: `calc(-50% + ${offset.x}px) calc(-50% + ${offset.y}px)`,
         }}
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100vh-4rem)] w-full max-w-lg gap-4 overflow-y-auto",
-          "rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-md",
+          "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-4 overflow-y-auto",
+          "rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-md sm:p-6",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           className,
@@ -139,7 +139,7 @@ function DialogContent({
       >
         {children}
         {showClose && (
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
+          <DialogPrimitive.Close className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-lg text-muted-foreground opacity-70 transition-[background-color,opacity] hover:bg-accent hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
             <X className="size-4" />
             <span className="sr-only">{t("common.close")}</span>
           </DialogPrimitive.Close>
