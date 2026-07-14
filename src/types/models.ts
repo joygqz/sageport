@@ -396,6 +396,18 @@ export interface HostKeyEvent {
   status: HostKeyStatus;
 }
 
+export interface PasswordPromptEvent {
+  promptId: string;
+  sessionId: string;
+  host: string;
+  port: number;
+  username: string;
+}
+
+export interface PasswordPromptClosedEvent {
+  promptId: string;
+}
+
 export interface AppError {
   code: string;
   message: string;

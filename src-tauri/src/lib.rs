@@ -23,7 +23,8 @@ fn cleanup_orphaned_sessions(state: &AppState) {
     state.pty.close_all();
     state.sftp.disconnect_all();
     state.monitor.stop_all();
-    state.host_key_prompts.lock().clear();
+    state.connection_prompts.host_keys.lock().clear();
+    state.connection_prompts.passwords.lock().clear();
     state.ai_cancels.lock().clear();
     let mut oauth = state.sync_oauth.lock();
     if let Some(cancel) = oauth.cancel.take() {
@@ -105,6 +106,8 @@ pub fn run() {
             commands::ssh::ssh_resize,
             commands::ssh::ssh_disconnect,
             commands::ssh::ssh_host_key_respond,
+            commands::ssh::ssh_password_respond,
+            commands::ssh::ssh_password_pending,
             commands::ssh_config::ssh_config_import_preview,
             commands::ssh_config::ssh_config_import_apply,
             commands::forwards::forwards_list,

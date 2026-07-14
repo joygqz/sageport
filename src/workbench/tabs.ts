@@ -39,6 +39,7 @@ export interface TerminalTab {
   title: string;
   status: TerminalStatus;
   error?: string;
+  errorCode?: string | null;
 
   attempt: number;
 }
@@ -98,6 +99,7 @@ interface TabsState {
     id: string,
     status: TerminalStatus,
     error?: string,
+    errorCode?: string | null,
   ) => void;
 
   reconnectTerminal: (id: string) => void;
@@ -143,9 +145,7 @@ export function targetTerminalId(state: {
 export const useTabsStore = create<TabsState>((set, get) => {
   const canOpenTerminal = () => {
     if (terminalTabs(get().tabs).length < MAX_TERMINAL_TABS) return true;
-    toast.warning(
-      t("editor.tabLimitReached", { count: MAX_TERMINAL_TABS }),
-    );
+    toast.warning(t("editor.tabLimitReached", { count: MAX_TERMINAL_TABS }));
     return false;
   };
 
@@ -351,10 +351,10 @@ export const useTabsStore = create<TabsState>((set, get) => {
       setActive(next.id);
     },
 
-    setTerminalStatus: (id, status, error) =>
+    setTerminalStatus: (id, status, error, errorCode) =>
       set((s) => ({
         tabs: s.tabs.map((t) =>
-          t.id === id && isTerminal(t) ? { ...t, status, error } : t,
+          t.id === id && isTerminal(t) ? { ...t, status, error, errorCode } : t,
         ),
       })),
 
@@ -366,6 +366,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
                 ...t,
                 status: "connecting" as const,
                 error: undefined,
+                errorCode: undefined,
                 attempt: t.attempt + 1,
               }
             : t,

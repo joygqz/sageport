@@ -17,6 +17,7 @@ export const zhCN: Dictionary = {
     saveChanges: "保存更改",
     loading: "正在加载…",
     loadError: "无法加载此内容",
+    unexpectedError: "发生意外错误",
     notification: "通知",
     notifications: "通知（{hotkey}）",
     showPassword: "显示密码",
@@ -37,6 +38,12 @@ export const zhCN: Dictionary = {
     connectTimedOut: "连接超时，请检查网络、防火墙或服务器上的 SSH 服务。",
     connectionInterrupted: "连接已中断，请检查网络后重新连接以继续。",
     hostKeyRejected: "已取消连接：未信任该主机的密钥。",
+    passwordPrompt: {
+      title: "输入密码",
+      description: "{username}@{host}",
+      password: "密码",
+      connect: "连接",
+    },
   },
 
   windowControls: {
@@ -48,8 +55,8 @@ export const zhCN: Dictionary = {
 
   titleBar: {
     commandCenter: "搜索主机",
-    togglePanel: "显示或隐藏文件面板",
-    toggleAssistant: "显示或隐藏 AI 助手",
+    togglePanel: "切换文件面板",
+    toggleAssistant: "切换 AI 助手",
   },
 
   activityBar: {
@@ -86,10 +93,10 @@ export const zhCN: Dictionary = {
     viewTitle: "端口转发",
     filterPlaceholder: "筛选端口转发",
     noMatches: "没有匹配的端口转发",
-    new: "新建转发",
+    new: "新建端口转发",
     start: "启动",
     stop: "停止",
-    startError: "启动转发失败",
+    startError: "启动端口转发失败",
     label: "名称",
     labelPlaceholder: "数据库隧道",
     host: "主机",
@@ -105,18 +112,18 @@ export const zhCN: Dictionary = {
       dynamic: "动态 SOCKS (-D)",
     },
     empty: {
-      title: "暂无转发",
+      title: "暂无端口转发",
       description: "通过 SSH 将本地端口转发到远程服务。",
     },
     delete: {
-      title: "删除转发",
-      error: "删除转发失败",
+      title: "删除端口转发",
+      error: "删除端口转发失败",
     },
     form: {
       newTitle: "新建端口转发",
       editTitle: "编辑端口转发",
       required: "名称和主机为必填项",
-      saveError: "保存转发失败",
+      saveError: "保存端口转发失败",
     },
   },
 
@@ -149,9 +156,9 @@ export const zhCN: Dictionary = {
     group: { new: "新建分组" },
     terminal: { newLocal: "新建本地终端" },
     view: {
-      toggleSidebar: "显示或隐藏侧边栏",
-      togglePanel: "显示或隐藏文件面板",
-      toggleAssistant: "显示或隐藏 AI 助手",
+      toggleSidebar: "切换侧边栏",
+      togglePanel: "切换文件面板",
+      toggleAssistant: "切换 AI 助手",
     },
     tab: { close: "关闭标签页" },
     settings: { open: "打开设置" },
@@ -170,12 +177,13 @@ export const zhCN: Dictionary = {
       placeholder: "查找",
       replacePlaceholder: "替换",
       noResults: "无结果",
-      invalidRegex: "正则无效",
+      invalidRegex: "正则表达式无效",
       resultCount: "{current}/{total}",
       previous: "上一个匹配项",
       next: "下一个匹配项",
       close: "关闭查找",
       toggleReplace: "展开或收起替换",
+      withSelection: "查找选中内容",
       matchCase: "区分大小写",
       wholeWord: "全字匹配",
       regex: "使用正则表达式",
@@ -201,6 +209,8 @@ export const zhCN: Dictionary = {
   terminal: {
     connecting: "正在连接 {host}…",
     connectFailed: "连接失败",
+    connectCancelled: "连接已取消",
+    retry: "重试",
     closed: "会话已结束",
     reconnect: "重新连接",
     local: {
@@ -218,7 +228,7 @@ export const zhCN: Dictionary = {
       dialogLabel: "查找",
       placeholder: "查找",
       noResults: "无结果",
-      invalidRegex: "正则无效",
+      invalidRegex: "正则表达式无效",
       resultCount: "{current}/{total}",
       previous: "上一个匹配项",
       next: "下一个匹配项",
@@ -307,18 +317,18 @@ export const zhCN: Dictionary = {
     portInvalid: "端口必须在 1 到 65535 之间",
     credentials: "凭据",
     customCredentials: "自定义凭据",
-    usingIdentityHint: "用户名和认证方式来自所选身份。",
+    usingIdentityHint: "用户名和身份验证方式来自所选身份。",
     username: "用户名",
     usernamePlaceholder: "root",
-    authentication: "认证方式",
+    authentication: "身份验证",
     password: "密码",
     passwordKeepHint: "留空则保留当前密码。",
     sshKey: "SSH 密钥",
     selectKey: "选择密钥",
-    noKeysHint: "暂无密钥，请先在凭据视图中添加。",
+    noKeysHint: "暂无密钥，请先在凭据页中添加。",
     jumpHost: "跳板机",
     noJumpHost: "直接连接",
-    jumpHostHint: "通过一台堡垒机中转此连接。",
+    jumpHostHint: "通过一台跳板机中转此连接。",
     startupCommand: "启动命令",
     startupCommandPlaceholder: "cd /var/www && tail -f app.log",
     startupCommandHint: "每次打开会话时自动执行。",
@@ -361,8 +371,8 @@ export const zhCN: Dictionary = {
     },
     keys: {
       sectionTitle: "SSH 密钥",
-      add: "添加密钥",
-      formTitle: "添加 SSH 密钥",
+      add: "新建密钥",
+      formTitle: "新建 SSH 密钥",
       modeGenerate: "生成",
       modeImport: "导入",
       name: "名称",
@@ -401,18 +411,19 @@ export const zhCN: Dictionary = {
     },
     identities: {
       sectionTitle: "身份",
-      add: "添加身份",
+      add: "新建身份",
       newTitle: "新建身份",
       editTitle: "编辑身份",
       name: "名称",
       namePlaceholder: "生产环境 root",
       username: "用户名",
-      authentication: "认证方式",
+      authentication: "身份验证",
       password: "密码",
       passwordKeepHint: "留空则保留当前密码。",
       sshKey: "SSH 密钥",
-      noKeysHint: "使用密钥认证前请先添加 SSH 密钥。",
-      empty: "暂无身份。身份将用户名与认证方式组合，可供多台主机共用同一登录。",
+      noKeysHint: "使用密钥身份验证前请先添加 SSH 密钥。",
+      empty:
+        "暂无身份。身份将用户名与身份验证方式组合，可供多台主机共用同一登录。",
       nameUsernameRequired: "名称和用户名为必填项",
       saveError: "保存身份失败",
       delete: {
@@ -473,7 +484,7 @@ export const zhCN: Dictionary = {
     forward: "前进",
     navigationHistory: "位置历史",
     refresh: "刷新",
-    pathPlaceholder: "输入路径后按回车",
+    pathPlaceholder: "输入路径后按 Enter",
     loading: "正在加载…",
     pathNotFound: "路径不存在：{path}",
     newFolder: "新建文件夹",
@@ -499,12 +510,12 @@ export const zhCN: Dictionary = {
     transferError: "启动传输失败",
     transferFailed: "传输失败",
     connectionLost: "远程连接已中断，请检查网络后重新连接。",
-    notConnected: "请先连接后再传输文件",
+    notConnected: "连接后即可传输文件",
     toggleHidden: "显示隐藏文件",
     bookmarks: {
-      title: "收藏",
-      add: "收藏此文件夹",
-      error: "保存收藏失败",
+      title: "书签",
+      add: "添加文件夹书签",
+      error: "保存书签失败",
     },
     permissions: {
       action: "权限",
@@ -531,7 +542,7 @@ export const zhCN: Dictionary = {
       empty: "暂无传输记录",
       clear: "清空历史",
       clearConfirm: "将清空全部传输历史，此操作无法撤销。",
-      clearError: "更新历史失败",
+      clearError: "清空传输历史失败",
       loadError: "加载传输历史失败",
       status: {
         active: "进行中",
@@ -555,7 +566,7 @@ export const zhCN: Dictionary = {
       description:
         "助手可以查看终端、执行命令并使用已启用的工具。变更操作需要你的批准。",
       descriptionAutonomous:
-        "自治模式已开启，操作无需逐项批准；你可随时停止执行。",
+        "自动模式已开启，操作无需逐项批准；你可随时停止执行。",
     },
     suggestion: {
       core: {
@@ -604,13 +615,13 @@ export const zhCN: Dictionary = {
     error: "助手出错",
     confirmRun: "请求在终端中运行此命令",
     confirmAction: "请求执行此操作",
-    confirmTransfer: "请求传输此文件或目录",
+    confirmTransfer: "请求传输此文件或文件夹",
     approve: "允许",
     deny: "拒绝",
     modelLabel: "模型",
     modelLoading: "正在加载模型…",
     contextUsage: "上下文 {percent}% · {used} / {total} tokens",
-    autonomousMode: "自治",
+    autonomousMode: "自动",
     autonomousModeHint: "操作将被自动批准。打开 AI 设置即可关闭此模式。",
     tool: {
       askUser: "请求你选择",
@@ -618,7 +629,7 @@ export const zhCN: Dictionary = {
       listGroups: "列出分组",
       connectHost: "连接主机",
       runCommandOnHosts: "在多台主机运行命令",
-      checkHostHealth: "检查主机健康",
+      checkHostHealth: "检查主机连接",
       createHost: "新建主机",
       updateHost: "更新主机",
       deleteHost: "删除主机",
@@ -645,7 +656,7 @@ export const zhCN: Dictionary = {
       listFiles: "列出文件",
       readFile: "读取文件",
       writeFile: "写入文件",
-      makeDirectory: "新建目录",
+      makeDirectory: "新建文件夹",
       movePath: "移动或重命名",
       deleteFile: "删除文件",
       chmodPath: "修改权限",
@@ -660,7 +671,7 @@ export const zhCN: Dictionary = {
       listSshKeys: "列出 SSH 密钥",
       generateSshKey: "生成 SSH 密钥",
       deleteSshKey: "删除 SSH 密钥",
-      getHostStats: "获取主机监控",
+      getHostStats: "获取主机状态",
     },
   },
 
@@ -684,10 +695,10 @@ export const zhCN: Dictionary = {
       darkThemes: "深色主题",
       lightThemes: "浅色主题",
       language: "语言",
-      languageHint: "设置应用的显示语言。",
+      languageHint: "选择界面的显示语言。",
       fontFamily: "字体",
       fontFamilyHint:
-        "应用于终端和文件编辑器。多个字体用逗号分隔；留空使用默认字体。",
+        "应用于终端和文件编辑器。多个字体用逗号分隔；留空则使用默认字体。",
       zoom: "缩放",
       zoomHint: "缩放整个界面，包括终端。快捷键：",
       zoomIn: "放大",
@@ -708,7 +719,7 @@ export const zhCN: Dictionary = {
       apiKeyHint:
         "仅发送到你配置的 AI 服务地址；启用同步时会包含在端到端加密备份中。",
       autonomousModeLabel: "助手模式",
-      autonomousMode: "自动执行操作",
+      autonomousMode: "自动执行",
       autonomousModeHint:
         "开启后，助手会自动批准命令、文件编辑和配置更改等操作。目标或意图不明确时，仍会向你询问。",
       autonomousModeWarning:
@@ -749,9 +760,9 @@ export const zhCN: Dictionary = {
       setup: {
         oauthSignIn: "使用 {name} 登录",
         oauthUnavailable:
-          "此构建未配置 {name} 的 OAuth Client ID，无法使用授权登录。",
+          "此构建未配置 {name} 的 OAuth 客户端 ID，无法使用授权登录。",
         oauthError: "授权失败",
-        deviceCodeHint: "在打开的 GitHub 页面中输入此代码以完成授权。",
+        deviceCodeHint: "在 GitHub 页面输入此代码以完成授权。",
         openPageButton: "打开 GitHub",
         browserWaiting: "等待你在浏览器中完成授权…",
         authorizedAs: "已登录：{account}",
@@ -779,9 +790,9 @@ export const zhCN: Dictionary = {
         connectError: "连接失败",
         mismatchTitle: "口令不匹配",
         mismatchDescription:
-          "此口令无法解密已有备份。请输入原口令，或清空远端备份历史，准备好后再手动备份。",
+          "此口令无法解密已有备份。请输入原口令，或清空远程备份，准备好后再手动备份。",
         mismatchCancelButton: "重新输入",
-        mismatchForceButton: "清空远端历史",
+        mismatchForceButton: "清空远程备份",
       },
       connected: {
         badge: "已连接",
@@ -793,12 +804,12 @@ export const zhCN: Dictionary = {
         unchangedDescription: "当前数据与最新备份一致，未上传新备份。",
         pushFailed: "备份失败",
         pushWrongPassphrase:
-          "已连接的备份无法再用本设备的口令解密，可能已在其他设备上被重新加密。请断开连接后使用正确的口令重新连接。",
+          "当前备份无法使用本设备的口令解密，可能已在其他设备上重新加密。请断开连接，然后使用正确的口令重新连接。",
         disconnectButton: "断开连接",
         disconnectError: "断开连接失败",
         disconnectConfirmTitle: "断开同步",
         disconnectConfirmDescription:
-          "本设备将停止备份到所连接的存储，远端备份本身会保留。",
+          "本设备将停止备份到所连接的存储，远程备份会保留。",
         disconnectConfirmButton: "断开连接",
       },
       versions: {
@@ -819,12 +830,12 @@ export const zhCN: Dictionary = {
           "尚未上传新备份。确认这是要保留的版本后，再点击“立即备份”。",
         restoreFailed: "恢复失败",
         restoreWrongPassphrase:
-          "该备份使用的口令与当前同步配置的口令不同。请断开连接后使用正确的口令重新连接，再重新尝试恢复。",
+          "该备份使用的口令与当前同步配置不同。请断开连接，使用正确的口令重新连接，然后再次恢复。",
       },
       file: {
         title: "文件备份",
         description:
-          "导出单个加密备份文件或从文件恢复，与所连接的存储互相独立。每次操作都需输入口令，口令不会被保存。",
+          "独立于已连接的存储，导出或恢复单个加密备份文件。每次操作都需输入口令，且不会保存。",
         exportButton: "导出到文件…",
         importButton: "从文件恢复…",
         exportDialogTitle: "导出加密备份",

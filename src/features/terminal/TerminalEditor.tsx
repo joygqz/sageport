@@ -291,13 +291,16 @@ function StatusOverlay({
   }
 
   if (tab.status === "error") {
+    const cancelled = tab.errorCode === "cancelled";
     return (
       <Shell>
         <span className="flex size-12 items-center justify-center rounded-full bg-danger/10 text-danger">
           <ServerCrash className="size-6" />
         </span>
         <p className="text-sm font-semibold text-foreground">
-          {t("terminal.connectFailed")}
+          {t(
+            cancelled ? "terminal.connectCancelled" : "terminal.connectFailed",
+          )}
         </p>
         {tab.error && (
           <p className="max-w-md select-text break-words text-center font-mono text-xs leading-relaxed text-danger">
@@ -305,7 +308,7 @@ function StatusOverlay({
           </p>
         )}
         <Button size="sm" variant="outline" onClick={onReconnect}>
-          {t("terminal.reconnect")}
+          {t("terminal.retry")}
         </Button>
       </Shell>
     );

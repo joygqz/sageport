@@ -21,6 +21,8 @@ import type {
   HostInput,
   HostKeyDecision,
   HostKeyEvent,
+  PasswordPromptClosedEvent,
+  PasswordPromptEvent,
   Identity,
   IdentityInput,
   KeyFile,
@@ -161,12 +163,28 @@ export const ipc = {
       invoke<void>("ssh_disconnect", { sessionId }),
     respondHostKey: (promptId: string, decision: HostKeyDecision) =>
       invoke<void>("ssh_host_key_respond", { promptId, decision }),
+    respondPassword: (promptId: string, password: string | null) =>
+      invoke<void>("ssh_password_respond", { promptId, password }),
+    pendingPasswords: () =>
+      invoke<PasswordPromptEvent[]>("ssh_password_pending"),
     onData: (handler: (e: SshDataEvent) => void): Promise<UnlistenFn> =>
       listen<SshDataEvent>("ssh://data", (event) => handler(event.payload)),
     onStatus: (handler: (e: SshStatusEvent) => void): Promise<UnlistenFn> =>
       listen<SshStatusEvent>("ssh://status", (event) => handler(event.payload)),
     onHostKey: (handler: (e: HostKeyEvent) => void): Promise<UnlistenFn> =>
       listen<HostKeyEvent>("ssh://host-key", (event) => handler(event.payload)),
+    onPassword: (
+      handler: (e: PasswordPromptEvent) => void,
+    ): Promise<UnlistenFn> =>
+      listen<PasswordPromptEvent>("ssh://password", (event) =>
+        handler(event.payload),
+      ),
+    onPasswordClosed: (
+      handler: (e: PasswordPromptClosedEvent) => void,
+    ): Promise<UnlistenFn> =>
+      listen<PasswordPromptClosedEvent>("ssh://password-closed", (event) =>
+        handler(event.payload),
+      ),
   },
   pty: {
     open: (params: { sessionId: string; cols: number; rows: number }) =>

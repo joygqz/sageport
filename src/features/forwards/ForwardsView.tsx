@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { useHostKeyStore } from "@/features/terminal/host-key";
+import { usePasswordPromptStore } from "@/features/terminal/password-prompt";
 
 import {
   Button,
@@ -71,6 +72,7 @@ export function ForwardsView() {
     if (isActive(forward.id)) {
       void ipc.forwards.stop(forward.id).catch(() => {});
       useHostKeyStore.getState().rejectSession(forward.id);
+      usePasswordPromptStore.getState().cancelSession(forward.id);
     } else {
       void ipc.forwards.start(forward.id).catch((err) => {
         toast.error(t("forwards.startError"), errorMessage(err));

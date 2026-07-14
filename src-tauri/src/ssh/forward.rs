@@ -8,7 +8,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{watch, Mutex};
 
 use super::connect::{establish, SshConnection};
-use super::{Hop, HostKeyPrompts};
+use super::{ConnectionPrompts, Hop};
 use crate::error::{AppError, AppResult};
 
 pub const EVENT_STATUS: &str = "forward://status";
@@ -57,7 +57,7 @@ impl ForwardManager {
         }
     }
 
-    pub async fn start(&self, app: AppHandle, prompts: HostKeyPrompts, spec: ForwardSpec) {
+    pub async fn start(&self, app: AppHandle, prompts: ConnectionPrompts, spec: ForwardSpec) {
         let (tx, rx) = watch::channel(false);
         {
             let mut active = self.active.lock().await;
@@ -87,7 +87,7 @@ fn emit(app: &AppHandle, id: &str, status: &str, message: Option<String>) {
 
 async fn run_forward(
     app: AppHandle,
-    prompts: HostKeyPrompts,
+    prompts: ConnectionPrompts,
     spec: ForwardSpec,
     mut shutdown: watch::Receiver<bool>,
 ) {

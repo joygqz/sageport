@@ -6,6 +6,7 @@ import { errorCode, errorMessage } from "@/lib/toast";
 import type { TerminalStatus } from "@/workbench/tabs";
 import { CommandTracker } from "./commands";
 import { hasHostKeyPrompt, useHostKeyStore } from "./host-key";
+import { hasPasswordPrompt, usePasswordPromptStore } from "./password-prompt";
 import type { TerminalStatusUpdate, TerminalTransport } from "./transport";
 import { attachWebglRenderer, createTerminal } from "./xterm";
 
@@ -233,7 +234,7 @@ export class TerminalSession {
     this.disposables.push(unData, unStatus);
 
     this.emitStatus({ status: "connecting" });
-    if (this.opts.watchHostKey) this.watchHostKeyPrompts();
+    if (this.opts.watchHostKey) this.watchConnectionPrompts();
     this.armWatchdog();
 
     try {
@@ -294,7 +295,7 @@ export class TerminalSession {
 
   private armWatchdog() {
     this.clearWatchdog();
-    if (this.opts.watchHostKey && hasHostKeyPrompt(this.opts.id)) return;
+    if (this.opts.watchHostKey && this.hasConnectionPrompt()) return;
     this.watchdog = setTimeout(() => {
       if (this.disposed || this.connectSettled) return;
       this.ended = true;
@@ -314,17 +315,23 @@ export class TerminalSession {
     this.clearWatchdog();
   }
 
-  private watchHostKeyPrompts() {
-    let prompted = hasHostKeyPrompt(this.opts.id);
+  private hasConnectionPrompt() {
+    return hasHostKeyPrompt(this.opts.id) || hasPasswordPrompt(this.opts.id);
+  }
+
+  private watchConnectionPrompts() {
+    let prompted = this.hasConnectionPrompt();
+    const update = () => {
+      const pending = this.hasConnectionPrompt();
+      if (pending === prompted) return;
+      prompted = pending;
+      if (this.disposed || this.connectSettled || this.ended) return;
+      if (pending) this.clearWatchdog();
+      else this.armWatchdog();
+    };
     this.disposables.push(
-      useHostKeyStore.subscribe((s) => {
-        const pending = s.queue.some((e) => e.sessionId === this.opts.id);
-        if (pending === prompted) return;
-        prompted = pending;
-        if (this.disposed || this.connectSettled || this.ended) return;
-        if (pending) this.clearWatchdog();
-        else this.armWatchdog();
-      }),
+      useHostKeyStore.subscribe(update),
+      usePasswordPromptStore.subscribe(update),
     );
   }
 

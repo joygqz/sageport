@@ -14,7 +14,7 @@ use tokio::sync::Notify;
 use tokio::sync::OnceCell;
 
 use crate::error::{AppError, AppResult};
-use crate::ssh::{establish, exec_capture, Hop, HostKeyPrompts, SshConnection};
+use crate::ssh::{establish, exec_capture, ConnectionPrompts, Hop, SshConnection};
 
 pub use path::base_name;
 pub use transfer::{transfer, Endpoint};
@@ -175,7 +175,7 @@ impl SftpManager {
         self.cancel_flags.lock().remove(transfer_id);
     }
 
-    pub fn connect(&self, app: AppHandle, prompts: HostKeyPrompts, params: SftpConnectParams) {
+    pub fn connect(&self, app: AppHandle, prompts: ConnectionPrompts, params: SftpConnectParams) {
         let id = params.connection_id.clone();
         let cancel = Arc::new(TransferCancel::new());
         {
@@ -206,7 +206,7 @@ impl SftpManager {
                         pending.remove(&id);
                     }
                 }
-                Err(AppError::Cancelled) => {}
+                Err(AppError::Cancelled) if cancel.is_cancelled() => {}
                 Err(e) => {
                     let mut pending = connect_cancels.lock();
                     let is_current = pending
@@ -303,7 +303,7 @@ impl SftpManager {
 
 async fn open(
     app: &AppHandle,
-    prompts: &HostKeyPrompts,
+    prompts: &ConnectionPrompts,
     params: &SftpConnectParams,
 ) -> AppResult<Conn> {
     let ssh = establish(app, prompts, &params.connection_id, &params.hops).await?;

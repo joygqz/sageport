@@ -10,6 +10,7 @@ import { GroupFormDialog } from "@/features/hosts/GroupFormDialog";
 import { HostFormDialog } from "@/features/hosts/HostFormDialog";
 import { bridgeSftpEvents } from "@/features/sftp/store";
 import { HostKeyDialog } from "@/features/terminal/HostKeyDialog";
+import { PasswordPromptDialog } from "@/features/terminal/PasswordPromptDialog";
 import { useUpdateNotifier } from "@/features/updates/notifier";
 import { ActivityBar } from "./ActivityBar";
 import { CommandPalette } from "./CommandPalette";
@@ -219,6 +220,7 @@ export function Workbench() {
         </Suspense>
       )}
       <HostKeyDialog />
+      <PasswordPromptDialog />
       <Toaster />
     </div>
   );

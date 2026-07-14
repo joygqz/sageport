@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { useHostKeyStore } from "@/features/terminal/host-key";
+import { usePasswordPromptStore } from "@/features/terminal/password-prompt";
 import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
@@ -29,6 +30,7 @@ function describeConnectError(code?: string | null, message?: string) {
   if (code === "invalid") return t("ssh.credentialsMissing");
   if (code === "auth") return t("ssh.authFailed");
   if (code === "host_key") return t("ssh.hostKeyRejected");
+  if (code === "cancelled") return t("terminal.connectCancelled");
   if (code === "network") return t("sftp.connectionLost");
   return message;
 }
@@ -347,6 +349,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
         }
         void ipc.sftp.disconnect(tab.connectionId).catch(() => {});
         useHostKeyStore.getState().rejectSession(tab.connectionId);
+        usePasswordPromptStore.getState().cancelSession(tab.connectionId);
       }
       set((s) => {
         const tabs = s.panes[side].tabs.filter((t) => t.id !== tabId);
@@ -412,8 +415,10 @@ export const useSftpStore = create<SftpState>((set, get) => {
     setSelected: (side, tabId, selected) => patchTab(side, tabId, { selected }),
 
     applyStatus: (connectionId, status, message, code) => {
-      if (status === "error" || status === "closed")
+      if (status === "error" || status === "closed") {
         useHostKeyStore.getState().rejectSession(connectionId);
+        usePasswordPromptStore.getState().cancelSession(connectionId);
+      }
       const found = findByConnection(connectionId);
       if (!found) return;
       const { side, tab } = found;

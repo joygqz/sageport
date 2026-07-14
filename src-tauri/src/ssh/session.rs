@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use super::connect::{establish, SshConnection};
-use super::{ConnectParams, HostKeyPrompts, EVENT_DATA, EVENT_STATUS, TERM};
+use super::{ConnectParams, ConnectionPrompts, EVENT_DATA, EVENT_STATUS, TERM};
 use crate::error::{AppError, AppResult};
 
 type ConnectionMap = Arc<Mutex<HashMap<String, Arc<SshConnection>>>>;
@@ -61,7 +61,7 @@ impl SessionManager {
         self.connections.lock().get(id).cloned()
     }
 
-    pub fn connect(&self, app: AppHandle, prompts: HostKeyPrompts, params: ConnectParams) {
+    pub fn connect(&self, app: AppHandle, prompts: ConnectionPrompts, params: ConnectParams) {
         let id = params.session_id.clone();
         let attempt = params.attempt;
         let (tx, rx) = mpsc::unbounded_channel();
@@ -143,7 +143,7 @@ fn emit_status(app: &AppHandle, id: &str, attempt: u32, status: &str, err: Optio
 
 async fn run_session(
     app: AppHandle,
-    prompts: HostKeyPrompts,
+    prompts: ConnectionPrompts,
     params: ConnectParams,
     rx: UnboundedReceiver<SessionCommand>,
     connections: ConnectionMap,
@@ -160,7 +160,7 @@ async fn run_session(
 
 async fn run_session_inner(
     app: &AppHandle,
-    prompts: &HostKeyPrompts,
+    prompts: &ConnectionPrompts,
     params: &ConnectParams,
     mut rx: UnboundedReceiver<SessionCommand>,
     connections: &ConnectionMap,

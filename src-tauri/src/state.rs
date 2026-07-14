@@ -9,7 +9,7 @@ use crate::pty::PtyManager;
 use crate::sftp::SftpManager;
 use crate::ssh::forward::ForwardManager;
 use crate::ssh::monitor::MonitorManager;
-use crate::ssh::{new_host_key_prompts, HostKeyPrompts, SessionManager};
+use crate::ssh::{new_connection_prompts, ConnectionPrompts, SessionManager};
 use crate::sync::{oauth::OAuthOutcome, ProviderKind};
 use crate::update::UpdateManager;
 
@@ -31,7 +31,7 @@ pub struct AppState {
 
     pub monitor: MonitorManager,
 
-    pub host_key_prompts: HostKeyPrompts,
+    pub connection_prompts: ConnectionPrompts,
 
     pub update: UpdateManager,
 
@@ -49,7 +49,7 @@ impl AppState {
             pty: PtyManager::new(),
             forwards: ForwardManager::new(),
             monitor: MonitorManager::new(),
-            host_key_prompts: new_host_key_prompts(),
+            connection_prompts: new_connection_prompts(),
             update: UpdateManager::new(),
             ai_cancels: Mutex::new(HashMap::new()),
             sync_oauth: Mutex::new(SyncOAuthSlot::default()),

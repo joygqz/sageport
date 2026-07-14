@@ -41,7 +41,7 @@ pub async fn hosts_run_command(
         targets.push((host_id.clone(), hops));
     }
 
-    let prompts = state.host_key_prompts.clone();
+    let prompts = state.connection_prompts.clone();
     let limit = Arc::new(Semaphore::new(BATCH_CONCURRENCY));
     let mut tasks = JoinSet::new();
 

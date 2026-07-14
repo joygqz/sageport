@@ -1,5 +1,8 @@
 import { create } from "zustand";
 
+import { detectLocale } from "@/i18n/config";
+import { translate } from "@/i18n/translate";
+
 export type ToastKind = "info" | "success" | "warning" | "error";
 
 export interface ToastAction {
@@ -54,7 +57,9 @@ export function errorMessage(err: unknown): string {
   if (err && typeof err === "object" && "message" in err) {
     return String((err as { message: unknown }).message);
   }
-  return typeof err === "string" ? err : "Unexpected error";
+  return typeof err === "string"
+    ? err
+    : translate(detectLocale(), "common.unexpectedError");
 }
 
 export function errorCode(err: unknown): string | null {

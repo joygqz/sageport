@@ -71,7 +71,7 @@ pub async fn fs_connect(
 
     state.sftp.connect(
         app,
-        state.host_key_prompts.clone(),
+        state.connection_prompts.clone(),
         SftpConnectParams {
             connection_id,
             hops,

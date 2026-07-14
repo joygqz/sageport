@@ -13,6 +13,7 @@ import { terminalFontSize } from "@/workbench/zoom";
 import { createAutocomplete } from "./autocomplete/controller";
 import { useBroadcastStore } from "./broadcast";
 import { useHostKeyStore } from "./host-key";
+import { usePasswordPromptStore } from "./password-prompt";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
 import { TerminalSession } from "./session";
 import { disposeSession, getSession, registerSession } from "./sessions";
@@ -79,6 +80,7 @@ export function TerminalView({
       if (code === "host_key") return translate("ssh.hostKeyRejected");
       if (code === "timeout") return translate("ssh.connectTimedOut");
       if (code === "network") return translate("ssh.connectionInterrupted");
+      if (code === "cancelled") return undefined;
       return message;
     };
 
@@ -104,6 +106,7 @@ export function TerminalView({
           else if (e.status === "closed" || e.status === "error") {
             stopMonitor(sessionId);
             useHostKeyStore.getState().rejectSession(sessionId);
+            usePasswordPromptStore.getState().cancelSession(sessionId);
           }
         }
         useTabsStore
@@ -112,6 +115,7 @@ export function TerminalView({
             sessionId,
             e.status,
             e.status === "error" ? describeError(e.code, e.message) : e.message,
+            e.status === "error" ? e.code : undefined,
           );
       },
       onUserInput: (data) => {
@@ -133,6 +137,7 @@ export function TerminalView({
         if (isSshLike) {
           stopMonitor(sessionId);
           useHostKeyStore.getState().rejectSession(sessionId);
+          usePasswordPromptStore.getState().cancelSession(sessionId);
         }
       },
     });

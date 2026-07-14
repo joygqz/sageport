@@ -9,6 +9,7 @@ import {
 import { HardDrive, Server } from "lucide-react";
 
 import { Spinner } from "@/components/ui";
+import { useI18n } from "@/i18n";
 import { IS_MACOS } from "@/lib/platform";
 import { useTheme } from "@/themes";
 import { monoFontFamily, useFontStore } from "@/workbench/font";
@@ -87,6 +88,7 @@ export function FileEditor({ tab }: { tab: FileTab }) {
 }
 
 function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
+  const { t } = useI18n();
   const hostRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<CodeEditorInstance | null>(null);
   const findBarRef = useRef<FileFindBarHandle>(null);
@@ -163,13 +165,13 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
     const findActions = [
       editor.addAction({
         id: "actions.find",
-        label: "Find",
+        label: t("editor.find.placeholder"),
         keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF],
         run: () => openFind(false),
       }),
       editor.addAction({
         id: "editor.action.startFindReplaceAction",
-        label: "Replace",
+        label: t("editor.find.replace"),
         keybindings: [
           ...(!IS_MACOS ? [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyH] : []),
           monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
@@ -178,7 +180,7 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
       }),
       editor.addAction({
         id: "editor.action.nextMatchFindAction",
-        label: "Find Next",
+        label: t("editor.find.next"),
         keybindings: [
           monaco.KeyCode.F3,
           ...(IS_MACOS ? [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG] : []),
@@ -190,7 +192,7 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
       }),
       editor.addAction({
         id: "editor.action.previousMatchFindAction",
-        label: "Find Previous",
+        label: t("editor.find.previous"),
         keybindings: [
           monaco.KeyMod.Shift | monaco.KeyCode.F3,
           ...(IS_MACOS
@@ -210,7 +212,7 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
         ? [
             editor.addAction({
               id: "actions.findWithSelection",
-              label: "Find With Selection",
+              label: t("editor.find.withSelection"),
               keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyE],
               run: () => openFind(false, true),
             }),
@@ -242,7 +244,7 @@ function CodeEditor({ tabId, title }: { tabId: string; title: string }) {
       editor.dispose();
       model.dispose();
     };
-  }, [openFind, tabId, title]);
+  }, [openFind, t, tabId, title]);
 
   const onKeyDownCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const key = event.key.toLowerCase();

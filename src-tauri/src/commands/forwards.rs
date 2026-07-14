@@ -71,7 +71,7 @@ pub async fn forward_start(
     let spec = build_spec(&state, &forward).await?;
     state
         .forwards
-        .start(app, state.host_key_prompts.clone(), spec)
+        .start(app, state.connection_prompts.clone(), spec)
         .await;
     Ok(())
 }
@@ -91,7 +91,7 @@ pub async fn start_auto_forwards(app: &AppHandle) {
         if let Ok(spec) = build_spec(&state, &forward).await {
             state
                 .forwards
-                .start(app.clone(), state.host_key_prompts.clone(), spec)
+                .start(app.clone(), state.connection_prompts.clone(), spec)
                 .await;
         }
     }

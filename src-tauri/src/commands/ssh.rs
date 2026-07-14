@@ -6,7 +6,8 @@ use crate::domain::{auth, Host};
 use crate::error::{AppError, AppResult};
 use crate::repository::{host_repo, identity_repo, key_repo};
 use crate::ssh::{
-    resolve_host_key, AuthMethod, ConnectParams, Hop, HostKeyDecision, JUMP_DEPTH_LIMIT,
+    pending_password_prompts, resolve_host_key, resolve_password, AuthMethod, ConnectParams, Hop,
+    HostKeyDecision, PasswordPromptEvent, JUMP_DEPTH_LIMIT,
 };
 use crate::state::AppState;
 
@@ -43,7 +44,7 @@ pub async fn ssh_connect(
 
     state
         .ssh
-        .connect(app, state.host_key_prompts.clone(), params);
+        .connect(app, state.connection_prompts.clone(), params);
     host_repo::touch_last_used(&state.db, &host_id).await?;
     Ok(())
 }
@@ -65,7 +66,7 @@ pub async fn ssh_connect_adhoc(
         host,
         port: valid_port(port)?,
         username,
-        auth: AuthMethod::Agent,
+        auth: AuthMethod::Automatic,
     };
     let params = ConnectParams {
         session_id,
@@ -77,7 +78,7 @@ pub async fn ssh_connect_adhoc(
     };
     state
         .ssh
-        .connect(app, state.host_key_prompts.clone(), params);
+        .connect(app, state.connection_prompts.clone(), params);
     Ok(())
 }
 
@@ -117,8 +118,27 @@ pub async fn ssh_host_key_respond(
         "remember" => HostKeyDecision::AcceptRemember,
         other => return Err(AppError::Invalid(format!("unknown decision: {other}"))),
     };
-    resolve_host_key(&state.host_key_prompts, &prompt_id, decision);
+    resolve_host_key(&state.connection_prompts.host_keys, &prompt_id, decision);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn ssh_password_respond(
+    state: State<'_, AppState>,
+    prompt_id: String,
+    password: Option<String>,
+) -> AppResult<()> {
+    resolve_password(&state.connection_prompts.passwords, &prompt_id, password);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn ssh_password_pending(
+    state: State<'_, AppState>,
+) -> AppResult<Vec<PasswordPromptEvent>> {
+    Ok(pending_password_prompts(
+        &state.connection_prompts.passwords,
+    ))
 }
 
 pub(crate) async fn build_hops(state: &State<'_, AppState>, host: &Host) -> AppResult<Vec<Hop>> {
@@ -176,12 +196,7 @@ pub(crate) async fn resolve_credentials(
     };
 
     let method = match auth_type.as_str() {
-        auth::PASSWORD => {
-            let password = password
-                .filter(|p| !p.is_empty())
-                .ok_or_else(|| AppError::Invalid("no password stored for this host".into()))?;
-            AuthMethod::Password(password)
-        }
+        auth::PASSWORD => AuthMethod::Password(password.filter(|p| !p.is_empty())),
         auth::KEY => {
             let key_id = key_id
                 .ok_or_else(|| AppError::Invalid("key auth selected but no key set".into()))?;
