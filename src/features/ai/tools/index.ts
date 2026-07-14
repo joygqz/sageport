@@ -31,6 +31,7 @@ export {
   TOOL_GROUPS,
   TOOLS_REQUIRING_APPROVAL,
   normalizeEnabledToolNames,
+  resolveEnabledToolNames,
 } from "./registry";
 export {
   normalizeArgs,

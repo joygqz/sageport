@@ -42,7 +42,7 @@ import { pickSuggestionsForSession } from "./suggestions";
 import { useAiStore } from "./store";
 import type { AgentLogItem } from "./transcript";
 import { askUserOptions, askUserQuestion } from "./tools";
-import { TOOL_GROUPS } from "./tools/registry";
+import { resolveEnabledToolNames, TOOL_GROUPS } from "./tools/registry";
 import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
 const EMPTY_LOG: AgentLogItem[] = [];
@@ -92,7 +92,8 @@ export function AssistantPanel({ width }: { width: number }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const enabledToolNames = new Set(config?.enabledTools ?? []);
+  const enabledToolList = resolveEnabledToolNames(config?.enabledTools);
+  const enabledToolNames = new Set(enabledToolList);
   const enabledSuggestionGroups = TOOL_GROUPS.filter(
     ({ id, tools }) =>
       id === "core" ||
@@ -169,7 +170,7 @@ export function AssistantPanel({ width }: { width: number }) {
         prompt,
         model,
         config?.autoApprove ?? false,
-        config?.enabledTools ?? [],
+        enabledToolList,
         config?.maxHistoryTokens,
       );
       return true;
@@ -192,7 +193,7 @@ export function AssistantPanel({ width }: { width: number }) {
       activeId,
       model,
       config?.autoApprove ?? false,
-      config?.enabledTools ?? [],
+      enabledToolList,
       config?.maxHistoryTokens,
     );
   };

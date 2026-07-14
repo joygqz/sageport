@@ -22,7 +22,7 @@ pub struct AiConfig {
     pub protocol: Protocol,
     pub model: String,
     pub auto_approve: bool,
-    pub enabled_tools: Vec<String>,
+    pub enabled_tools: Option<Vec<String>>,
     pub max_history_tokens: Option<u32>,
 }
 
@@ -80,8 +80,7 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
         == Some("true");
     let enabled_tools = settings_repo::get(&state.db, ENABLED_TOOLS_SETTING)
         .await?
-        .and_then(|value| serde_json::from_str::<Vec<String>>(&value).ok())
-        .unwrap_or_default();
+        .and_then(|value| serde_json::from_str::<Vec<String>>(&value).ok());
     let max_history_tokens = settings_repo::get(&state.db, MAX_HISTORY_TOKENS_SETTING)
         .await?
         .and_then(|value| value.trim().parse::<u32>().ok())

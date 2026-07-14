@@ -252,7 +252,7 @@ export interface AiConfig {
   protocol: AiProtocol;
   model: string;
   autoApprove: boolean;
-  enabledTools: string[];
+  enabledTools: string[] | null;
   maxHistoryTokens: number | null;
 }
 

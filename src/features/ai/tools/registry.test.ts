@@ -13,6 +13,7 @@ import {
   enabledToolSpecs,
   normalizeEnabledToolNames,
   prepareTool,
+  resolveEnabledToolNames,
   redactToolArguments,
   validateToolArguments,
 } from "./registry";
@@ -57,6 +58,19 @@ describe("tool registry", () => {
 
     expect(new Set(names)).toEqual(new Set([...CORE_TOOL_NAMES, "list_hosts"]));
     expect(normalizeEnabledToolNames(names)).toEqual(["list_hosts"]);
+  });
+
+  it("resolves an unset tool list to every optional tool", () => {
+    const optionalNames = ALL_TOOLS.filter(
+      (tool) => !CORE_TOOL_NAMES.has(tool.spec.name),
+    ).map((tool) => tool.spec.name);
+
+    expect(resolveEnabledToolNames(null)).toEqual(optionalNames);
+    expect(resolveEnabledToolNames(undefined)).toEqual(optionalNames);
+    expect(resolveEnabledToolNames([])).toEqual([]);
+    expect(resolveEnabledToolNames(["list_hosts", "ask_user"])).toEqual([
+      "list_hosts",
+    ]);
   });
 
   it("returns args unchanged when a tool declares no prepare hook", async () => {

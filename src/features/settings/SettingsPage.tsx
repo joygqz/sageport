@@ -60,6 +60,7 @@ import {
 import {
   CORE_TOOL_NAMES,
   normalizeEnabledToolNames,
+  resolveEnabledToolNames,
   TOOL_GROUPS,
 } from "@/features/ai/tools";
 import { SyncSection } from "@/features/sync/SyncSection";
@@ -505,7 +506,7 @@ function AiForm({ config }: { config: AiConfig }) {
   const [apiKey, setApiKey] = useState(config.apiKey);
   const [autoApprove, setAutoApprove] = useState(config.autoApprove);
   const [enabledTools, setEnabledTools] = useState(() =>
-    normalizeEnabledToolNames(config.enabledTools ?? []),
+    resolveEnabledToolNames(config.enabledTools),
   );
   const [maxHistoryTokens, setMaxHistoryTokens] = useState(
     config.maxHistoryTokens,
