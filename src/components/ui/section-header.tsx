@@ -14,13 +14,13 @@ export function SectionHeader({
   return (
     <div>
       <div className="flex items-center gap-1.5">
-        <h3 className="text-base font-semibold tracking-tight text-foreground">
+        <h3 className="text-sm font-medium leading-none text-foreground">
           {title}
         </h3>
         {actions}
       </div>
       {description && (
-        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
           {description}
         </p>
       )}

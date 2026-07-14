@@ -669,8 +669,6 @@ export const zhCN: Dictionary = {
       about: "关于",
     },
     appearance: {
-      themeTitle: "主题",
-      themeDescription: "选择一套协调的主题系列，并设置它如何跟随系统外观。",
       colorMode: "颜色模式",
       modeSystem: "跟随系统",
       modeLight: "浅色",
@@ -693,7 +691,6 @@ export const zhCN: Dictionary = {
       zoomReset: "重置缩放",
     },
     ai: {
-      title: "AI 服务商",
       description:
         "使用你自己的 API 密钥，支持 Anthropic 和任意 OpenAI 兼容接口。更改会自动保存。",
       protocolLabel: "接口格式",
@@ -733,7 +730,6 @@ export const zhCN: Dictionary = {
       saveError: "保存配置失败",
     },
     sync: {
-      title: "同步",
       description:
         "将主机、密钥、命令片段和设置备份到你选择的存储。所有数据在离开本设备前都会先用口令进行端到端加密。切换存储需先断开连接。",
       corruptRemoteBackup:
@@ -784,7 +780,6 @@ export const zhCN: Dictionary = {
       },
       connected: {
         badge: "已连接",
-        hint: "本设备会备份到并从所连接的存储恢复。如需切换存储或更换口令，请先断开连接。",
         lastSyncedLabel: "上次同步",
         neverSynced: "从未同步",
         pushButton: "立即备份",

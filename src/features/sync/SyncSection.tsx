@@ -40,28 +40,43 @@ export function SyncSection() {
   const { t } = useI18n();
   const { data: status, isLoading, isError, refetch } = useSyncStatus();
 
-  if (isLoading) return <LoadingState label={t("common.loading")} />;
-  if (isError || !status) {
-    return (
-      <ErrorState
-        title={t("common.loadError")}
-        retryLabel={t("common.retry")}
-        onRetry={() => void refetch()}
-      />
-    );
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      {status.provider ? (
-        <>
-          <ConnectedCard status={status} />
-          <Separator />
-          <VersionsCard />
-        </>
-      ) : (
-        <SetupView status={status} />
-      )}
+      <section
+        aria-labelledby="sync-storage-heading"
+        className="flex flex-col gap-6"
+      >
+        <div>
+          <h1
+            id="sync-storage-heading"
+            className="text-lg font-semibold tracking-tight text-foreground"
+          >
+            {t("settings.nav.sync")}
+          </h1>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            {t("settings.sync.description")}
+          </p>
+        </div>
+
+        {isLoading && <LoadingState label={t("common.loading")} />}
+        {!isLoading && (isError || !status) && (
+          <ErrorState
+            title={t("common.loadError")}
+            retryLabel={t("common.retry")}
+            onRetry={() => void refetch()}
+          />
+        )}
+        {!isLoading && !isError && status?.provider && (
+          <>
+            <ConnectedCard status={status} />
+            <Separator />
+            <VersionsCard />
+          </>
+        )}
+        {!isLoading && !isError && status && !status.provider && (
+          <SetupView status={status} />
+        )}
+      </section>
       <Separator />
       <FileBackupCard />
     </div>
@@ -129,11 +144,6 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionHeader
-        title={t("settings.sync.title")}
-        description={t("settings.sync.connected.hint")}
-      />
-
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card/55 px-4 py-3">
         <Icon className="size-6 shrink-0 text-foreground" />
         <div className="flex min-w-0 flex-1 basis-64 flex-col">
@@ -386,11 +396,21 @@ function FileBackupCard() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <SectionHeader
-        title={t("settings.sync.file.title")}
-        description={t("settings.sync.file.description")}
-      />
+    <section
+      aria-labelledby="file-backup-heading"
+      className="flex flex-col gap-4"
+    >
+      <div>
+        <h2
+          id="file-backup-heading"
+          className="text-lg font-semibold tracking-tight text-foreground"
+        >
+          {t("settings.sync.file.title")}
+        </h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+          {t("settings.sync.file.description")}
+        </p>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <Button
@@ -414,7 +434,7 @@ function FileBackupCard() {
         onOpenChange={(next) => !next && setAction(null)}
         onConfirm={handleConfirm}
       />
-    </div>
+    </section>
   );
 }
 

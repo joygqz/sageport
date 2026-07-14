@@ -65,10 +65,25 @@ import {
 import { SyncSection } from "@/features/sync/SyncSection";
 import { AboutSection } from "./AboutSection";
 
-const NAV: { id: SettingsSection; labelKey: TKey; icon: typeof Palette }[] = [
+const NAV: {
+  id: SettingsSection;
+  labelKey: TKey;
+  descriptionKey?: TKey;
+  icon: typeof Palette;
+}[] = [
   { id: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
-  { id: "ai", labelKey: "settings.nav.ai", icon: Sparkles },
-  { id: "sync", labelKey: "settings.nav.sync", icon: RefreshCw },
+  {
+    id: "ai",
+    labelKey: "settings.nav.ai",
+    descriptionKey: "settings.ai.description",
+    icon: Sparkles,
+  },
+  {
+    id: "sync",
+    labelKey: "settings.nav.sync",
+    descriptionKey: "settings.sync.description",
+    icon: RefreshCw,
+  },
   { id: "about", labelKey: "settings.nav.about", icon: Info },
 ];
 
@@ -114,6 +129,7 @@ function SettingsPage({
   onSectionChange: (section: SettingsSection) => void;
 }) {
   const { t } = useI18n();
+  const currentSection = NAV.find((item) => item.id === section)!;
 
   return (
     <div className="settings-page min-h-0 flex-1 overflow-hidden bg-background">
@@ -149,11 +165,18 @@ function SettingsPage({
 
         <ScrollArea className="min-h-0 min-w-0 flex-1">
           <main className="settings-content flex w-full max-w-3xl flex-col gap-6 px-5 py-6 sm:px-8 sm:py-8">
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight text-foreground">
-                {t(NAV.find((item) => item.id === section)!.labelKey)}
-              </h1>
-            </div>
+            {section !== "sync" && (
+              <div>
+                <h1 className="text-lg font-semibold tracking-tight text-foreground">
+                  {t(currentSection.labelKey)}
+                </h1>
+                {currentSection.descriptionKey && (
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                    {t(currentSection.descriptionKey)}
+                  </p>
+                )}
+              </div>
+            )}
             {section === "appearance" && <AppearanceSection />}
             {section === "ai" && <AiSection />}
             {section === "sync" && <SyncSection />}
@@ -201,26 +224,15 @@ function AppearanceSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader
-        title={t("settings.appearance.themeTitle")}
-        description={t("settings.appearance.themeDescription")}
-      />
-
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          {t("settings.appearance.colorMode")}
-        </p>
+      <Field label={t("settings.appearance.colorMode")}>
         <SegmentedControl
           value={preference.mode}
           onChange={setMode}
           options={modes}
         />
-      </div>
+      </Field>
 
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          {t("settings.appearance.themeFamily")}
-        </p>
+      <Field label={t("settings.appearance.themeFamily")}>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3">
           {THEME_FAMILIES.map((family) => (
             <ThemeFamilyCard
@@ -233,7 +245,7 @@ function AppearanceSection() {
             />
           ))}
         </div>
-      </div>
+      </Field>
 
       <Separator />
 
@@ -600,11 +612,6 @@ function AiForm({ config }: { config: AiConfig }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader
-        title={t("settings.ai.title")}
-        description={t("settings.ai.description")}
-      />
-
       <div className="flex flex-col gap-4">
         <Field label={t("settings.ai.protocolLabel")}>
           <Select
@@ -689,10 +696,7 @@ function AiForm({ config }: { config: AiConfig }) {
       </div>
 
       <div className="flex flex-col gap-3">
-        <SectionHeader
-          title={t("settings.ai.tools.title")}
-          description={t("settings.ai.tools.description")}
-        />
+        <SectionHeader title={t("settings.ai.tools.title")} />
         <p className="text-xs text-muted-foreground">
           {t("settings.ai.tools.enabledSummary", {
             enabled: CORE_TOOL_NAMES.size + enabledTools.length,
@@ -719,6 +723,9 @@ function AiForm({ config }: { config: AiConfig }) {
             />
           ))}
         </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t("settings.ai.tools.description")}
+        </p>
       </div>
     </div>
   );

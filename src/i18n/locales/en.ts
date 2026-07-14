@@ -692,9 +692,6 @@ export const en = {
       about: "About",
     },
     appearance: {
-      themeTitle: "Theme",
-      themeDescription:
-        "Choose a coordinated color family and how it responds to your system appearance.",
       colorMode: "Color mode",
       modeSystem: "System",
       modeLight: "Light",
@@ -718,7 +715,6 @@ export const en = {
       zoomReset: "Reset Zoom",
     },
     ai: {
-      title: "AI Provider",
       description:
         "Bring your own API key. Works with Anthropic and any OpenAI-compatible endpoint. Changes are saved automatically.",
       protocolLabel: "API Format",
@@ -758,7 +754,6 @@ export const en = {
       saveError: "Failed to save configuration",
     },
     sync: {
-      title: "Sync",
       description:
         "Back up hosts, keys, snippets, and settings to a storage of your choice. Everything is end-to-end encrypted with your passphrase before it leaves this device. Disconnect first to switch storage.",
       corruptRemoteBackup:
@@ -811,7 +806,6 @@ export const en = {
       },
       connected: {
         badge: "Connected",
-        hint: "This device backs up to and restores from the connected storage. Disconnect to switch storage or change the passphrase.",
         lastSyncedLabel: "Last synced",
         neverSynced: "Never",
         pushButton: "Back Up Now",
