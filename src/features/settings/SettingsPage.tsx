@@ -92,9 +92,11 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showClose={false}
-        className="flex h-[min(44rem,calc(100vh-4rem))] w-[min(58rem,calc(100vw-4rem))] max-w-none flex-col gap-0 overflow-hidden p-0"
+        className="flex h-[min(44rem,calc(100vh-4rem))] w-[min(58rem,calc(100vw-4rem))] max-w-none flex-col gap-0 overflow-hidden bg-background p-0 text-foreground"
       >
-        <DialogToolbar>{t("settings.title")}</DialogToolbar>
+        <DialogToolbar className="bg-background">
+          {t("settings.title")}
+        </DialogToolbar>
         <SettingsPage section={section} onSectionChange={onSectionChange} />
       </DialogContent>
     </Dialog>
