@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronRight, Plug, Server } from "lucide-react";
 
@@ -8,6 +8,11 @@ import { parseQuickConnect } from "@/features/terminal/quick-connect";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { Host } from "@/types/models";
+import {
+  clampPaletteIndex,
+  hasPointerMoved,
+  movePaletteIndex,
+} from "./command-palette-navigation";
 import { useCommands, type WorkbenchCommand } from "./commands";
 import { useTabsStore, type AdhocTarget } from "./tabs";
 
@@ -67,6 +72,7 @@ function PaletteBody({
   const [input, setInput] = useState(initialMode === "commands" ? ">" : "");
   const [index, setIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const pointerPositionRef = useRef<{ x: number; y: number } | null>(null);
   const listId = useId();
 
   const { data: hosts = [] } = useHosts();
@@ -108,13 +114,23 @@ function PaletteBody({
     }
     return matches;
   }, [commandMode, query, commands, hosts, t]);
-  const safeIndex = Math.min(index, Math.max(0, items.length - 1));
+  const safeIndex = clampPaletteIndex(index, items.length);
 
-  useEffect(() => {
-    listRef.current
-      ?.querySelector('[data-highlighted="true"]')
-      ?.scrollIntoView({ block: "nearest" });
-  }, [safeIndex]);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const highlighted = list?.querySelector<HTMLElement>(
+      '[data-highlighted="true"]',
+    );
+    if (!list || !highlighted) return;
+
+    const listRect = list.getBoundingClientRect();
+    const highlightedRect = highlighted.getBoundingClientRect();
+    if (highlightedRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - highlightedRect.top;
+    } else if (highlightedRect.bottom > listRect.bottom) {
+      list.scrollTop += highlightedRect.bottom - listRect.bottom;
+    }
+  }, [commandMode, query, safeIndex]);
 
   const run = (item: PaletteItem) => {
     onClose();
@@ -126,10 +142,10 @@ function PaletteBody({
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setIndex((i) => Math.min(i + 1, items.length - 1));
+      setIndex((i) => movePaletteIndex(i, 1, items.length));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setIndex((i) => Math.max(i - 1, 0));
+      setIndex((i) => movePaletteIndex(i, -1, items.length));
     } else if (e.key === "Home") {
       e.preventDefault();
       setIndex(0);
@@ -196,7 +212,22 @@ function PaletteBody({
               item={item}
               id={`${listId}-option-${i}`}
               highlighted={i === safeIndex}
-              onHover={() => setIndex(i)}
+              onHover={(event) => {
+                const nextPosition = {
+                  x: event.clientX,
+                  y: event.clientY,
+                };
+                const previousPosition = pointerPositionRef.current;
+                pointerPositionRef.current = nextPosition;
+                const pointerMoved = hasPointerMoved(
+                  previousPosition,
+                  nextPosition,
+                  { x: event.movementX, y: event.movementY },
+                );
+
+                if (!pointerMoved) return;
+                setIndex(i);
+              }}
               onSelect={() => run(item)}
             />
           ))
@@ -216,7 +247,7 @@ function PaletteRow({
   item: PaletteItem;
   id: string;
   highlighted: boolean;
-  onHover: () => void;
+  onHover: (event: React.PointerEvent<HTMLDivElement>) => void;
   onSelect: () => void;
 }) {
   const { t } = useI18n();
