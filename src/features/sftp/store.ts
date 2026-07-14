@@ -86,6 +86,7 @@ interface SftpState {
   addRemoteTab: (side: PaneSide, host: Host) => void;
   reconnectTab: (side: PaneSide, tabId: string) => void;
   closeTab: (side: PaneSide, tabId: string) => void;
+  moveTab: (side: PaneSide, tabId: string, toIndex: number) => void;
   setActive: (side: PaneSide, tabId: string) => void;
 
   navigate: (side: PaneSide, tabId: string, path: string) => Promise<void>;
@@ -338,6 +339,27 @@ export const useSftpStore = create<SftpState>((set, get) => {
         return { panes: { ...s.panes, [side]: { tabs, activeTabId } } };
       });
     },
+
+    moveTab: (side, tabId, toIndex) =>
+      set((s) => {
+        const pane = s.panes[side];
+        const fromIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
+        if (fromIndex === -1) return s;
+
+        const nextIndex = Math.max(0, Math.min(toIndex, pane.tabs.length - 1));
+        if (fromIndex === nextIndex) return s;
+
+        const tabs = [...pane.tabs];
+        const [tab] = tabs.splice(fromIndex, 1);
+        if (!tab) return s;
+        tabs.splice(nextIndex, 0, tab);
+        return {
+          panes: {
+            ...s.panes,
+            [side]: { ...pane, tabs },
+          },
+        };
+      }),
 
     setActive: (side, tabId) =>
       set((s) => ({

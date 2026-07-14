@@ -10,9 +10,9 @@ export interface TabDropTarget {
 }
 
 /**
- * Resolves a tab insertion point from the pointer position. The tab strip sits
- * inside the editor pane's one-pixel left border, so the first insertion marker
- * deliberately occupies that border rather than the strip's content edge.
+ * Resolves a tab insertion point from the pointer position. The marker is
+ * centered in the visual gap at that insertion point instead of overlapping a
+ * neighboring tab edge.
  */
 export function getTabDropTarget({
   pointerX,
@@ -27,16 +27,58 @@ export function getTabDropTarget({
     (rect) => rect !== null && pointerX < rect.left + rect.width / 2,
   );
   const targetIndex = insertIndex === -1 ? tabRects.length : insertIndex;
+  const previous = findPreviousRect(tabRects, targetIndex);
+  const next = findNextRect(tabRects, targetIndex);
 
-  if (targetIndex === 0) {
+  if (previous && next) {
     return {
       insertIndex: targetIndex,
-      indicatorX: stripRect.left - 1,
+      indicatorX: (previous.right + next.left) / 2,
+    };
+  }
+
+  if (next) {
+    return {
+      insertIndex: targetIndex,
+      indicatorX: (stripRect.left + next.left) / 2,
+    };
+  }
+
+  if (previous) {
+    const beforePrevious = findPreviousRect(tabRects, targetIndex - 1);
+    const trailingGap = beforePrevious
+      ? Math.max(0, previous.left - beforePrevious.right)
+      : Math.max(0, previous.left - stripRect.left);
+    return {
+      insertIndex: targetIndex,
+      indicatorX: previous.right + trailingGap / 2,
     };
   }
 
   return {
     insertIndex: targetIndex,
-    indicatorX: (tabRects[targetIndex - 1]?.right ?? stripRect.right) - 1,
+    indicatorX: stripRect.left,
   };
+}
+
+function findPreviousRect(
+  rects: Array<HorizontalRect | null>,
+  beforeIndex: number,
+): HorizontalRect | null {
+  for (let index = beforeIndex - 1; index >= 0; index -= 1) {
+    const rect = rects[index];
+    if (rect) return rect;
+  }
+  return null;
+}
+
+function findNextRect(
+  rects: Array<HorizontalRect | null>,
+  fromIndex: number,
+): HorizontalRect | null {
+  for (let index = fromIndex; index < rects.length; index += 1) {
+    const rect = rects[index];
+    if (rect) return rect;
+  }
+  return null;
 }

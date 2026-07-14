@@ -7,6 +7,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { FileText, Plus, TerminalSquare, X } from "lucide-react";
 
 import {
@@ -22,6 +23,14 @@ import { focusFileEditor } from "@/features/sftp/editor-registry";
 import { focusTerminal } from "@/features/terminal/sessions";
 import { useOverlayStore } from "./overlays";
 import { getTabDropTarget } from "./tab-drag";
+import {
+  WORKBENCH_TAB_ACTIVE_CLASS,
+  WORKBENCH_TAB_CLASS,
+  WORKBENCH_TAB_CLOSE_CLASS,
+  WORKBENCH_TAB_DROP_INDICATOR_CLASS,
+  WORKBENCH_TAB_INACTIVE_CLASS,
+  WORKBENCH_TAB_STRIP_GUTTER_CLASS,
+} from "./tab-styles";
 import {
   isFileDirty,
   useTabsStore,
@@ -125,6 +134,10 @@ export function EditorArea() {
         (element) => element?.getBoundingClientRect() ?? null,
       ),
     });
+    const markerRect =
+      tabElements
+        .find((element) => element !== null)
+        ?.getBoundingClientRect() ?? bounds;
 
     const nextIndex = sourceIndex < insertIndex ? insertIndex - 1 : insertIndex;
     dropIndexRef.current = nextIndex;
@@ -135,8 +148,8 @@ export function EditorArea() {
             clientX,
             clientY,
             indicatorX,
-            indicatorTop: bounds.top,
-            indicatorHeight: bounds.height,
+            indicatorTop: markerRect.top,
+            indicatorHeight: markerRect.height,
           }
         : current,
     );
@@ -222,12 +235,15 @@ export function EditorArea() {
             e.preventDefault();
             el.scrollLeft += e.deltaX || e.deltaY;
           }}
-          className="scrollbar-none flex h-[var(--workbench-bar-height)] overflow-x-auto overflow-y-hidden"
+          className={cn(
+            "scrollbar-none flex h-[var(--workbench-bar-height)] overflow-x-auto overflow-y-hidden",
+            WORKBENCH_TAB_STRIP_GUTTER_CLASS,
+          )}
         >
           <div
             role="tablist"
             aria-label={t("editor.tabList")}
-            className="flex h-full items-center gap-1 px-1"
+            className="flex h-full items-center gap-1"
           >
             {tabs.map((tab) => (
               <TabItem
@@ -258,7 +274,7 @@ export function EditorArea() {
             <button
               type="button"
               onClick={() => openPalette("quick")}
-              className="mx-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               <Plus className="size-4" />
             </button>
@@ -268,20 +284,23 @@ export function EditorArea() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border"
         />
-        {dragState && draggedTab && (
-          <>
-            <span
-              aria-hidden="true"
-              className="pointer-events-none fixed z-[90] w-px bg-primary"
-              style={{
-                left: dragState.indicatorX,
-                top: dragState.indicatorTop,
-                height: dragState.indicatorHeight,
-              }}
-            />
-            <TabDragGhost tab={draggedTab} dragState={dragState} />
-          </>
-        )}
+        {dragState &&
+          draggedTab &&
+          createPortal(
+            <>
+              <span
+                aria-hidden="true"
+                className={WORKBENCH_TAB_DROP_INDICATOR_CLASS}
+                style={{
+                  left: Math.round(dragState.indicatorX - 1),
+                  top: dragState.indicatorTop,
+                  height: dragState.indicatorHeight,
+                }}
+              />
+              <TabDragGhost tab={draggedTab} dragState={dragState} />
+            </>,
+            document.body,
+          )}
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -426,12 +445,12 @@ function TabItem({
         if (e.button === 1) onClose();
       }}
       className={cn(
-        "group relative flex h-[calc(var(--workbench-bar-height)-0.5rem)] w-44 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3 text-xs transition-[background-color,color,box-shadow]",
-        "touch-none select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
+        WORKBENCH_TAB_CLASS,
+        "h-full w-44 gap-2 px-3",
         dragged && "opacity-50",
         active
-          ? "z-10 bg-terminal-background font-medium text-foreground shadow-sm"
-          : "text-muted-foreground hover:bg-terminal-background/60 hover:text-foreground",
+          ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
+          : WORKBENCH_TAB_INACTIVE_CLASS,
       )}
     >
       {tab.kind === "terminal" ? (
@@ -440,7 +459,7 @@ function TabItem({
           <span
             className={cn(
               "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2",
-              active ? "ring-terminal-background" : "ring-surface",
+              "ring-[var(--tab-background)]",
               statusDot[tab.status],
             )}
           />
@@ -466,10 +485,10 @@ function TabItem({
         }}
         aria-label={t("editor.closeTab")}
         className={cn(
-          "flex h-5 shrink-0 items-center justify-center overflow-hidden rounded text-muted-foreground transition-[background-color,color,opacity] hover:bg-accent hover:text-foreground",
-          active
-            ? "w-5 opacity-70"
-            : "pointer-events-none -ml-2 w-0 opacity-0 group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-5 group-hover:opacity-70 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-5 group-focus-within:opacity-70",
+          WORKBENCH_TAB_CLOSE_CLASS,
+          "size-5",
+          !active &&
+            "pointer-events-none -ml-2 w-0 opacity-0 group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-5 group-hover:opacity-70",
         )}
       >
         <X className="size-3.5" />
@@ -491,7 +510,7 @@ function TabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[100] flex items-center gap-2 rounded-lg border border-border bg-terminal-background px-3 text-xs text-foreground opacity-90 shadow-lg"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-lg border border-border bg-list-active px-2.5 text-xs text-list-active-foreground opacity-90 shadow-lg"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -504,7 +523,7 @@ function TabDragGhost({
           <TerminalSquare className="size-3.5" />
           <span
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2 ring-terminal-background",
+              "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2 ring-list-active",
               statusDot[tab.status],
             )}
           />

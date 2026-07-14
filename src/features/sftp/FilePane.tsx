@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,6 +36,15 @@ import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { useHosts } from "@/features/hosts/api";
+import { getTabDropTarget } from "@/workbench/tab-drag";
+import {
+  WORKBENCH_COMPACT_TAB_STRIP_GUTTER_CLASS,
+  WORKBENCH_TAB_ACTIVE_CLASS,
+  WORKBENCH_TAB_CLASS,
+  WORKBENCH_TAB_CLOSE_CLASS,
+  WORKBENCH_TAB_DROP_INDICATOR_CLASS,
+  WORKBENCH_TAB_INACTIVE_CLASS,
+} from "@/workbench/tab-styles";
 import { FileList } from "./FileList";
 import { BookmarkMenu } from "./BookmarkMenu";
 import { PermissionsDialog } from "./PermissionsDialog";
@@ -50,12 +65,26 @@ const statusColor: Record<TabStatus, string> = {
   error: "bg-destructive",
 };
 
+interface SftpTabDragPointer {
+  clientX: number;
+  clientY: number;
+  rect: DOMRect;
+}
+
+interface SftpTabDragState extends SftpTabDragPointer {
+  id: string;
+  indicatorX: number;
+  indicatorTop: number;
+  indicatorHeight: number;
+}
+
 export function FilePane({ side }: { side: PaneSide }) {
   const { t } = useI18n();
   const pane = useSftpStore((s) => s.panes[side]);
   const addLocalTab = useSftpStore((s) => s.addLocalTab);
   const addRemoteTab = useSftpStore((s) => s.addRemoteTab);
   const closeTab = useSftpStore((s) => s.closeTab);
+  const moveTab = useSftpStore((s) => s.moveTab);
   const setActive = useSftpStore((s) => s.setActive);
   const navigateToHistory = useSftpStore((s) => s.navigateToHistory);
   const restoreLoadedPath = useSftpStore((s) => s.restoreLoadedPath);
@@ -63,6 +92,9 @@ export function FilePane({ side }: { side: PaneSide }) {
   const { data: hosts = [] } = useHosts();
 
   const tabStripRef = useRef<HTMLDivElement>(null);
+  const [dragState, setDragState] = useState<SftpTabDragState | null>(null);
+  const dropIndexRef = useRef<number | null>(null);
+  const suppressClickRef = useRef<string | null>(null);
   const [creation, setCreation] = useState<{
     kind: "file" | "folder";
     tabId: string;
@@ -85,6 +117,110 @@ export function FilePane({ side }: { side: PaneSide }) {
     creation.cwd === active.cwd
       ? creation.kind
       : null;
+  const draggedTab = dragState
+    ? pane.tabs.find((tab) => tab.id === dragState.id)
+    : undefined;
+
+  useEffect(() => {
+    if (!dragState) return;
+
+    const style = document.createElement("style");
+    style.textContent = "* { cursor: default !important; }";
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, [dragState]);
+
+  const handleTabDragStart = (tabId: string, pointer: SftpTabDragPointer) => {
+    const sourceIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
+    if (sourceIndex === -1) return;
+
+    dropIndexRef.current = sourceIndex;
+    setDragState({
+      ...pointer,
+      id: tabId,
+      indicatorX: pointer.rect.left,
+      indicatorTop: pointer.rect.top,
+      indicatorHeight: pointer.rect.height,
+    });
+  };
+
+  const handleTabDragMove = (
+    tabId: string,
+    clientX: number,
+    clientY: number,
+  ) => {
+    const strip = tabStripRef.current;
+    if (!strip) return;
+
+    const bounds = strip.getBoundingClientRect();
+    const edge = 24;
+    if (clientX < bounds.left + edge) strip.scrollLeft -= 12;
+    else if (clientX > bounds.right - edge) strip.scrollLeft += 12;
+
+    const sourceIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
+    if (sourceIndex === -1) return;
+
+    const tabElements = pane.tabs.map((tab) =>
+      strip.querySelector<HTMLElement>(
+        `[data-sftp-tab-id="${CSS.escape(tab.id)}"]`,
+      ),
+    );
+    const { insertIndex, indicatorX } = getTabDropTarget({
+      pointerX: clientX,
+      stripRect: bounds,
+      tabRects: tabElements.map(
+        (element) => element?.getBoundingClientRect() ?? null,
+      ),
+    });
+    const markerRect =
+      tabElements
+        .find((element) => element !== null)
+        ?.getBoundingClientRect() ?? bounds;
+
+    const nextIndex = sourceIndex < insertIndex ? insertIndex - 1 : insertIndex;
+    dropIndexRef.current = nextIndex;
+    setDragState((current) =>
+      current?.id === tabId
+        ? {
+            ...current,
+            clientX,
+            clientY,
+            indicatorX,
+            indicatorTop: markerRect.top,
+            indicatorHeight: markerRect.height,
+          }
+        : current,
+    );
+  };
+
+  const handleTabDragEnd = (tabId: string, didDrag: boolean) => {
+    const dropIndex = dropIndexRef.current;
+    dropIndexRef.current = null;
+    setDragState(null);
+    if (!didDrag) return;
+
+    if (dropIndex !== null) moveTab(side, tabId, dropIndex);
+
+    suppressClickRef.current = tabId;
+    window.setTimeout(() => {
+      if (suppressClickRef.current === tabId) suppressClickRef.current = null;
+    }, 0);
+  };
+
+  const handleTabKeyboardMove = (tabId: string, direction: -1 | 1) => {
+    const index = pane.tabs.findIndex((tab) => tab.id === tabId);
+    if (index === -1) return;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= pane.tabs.length) return;
+    moveTab(side, tabId, nextIndex);
+    requestAnimationFrame(() => {
+      tabStripRef.current
+        ?.querySelector<HTMLElement>(
+          `[data-sftp-tab-id="${CSS.escape(tabId)}"]`,
+        )
+        ?.focus();
+    });
+  };
 
   const onCreate = async (
     tab: SftpTab,
@@ -178,22 +314,27 @@ export function FilePane({ side }: { side: PaneSide }) {
           if (!el || el.scrollWidth <= el.clientWidth) return;
           el.scrollLeft += e.deltaX + e.deltaY;
         }}
-        className="scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface px-1.5"
+        className={cn(
+          "scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface",
+          WORKBENCH_COMPACT_TAB_STRIP_GUTTER_CLASS,
+        )}
       >
         {pane.tabs.map((tab) => (
-          <div
+          <SftpTabItem
             key={tab.id}
-            role="tab"
-            tabIndex={tab.id === pane.activeTabId ? 0 : -1}
-            aria-selected={tab.id === pane.activeTabId}
-            onClick={() => setActive(side, tab.id)}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
+            tab={tab}
+            active={tab.id === pane.activeTabId}
+            dragged={dragState?.id === tab.id}
+            label={tab.kind === "local" ? t("sftp.local") : tab.title}
+            onSelect={() => {
+              if (suppressClickRef.current === tab.id) {
+                suppressClickRef.current = null;
+                return;
+              }
               setActive(side, tab.id);
             }}
-            onDoubleClick={(event) => {
-              if ((event.target as HTMLElement).closest("button")) return;
+            onClose={() => closeTab(side, tab.id)}
+            onReopen={() => {
               if (tab.kind === "local") {
                 void addLocalTab(side);
                 return;
@@ -201,44 +342,15 @@ export function FilePane({ side }: { side: PaneSide }) {
               const host = hosts.find((h) => h.id === tab.hostId);
               if (host) addRemoteTab(side, host);
             }}
-            className={cn(
-              "group flex h-7 w-40 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs outline-none transition-[background-color,color,box-shadow]",
-              tab.id === pane.activeTabId
-                ? "bg-card text-card-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
-            )}
-          >
-            <span
-              className={cn(
-                "size-[6px] shrink-0 rounded-full",
-                statusColor[tab.status],
-              )}
-            />
-            {tab.kind === "local" ? (
-              <HardDrive className="size-3 shrink-0" />
-            ) : (
-              <Server className="size-3 shrink-0" />
-            )}
-            <span className="min-w-0 flex-1 truncate">
-              {tab.kind === "local" ? t("sftp.local") : tab.title}
-            </span>
-            <button
-              type="button"
-              aria-label={t("editor.closeTab")}
-              onClick={(e) => {
-                e.stopPropagation();
-                closeTab(side, tab.id);
-              }}
-              className={cn(
-                "flex h-4 shrink-0 items-center justify-center overflow-hidden rounded outline-none transition-[background-color,opacity] hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/35",
-                tab.id === pane.activeTabId
-                  ? "w-4 opacity-100"
-                  : "pointer-events-none -ml-1.5 w-0 opacity-0 group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-4 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-4 group-focus-within:opacity-100",
-              )}
-            >
-              <X className="size-3" />
-            </button>
-          </div>
+            onDragStart={(pointer) => handleTabDragStart(tab.id, pointer)}
+            onDragMove={(clientX, clientY) =>
+              handleTabDragMove(tab.id, clientX, clientY)
+            }
+            onDragEnd={(didDrag) => handleTabDragEnd(tab.id, didDrag)}
+            onKeyboardMove={(direction) =>
+              handleTabKeyboardMove(tab.id, direction)
+            }
+          />
         ))}
 
         <DropdownMenu>
@@ -265,6 +377,24 @@ export function FilePane({ side }: { side: PaneSide }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {dragState &&
+        draggedTab &&
+        createPortal(
+          <>
+            <span
+              aria-hidden="true"
+              className={WORKBENCH_TAB_DROP_INDICATOR_CLASS}
+              style={{
+                left: Math.round(dragState.indicatorX - 1),
+                top: dragState.indicatorTop,
+                height: dragState.indicatorHeight,
+              }}
+            />
+            <SftpTabDragGhost tab={draggedTab} dragState={dragState} />
+          </>,
+          document.body,
+        )}
 
       {active ? (
         <>
@@ -426,6 +556,199 @@ export function FilePane({ side }: { side: PaneSide }) {
           if (permTarget) void refresh(side, permTarget.tab.id);
         }}
       />
+    </div>
+  );
+}
+
+function SftpTabItem({
+  tab,
+  active,
+  dragged,
+  label,
+  onSelect,
+  onClose,
+  onReopen,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onKeyboardMove,
+}: {
+  tab: SftpTab;
+  active: boolean;
+  dragged: boolean;
+  label: string;
+  onSelect: () => void;
+  onClose: () => void;
+  onReopen: () => void;
+  onDragStart: (pointer: SftpTabDragPointer) => void;
+  onDragMove: (clientX: number, clientY: number) => void;
+  onDragEnd: (didDrag: boolean) => void;
+  onKeyboardMove: (direction: -1 | 1) => void;
+}) {
+  const { t } = useI18n();
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    active: boolean;
+  } | null>(null);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest("button")) {
+      return;
+    }
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    if (!drag.active) {
+      const distance = Math.hypot(
+        event.clientX - drag.startX,
+        event.clientY - drag.startY,
+      );
+      if (distance < 5) return;
+      drag.active = true;
+      onDragStart({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        rect: event.currentTarget.getBoundingClientRect(),
+      });
+    }
+
+    event.preventDefault();
+    onDragMove(event.clientX, event.clientY);
+  };
+
+  const finishPointerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.active) event.preventDefault();
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    onDragEnd(drag.active);
+  };
+
+  return (
+    <div
+      data-sftp-tab-id={tab.id}
+      role="tab"
+      tabIndex={active ? 0 : -1}
+      aria-selected={active}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishPointerDrag}
+      onPointerCancel={finishPointerDrag}
+      onClick={onSelect}
+      onDoubleClick={(event) => {
+        if ((event.target as HTMLElement).closest("button")) return;
+        onReopen();
+      }}
+      onAuxClick={(event) => {
+        if (event.button === 1) onClose();
+      }}
+      onKeyDown={(event) => {
+        if (
+          event.altKey &&
+          (event.key === "ArrowLeft" || event.key === "ArrowRight")
+        ) {
+          event.preventDefault();
+          onKeyboardMove(event.key === "ArrowLeft" ? -1 : 1);
+          return;
+        }
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelect();
+      }}
+      className={cn(
+        WORKBENCH_TAB_CLASS,
+        "h-full w-40 gap-1.5 px-2",
+        dragged && "opacity-50",
+        active
+          ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
+          : WORKBENCH_TAB_INACTIVE_CLASS,
+      )}
+    >
+      <span className="relative flex shrink-0 items-center justify-center">
+        {tab.kind === "local" ? (
+          <HardDrive className="size-3" />
+        ) : (
+          <Server className="size-3" />
+        )}
+        <span
+          className={cn(
+            "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2 ring-[var(--tab-background)]",
+            statusColor[tab.status],
+          )}
+        />
+      </span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <button
+        type="button"
+        aria-label={t("editor.closeTab")}
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose();
+        }}
+        className={cn(
+          WORKBENCH_TAB_CLOSE_CLASS,
+          "size-4",
+          !active &&
+            "pointer-events-none -ml-1.5 w-0 opacity-0 group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-4 group-hover:opacity-70",
+        )}
+      >
+        <X className="size-3" />
+      </button>
+    </div>
+  );
+}
+
+function SftpTabDragGhost({
+  tab,
+  dragState,
+}: {
+  tab: SftpTab;
+  dragState: SftpTabDragState;
+}) {
+  const { t } = useI18n();
+  const label = tab.kind === "local" ? t("sftp.local") : tab.title;
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-1.5 rounded-lg border border-border bg-list-active px-2 text-xs text-list-active-foreground opacity-90 shadow-lg"
+      style={{
+        left: dragState.clientX,
+        top: dragState.clientY,
+        width: dragState.rect.width,
+        height: dragState.rect.height,
+      }}
+    >
+      <span className="relative flex shrink-0 items-center justify-center">
+        {tab.kind === "local" ? (
+          <HardDrive className="size-3" />
+        ) : (
+          <Server className="size-3" />
+        )}
+        <span
+          className={cn(
+            "absolute -bottom-0.5 -right-0.5 size-[6px] rounded-full ring-2 ring-list-active",
+            statusColor[tab.status],
+          )}
+        />
+      </span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <X className="size-3 shrink-0 opacity-60" />
     </div>
   );
 }

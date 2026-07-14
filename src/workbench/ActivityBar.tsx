@@ -13,6 +13,10 @@ import { useI18n, type TKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type Activity } from "./layout";
 import { useOverlayStore } from "./overlays";
+import {
+  WORKBENCH_ITEM_ACTIVE_CLASS,
+  WORKBENCH_ITEM_INACTIVE_CLASS,
+} from "./tab-styles";
 
 const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "hosts", icon: Server, labelKey: "activityBar.hosts" },
@@ -50,8 +54,8 @@ export function ActivityBar() {
                   ACTIVITY_BUTTON_CLASS,
                   "relative",
                   active
-                    ? "bg-list-active text-list-active-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
+                    ? WORKBENCH_ITEM_ACTIVE_CLASS
+                    : WORKBENCH_ITEM_INACTIVE_CLASS,
                 )}
               >
                 <Icon className="size-5" strokeWidth={1.75} />
@@ -70,8 +74,8 @@ export function ActivityBar() {
           className={cn(
             ACTIVITY_BUTTON_CLASS,
             settingsActive
-              ? "bg-list-active text-list-active-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
+              ? WORKBENCH_ITEM_ACTIVE_CLASS
+              : WORKBENCH_ITEM_INACTIVE_CLASS,
           )}
         >
           <Settings className="size-5" strokeWidth={1.75} />

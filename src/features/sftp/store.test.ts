@@ -59,23 +59,73 @@ describe("SFTP navigation state", () => {
   });
 });
 
-const transferTab = (
+describe("SFTP tab ordering", () => {
+  beforeEach(() => {
+    const leftTabs = [
+      transferTab("left-a", null, "/a"),
+      transferTab("left-b", null, "/b"),
+      transferTab("left-c", null, "/c"),
+    ];
+    useSftpStore.setState({
+      panes: {
+        left: { tabs: leftTabs, activeTabId: "left-b" },
+        right: {
+          tabs: [transferTab("right-a", null, "/right")],
+          activeTabId: "right-a",
+        },
+      },
+      transfers: {},
+    });
+  });
+
+  it("reorders tabs only within the requested pane", () => {
+    const originalActive = useSftpStore.getState().panes.left.tabs[1];
+
+    useSftpStore.getState().moveTab("left", "left-a", 2);
+
+    const { left, right } = useSftpStore.getState().panes;
+    expect(left.tabs.map((tab) => tab.id)).toEqual([
+      "left-b",
+      "left-c",
+      "left-a",
+    ]);
+    expect(left.activeTabId).toBe("left-b");
+    expect(left.tabs[0]).toBe(originalActive);
+    expect(right.tabs.map((tab) => tab.id)).toEqual(["right-a"]);
+  });
+
+  it("clamps the destination and ignores unknown tabs", () => {
+    useSftpStore.getState().moveTab("left", "left-a", 100);
+    expect(
+      useSftpStore.getState().panes.left.tabs.map((tab) => tab.id),
+    ).toEqual(["left-b", "left-c", "left-a"]);
+
+    useSftpStore.getState().moveTab("left", "missing", 0);
+    expect(
+      useSftpStore.getState().panes.left.tabs.map((tab) => tab.id),
+    ).toEqual(["left-b", "left-c", "left-a"]);
+  });
+});
+
+function transferTab(
   id: string,
   connectionId: string | null,
   cwd: string,
-): SftpTab => ({
-  id,
-  kind: connectionId ? "remote" : "local",
-  connectionId,
-  title: id,
-  cwd,
-  status: "connected",
-  entries: [],
-  selected: [],
-  history: [cwd],
-  historyIndex: 0,
-  loading: false,
-});
+): SftpTab {
+  return {
+    id,
+    kind: connectionId ? "remote" : "local",
+    connectionId,
+    title: id,
+    cwd,
+    status: "connected",
+    entries: [],
+    selected: [],
+    history: [cwd],
+    historyIndex: 0,
+    loading: false,
+  };
+}
 
 describe("SFTP transfer refresh", () => {
   beforeEach(() => {

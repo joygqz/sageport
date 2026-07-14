@@ -2,32 +2,41 @@ import { describe, expect, it } from "vitest";
 
 import { getTabDropTarget } from "./tab-drag";
 
-const stripRect = { left: 101, right: 501, width: 400 };
+const stripRect = { left: 100, right: 500, width: 400 };
 const tabRects = [
-  { left: 101, right: 201, width: 100 },
-  { left: 201, right: 301, width: 100 },
-  { left: 301, right: 401, width: 100 },
+  { left: 108, right: 208, width: 100 },
+  { left: 212, right: 312, width: 100 },
+  { left: 316, right: 416, width: 100 },
 ];
 
 describe("getTabDropTarget", () => {
-  it("overlaps the editor pane's left border before the first tab", () => {
+  it("centers the marker in the leading gutter", () => {
     expect(getTabDropTarget({ pointerX: 120, stripRect, tabRects })).toEqual({
       insertIndex: 0,
-      indicatorX: 100,
+      indicatorX: 104,
     });
   });
 
-  it("uses the preceding tab border for other insertion points", () => {
-    expect(getTabDropTarget({ pointerX: 260, stripRect, tabRects })).toEqual({
+  it("centers the marker in the gap between tabs", () => {
+    expect(getTabDropTarget({ pointerX: 320, stripRect, tabRects })).toEqual({
       insertIndex: 2,
-      indicatorX: 300,
+      indicatorX: 314,
     });
   });
 
-  it("uses the final tab's border after the final tab", () => {
+  it("centers the marker in a trailing gap matching the tab spacing", () => {
     expect(getTabDropTarget({ pointerX: 480, stripRect, tabRects })).toEqual({
       insertIndex: 3,
-      indicatorX: 400,
+      indicatorX: 418,
+    });
+  });
+
+  it("uses the leading gutter as the trailing gap for a single tab", () => {
+    expect(
+      getTabDropTarget({ pointerX: 480, stripRect, tabRects: [tabRects[0]] }),
+    ).toEqual({
+      insertIndex: 1,
+      indicatorX: 212,
     });
   });
 });

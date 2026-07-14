@@ -35,6 +35,7 @@
   --list-hover: #272d3e;
   --list-active: #344663;
   --list-active-foreground: #ffffff;
+  --tab-active: color-mix(in oklch, var(--list-active) 50%, var(--surface));
   --terminal-background: #12141f;
   --terminal-foreground: #e1e4ee;
 
@@ -59,6 +60,7 @@
 }
 
 .dark {
+  --tab-active: color-mix(in oklch, var(--list-active) 65%, var(--surface));
   --elevation-sm:
     0 1px 2px color-mix(in oklch, black 34%, transparent),
     0 6px 18px color-mix(in oklch, black 26%, transparent);
@@ -108,6 +110,7 @@
   --color-list-hover: var(--list-hover);
   --color-list-active: var(--list-active);
   --color-list-active-foreground: var(--list-active-foreground);
+  --color-tab-active: var(--tab-active);
 
   --color-terminal-background: var(--terminal-background);
   --color-terminal-foreground: var(--terminal-foreground);
