@@ -12,6 +12,8 @@ use crate::ssh::{
 };
 use crate::state::AppState;
 
+const MAX_INPUT_BYTES: usize = 1024 * 1024;
+
 fn valid_port(port: i64) -> AppResult<u16> {
     let port = u16::try_from(port)
         .map_err(|_| AppError::Invalid("port must be between 1 and 65535".into()))?;
@@ -21,14 +23,30 @@ fn valid_port(port: i64) -> AppResult<u16> {
     Ok(port)
 }
 
-fn validate_connection_input(session_id: &str, cols: u32, rows: u32) -> AppResult<()> {
+fn validate_session_id(session_id: &str) -> AppResult<()> {
     if session_id.trim().is_empty() || session_id.len() > 128 {
         return Err(AppError::Invalid("invalid SSH session id".into()));
     }
+    Ok(())
+}
+
+fn validate_dimensions(cols: u32, rows: u32) -> AppResult<()> {
     if !(1..=10_000).contains(&cols) || !(1..=10_000).contains(&rows) {
         return Err(AppError::Invalid(
             "terminal dimensions must be between 1 and 10000".into(),
         ));
+    }
+    Ok(())
+}
+
+fn validate_connection_input(session_id: &str, cols: u32, rows: u32) -> AppResult<()> {
+    validate_session_id(session_id)?;
+    validate_dimensions(cols, rows)
+}
+
+fn validate_input(data: &str) -> AppResult<()> {
+    if data.len() > MAX_INPUT_BYTES {
+        return Err(AppError::Invalid("terminal input is too large".into()));
     }
     Ok(())
 }
@@ -151,6 +169,8 @@ pub async fn ssh_send(
     attempt: u32,
     data: String,
 ) -> AppResult<()> {
+    validate_session_id(&session_id)?;
+    validate_input(&data)?;
     state
         .ssh
         .send_input(&session_id, attempt, data.into_bytes())
@@ -164,6 +184,8 @@ pub async fn ssh_resize(
     cols: u32,
     rows: u32,
 ) -> AppResult<()> {
+    validate_session_id(&session_id)?;
+    validate_dimensions(cols, rows)?;
     state.ssh.resize(&session_id, attempt, cols, rows)
 }
 
@@ -173,6 +195,7 @@ pub async fn ssh_disconnect(
     session_id: String,
     attempt: Option<u32>,
 ) -> AppResult<()> {
+    validate_session_id(&session_id)?;
     state.ssh.close(&session_id, attempt)
 }
 
@@ -300,4 +323,32 @@ pub(crate) async fn resolve_credentials(
     };
 
     Ok((username, method))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_dimensions, validate_input, validate_session_id, MAX_INPUT_BYTES};
+
+    #[test]
+    fn rejects_invalid_session_ids() {
+        assert!(validate_session_id("").is_err());
+        assert!(validate_session_id("   ").is_err());
+        assert!(validate_session_id(&"x".repeat(129)).is_err());
+        assert!(validate_session_id("terminal-1").is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_terminal_dimensions() {
+        assert!(validate_dimensions(0, 24).is_err());
+        assert!(validate_dimensions(80, 0).is_err());
+        assert!(validate_dimensions(10_001, 24).is_err());
+        assert!(validate_dimensions(80, 10_001).is_err());
+        assert!(validate_dimensions(80, 24).is_ok());
+    }
+
+    #[test]
+    fn rejects_oversized_terminal_input() {
+        assert!(validate_input(&"x".repeat(MAX_INPUT_BYTES)).is_ok());
+        assert!(validate_input(&"x".repeat(MAX_INPUT_BYTES + 1)).is_err());
+    }
 }

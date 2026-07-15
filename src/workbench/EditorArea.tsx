@@ -352,6 +352,7 @@ function TabItem({
   const { t } = useI18n();
   const openTerminal = useTabsStore((s) => s.openTerminal);
   const openLocalTerminal = useTabsStore((s) => s.openLocalTerminal);
+  const openAdhocTerminal = useTabsStore((s) => s.openAdhocTerminal);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -366,7 +367,9 @@ function TabItem({
     tab.kind === "terminal"
       ? tab.target === "local"
         ? () => openLocalTerminal()
-        : () => openTerminal({ id: tab.hostId, label: tab.title })
+        : tab.target === "ssh-adhoc" && tab.adhoc
+          ? () => openAdhocTerminal(tab.adhoc!)
+          : () => openTerminal({ id: tab.hostId, label: tab.title })
       : undefined;
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {

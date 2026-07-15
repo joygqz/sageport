@@ -6,16 +6,17 @@ import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
 import { useZoomStore } from "./zoom";
+import { isWorkbenchShortcut, workbenchShortcutKey } from "./shortcuts";
 
 export function useKeybindings() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
+      if (!isWorkbenchShortcut(e)) return;
 
       const layout = useLayoutStore.getState();
       const overlays = useOverlayStore.getState();
       const tabs = useTabsStore.getState();
-      const key = e.key.toLowerCase();
+      const key = workbenchShortcutKey(e);
 
       const run = (action: () => void) => {
         e.preventDefault();

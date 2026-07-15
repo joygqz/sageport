@@ -376,11 +376,13 @@ export interface SshDataEvent {
 
 export interface PtyDataEvent {
   id: string;
+  attempt: number;
   data: string;
 }
 
 export interface PtyExitEvent {
   id: string;
+  attempt: number;
   code: number;
 }
 

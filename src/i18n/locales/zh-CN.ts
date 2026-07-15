@@ -155,7 +155,10 @@ export const zhCN: Dictionary = {
     },
     host: { new: "新建主机" },
     group: { new: "新建分组" },
-    terminal: { newLocal: "新建本地终端" },
+    terminal: {
+      newLocal: "新建本地终端",
+      toggleBroadcast: "切换终端输入广播",
+    },
     view: {
       toggleSidebar: "切换侧边栏",
       togglePanel: "切换文件面板",

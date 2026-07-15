@@ -136,6 +136,15 @@ export class TerminalSession {
       }
       this.observe(container);
       void this.start();
+    } catch (err) {
+      if (!this.disposed) {
+        this.ended = true;
+        this.emitStatus({
+          status: "error",
+          code: errorCode(err),
+          message: errorMessage(err),
+        });
+      }
     } finally {
       this.opening = false;
     }
@@ -211,6 +220,7 @@ export class TerminalSession {
     this.observer?.disconnect();
     this.observer = null;
     for (const dispose of this.disposables.splice(0)) dispose();
+    void this.transport.disconnect().catch(() => {});
     try {
       this.opts.onDispose?.();
     } finally {
@@ -220,12 +230,27 @@ export class TerminalSession {
   }
 
   private async start() {
-    const [unData, unStatus] = await Promise.all([
-      this.transport.onData((bytes) => {
+    let unData: (() => void) | undefined;
+    let unStatus: (() => void) | undefined;
+    try {
+      unData = await this.transport.onData((bytes) => {
         if (!this.disposed && !this.ended) this.term.write(bytes);
-      }),
-      this.transport.onStatus((e) => this.handleStatus(e)),
-    ]);
+      });
+      unStatus = await this.transport.onStatus((e) => this.handleStatus(e));
+    } catch (err) {
+      unData?.();
+      unStatus?.();
+      if (!this.disposed) {
+        this.ended = true;
+        this.pendingInput = "";
+        this.emitStatus({
+          status: "error",
+          code: errorCode(err),
+          message: errorMessage(err),
+        });
+      }
+      return;
+    }
     if (this.disposed) {
       unData();
       unStatus();
@@ -245,8 +270,9 @@ export class TerminalSession {
       if (this.disposed || this.ended) return;
     } catch (err) {
       this.settleConnect();
+      this.ended = true;
       this.pendingInput = "";
-      if (!this.disposed && !this.ended) {
+      if (!this.disposed) {
         this.emitStatus({
           status: "error",
           code: errorCode(err),

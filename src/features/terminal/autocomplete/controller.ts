@@ -1,6 +1,7 @@
 import type { IDecoration, Terminal as XTerm } from "@xterm/xterm";
 
 import { ipc } from "@/lib/ipc";
+import { isWorkbenchShortcut } from "@/workbench/shortcuts";
 import { COMMON_COMMANDS } from "./common-commands";
 import { currentInput, extractCommand, suggest } from "./engine";
 
@@ -122,9 +123,10 @@ export function createAutocomplete(opts: {
     });
     instance.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
+      if (isWorkbenchShortcut(e)) return false;
       if (e.key === "Escape" && ghost) {
         clearGhost();
-        return true;
+        return false;
       }
       if (e.key === "ArrowRight" && ghost) {
         return !acceptGhost();

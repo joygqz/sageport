@@ -158,7 +158,10 @@ export const en = {
     },
     host: { new: "New host" },
     group: { new: "New group" },
-    terminal: { newLocal: "New local terminal" },
+    terminal: {
+      newLocal: "New local terminal",
+      toggleBroadcast: "Toggle terminal input broadcasting",
+    },
     view: {
       toggleSidebar: "Toggle sidebar",
       togglePanel: "Toggle files panel",

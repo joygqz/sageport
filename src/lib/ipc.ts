@@ -195,13 +195,18 @@ export const ipc = {
       ),
   },
   pty: {
-    open: (params: { sessionId: string; cols: number; rows: number }) =>
-      invoke<void>("pty_open", params),
-    write: (sessionId: string, data: string) =>
-      invoke<void>("pty_write", { sessionId, data }),
-    resize: (sessionId: string, cols: number, rows: number) =>
-      invoke<void>("pty_resize", { sessionId, cols, rows }),
-    close: (sessionId: string) => invoke<void>("pty_close", { sessionId }),
+    open: (params: {
+      sessionId: string;
+      attempt: number;
+      cols: number;
+      rows: number;
+    }) => invoke<void>("pty_open", params),
+    write: (sessionId: string, attempt: number, data: string) =>
+      invoke<void>("pty_write", { sessionId, attempt, data }),
+    resize: (sessionId: string, attempt: number, cols: number, rows: number) =>
+      invoke<void>("pty_resize", { sessionId, attempt, cols, rows }),
+    close: (sessionId: string, attempt?: number) =>
+      invoke<void>("pty_close", { sessionId, attempt }),
     onData: (handler: (e: PtyDataEvent) => void): Promise<UnlistenFn> =>
       listen<PtyDataEvent>("pty://data", (event) => handler(event.payload)),
     onExit: (handler: (e: PtyExitEvent) => void): Promise<UnlistenFn> =>

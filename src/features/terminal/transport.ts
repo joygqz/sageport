@@ -70,24 +70,29 @@ export function sshAdhocTransport(
   );
 }
 
-export function localTransport(sessionId: string): TerminalTransport {
+export function localTransport(
+  sessionId: string,
+  attempt: number,
+): TerminalTransport {
   let onStatus: ((update: TerminalStatusUpdate) => void) | undefined;
   return {
     connect: async ({ cols, rows }) => {
-      await ipc.pty.open({ sessionId, cols, rows });
+      await ipc.pty.open({ sessionId, attempt, cols, rows });
       onStatus?.({ status: "connected" });
     },
-    send: (data) => ipc.pty.write(sessionId, data),
-    resize: (cols, rows) => ipc.pty.resize(sessionId, cols, rows),
-    disconnect: () => ipc.pty.close(sessionId),
+    send: (data) => ipc.pty.write(sessionId, attempt, data),
+    resize: (cols, rows) => ipc.pty.resize(sessionId, attempt, cols, rows),
+    disconnect: () => ipc.pty.close(sessionId, attempt),
     onData: (handler) =>
       ipc.pty.onData((e) => {
-        if (e.id === sessionId) handler(decodeBase64(e.data));
+        if (e.id === sessionId && e.attempt === attempt)
+          handler(decodeBase64(e.data));
       }),
     onStatus: (handler) => {
       onStatus = handler;
       return ipc.pty.onExit((e) => {
-        if (e.id === sessionId) handler({ status: "closed" });
+        if (e.id === sessionId && e.attempt === attempt)
+          handler({ status: "closed" });
       });
     },
   };

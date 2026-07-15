@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import { useI18n, type TKey } from "@/i18n";
+import { useBroadcastStore } from "@/features/terminal/broadcast";
 import { THEMES } from "@/themes";
 import { useTheme } from "@/themes/useTheme";
 import { useLayoutStore } from "./layout";
@@ -46,6 +47,13 @@ export function useCommands(): WorkbenchCommand[] {
         label: t("commands.terminal.newLocal"),
         shortcut: ["mod", "shift", "T"],
         run: () => tabs().openLocalTerminal(),
+      },
+      {
+        id: "terminal.toggleBroadcast",
+        categoryKey: "commands.category.terminal",
+        label: t("commands.terminal.toggleBroadcast"),
+        shortcut: ["mod", "shift", "B"],
+        run: () => useBroadcastStore.getState().toggle(),
       },
       {
         id: "view.toggleSidebar",

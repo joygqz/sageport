@@ -19,8 +19,9 @@ const TERM: &str = "xterm-256color";
 type PtyMap = Arc<Mutex<HashMap<String, PtyEntry>>>;
 
 struct PtyEntry {
-    master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+    attempt: u32,
+    master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
+    writer: Arc<Mutex<Box<dyn Write + Send>>>,
     killer: Box<dyn ChildKiller + Send + Sync>,
 }
 
@@ -28,6 +29,7 @@ struct PtyEntry {
 #[serde(rename_all = "camelCase")]
 struct DataEvent {
     id: String,
+    attempt: u32,
     data: String,
 }
 
@@ -35,10 +37,11 @@ struct DataEvent {
 #[serde(rename_all = "camelCase")]
 struct ExitEvent {
     id: String,
+    attempt: u32,
     code: u32,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct PtyManager {
     ptys: PtyMap,
 }
@@ -48,7 +51,19 @@ impl PtyManager {
         Self::default()
     }
 
-    pub fn open(&self, app: AppHandle, id: String, cols: u32, rows: u32) -> AppResult<()> {
+    pub fn open(
+        &self,
+        app: AppHandle,
+        id: String,
+        attempt: u32,
+        cols: u32,
+        rows: u32,
+    ) -> AppResult<()> {
+        let mut ptys = self.ptys.lock();
+        if ptys.get(&id).is_some_and(|entry| entry.attempt >= attempt) {
+            return Ok(());
+        }
+
         let size = PtySize {
             rows: rows.clamp(1, u16::MAX as u32) as u16,
             cols: cols.clamp(1, u16::MAX as u32) as u16,
@@ -65,12 +80,6 @@ impl PtyManager {
             cmd.cwd(home);
         }
 
-        let mut child = pair
-            .slave
-            .spawn_command(cmd)
-            .map_err(|e| AppError::Other(e.to_string()))?;
-        drop(pair.slave);
-
         let reader = pair
             .master
             .try_clone_reader()
@@ -79,72 +88,111 @@ impl PtyManager {
             .master
             .take_writer()
             .map_err(|e| AppError::Other(e.to_string()))?;
+        let mut child = pair
+            .slave
+            .spawn_command(cmd)
+            .map_err(|e| AppError::Other(e.to_string()))?;
+        drop(pair.slave);
         let killer = child.clone_killer();
 
-        self.ptys.lock().insert(
+        let previous = ptys.insert(
             id.clone(),
             PtyEntry {
-                master: pair.master,
-                writer,
+                attempt,
+                master: Arc::new(Mutex::new(pair.master)),
+                writer: Arc::new(Mutex::new(writer)),
                 killer,
             },
         );
+        drop(ptys);
+        if let Some(mut previous) = previous {
+            let _ = previous.killer.kill();
+        }
 
-        spawn_reader(app.clone(), id.clone(), reader);
+        spawn_reader(app.clone(), id.clone(), attempt, reader);
 
         let ptys = self.ptys.clone();
         std::thread::spawn(move || {
             let code = child.wait().map(|s| s.exit_code()).unwrap_or(1);
-            ptys.lock().remove(&id);
-            let _ = app.emit(EVENT_EXIT, ExitEvent { id, code });
+            let mut ptys = ptys.lock();
+            if ptys.get(&id).is_some_and(|entry| entry.attempt == attempt) {
+                ptys.remove(&id);
+            }
+            drop(ptys);
+            let _ = app.emit(EVENT_EXIT, ExitEvent { id, attempt, code });
         });
 
         Ok(())
     }
 
-    pub fn write(&self, id: &str, data: Vec<u8>) -> AppResult<()> {
-        let mut ptys = self.ptys.lock();
-        let entry = ptys
-            .get_mut(id)
-            .ok_or_else(|| AppError::NotFound(format!("terminal {id}")))?;
-        entry
-            .writer
+    pub fn write(&self, id: &str, attempt: u32, data: Vec<u8>) -> AppResult<()> {
+        let writer = {
+            let ptys = self.ptys.lock();
+            let entry = ptys
+                .get(id)
+                .ok_or_else(|| AppError::NotFound(format!("terminal {id}")))?;
+            if entry.attempt != attempt {
+                return Ok(());
+            }
+            entry.writer.clone()
+        };
+        let mut writer = writer.lock();
+        writer
             .write_all(&data)
-            .and_then(|()| entry.writer.flush())
+            .and_then(|()| writer.flush())
             .map_err(|e| AppError::Other(e.to_string()))
     }
 
-    pub fn resize(&self, id: &str, cols: u32, rows: u32) -> AppResult<()> {
-        let ptys = self.ptys.lock();
-        let entry = ptys
-            .get(id)
-            .ok_or_else(|| AppError::NotFound(format!("terminal {id}")))?;
-        entry
-            .master
+    pub fn resize(&self, id: &str, attempt: u32, cols: u32, rows: u32) -> AppResult<()> {
+        let master = {
+            let ptys = self.ptys.lock();
+            let entry = ptys
+                .get(id)
+                .ok_or_else(|| AppError::NotFound(format!("terminal {id}")))?;
+            if entry.attempt != attempt {
+                return Ok(());
+            }
+            entry.master.clone()
+        };
+        let result = master
+            .lock()
             .resize(PtySize {
                 rows: rows.clamp(1, u16::MAX as u32) as u16,
                 cols: cols.clamp(1, u16::MAX as u32) as u16,
                 pixel_width: 0,
                 pixel_height: 0,
             })
-            .map_err(|e| AppError::Other(e.to_string()))
+            .map_err(|e| AppError::Other(e.to_string()));
+        result
     }
 
-    pub fn close(&self, id: &str) -> AppResult<()> {
-        if let Some(mut entry) = self.ptys.lock().remove(id) {
+    pub fn close(&self, id: &str, attempt: Option<u32>) -> AppResult<()> {
+        let entry = {
+            let mut ptys = self.ptys.lock();
+            if ptys
+                .get(id)
+                .is_some_and(|entry| attempt.is_none_or(|value| value == entry.attempt))
+            {
+                ptys.remove(id)
+            } else {
+                None
+            }
+        };
+        if let Some(mut entry) = entry {
             let _ = entry.killer.kill();
         }
         Ok(())
     }
 
     pub fn close_all(&self) {
-        for (_, mut entry) in self.ptys.lock().drain() {
+        let entries: Vec<_> = self.ptys.lock().drain().map(|(_, entry)| entry).collect();
+        for mut entry in entries {
             let _ = entry.killer.kill();
         }
     }
 }
 
-fn spawn_reader(app: AppHandle, id: String, mut reader: Box<dyn Read + Send>) {
+fn spawn_reader(app: AppHandle, id: String, attempt: u32, mut reader: Box<dyn Read + Send>) {
     std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
         loop {
@@ -155,6 +203,7 @@ fn spawn_reader(app: AppHandle, id: String, mut reader: Box<dyn Read + Send>) {
                         EVENT_DATA,
                         DataEvent {
                             id: id.clone(),
+                            attempt,
                             data: STANDARD.encode(&buf[..n]),
                         },
                     );
@@ -164,10 +213,10 @@ fn spawn_reader(app: AppHandle, id: String, mut reader: Box<dyn Read + Send>) {
     });
 }
 
-fn home_dir() -> Option<String> {
+fn home_dir() -> Option<std::ffi::OsString> {
     #[cfg(windows)]
     let key = "USERPROFILE";
     #[cfg(not(windows))]
     let key = "HOME";
-    std::env::var(key).ok().filter(|v| !v.is_empty())
+    std::env::var_os(key).filter(|value| !value.is_empty())
 }

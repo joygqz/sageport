@@ -11,7 +11,7 @@ import {
 import { monoFontFamily } from "@/workbench/font";
 import { terminalFontSize } from "@/workbench/zoom";
 import { createAutocomplete } from "./autocomplete/controller";
-import { useBroadcastStore } from "./broadcast";
+import { broadcastTargets, useBroadcastStore } from "./broadcast";
 import { useHostKeyStore } from "./host-key";
 import { usePasswordPromptStore } from "./password-prompt";
 import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
@@ -67,7 +67,7 @@ export function TerminalView({
     const isLocal = target === "local";
     const isSshLike = !isLocal;
     const transport = isLocal
-      ? localTransport(sessionId)
+      ? localTransport(sessionId, attempt)
       : target === "ssh-adhoc" && adhoc
         ? sshAdhocTransport(sessionId, attempt, adhoc)
         : sshTransport(sessionId, hostId, attempt);
@@ -85,13 +85,10 @@ export function TerminalView({
       return message;
     };
 
-    const autocomplete =
-      target === "ssh"
-        ? createAutocomplete({
-            hostId,
-            send: (data) => sessionRef.current?.send(data),
-          })
-        : null;
+    const autocomplete = createAutocomplete({
+      hostId: target === "ssh" ? hostId : null,
+      send: (data) => sessionRef.current?.send(data),
+    });
 
     const session = new TerminalSession({
       id: sessionId,
@@ -120,21 +117,16 @@ export function TerminalView({
           );
       },
       onUserInput: (data) => {
-        autocomplete?.handleData(data);
-        if (isSshLike && useBroadcastStore.getState().enabled) {
-          for (const other of terminalTabs(useTabsStore.getState().tabs)) {
-            if (
-              other.target !== "local" &&
-              other.id !== sessionId &&
-              other.status === "connected"
-            ) {
-              getSession(other.id)?.send(data);
-            }
+        autocomplete.handleData(data);
+        if (useBroadcastStore.getState().enabled) {
+          const tabs = terminalTabs(useTabsStore.getState().tabs);
+          for (const other of broadcastTargets(tabs, sessionId)) {
+            getSession(other.id)?.send(data);
           }
         }
       },
       onDispose: () => {
-        autocomplete?.dispose();
+        autocomplete.dispose();
         if (isSshLike) {
           stopMonitor(sessionId);
           useHostKeyStore.getState().rejectSession(sessionId);
@@ -143,7 +135,7 @@ export function TerminalView({
       },
     });
     sessionRef.current = session;
-    autocomplete?.attach(session.term);
+    autocomplete.attach(session.term);
     registerSession(sessionId, session);
     session.attach(containerRef.current!);
 
