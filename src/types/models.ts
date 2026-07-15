@@ -397,12 +397,20 @@ export interface HostKeyEvent {
   status: HostKeyStatus;
 }
 
+export interface HostKeyPromptClosedEvent {
+  promptId: string;
+}
+
 export interface PasswordPromptEvent {
   promptId: string;
   sessionId: string;
   host: string;
   port: number;
   username: string;
+  prompt?: string;
+  instructions?: string;
+  echo: boolean;
+  allowEmpty: boolean;
 }
 
 export interface PasswordPromptClosedEvent {

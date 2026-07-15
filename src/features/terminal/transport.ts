@@ -34,9 +34,9 @@ function sshLikeTransport(
 ): TerminalTransport {
   return {
     connect,
-    send: (data) => ipc.ssh.send(sessionId, data),
-    resize: (cols, rows) => ipc.ssh.resize(sessionId, cols, rows),
-    disconnect: () => ipc.ssh.disconnect(sessionId),
+    send: (data) => ipc.ssh.send(sessionId, attempt, data),
+    resize: (cols, rows) => ipc.ssh.resize(sessionId, attempt, cols, rows),
+    disconnect: () => ipc.ssh.disconnect(sessionId, attempt),
     onData: (handler) =>
       ipc.ssh.onData((e) => {
         if (e.id === sessionId && e.attempt === attempt)

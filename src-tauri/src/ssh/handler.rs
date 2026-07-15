@@ -2,25 +2,35 @@ use std::time::Duration;
 
 use russh::client;
 use russh::keys::ssh_key::PublicKey;
-use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, watch};
 
 use super::known_hosts::{self, KnownHostStatus};
-use super::{HostKeyDecision, HostKeyPrompts, EVENT_HOST_KEY};
+use super::{
+    HostKeyDecision, HostKeyEvent, HostKeyPromptClosedEvent, HostKeyPrompts, PendingHostKeyPrompt,
+    EVENT_HOST_KEY, EVENT_HOST_KEY_CLOSED,
+};
 
 const HOST_KEY_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct HostKeyEvent {
+struct HostKeyPromptGuard {
+    app: AppHandle,
+    prompts: HostKeyPrompts,
     prompt_id: String,
-    session_id: String,
-    host: String,
-    port: u16,
-    key_type: String,
-    fingerprint: String,
-    status: String,
+    activity: watch::Sender<bool>,
+}
+
+impl Drop for HostKeyPromptGuard {
+    fn drop(&mut self) {
+        self.prompts.lock().remove(&self.prompt_id);
+        let _ = self.activity.send(false);
+        let _ = self.app.emit(
+            EVENT_HOST_KEY_CLOSED,
+            HostKeyPromptClosedEvent {
+                prompt_id: self.prompt_id.clone(),
+            },
+        );
+    }
 }
 
 pub struct ClientHandler {
@@ -29,6 +39,7 @@ pub struct ClientHandler {
     pub session_id: String,
     pub host: String,
     pub port: u16,
+    pub host_key_activity: watch::Sender<bool>,
 }
 
 impl client::Handler for ClientHandler {
@@ -43,32 +54,42 @@ impl client::Handler for ClientHandler {
 
         let prompt_id = uuid::Uuid::new_v4().to_string();
         let (tx, rx) = oneshot::channel();
-        self.prompts.lock().insert(prompt_id.clone(), tx);
-
-        let _ = self.app.emit(
-            EVENT_HOST_KEY,
-            HostKeyEvent {
-                prompt_id: prompt_id.clone(),
-                session_id: self.session_id.clone(),
-                host: self.host.clone(),
-                port: self.port,
-                key_type: key.algorithm().to_string(),
-                fingerprint: known_hosts::fingerprint(key),
-                status: status.to_string(),
+        let _ = self.host_key_activity.send(true);
+        let event = HostKeyEvent {
+            prompt_id: prompt_id.clone(),
+            session_id: self.session_id.clone(),
+            host: self.host.clone(),
+            port: self.port,
+            key_type: key.algorithm().to_string(),
+            fingerprint: known_hosts::fingerprint(key),
+            status: status.to_string(),
+        };
+        self.prompts.lock().insert(
+            prompt_id.clone(),
+            PendingHostKeyPrompt {
+                event: event.clone(),
+                response: tx,
             },
         );
+        let _guard = HostKeyPromptGuard {
+            app: self.app.clone(),
+            prompts: self.prompts.clone(),
+            prompt_id,
+            activity: self.host_key_activity.clone(),
+        };
+
+        let _ = self.app.emit(EVENT_HOST_KEY, event);
 
         let decision = match tokio::time::timeout(HOST_KEY_TIMEOUT, rx).await {
             Ok(Ok(decision)) => decision,
             _ => HostKeyDecision::Reject,
         };
-        self.prompts.lock().remove(&prompt_id);
-
         match decision {
             HostKeyDecision::Reject => Ok(false),
             HostKeyDecision::AcceptOnce => Ok(true),
             HostKeyDecision::AcceptRemember => {
-                known_hosts::learn(&self.app, &self.host, self.port, key);
+                known_hosts::learn(&self.app, &self.host, self.port, key)
+                    .map_err(russh::Error::from)?;
                 Ok(true)
             }
         }

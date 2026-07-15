@@ -289,7 +289,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
       }
       if (tab && isTerminal(tab)) {
         if (tab.target === "local") void ipc.pty.close(id).catch(() => {});
-        else void ipc.ssh.disconnect(id).catch(() => {});
+        else void ipc.ssh.disconnect(id, tab.attempt).catch(() => {});
         disposeSession(id);
         const search = useTerminalSearch.getState();
         if (search.openFor === id) search.close();

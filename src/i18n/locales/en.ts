@@ -36,12 +36,14 @@ export const en = {
       "The server rejected the credentials. Check the username, password, or key for this host.",
     connectTimedOut:
       "The connection timed out. Check your network, firewall, and the SSH service on the server.",
+    dnsFailed:
+      "The host name could not be resolved. Check the address and your DNS connection.",
     connectionInterrupted:
       "The connection was interrupted. Check your network, then reconnect to continue.",
     hostKeyRejected:
       "The connection was cancelled because the host key was not trusted.",
     passwordPrompt: {
-      title: "Enter password",
+      title: "Authentication required",
       description: "{username}@{host}",
       password: "Password",
       connect: "Connect",

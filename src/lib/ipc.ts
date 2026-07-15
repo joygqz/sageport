@@ -21,6 +21,7 @@ import type {
   HostInput,
   HostKeyDecision,
   HostKeyEvent,
+  HostKeyPromptClosedEvent,
   PasswordPromptClosedEvent,
   PasswordPromptEvent,
   Identity,
@@ -155,14 +156,15 @@ export const ipc = {
       cols: number;
       rows: number;
     }) => invoke<void>("ssh_connect_adhoc", params),
-    send: (sessionId: string, data: string) =>
-      invoke<void>("ssh_send", { sessionId, data }),
-    resize: (sessionId: string, cols: number, rows: number) =>
-      invoke<void>("ssh_resize", { sessionId, cols, rows }),
-    disconnect: (sessionId: string) =>
-      invoke<void>("ssh_disconnect", { sessionId }),
+    send: (sessionId: string, attempt: number, data: string) =>
+      invoke<void>("ssh_send", { sessionId, attempt, data }),
+    resize: (sessionId: string, attempt: number, cols: number, rows: number) =>
+      invoke<void>("ssh_resize", { sessionId, attempt, cols, rows }),
+    disconnect: (sessionId: string, attempt?: number) =>
+      invoke<void>("ssh_disconnect", { sessionId, attempt }),
     respondHostKey: (promptId: string, decision: HostKeyDecision) =>
       invoke<void>("ssh_host_key_respond", { promptId, decision }),
+    pendingHostKeys: () => invoke<HostKeyEvent[]>("ssh_host_key_pending"),
     respondPassword: (promptId: string, password: string | null) =>
       invoke<void>("ssh_password_respond", { promptId, password }),
     pendingPasswords: () =>
@@ -173,6 +175,12 @@ export const ipc = {
       listen<SshStatusEvent>("ssh://status", (event) => handler(event.payload)),
     onHostKey: (handler: (e: HostKeyEvent) => void): Promise<UnlistenFn> =>
       listen<HostKeyEvent>("ssh://host-key", (event) => handler(event.payload)),
+    onHostKeyClosed: (
+      handler: (e: HostKeyPromptClosedEvent) => void,
+    ): Promise<UnlistenFn> =>
+      listen<HostKeyPromptClosedEvent>("ssh://host-key-closed", (event) =>
+        handler(event.payload),
+      ),
     onPassword: (
       handler: (e: PasswordPromptEvent) => void,
     ): Promise<UnlistenFn> =>

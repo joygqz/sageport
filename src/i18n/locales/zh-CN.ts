@@ -36,10 +36,11 @@ export const zhCN: Dictionary = {
     authFailed:
       "服务器拒绝了这些凭据，请检查该主机的用户名、密码或密钥是否正确。",
     connectTimedOut: "连接超时，请检查网络、防火墙或服务器上的 SSH 服务。",
+    dnsFailed: "无法解析主机名，请检查地址和 DNS 连接。",
     connectionInterrupted: "连接已中断，请检查网络后重新连接以继续。",
     hostKeyRejected: "已取消连接：未信任该主机的密钥。",
     passwordPrompt: {
-      title: "输入密码",
+      title: "需要身份验证",
       description: "{username}@{host}",
       password: "密码",
       connect: "连接",

@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogToolbar,
   Field,
+  Input,
   PasswordInput,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
@@ -48,6 +49,10 @@ export function PasswordPromptDialog() {
             key={current.promptId}
             host={formatSshHost(current.host, current.port)}
             username={current.username}
+            prompt={current.prompt}
+            instructions={current.instructions}
+            echo={current.echo}
+            allowEmpty={current.allowEmpty}
             onRespond={(password) => respondTo(current.promptId, password)}
           />
         )}
@@ -66,10 +71,18 @@ function formatSshHost(host: string, port: number) {
 function PasswordPromptForm({
   host,
   username,
+  prompt,
+  instructions,
+  echo,
+  allowEmpty,
   onRespond,
 }: {
   host: string;
   username: string;
+  prompt?: string;
+  instructions?: string;
+  echo: boolean;
+  allowEmpty: boolean;
   onRespond: (password: string | null) => void;
 }) {
   const { t } = useI18n();
@@ -77,8 +90,10 @@ function PasswordPromptForm({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (password) onRespond(password);
+    if (allowEmpty || password) onRespond(password);
   };
+
+  const label = prompt?.trim() || t("ssh.passwordPrompt.password");
 
   return (
     <>
@@ -87,19 +102,37 @@ function PasswordPromptForm({
         <p className="font-mono text-sm leading-relaxed text-muted-foreground">
           {t("ssh.passwordPrompt.description", { host, username })}
         </p>
-        <Field label={t("ssh.passwordPrompt.password")}>
-          <PasswordInput
-            autoFocus
-            autoComplete="off"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+        {instructions && (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+            {instructions}
+          </p>
+        )}
+        <Field label={label}>
+          {echo ? (
+            <Input
+              autoFocus
+              autoComplete="off"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          ) : (
+            <PasswordInput
+              autoFocus
+              autoComplete="off"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          )}
         </Field>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={() => onRespond(null)}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={!password}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!allowEmpty && !password}
+          >
             {t("ssh.passwordPrompt.connect")}
           </Button>
         </div>

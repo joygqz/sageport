@@ -6,8 +6,9 @@ use crate::domain::{auth, Host};
 use crate::error::{AppError, AppResult};
 use crate::repository::{host_repo, identity_repo, key_repo};
 use crate::ssh::{
-    pending_password_prompts, resolve_host_key, resolve_password, AuthMethod, ConnectParams, Hop,
-    HostKeyDecision, PasswordPromptEvent, JUMP_DEPTH_LIMIT,
+    pending_host_key_prompts, pending_password_prompts, resolve_host_key, resolve_password,
+    AuthMethod, ConnectParams, Hop, HostKeyDecision, HostKeyEvent, PasswordPromptEvent,
+    JUMP_DEPTH_LIMIT,
 };
 use crate::state::AppState;
 
@@ -20,6 +21,18 @@ fn valid_port(port: i64) -> AppResult<u16> {
     Ok(port)
 }
 
+fn validate_connection_input(session_id: &str, cols: u32, rows: u32) -> AppResult<()> {
+    if session_id.trim().is_empty() || session_id.len() > 128 {
+        return Err(AppError::Invalid("invalid SSH session id".into()));
+    }
+    if !(1..=10_000).contains(&cols) || !(1..=10_000).contains(&rows) {
+        return Err(AppError::Invalid(
+            "terminal dimensions must be between 1 and 10000".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn ssh_connect(
     app: AppHandle,
@@ -30,22 +43,37 @@ pub async fn ssh_connect(
     cols: u32,
     rows: u32,
 ) -> AppResult<()> {
-    let host = host_repo::get(&state.db, &host_id).await?;
-    let hops = build_hops(&state, &host).await?;
+    validate_connection_input(&session_id, cols, rows)?;
+    let Some(reservation) = state.ssh.reserve(session_id.clone(), attempt) else {
+        return Ok(());
+    };
+    let prepared = async {
+        let host = host_repo::get(&state.db, &host_id).await?;
+        let hops = build_hops(&state, &host).await?;
+        host_repo::touch_last_used(&state.db, &host_id).await?;
+        Ok::<_, AppError>((hops, host.startup_command))
+    }
+    .await;
+    let (hops, startup_command) = match prepared {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            state.ssh.abandon(&session_id, attempt);
+            return Err(error);
+        }
+    };
 
     let params = ConnectParams {
-        session_id,
+        session_id: session_id.clone(),
         attempt,
         hops,
         cols,
         rows,
-        startup_command: host.startup_command.clone(),
+        startup_command,
     };
 
     state
         .ssh
-        .connect(app, state.connection_prompts.clone(), params);
-    host_repo::touch_last_used(&state.db, &host_id).await?;
+        .start(app, state.connection_prompts.clone(), params, reservation);
     Ok(())
 }
 
@@ -62,14 +90,48 @@ pub async fn ssh_connect_adhoc(
     cols: u32,
     rows: u32,
 ) -> AppResult<()> {
+    validate_connection_input(&session_id, cols, rows)?;
+    let Some(reservation) = state.ssh.reserve(session_id.clone(), attempt) else {
+        return Ok(());
+    };
+    let host = host.trim();
+    let host = host
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(host)
+        .to_string();
+    let username = username.trim().to_string();
+    if host.is_empty()
+        || host.len() > 1024
+        || host.chars().any(char::is_whitespace)
+        || host.contains(['@', '[', ']'])
+    {
+        state.ssh.abandon(&session_id, attempt);
+        return Err(AppError::Invalid("host is required".into()));
+    }
+    if username.is_empty()
+        || username.len() > 256
+        || username.chars().any(char::is_whitespace)
+        || username.contains(['@', ':'])
+    {
+        state.ssh.abandon(&session_id, attempt);
+        return Err(AppError::Invalid("username is required".into()));
+    }
+    let port = match valid_port(port) {
+        Ok(port) => port,
+        Err(error) => {
+            state.ssh.abandon(&session_id, attempt);
+            return Err(error);
+        }
+    };
     let hop = Hop {
         host,
-        port: valid_port(port)?,
+        port,
         username,
         auth: AuthMethod::Automatic,
     };
     let params = ConnectParams {
-        session_id,
+        session_id: session_id.clone(),
         attempt,
         hops: vec![hop],
         cols,
@@ -78,7 +140,7 @@ pub async fn ssh_connect_adhoc(
     };
     state
         .ssh
-        .connect(app, state.connection_prompts.clone(), params);
+        .start(app, state.connection_prompts.clone(), params, reservation);
     Ok(())
 }
 
@@ -86,24 +148,32 @@ pub async fn ssh_connect_adhoc(
 pub async fn ssh_send(
     state: State<'_, AppState>,
     session_id: String,
+    attempt: u32,
     data: String,
 ) -> AppResult<()> {
-    state.ssh.send_input(&session_id, data.into_bytes())
+    state
+        .ssh
+        .send_input(&session_id, attempt, data.into_bytes())
 }
 
 #[tauri::command]
 pub async fn ssh_resize(
     state: State<'_, AppState>,
     session_id: String,
+    attempt: u32,
     cols: u32,
     rows: u32,
 ) -> AppResult<()> {
-    state.ssh.resize(&session_id, cols, rows)
+    state.ssh.resize(&session_id, attempt, cols, rows)
 }
 
 #[tauri::command]
-pub async fn ssh_disconnect(state: State<'_, AppState>, session_id: String) -> AppResult<()> {
-    state.ssh.close(&session_id)
+pub async fn ssh_disconnect(
+    state: State<'_, AppState>,
+    session_id: String,
+    attempt: Option<u32>,
+) -> AppResult<()> {
+    state.ssh.close(&session_id, attempt)
 }
 
 #[tauri::command]
@@ -128,6 +198,14 @@ pub async fn ssh_password_respond(
     prompt_id: String,
     password: Option<String>,
 ) -> AppResult<()> {
+    if password
+        .as_ref()
+        .is_some_and(|value| value.len() > 64 * 1024)
+    {
+        return Err(AppError::Invalid(
+            "authentication response is too large".into(),
+        ));
+    }
     resolve_password(&state.connection_prompts.passwords, &prompt_id, password);
     Ok(())
 }
@@ -138,6 +216,13 @@ pub async fn ssh_password_pending(
 ) -> AppResult<Vec<PasswordPromptEvent>> {
     Ok(pending_password_prompts(
         &state.connection_prompts.passwords,
+    ))
+}
+
+#[tauri::command]
+pub async fn ssh_host_key_pending(state: State<'_, AppState>) -> AppResult<Vec<HostKeyEvent>> {
+    Ok(pending_host_key_prompts(
+        &state.connection_prompts.host_keys,
     ))
 }
 

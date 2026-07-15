@@ -243,11 +243,6 @@ export class TerminalSession {
         rows: this.term.rows,
       });
       if (this.disposed || this.ended) return;
-      this.inputReady = true;
-      void this.transport
-        .resize(this.term.cols, this.term.rows)
-        .catch(() => {});
-      this.flushInput();
     } catch (err) {
       this.settleConnect();
       this.pendingInput = "";
@@ -264,6 +259,17 @@ export class TerminalSession {
   private handleStatus(e: TerminalStatusUpdate) {
     if (this.disposed || this.ended) return;
     if (e.status !== "connecting") this.settleConnect();
+    if (e.status === "connected") {
+      this.inputReady = true;
+      void this.transport
+        .resize(this.term.cols, this.term.rows)
+        .catch(() => {});
+      this.flushInput();
+    } else if (e.status === "closed" || e.status === "error") {
+      this.ended = true;
+      this.inputReady = false;
+      this.pendingInput = "";
+    }
     this.emitStatus(e);
   }
 

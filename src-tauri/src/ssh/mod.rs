@@ -22,6 +22,7 @@ pub use session::SessionManager;
 pub const EVENT_DATA: &str = "ssh://data";
 pub const EVENT_STATUS: &str = "ssh://status";
 pub const EVENT_HOST_KEY: &str = "ssh://host-key";
+pub const EVENT_HOST_KEY_CLOSED: &str = "ssh://host-key-closed";
 pub const EVENT_PASSWORD: &str = "ssh://password";
 pub const EVENT_PASSWORD_CLOSED: &str = "ssh://password-closed";
 
@@ -64,7 +65,30 @@ pub enum HostKeyDecision {
     AcceptRemember,
 }
 
-pub type HostKeyPrompts = Arc<Mutex<HashMap<String, oneshot::Sender<HostKeyDecision>>>>;
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostKeyEvent {
+    pub prompt_id: String,
+    pub session_id: String,
+    pub host: String,
+    pub port: u16,
+    pub key_type: String,
+    pub fingerprint: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostKeyPromptClosedEvent {
+    pub prompt_id: String,
+}
+
+pub struct PendingHostKeyPrompt {
+    pub event: HostKeyEvent,
+    pub response: oneshot::Sender<HostKeyDecision>,
+}
+
+pub type HostKeyPrompts = Arc<Mutex<HashMap<String, PendingHostKeyPrompt>>>;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -74,6 +98,12 @@ pub struct PasswordPromptEvent {
     pub host: String,
     pub port: u16,
     pub username: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    pub echo: bool,
+    pub allow_empty: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -103,9 +133,17 @@ pub fn new_connection_prompts() -> ConnectionPrompts {
 }
 
 pub fn resolve_host_key(prompts: &HostKeyPrompts, prompt_id: &str, decision: HostKeyDecision) {
-    if let Some(tx) = prompts.lock().remove(prompt_id) {
-        let _ = tx.send(decision);
+    if let Some(prompt) = prompts.lock().remove(prompt_id) {
+        let _ = prompt.response.send(decision);
     }
+}
+
+pub fn pending_host_key_prompts(prompts: &HostKeyPrompts) -> Vec<HostKeyEvent> {
+    prompts
+        .lock()
+        .values()
+        .map(|prompt| prompt.event.clone())
+        .collect()
 }
 
 pub fn resolve_password(prompts: &PasswordPrompts, prompt_id: &str, password: Option<String>) {
@@ -127,6 +165,37 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn pending_host_key_prompts_can_be_recovered_and_resolved() {
+        let prompts = new_connection_prompts();
+        let event = HostKeyEvent {
+            prompt_id: "host-key-1".into(),
+            session_id: "session-1".into(),
+            host: "example.com".into(),
+            port: 22,
+            key_type: "ssh-ed25519".into(),
+            fingerprint: "SHA256:test".into(),
+            status: "unknown".into(),
+        };
+        let (tx, rx) = oneshot::channel();
+        prompts.host_keys.lock().insert(
+            event.prompt_id.clone(),
+            PendingHostKeyPrompt {
+                event: event.clone(),
+                response: tx,
+            },
+        );
+
+        assert_eq!(pending_host_key_prompts(&prompts.host_keys).len(), 1);
+        resolve_host_key(
+            &prompts.host_keys,
+            "host-key-1",
+            HostKeyDecision::AcceptOnce,
+        );
+        assert!(matches!(rx.await, Ok(HostKeyDecision::AcceptOnce)));
+        assert!(pending_host_key_prompts(&prompts.host_keys).is_empty());
+    }
+
+    #[tokio::test]
     async fn pending_password_prompts_can_be_recovered_and_resolved() {
         let prompts = new_connection_prompts();
         let event = PasswordPromptEvent {
@@ -135,6 +204,10 @@ mod tests {
             host: "example.com".into(),
             port: 22,
             username: "root".into(),
+            prompt: None,
+            instructions: None,
+            echo: false,
+            allow_empty: false,
         };
         let (tx, rx) = oneshot::channel();
         prompts.passwords.lock().insert(

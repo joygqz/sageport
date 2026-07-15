@@ -6,6 +6,8 @@ interface PasswordPrompt {
   host: string;
   port: number;
   username: string;
+  echo: boolean;
+  allowEmpty: boolean;
 }
 
 const mocks = vi.hoisted(() => ({
@@ -47,6 +49,8 @@ const prompt = (promptId: string, sessionId = "session-1"): PasswordPrompt => ({
   host: "example.com",
   port: 22,
   username: "root",
+  echo: false,
+  allowEmpty: false,
 });
 
 describe("password prompts", () => {

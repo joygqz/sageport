@@ -4,7 +4,10 @@ import { ChevronRight, Plug, Server } from "lucide-react";
 
 import { DialogOverlay, Input, Kbd } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
-import { parseQuickConnect } from "@/features/terminal/quick-connect";
+import {
+  formatQuickConnectTarget,
+  parseQuickConnect,
+} from "@/features/terminal/quick-connect";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { Host } from "@/types/models";
@@ -286,8 +289,7 @@ function PaletteRow({
           <Plug className="size-4 shrink-0 opacity-70" />
           <span className="min-w-0 flex-1 truncate">
             <span className="font-medium">{t("palette.quickConnect")} </span>
-            {item.target.username}@{item.target.host}
-            {item.target.port === 22 ? "" : `:${item.target.port}`}
+            {formatQuickConnectTarget(item.target)}
           </span>
         </>
       ) : (

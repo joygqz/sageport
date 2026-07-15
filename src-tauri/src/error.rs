@@ -39,6 +39,12 @@ pub enum AppError {
     Network(String),
 
     #[error("{0}")]
+    Dns(String),
+
+    #[error("{0}")]
+    Timeout(String),
+
+    #[error("{0}")]
     ContextLength(String),
 
     #[error("cancelled")]
@@ -53,10 +59,10 @@ impl AppError {
         match self {
             AppError::Database(_) | AppError::Migration(_) => "database",
             AppError::Ssh(russh::Error::UnknownKey) => "host_key",
+            AppError::Ssh(russh::Error::ConnectionTimeout) => "timeout",
             AppError::Ssh(
                 russh::Error::Disconnect
                 | russh::Error::HUP
-                | russh::Error::ConnectionTimeout
                 | russh::Error::KeepaliveTimeout
                 | russh::Error::InactivityTimeout
                 | russh::Error::SendError
@@ -99,6 +105,8 @@ impl AppError {
             AppError::Invalid(_) => "invalid",
             AppError::InUse(_) => "in_use",
             AppError::Network(_) => "network",
+            AppError::Dns(_) => "dns",
+            AppError::Timeout(_) => "timeout",
             AppError::ContextLength(_) => "context_length",
             AppError::Cancelled => "cancelled",
             AppError::Other(_) => "other",
@@ -134,9 +142,14 @@ mod tests {
         let io = AppError::Io(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
         assert_eq!(io.code(), "network");
         assert_eq!(
+            AppError::Ssh(russh::Error::ConnectionTimeout).code(),
+            "timeout"
+        );
+        assert_eq!(
             AppError::Ssh(russh::Error::KeepaliveTimeout).code(),
             "network"
         );
+        assert_eq!(AppError::Dns("lookup failed".into()).code(), "dns");
         assert_eq!(
             AppError::Sftp(russh_sftp::client::error::Error::Timeout).code(),
             "network"

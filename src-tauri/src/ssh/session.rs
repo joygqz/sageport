@@ -13,7 +13,12 @@ use super::connect::{establish, SshConnection};
 use super::{ConnectParams, ConnectionPrompts, EVENT_DATA, EVENT_STATUS, TERM};
 use crate::error::{AppError, AppResult};
 
-type ConnectionMap = Arc<Mutex<HashMap<String, Arc<SshConnection>>>>;
+struct ConnectionEntry {
+    attempt: u32,
+    connection: Arc<SshConnection>,
+}
+
+type ConnectionMap = Arc<Mutex<HashMap<String, ConnectionEntry>>>;
 
 enum SessionCommand {
     Input(Vec<u8>),
@@ -24,6 +29,12 @@ enum SessionCommand {
 struct SessionEntry {
     tx: UnboundedSender<SessionCommand>,
     attempt: u32,
+}
+
+pub struct SessionReservation {
+    id: String,
+    attempt: u32,
+    rx: UnboundedReceiver<SessionCommand>,
 }
 
 #[derive(Serialize, Clone)]
@@ -58,12 +69,13 @@ impl SessionManager {
     }
 
     pub fn connection(&self, id: &str) -> Option<Arc<SshConnection>> {
-        self.connections.lock().get(id).cloned()
+        self.connections
+            .lock()
+            .get(id)
+            .map(|entry| entry.connection.clone())
     }
 
-    pub fn connect(&self, app: AppHandle, prompts: ConnectionPrompts, params: ConnectParams) {
-        let id = params.session_id.clone();
-        let attempt = params.attempt;
+    pub fn reserve(&self, id: String, attempt: u32) -> Option<SessionReservation> {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let previous = {
@@ -72,19 +84,43 @@ impl SessionManager {
                 .get(&id)
                 .is_some_and(|entry| entry.attempt == attempt)
             {
-                return;
+                return None;
             }
             sessions.insert(id.clone(), SessionEntry { tx, attempt })
         };
         if let Some(entry) = previous {
             let _ = entry.tx.send(SessionCommand::Close);
         }
+        Some(SessionReservation { id, attempt, rx })
+    }
+
+    pub fn abandon(&self, id: &str, attempt: u32) {
+        let mut sessions = self.sessions.lock();
+        if sessions
+            .get(id)
+            .is_some_and(|entry| entry.attempt == attempt)
+        {
+            sessions.remove(id);
+        }
+    }
+
+    pub fn start(
+        &self,
+        app: AppHandle,
+        prompts: ConnectionPrompts,
+        params: ConnectParams,
+        reservation: SessionReservation,
+    ) {
+        let id = params.session_id.clone();
+        let attempt = params.attempt;
+        debug_assert_eq!(reservation.id, id);
+        debug_assert_eq!(reservation.attempt, attempt);
 
         let sessions = self.sessions.clone();
         let connections = self.connections.clone();
         tokio::spawn(async move {
-            run_session(app, prompts, params, rx, connections.clone()).await;
-            connections.lock().remove(&id);
+            run_session(app, prompts, params, reservation.rx, connections.clone()).await;
+            remove_connection(&connections, &id, attempt);
             let mut sessions = sessions.lock();
             if sessions
                 .get(&id)
@@ -95,16 +131,27 @@ impl SessionManager {
         });
     }
 
-    pub fn send_input(&self, id: &str, data: Vec<u8>) -> AppResult<()> {
-        self.dispatch(id, SessionCommand::Input(data))
+    pub fn send_input(&self, id: &str, attempt: u32, data: Vec<u8>) -> AppResult<()> {
+        self.dispatch(id, attempt, SessionCommand::Input(data))
     }
 
-    pub fn resize(&self, id: &str, cols: u32, rows: u32) -> AppResult<()> {
-        self.dispatch(id, SessionCommand::Resize(cols, rows))
+    pub fn resize(&self, id: &str, attempt: u32, cols: u32, rows: u32) -> AppResult<()> {
+        self.dispatch(id, attempt, SessionCommand::Resize(cols, rows))
     }
 
-    pub fn close(&self, id: &str) -> AppResult<()> {
-        if let Some(entry) = self.sessions.lock().remove(id) {
+    pub fn close(&self, id: &str, attempt: Option<u32>) -> AppResult<()> {
+        let entry = {
+            let mut sessions = self.sessions.lock();
+            if sessions
+                .get(id)
+                .is_some_and(|entry| attempt.is_none_or(|value| value == entry.attempt))
+            {
+                sessions.remove(id)
+            } else {
+                None
+            }
+        };
+        if let Some(entry) = entry {
             let _ = entry.tx.send(SessionCommand::Close);
         }
         Ok(())
@@ -116,15 +163,28 @@ impl SessionManager {
         }
     }
 
-    fn dispatch(&self, id: &str, cmd: SessionCommand) -> AppResult<()> {
+    fn dispatch(&self, id: &str, attempt: u32, cmd: SessionCommand) -> AppResult<()> {
         let sessions = self.sessions.lock();
         let entry = sessions
             .get(id)
             .ok_or_else(|| AppError::NotFound(format!("session {id}")))?;
+        if entry.attempt != attempt {
+            return Ok(());
+        }
         entry
             .tx
             .send(cmd)
             .map_err(|_| AppError::Other("session is no longer running".into()))
+    }
+}
+
+fn remove_connection(connections: &ConnectionMap, id: &str, attempt: u32) {
+    let mut connections = connections.lock();
+    if connections
+        .get(id)
+        .is_some_and(|entry| entry.attempt == attempt)
+    {
+        connections.remove(id);
     }
 }
 
@@ -152,7 +212,7 @@ async fn run_session(
     let attempt = params.attempt;
     emit_status(&app, &id, attempt, "connecting", None);
 
-    match run_session_inner(&app, &prompts, &params, rx, &connections).await {
+    match run_session_inner(&app, &prompts, params, rx, &connections).await {
         Ok(()) => emit_status(&app, &id, attempt, "closed", None),
         Err(e) => emit_status(&app, &id, attempt, "error", Some(&e)),
     }
@@ -161,30 +221,53 @@ async fn run_session(
 async fn run_session_inner(
     app: &AppHandle,
     prompts: &ConnectionPrompts,
-    params: &ConnectParams,
+    params: ConnectParams,
     mut rx: UnboundedReceiver<SessionCommand>,
     connections: &ConnectionMap,
 ) -> AppResult<()> {
-    let id = &params.session_id;
-    let attempt = params.attempt;
+    let ConnectParams {
+        session_id: id,
+        attempt,
+        hops,
+        cols,
+        rows,
+        startup_command,
+    } = params;
 
     let conn = tokio::select! {
-        result = establish(app, prompts, id, &params.hops) => Arc::new(result?),
+        result = establish(app, prompts, &id, &hops) => Arc::new(result?),
         _ = wait_close(&mut rx) => return Ok(()),
     };
-    let mut channel = conn.handle.channel_open_session().await?;
-    channel
-        .request_pty(false, TERM, params.cols, params.rows, 0, 0, &[])
-        .await?;
-    channel.request_shell(true).await?;
+    drop(hops);
+    let open_channel = async {
+        let channel = conn.handle.channel_open_session().await?;
+        channel
+            .request_pty(false, TERM, cols, rows, 0, 0, &[])
+            .await?;
+        channel.request_shell(true).await?;
+        Ok::<_, russh::Error>(channel)
+    };
+    let mut channel = tokio::select! {
+        result = tokio::time::timeout(std::time::Duration::from_secs(15), open_channel) => {
+            result
+                .map_err(|_| AppError::Timeout("opening the SSH shell timed out".into()))??
+        }
+        _ = wait_close(&mut rx) => return Ok(()),
+    };
 
-    connections.lock().insert(id.clone(), conn.clone());
-    emit_status(app, id, attempt, "connected", None);
+    connections.lock().insert(
+        id.clone(),
+        ConnectionEntry {
+            attempt,
+            connection: conn.clone(),
+        },
+    );
+    emit_status(app, &id, attempt, "connected", None);
 
-    if let Some(command) = &params.startup_command {
+    if let Some(command) = &startup_command {
         if !command.trim().is_empty() {
             let line = format!("{command}\n");
-            let _ = channel.data(line.as_bytes()).await;
+            channel.data(line.as_bytes()).await?;
         }
     }
 
@@ -192,8 +275,8 @@ async fn run_session_inner(
         tokio::select! {
             msg = channel.wait() => {
                 match msg {
-                    Some(ChannelMsg::Data { data }) => emit_data(app, id, attempt, &data),
-                    Some(ChannelMsg::ExtendedData { data, .. }) => emit_data(app, id, attempt, &data),
+                    Some(ChannelMsg::Data { data }) => emit_data(app, &id, attempt, &data),
+                    Some(ChannelMsg::ExtendedData { data, .. }) => emit_data(app, &id, attempt, &data),
                     Some(ChannelMsg::Eof) => {}
                     Some(ChannelMsg::Close) | None => break,
                     _ => {}
@@ -213,7 +296,7 @@ async fn run_session_inner(
         }
     }
 
-    connections.lock().remove(id);
+    remove_connection(connections, &id, attempt);
     drop(conn);
     Ok(())
 }
@@ -236,4 +319,47 @@ fn emit_data(app: &AppHandle, id: &str, attempt: u32, data: &[u8]) {
             data: STANDARD.encode(data),
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SessionCommand, SessionManager};
+
+    #[test]
+    fn newer_reservation_cancels_the_previous_attempt() {
+        let manager = SessionManager::new();
+        let mut first = manager.reserve("session".into(), 1).unwrap();
+
+        let second = manager.reserve("session".into(), 2).unwrap();
+
+        assert!(matches!(first.rx.try_recv(), Ok(SessionCommand::Close)));
+        assert_eq!(second.attempt, 2);
+    }
+
+    #[test]
+    fn stale_disconnect_does_not_close_the_new_attempt() {
+        let manager = SessionManager::new();
+        let mut current = manager.reserve("session".into(), 2).unwrap();
+
+        manager.close("session", Some(1)).unwrap();
+        assert!(current.rx.try_recv().is_err());
+
+        manager.close("session", Some(2)).unwrap();
+        assert!(matches!(current.rx.try_recv(), Ok(SessionCommand::Close)));
+    }
+
+    #[test]
+    fn stale_input_is_not_dispatched_to_the_new_attempt() {
+        let manager = SessionManager::new();
+        let mut current = manager.reserve("session".into(), 2).unwrap();
+
+        manager.send_input("session", 1, b"old".to_vec()).unwrap();
+        assert!(current.rx.try_recv().is_err());
+
+        manager.send_input("session", 2, b"new".to_vec()).unwrap();
+        assert!(matches!(
+            current.rx.try_recv(),
+            Ok(SessionCommand::Input(data)) if data == b"new"
+        ));
+    }
 }

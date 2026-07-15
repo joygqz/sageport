@@ -106,6 +106,7 @@ pub fn run() {
             commands::ssh::ssh_resize,
             commands::ssh::ssh_disconnect,
             commands::ssh::ssh_host_key_respond,
+            commands::ssh::ssh_host_key_pending,
             commands::ssh::ssh_password_respond,
             commands::ssh::ssh_password_pending,
             commands::ssh_config::ssh_config_import_preview,
