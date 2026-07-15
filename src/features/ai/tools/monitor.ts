@@ -9,7 +9,7 @@ import {
 import type { HostStats } from "@/types/models";
 import {
   noTerminalSessionError,
-  resolveTerminalTab,
+  resolveTerminalPane,
   sessionNotConnectedError,
   sleep,
 } from "./terminal";
@@ -72,7 +72,7 @@ async function getHostStats(
 ): Promise<ToolExecutionResult> {
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
-  const tab = resolveTerminalTab(requested);
+  const tab = resolveTerminalPane(requested);
   if (!tab) return toolFailure(noTerminalSessionError(requested));
   if (tab.status !== "connected") {
     return toolFailure(sessionNotConnectedError(tab));

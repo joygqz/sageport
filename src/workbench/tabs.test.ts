@@ -6,6 +6,9 @@ vi.mock("@/lib/ipc", () => ({
       disconnect: vi.fn(() => Promise.resolve()),
       send: vi.fn(() => Promise.resolve()),
     },
+    pty: {
+      close: vi.fn(() => Promise.resolve()),
+    },
     sftp: {
       readText: vi.fn(() => new Promise(() => {})),
       writeText: vi.fn(() => Promise.resolve()),
@@ -24,11 +27,14 @@ import {
   unregisterSession,
 } from "@/features/terminal/sessions";
 import type { TerminalSession } from "@/features/terminal/session";
+import { layoutPaneIds } from "./pane-layout";
 import {
   isFileDirty,
   MAX_FILE_TABS,
-  MAX_TERMINAL_TABS,
-  targetTerminalId,
+  MAX_TERMINAL_SESSIONS,
+  paneTab,
+  targetPaneId,
+  terminalPanes,
   terminalTabs,
   useTabsStore,
 } from "./tabs";
@@ -37,9 +43,15 @@ import type { FileTab } from "./tabs";
 const host = (id: string) => ({ id, label: `host-${id}` });
 
 function openHost(id: string): string {
-  const tabId = useTabsStore.getState().openTerminal(host(id));
-  if (!tabId) throw new Error("Expected terminal tab to open");
-  return tabId;
+  const paneId = useTabsStore.getState().openTerminal(host(id));
+  if (!paneId) throw new Error("Expected terminal tab to open");
+  return paneId;
+}
+
+function tabIdOf(paneId: string): string {
+  const tab = paneTab(useTabsStore.getState().tabs, paneId);
+  if (!tab) throw new Error(`Expected a tab containing pane ${paneId}`);
+  return tab.id;
 }
 
 beforeEach(() => {
@@ -48,34 +60,34 @@ beforeEach(() => {
   useTabsStore.setState({
     tabs: [],
     activeId: null,
-    lastTerminalId: null,
+    lastPaneId: null,
     pendingCloseId: null,
     pendingWindowClose: false,
   });
 });
 
 describe("openTerminal", () => {
-  it("appends the tab, activates it, and tracks it as last terminal", () => {
-    const id = openHost("a");
+  it("appends the tab, activates it, and tracks its pane as last pane", () => {
+    const paneId = openHost("a");
     const s = useTabsStore.getState();
     expect(s.tabs).toHaveLength(1);
-    expect(s.activeId).toBe(id);
-    expect(s.lastTerminalId).toBe(id);
+    expect(s.activeId).toBe(tabIdOf(paneId));
+    expect(s.lastPaneId).toBe(paneId);
   });
 
-  it("rejects new terminal tabs after reaching the limit", () => {
+  it("rejects new terminal sessions after reaching the limit", () => {
     const store = useTabsStore.getState();
-    for (let i = 0; i < MAX_TERMINAL_TABS; i++) {
+    for (let i = 0; i < MAX_TERMINAL_SESSIONS; i++) {
       expect(store.openTerminal(host(String(i)))).not.toBeNull();
     }
 
     expect(store.openLocalTerminal()).toBeNull();
-    expect(useTabsStore.getState().tabs).toHaveLength(MAX_TERMINAL_TABS);
+    expect(useTabsStore.getState().tabs).toHaveLength(MAX_TERMINAL_SESSIONS);
   });
 
   it("allows another terminal after one is closed", () => {
     const store = useTabsStore.getState();
-    const ids = Array.from({ length: MAX_TERMINAL_TABS }, (_, i) =>
+    const ids = Array.from({ length: MAX_TERMINAL_SESSIONS }, (_, i) =>
       openHost(String(i)),
     );
 
@@ -88,7 +100,97 @@ describe("openTerminal", () => {
         username: "me",
       }),
     ).not.toBeNull();
-    expect(useTabsStore.getState().tabs).toHaveLength(MAX_TERMINAL_TABS);
+    expect(useTabsStore.getState().tabs).toHaveLength(MAX_TERMINAL_SESSIONS);
+  });
+});
+
+describe("splitPane", () => {
+  it("clones the source connection into a sibling pane and focuses it", () => {
+    const source = openHost("a");
+    const split = useTabsStore.getState().splitPane(source, "right");
+
+    expect(split).not.toBeNull();
+    const s = useTabsStore.getState();
+    expect(s.tabs).toHaveLength(1);
+    const tab = terminalTabs(s.tabs)[0];
+    expect(tab.panes).toHaveLength(2);
+    expect(tab.activePaneId).toBe(split);
+    expect(s.lastPaneId).toBe(split);
+    expect(layoutPaneIds(tab.layout)).toEqual([source, split]);
+    const clone = tab.panes.find((pane) => pane.id === split)!;
+    expect(clone).toMatchObject({
+      target: "ssh",
+      hostId: "a",
+      title: "host-a",
+      status: "idle",
+      attempt: 0,
+    });
+  });
+
+  it("counts panes toward the session limit", () => {
+    const first = openHost("a");
+    for (let i = 1; i < MAX_TERMINAL_SESSIONS; i++) {
+      expect(useTabsStore.getState().splitPane(first, "right")).not.toBeNull();
+    }
+    expect(useTabsStore.getState().splitPane(first, "down")).toBeNull();
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(
+      MAX_TERMINAL_SESSIONS,
+    );
+  });
+});
+
+describe("closePane", () => {
+  it("collapses back to a single pane and refocuses the neighbor", () => {
+    const source = openHost("a");
+    const split = useTabsStore.getState().splitPane(source, "right")!;
+
+    useTabsStore.getState().closePane(split);
+
+    const s = useTabsStore.getState();
+    const tab = terminalTabs(s.tabs)[0];
+    expect(tab.panes.map((pane) => pane.id)).toEqual([source]);
+    expect(tab.layout).toEqual({ type: "leaf", paneId: source });
+    expect(tab.activePaneId).toBe(source);
+    expect(s.lastPaneId).toBe(source);
+  });
+
+  it("closes the whole tab when the last pane closes", () => {
+    const source = openHost("a");
+    useTabsStore.getState().closePane(source);
+    expect(useTabsStore.getState().tabs).toHaveLength(0);
+    expect(ipc.ssh.disconnect).toHaveBeenCalledWith(source, 0);
+  });
+});
+
+describe("focusPane", () => {
+  it("focusPaneNext cycles panes in layout order", () => {
+    const a = openHost("a");
+    const b = useTabsStore.getState().splitPane(a, "right")!;
+    const c = useTabsStore.getState().splitPane(b, "down")!;
+
+    useTabsStore.getState().focusPaneNext(1);
+    expect(paneTab(useTabsStore.getState().tabs, a)!.activePaneId).toBe(a);
+    useTabsStore.getState().focusPaneNext(-1);
+    expect(paneTab(useTabsStore.getState().tabs, a)!.activePaneId).toBe(c);
+    useTabsStore.getState().focusPaneNext(-1);
+    expect(paneTab(useTabsStore.getState().tabs, a)!.activePaneId).toBe(b);
+  });
+
+  it("setActive accepts a pane id and activates its tab and pane", () => {
+    const a = openHost("a");
+    const b = useTabsStore.getState().splitPane(a, "right")!;
+    openHost("other");
+
+    useTabsStore.getState().setActive(a);
+    let s = useTabsStore.getState();
+    expect(s.activeId).toBe(tabIdOf(a));
+    expect(paneTab(s.tabs, a)!.activePaneId).toBe(a);
+    expect(s.lastPaneId).toBe(a);
+
+    useTabsStore.getState().setActive(b);
+    s = useTabsStore.getState();
+    expect(paneTab(s.tabs, b)!.activePaneId).toBe(b);
+    expect(s.lastPaneId).toBe(b);
   });
 });
 
@@ -125,9 +227,9 @@ describe("close", () => {
     const c = openHost("c");
     useTabsStore.getState().setActive(b);
     useTabsStore.getState().close(b);
-    expect(useTabsStore.getState().activeId).toBe(c);
+    expect(useTabsStore.getState().activeId).toBe(tabIdOf(c));
     useTabsStore.getState().close(c);
-    expect(useTabsStore.getState().activeId).toBe(a);
+    expect(useTabsStore.getState().activeId).toBe(tabIdOf(a));
   });
 
   it("keeps the active tab when closing an inactive one", () => {
@@ -135,15 +237,24 @@ describe("close", () => {
     const b = openHost("b");
     useTabsStore.getState().setActive(b);
     useTabsStore.getState().close(a);
-    expect(useTabsStore.getState().activeId).toBe(b);
+    expect(useTabsStore.getState().activeId).toBe(tabIdOf(b));
   });
 
-  it("repoints lastTerminalId to the nearest surviving terminal", () => {
+  it("repoints lastPaneId to the nearest surviving terminal pane", () => {
     const a = openHost("a");
     const b = openHost("b");
     useTabsStore.getState().setActive(b);
     useTabsStore.getState().close(b);
-    expect(useTabsStore.getState().lastTerminalId).toBe(a);
+    expect(useTabsStore.getState().lastPaneId).toBe(a);
+  });
+
+  it("disposes every pane when a split tab closes", () => {
+    const a = openHost("a");
+    const b = useTabsStore.getState().splitPane(a, "right")!;
+    useTabsStore.getState().close(tabIdOf(a));
+    expect(useTabsStore.getState().tabs).toHaveLength(0);
+    expect(ipc.ssh.disconnect).toHaveBeenCalledWith(a, 0);
+    expect(ipc.ssh.disconnect).toHaveBeenCalledWith(b, 0);
   });
 
   it("deflects a dirty file close into pendingCloseId", () => {
@@ -250,9 +361,9 @@ describe("activateNext", () => {
     const a = openHost("a");
     const b = openHost("b");
     useTabsStore.getState().activateNext(1);
-    expect(useTabsStore.getState().activeId).toBe(a);
+    expect(useTabsStore.getState().activeId).toBe(tabIdOf(a));
     useTabsStore.getState().activateNext(-1);
-    expect(useTabsStore.getState().activeId).toBe(b);
+    expect(useTabsStore.getState().activeId).toBe(tabIdOf(b));
   });
 });
 
@@ -263,11 +374,13 @@ describe("moveTab", () => {
     const c = openHost("c");
     useTabsStore.getState().setActive(b);
 
-    useTabsStore.getState().moveTab(a, 2);
+    useTabsStore.getState().moveTab(tabIdOf(a), 2);
 
     const reorderedTabs = useTabsStore.getState().tabs;
-    expect(reorderedTabs.map((tab) => tab.id)).toEqual([b, c, a]);
-    expect(useTabsStore.getState().activeId).toBe(b);
+    expect(reorderedTabs.map((tab) => tab.id)).toEqual(
+      [b, c, a].map(tabIdOf),
+    );
+    expect(useTabsStore.getState().activeId).toBe(tabIdOf(b));
   });
 
   it("retains terminal tab objects and their connection status", () => {
@@ -277,48 +390,63 @@ describe("moveTab", () => {
     store.setTerminalStatus(connected, "connected");
     const connectedTab = useTabsStore
       .getState()
-      .tabs.find((tab) => tab.id === connected);
+      .tabs.find((tab) => tab.id === tabIdOf(connected));
 
-    useTabsStore.getState().moveTab(connected, 1);
+    useTabsStore.getState().moveTab(tabIdOf(connected), 1);
 
     const reorderedTab = useTabsStore
       .getState()
-      .tabs.find((tab) => tab.id === connected);
+      .tabs.find((tab) => tab.id === tabIdOf(connected));
     expect(reorderedTab).toBe(connectedTab);
-    expect(reorderedTab).toMatchObject({ status: "connected" });
-    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([
-      connecting,
-      connected,
-    ]);
+    expect(
+      terminalPanes([reorderedTab!]).map((pane) => pane.status),
+    ).toEqual(["connected"]);
+    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual(
+      [connecting, connected].map(tabIdOf),
+    );
   });
 
   it("clamps the destination and ignores unknown tabs", () => {
     const a = openHost("a");
     const b = openHost("b");
 
-    useTabsStore.getState().moveTab(a, 100);
-    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([b, a]);
+    useTabsStore.getState().moveTab(tabIdOf(a), 100);
+    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual(
+      [b, a].map(tabIdOf),
+    );
 
     useTabsStore.getState().moveTab("missing", 0);
-    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual([b, a]);
+    expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual(
+      [b, a].map(tabIdOf),
+    );
   });
 });
 
 describe("selectors", () => {
-  it("targetTerminalId prefers the active terminal, else the last one", () => {
+  it("targetPaneId prefers the active tab's pane, else the last one", () => {
     const store = useTabsStore.getState();
     const a = openHost("a");
     store.openFile({ connectionId: null, path: "/tmp/a", name: "a" });
-    expect(targetTerminalId(useTabsStore.getState())).toBe(a);
+    expect(targetPaneId(useTabsStore.getState())).toBe(a);
     useTabsStore.getState().setActive(a);
-    expect(targetTerminalId(useTabsStore.getState())).toBe(a);
+    expect(targetPaneId(useTabsStore.getState())).toBe(a);
   });
 
-  it("terminalTabs filters non-terminal tabs", () => {
+  it("targetPaneId follows the focused pane inside a split", () => {
+    const a = openHost("a");
+    const b = useTabsStore.getState().splitPane(a, "right")!;
+    expect(targetPaneId(useTabsStore.getState())).toBe(b);
+    useTabsStore.getState().focusPane(a);
+    expect(targetPaneId(useTabsStore.getState())).toBe(a);
+  });
+
+  it("terminalPanes flattens panes across terminal tabs only", () => {
     const store = useTabsStore.getState();
-    store.openTerminal(host("a"));
+    const a = openHost("a");
+    useTabsStore.getState().splitPane(a, "right");
     store.openFile({ connectionId: null, path: "/tmp/a", name: "a" });
     expect(terminalTabs(useTabsStore.getState().tabs)).toHaveLength(1);
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(2);
   });
 
   it("isFileDirty compares buffer against saved content", () => {
@@ -339,7 +467,7 @@ describe("selectors", () => {
 });
 
 describe("sendToTerminal", () => {
-  it("sends to a connected terminal and records scoped history", () => {
+  it("sends to the focused connected pane and records scoped history", () => {
     const id = openHost("a");
     const sendCommand = vi.fn();
     registerSession(id, { sendCommand } as unknown as TerminalSession);

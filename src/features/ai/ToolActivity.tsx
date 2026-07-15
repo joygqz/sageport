@@ -24,7 +24,7 @@ import {
   TOOL_LABEL_KEYS,
   TOOLS_REQUIRING_APPROVAL,
 } from "./tools";
-import { terminalTabs, useTabsStore } from "@/workbench/tabs";
+import { findPane, useTabsStore } from "@/workbench/tabs";
 
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
 
@@ -112,10 +112,7 @@ export function ToolActivity({
   const targetSessionId =
     typeof item.args.sessionId === "string" ? item.args.sessionId : undefined;
   const targetTitle = useTabsStore((state) =>
-    targetSessionId
-      ? terminalTabs(state.tabs).find((tab) => tab.id === targetSessionId)
-          ?.title
-      : undefined,
+    targetSessionId ? findPane(state.tabs, targetSessionId)?.title : undefined,
   );
 
   return (

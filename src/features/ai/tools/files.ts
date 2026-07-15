@@ -15,7 +15,7 @@ import { ipc } from "@/lib/ipc";
 import { errorMessage } from "@/lib/toast";
 import type { SftpStatusKind } from "@/types/models";
 import type { FsEndpoint, TransferEvent } from "@/types/models";
-import { resolveTerminalTab, sleep } from "./terminal";
+import { resolveTerminalPane, sleep } from "./terminal";
 import {
   bool,
   optionalStr,
@@ -62,7 +62,7 @@ async function resolveSftpConnection(
   }
   let targetHostId = hostId;
   if (!targetHostId) {
-    targetHostId = resolveTerminalTab()?.hostId || undefined;
+    targetHostId = resolveTerminalPane()?.hostId || undefined;
     if (!targetHostId) {
       return {
         error:
@@ -149,7 +149,7 @@ async function withConn(
 function prepareSftpTarget(args: Record<string, unknown>): PreparedCall {
   const requested = optionalStr(args, "hostId");
   if (requested) return { args: { ...args, hostId: requested } };
-  const hostId = resolveTerminalTab()?.hostId || undefined;
+  const hostId = resolveTerminalPane()?.hostId || undefined;
   if (!hostId) {
     return {
       args,

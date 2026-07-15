@@ -28,7 +28,7 @@ import { PanelContent } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { STATUS_DOT_CLASS } from "@/workbench/tab-styles";
-import { terminalTabs, useTabsStore, type TerminalTab } from "@/workbench/tabs";
+import { terminalPanes, useTabsStore, type TerminalPane } from "@/workbench/tabs";
 
 export function MonitorView() {
   const { t } = useI18n();
@@ -42,7 +42,7 @@ export function MonitorView() {
   }, []);
 
   const groups = groupByHost(
-    terminalTabs(tabs).filter((tab) => tab.target !== "local"),
+    terminalPanes(tabs).filter((pane) => pane.target !== "local"),
   );
   const hostById = new Map(hosts.map((host) => [host.id, host]));
   const q = query.trim().toLowerCase();
@@ -99,7 +99,7 @@ export function MonitorView() {
   );
 }
 
-function hostKey(tab: TerminalTab): string {
+function hostKey(tab: TerminalPane): string {
   if (tab.target === "ssh") return `host:${tab.hostId}`;
   if (tab.adhoc)
     return JSON.stringify([
@@ -111,9 +111,9 @@ function hostKey(tab: TerminalTab): string {
   return tab.id;
 }
 
-function groupByHost(sessions: TerminalTab[]) {
-  const groups: { key: string; sessions: TerminalTab[] }[] = [];
-  const byKey = new Map<string, TerminalTab[]>();
+function groupByHost(sessions: TerminalPane[]) {
+  const groups: { key: string; sessions: TerminalPane[] }[] = [];
+  const byKey = new Map<string, TerminalPane[]>();
   for (const session of sessions) {
     const key = hostKey(session);
     const group = byKey.get(key);
@@ -128,7 +128,7 @@ function groupByHost(sessions: TerminalTab[]) {
   return groups;
 }
 
-function hostAddress(session: TerminalTab, host?: Host): string | null {
+function hostAddress(session: TerminalPane, host?: Host): string | null {
   if (session.adhoc) {
     const { username, host: addr, port } = session.adhoc;
     return `${username}@${addr}${port === 22 ? "" : `:${port}`}`;
@@ -151,12 +151,15 @@ function HostCard({
   sessions,
   host,
 }: {
-  sessions: TerminalTab[];
+  sessions: TerminalPane[];
   host?: Host;
 }) {
   const { t } = useI18n();
   const setActive = useTabsStore((s) => s.setActive);
-  const activeId = useTabsStore((s) => s.activeId);
+  const activeId = useTabsStore((s) => {
+    const active = s.tabs.find((tab) => tab.id === s.activeId);
+    return active?.kind === "terminal" ? active.activePaneId : null;
+  });
   const connectedSessions = sessions.filter(
     (session) => session.status === "connected",
   );

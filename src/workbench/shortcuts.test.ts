@@ -27,6 +27,12 @@ describe("isWorkbenchShortcut", () => {
     expect(shortcut(key("{", { shiftKey: true, code: "BracketLeft" }))).toBe(
       true,
     );
+    expect(shortcut(key("[", { code: "BracketLeft" }))).toBe(true);
+    expect(shortcut(key("]", { code: "BracketRight" }))).toBe(true);
+    expect(shortcut(key("\\", { code: "Backslash" }))).toBe(true);
+    expect(shortcut(key("|", { shiftKey: true, code: "Backslash" }))).toBe(
+      true,
+    );
     expect(shortcut(key("+", { shiftKey: true }))).toBe(true);
   });
 

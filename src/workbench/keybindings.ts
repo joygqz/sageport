@@ -41,15 +41,35 @@ export function useKeybindings() {
         run(() => layout.toggleAux());
       } else if (key === "w" && !e.shiftKey) {
         run(() => {
-          if (overlays.overlay) overlays.close();
-          else if (tabs.activeId) tabs.close(tabs.activeId);
+          if (overlays.overlay) {
+            overlays.close();
+            return;
+          }
+          const active = tabs.tabs.find((t) => t.id === tabs.activeId);
+          if (active?.kind === "terminal" && active.panes.length > 1) {
+            tabs.closePane(active.activePaneId);
+          } else if (tabs.activeId) {
+            tabs.close(tabs.activeId);
+          }
         });
       } else if (e.shiftKey && (key === "[" || key === "]")) {
         run(() => tabs.activateNext(key === "]" ? 1 : -1));
+      } else if (key === "[" || key === "]") {
+        const active = tabs.tabs.find((t) => t.id === tabs.activeId);
+        if (active?.kind === "terminal" && active.panes.length > 1) {
+          run(() => tabs.focusPaneNext(key === "]" ? 1 : -1));
+        }
+      } else if (key === "\\") {
+        const active = tabs.tabs.find((t) => t.id === tabs.activeId);
+        if (active?.kind === "terminal") {
+          run(() =>
+            tabs.splitPane(active.activePaneId, e.shiftKey ? "down" : "right"),
+          );
+        }
       } else if (key === "f" && !e.shiftKey) {
         const active = tabs.tabs.find((t) => t.id === tabs.activeId);
         if (active?.kind === "terminal") {
-          run(() => useTerminalSearch.getState().open(active.id));
+          run(() => useTerminalSearch.getState().open(active.activePaneId));
         }
       } else if (key === "=" || key === "+") {
         run(() => useZoomStore.getState().zoomIn());

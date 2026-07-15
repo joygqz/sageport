@@ -169,6 +169,9 @@ export const en = {
     terminal: {
       newLocal: "New local terminal",
       toggleBroadcast: "Toggle terminal input broadcasting",
+      splitRight: "Split terminal right",
+      splitDown: "Split terminal down",
+      focusNextPane: "Focus next terminal pane",
     },
     view: {
       toggleSidebar: "Toggle sidebar",

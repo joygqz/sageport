@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { TerminalTab } from "@/workbench/tabs";
+import type { TerminalPane } from "@/workbench/tabs";
 import { broadcastTargets } from "./broadcast";
 
-function tab(
+function pane(
   id: string,
-  target: TerminalTab["target"],
-  status: TerminalTab["status"],
-): TerminalTab {
+  target: TerminalPane["target"],
+  status: TerminalPane["status"],
+): TerminalPane {
   return {
-    kind: "terminal",
     id,
     target,
     hostId: target === "ssh" ? `host-${id}` : "",
@@ -21,24 +20,24 @@ function tab(
 
 describe("broadcastTargets", () => {
   it("includes every other connected SSH and local terminal", () => {
-    const tabs = [
-      tab("source", "ssh", "connected"),
-      tab("local", "local", "connected"),
-      tab("adhoc", "ssh-adhoc", "connected"),
-      tab("offline", "ssh", "closed"),
+    const panes = [
+      pane("source", "ssh", "connected"),
+      pane("local", "local", "connected"),
+      pane("adhoc", "ssh-adhoc", "connected"),
+      pane("offline", "ssh", "closed"),
     ];
 
-    expect(broadcastTargets(tabs, "source").map((item) => item.id)).toEqual([
+    expect(broadcastTargets(panes, "source").map((item) => item.id)).toEqual([
       "local",
       "adhoc",
     ]);
   });
 
   it("does not broadcast input from a source that is not connected", () => {
-    const tabs = [
-      tab("source", "local", "connecting"),
-      tab("remote", "ssh", "connected"),
+    const panes = [
+      pane("source", "local", "connecting"),
+      pane("remote", "ssh", "connected"),
     ];
-    expect(broadcastTargets(tabs, "source")).toEqual([]);
+    expect(broadcastTargets(panes, "source")).toEqual([]);
   });
 });

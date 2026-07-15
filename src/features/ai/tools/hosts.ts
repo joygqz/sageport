@@ -19,10 +19,12 @@ import type {
   HostInput,
 } from "@/types/models";
 import {
-  terminalTabs,
+  findPane,
+  terminalPanes,
   useTabsStore,
+  type EditorTab,
+  type TerminalPane,
   type TerminalStatus,
-  type TerminalTab,
 } from "@/workbench/tabs";
 import { invalidateHosts } from "./cache";
 import { sleep } from "./terminal";
@@ -40,9 +42,9 @@ import {
 } from "./types";
 
 export function reusableHostSession(
-  tabs: Parameters<typeof terminalTabs>[0],
+  tabs: readonly EditorTab[],
   hostId: string,
-): TerminalTab | undefined {
+): TerminalPane | undefined {
   const priority: Record<TerminalStatus, number> = {
     connected: 0,
     connecting: 1,
@@ -50,8 +52,8 @@ export function reusableHostSession(
     closed: 3,
     error: 4,
   };
-  return terminalTabs(tabs)
-    .filter((tab) => tab.hostId === hostId)
+  return terminalPanes(tabs)
+    .filter((pane) => pane.hostId === hostId)
     .sort((a, b) => priority[a.status] - priority[b.status])[0];
 }
 
@@ -62,13 +64,11 @@ async function waitForConnection(
 ): Promise<TerminalStatus> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const tab = terminalTabs(useTabsStore.getState().tabs).find(
-      (t) => t.id === id,
-    );
-    if (!tab) return "closed";
-    if (isCancelled()) return tab.status;
-    if (tab.status !== "connecting" && tab.status !== "idle") {
-      return tab.status;
+    const pane = findPane(useTabsStore.getState().tabs, id);
+    if (!pane) return "closed";
+    if (isCancelled()) return pane.status;
+    if (pane.status !== "connecting" && pane.status !== "idle") {
+      return pane.status;
     }
     await sleep(250);
   }
@@ -169,10 +169,8 @@ async function connectHost(
       `Still connecting to "${host.label}" (sessionId: ${id}). The user may need to answer a prompt in the terminal tab (host key trust, password). Check again later with list_terminal_sessions or read_terminal_output.`,
     );
   }
-  const tab = terminalTabs(useTabsStore.getState().tabs).find(
-    (t) => t.id === id,
-  );
-  const detail = tab?.error ? `: ${tab.error}` : ".";
+  const pane = findPane(useTabsStore.getState().tabs, id);
+  const detail = pane?.error ? `: ${pane.error}` : ".";
   return toolFailure(
     `Error: connection to "${host.label}" ${
       status === "error" ? "failed" : "was closed"

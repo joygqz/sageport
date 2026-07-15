@@ -40,7 +40,9 @@ import {
   WORKBENCH_TAB_STRIP_GUTTER_CLASS,
 } from "./tab-styles";
 import {
+  activePane,
   isFileDirty,
+  tabTitle,
   useTabsStore,
   type EditorTab,
   type FileTab,
@@ -268,8 +270,11 @@ export function EditorArea() {
       preserveTabFocusRef.current = false;
       return;
     }
-    focusTerminal(activeId);
-    focusFileEditor(activeId);
+    const active = useTabsStore
+      .getState()
+      .tabs.find((tab) => tab.id === activeId);
+    if (active?.kind === "terminal") focusTerminal(active.activePaneId);
+    else focusFileEditor(activeId);
   }, [activeId]);
 
   if (tabs.length === 0) return <Watermark />;
@@ -427,17 +432,17 @@ function TabItem({
     active: boolean;
   } | null>(null);
 
-  const title = tab.title;
+  const title = tabTitle(tab);
   const dirty = tab.kind === "file" && isFileDirty(tab);
+  const pane = tab.kind === "terminal" ? activePane(tab) : null;
 
-  const reopen =
-    tab.kind === "terminal"
-      ? tab.target === "local"
-        ? () => openLocalTerminal()
-        : tab.target === "ssh-adhoc" && tab.adhoc
-          ? () => openAdhocTerminal(tab.adhoc!)
-          : () => openTerminal({ id: tab.hostId, label: tab.title })
-      : undefined;
+  const reopen = pane
+    ? pane.target === "local"
+      ? () => openLocalTerminal()
+      : pane.target === "ssh-adhoc" && pane.adhoc
+        ? () => openAdhocTerminal(pane.adhoc!)
+        : () => openTerminal({ id: pane.hostId, label: pane.title })
+    : undefined;
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (
@@ -529,14 +534,14 @@ function TabItem({
           onKeyboardMove(e.key === "ArrowLeft" ? -1 : 1);
         }}
       >
-        {tab.kind === "terminal" ? (
+        {tab.kind === "terminal" && pane ? (
           <span className="relative flex shrink-0 items-center justify-center">
             <TerminalSquare className="size-3.5" />
             <span
               className={cn(
                 "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2",
                 "ring-[var(--tab-background)]",
-                STATUS_DOT_CLASS[tab.status],
+                STATUS_DOT_CLASS[pane.status],
               )}
             />
           </span>
@@ -545,6 +550,12 @@ function TabItem({
         )}
 
         <span className="min-w-0 max-w-36 truncate text-left">{title}</span>
+
+        {tab.kind === "terminal" && tab.panes.length > 1 && (
+          <span className="shrink-0 rounded-sm bg-accent px-1 font-mono text-[10px] leading-4 text-muted-foreground">
+            {tab.panes.length}
+          </span>
+        )}
 
         {dirty && (
           <span
@@ -583,7 +594,7 @@ function TabDragGhost({
   tab: EditorTab;
   dragState: TabDragState;
 }) {
-  const title = tab.title;
+  const title = tabTitle(tab);
   const dirty = tab.kind === "file" && isFileDirty(tab);
 
   return (
@@ -603,7 +614,7 @@ function TabDragGhost({
           <span
             className={cn(
               "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-list-active",
-              STATUS_DOT_CLASS[tab.status],
+              STATUS_DOT_CLASS[activePane(tab).status],
             )}
           />
         </span>

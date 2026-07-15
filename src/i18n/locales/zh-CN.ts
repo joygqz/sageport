@@ -166,6 +166,9 @@ export const zhCN: Dictionary = {
     terminal: {
       newLocal: "新建本地终端",
       toggleBroadcast: "切换终端输入广播",
+      splitRight: "向右拆分终端",
+      splitDown: "向下拆分终端",
+      focusNextPane: "聚焦下一个终端窗格",
     },
     view: {
       toggleSidebar: "切换侧边栏",
