@@ -197,9 +197,31 @@ async function runCommandOnHosts(
   }
 
   const results = new Map<string, BatchExecEvent>();
-  await ipc.hosts.runCommand(hostIds, command, (event) => {
-    results.set(event.hostId, event);
-  });
+  const requestId = crypto.randomUUID();
+  let cancelInFlight = false;
+  const cancelTimer = globalThis.setInterval(() => {
+    if (!cancelInFlight && context.isCancelled?.()) {
+      cancelInFlight = true;
+      void ipc.hosts
+        .cancelRun(requestId)
+        .catch(() => {})
+        .finally(() => {
+          cancelInFlight = false;
+        });
+    }
+  }, 50);
+  try {
+    await ipc.hosts.runCommand(
+      hostIds,
+      command,
+      (event) => {
+        results.set(event.hostId, event);
+      },
+      requestId,
+    );
+  } finally {
+    globalThis.clearInterval(cancelTimer);
+  }
   if (context.isCancelled?.()) {
     return toolFailure(
       "Error: the assistant run was stopped; commands that had already started may still have completed.",
@@ -450,9 +472,15 @@ export const hostTools: AiTool[] = [
             type: "array",
             items: { type: "string" },
             minItems: 1,
+            maxItems: 100,
             description: "Host ids from list_hosts.",
           },
-          command: { type: "string", description: "The command to run." },
+          command: {
+            type: "string",
+            minLength: 1,
+            maxLength: 32 * 1024,
+            description: "The command to run.",
+          },
         },
         required: ["hostIds", "command"],
         additionalProperties: false,

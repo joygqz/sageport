@@ -113,4 +113,24 @@ describe("tool registry", () => {
       validateToolArguments("delete_host", { id: "host-1" }),
     ).toBeUndefined();
   });
+
+  it("rejects oversized commands and out-of-range execution options", () => {
+    expect(
+      validateToolArguments("run_terminal_command", {
+        command: "x".repeat(32 * 1024 + 1),
+      }),
+    ).toContain("at most");
+    expect(
+      validateToolArguments("run_terminal_command", {
+        command: "uptime",
+        timeoutMs: 30_001,
+      }),
+    ).toContain("at most 30000");
+    expect(
+      validateToolArguments("run_command_on_hosts", {
+        hostIds: Array.from({ length: 101 }, (_, index) => `host-${index}`),
+        command: "uptime",
+      }),
+    ).toContain("at most 100");
+  });
 });

@@ -277,6 +277,8 @@ export const terminalTools: AiTool[] = [
         properties: {
           command: {
             type: "string",
+            minLength: 1,
+            maxLength: 32 * 1024,
             description: "The exact shell command to run.",
           },
           sessionId: {
@@ -286,6 +288,8 @@ export const terminalTools: AiTool[] = [
           },
           timeoutMs: {
             type: "integer",
+            minimum: 1,
+            maximum: 30_000,
             description: "Output wait in ms (default 10000, max 30000).",
           },
         },

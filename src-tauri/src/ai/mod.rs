@@ -12,6 +12,12 @@ const ANTHROPIC_VERSION: &str = "2023-06-01";
 pub const DEFAULT_MAX_OUTPUT_TOKENS: u32 = 16_000;
 pub const MAX_OUTPUT_TOKENS: u32 = 64_000;
 const MAX_STREAM_BYTES: usize = 8 * 1024 * 1024;
+const MAX_METADATA_BYTES: usize = 2 * 1024 * 1024;
+const MAX_LISTED_MODELS: usize = 5_000;
+const MAX_MODEL_ID_BYTES: usize = 1_024;
+const MAX_ERROR_MESSAGE_CHARS: usize = 4_096;
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+const METADATA_TIMEOUT: Duration = Duration::from_secs(30);
 
 const SYSTEM_PROMPT: &str = "You are an autonomous operations agent inside Sageport, an SSH \
 client. Inspect and act with the provided tools instead of guessing or handing work back to the \
@@ -150,6 +156,8 @@ fn http_client() -> &'static reqwest::Client {
     CLIENT.get_or_init(|| {
         reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(15))
+            .timeout(REQUEST_TIMEOUT)
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("valid AI HTTP client configuration")
     })
@@ -160,11 +168,22 @@ pub async fn list_models(ep: &Endpoint<'_>) -> AppResult<Vec<String>> {
         Protocol::Openai => "/models",
         Protocol::Anthropic => "/v1/models",
     };
-    let req = ep.authorize(http_client().get(ep.url(path)));
+    let req = ep
+        .authorize(http_client().get(ep.url(path)))
+        .timeout(METADATA_TIMEOUT);
     let bytes = send(req).await?;
     let parsed: ModelsResponse = serde_json::from_slice(&bytes)?;
-    let mut models: Vec<String> = parsed.data.into_iter().map(|m| m.id).collect();
+    let mut models: Vec<String> = parsed
+        .data
+        .into_iter()
+        .map(|model| model.id.trim().to_string())
+        .filter(|id| {
+            !id.is_empty() && id.len() <= MAX_MODEL_ID_BYTES && !id.chars().any(char::is_control)
+        })
+        .collect();
     models.sort();
+    models.dedup();
+    models.truncate(MAX_LISTED_MODELS);
     Ok(models)
 }
 
@@ -181,7 +200,9 @@ pub async fn model_limits(ep: &Endpoint<'_>, model: &str) -> ModelLimits {
     };
     segments.push(model);
     drop(segments);
-    let req = ep.authorize(http_client().get(url));
+    let req = ep
+        .authorize(http_client().get(url))
+        .timeout(METADATA_TIMEOUT);
     let Ok(bytes) = send(req).await else {
         return ModelLimits::default();
     };
@@ -231,14 +252,11 @@ pub async fn chat(
     let mut response = req
         .send()
         .await
-        .map_err(|e| AppError::Network(format!("request failed: {e}")))?;
+        .map_err(|e| request_error("request failed", e))?;
 
     let status = response.status();
     if !status.is_success() {
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| AppError::Network(format!("failed to read response: {e}")))?;
+        let bytes = read_response(response, MAX_METADATA_BYTES).await?;
         return Err(status_error(status, &bytes));
     }
 
@@ -249,7 +267,7 @@ pub async fn chat(
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|e| AppError::Network(format!("stream interrupted: {e}")))?
+        .map_err(|e| request_error("stream interrupted", e))?
     {
         received_bytes = received_bytes.saturating_add(chunk.len());
         if received_bytes > MAX_STREAM_BYTES {
@@ -307,7 +325,7 @@ fn feed_stream_data(
     on_text: &mut dyn FnMut(&str),
 ) -> AppResult<()> {
     match protocol {
-        Protocol::Openai => openai_acc.feed(data, on_text),
+        Protocol::Openai => openai_acc.feed(data, on_text)?,
         Protocol::Anthropic => anthropic_acc.feed(data, on_text)?,
     }
     Ok(())
@@ -317,17 +335,43 @@ async fn send(req: reqwest::RequestBuilder) -> AppResult<Vec<u8>> {
     let response = req
         .send()
         .await
-        .map_err(|e| AppError::Network(format!("request failed: {e}")))?;
+        .map_err(|e| request_error("request failed", e))?;
     let status = response.status();
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| AppError::Network(format!("failed to read response: {e}")))?;
+    let bytes = read_response(response, MAX_METADATA_BYTES).await?;
 
     if !status.is_success() {
         return Err(status_error(status, &bytes));
     }
-    Ok(bytes.to_vec())
+    Ok(bytes)
+}
+
+fn request_error(context: &str, error: reqwest::Error) -> AppError {
+    if error.is_timeout() {
+        AppError::Timeout(format!("{context}: timed out"))
+    } else {
+        AppError::Network(format!("{context}: {error}"))
+    }
+}
+
+async fn read_response(mut response: reqwest::Response, limit: usize) -> AppResult<Vec<u8>> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > limit as u64)
+    {
+        return Err(AppError::Other("AI provider response was too large".into()));
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|e| request_error("failed to read response", e))?
+    {
+        if bytes.len().saturating_add(chunk.len()) > limit {
+            return Err(AppError::Other("AI provider response was too large".into()));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
 }
 
 fn status_error(status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
@@ -336,6 +380,7 @@ fn status_error(status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
         .as_ref()
         .map(|e| e.error.message.clone())
         .unwrap_or_else(|| format!("AI request failed with status {status}"));
+    let message: String = message.chars().take(MAX_ERROR_MESSAGE_CHARS).collect();
     if status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error() {
         AppError::Network(message)
     } else if is_context_length_error(status, parsed.as_ref(), &message) {

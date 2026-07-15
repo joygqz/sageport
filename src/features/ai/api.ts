@@ -47,6 +47,7 @@ export function useSetAiConfig() {
             }
           : prev,
       );
+      qc.invalidateQueries({ queryKey: configKey });
       qc.invalidateQueries({ queryKey: modelsKey });
     },
   });

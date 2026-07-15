@@ -37,6 +37,9 @@ function approvalValue(key: string, value: unknown): unknown {
   if (key === "content" && typeof value === "string") {
     return `[${value.length} characters]`;
   }
+  if (typeof value === "string" && value.length > 4096) {
+    return `${value.slice(0, 4096)}… [${value.length - 4096} more characters]`;
+  }
   if (Array.isArray(value)) return value.map((item) => approvalValue("", item));
   if (value && typeof value === "object") {
     return Object.fromEntries(

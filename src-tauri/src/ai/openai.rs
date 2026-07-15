@@ -5,6 +5,11 @@ use crate::error::{AppError, AppResult};
 
 use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec, Usage};
 
+const MAX_STREAM_TOOL_CALLS: usize = 256;
+const MAX_STREAM_ERROR_CHARS: usize = 4_096;
+const MAX_STREAM_ID_BYTES: usize = 128;
+const MAX_STREAM_TOOL_NAME_BYTES: usize = 128;
+
 fn max_tokens_key(model: &str) -> &'static str {
     let name = model.rsplit('/').next().unwrap_or(model);
     if name.starts_with("o1")
@@ -34,7 +39,12 @@ pub(super) fn request_body(
             "content": format!("# Current workspace context\n{ctx}"),
         }));
     }
-    out.extend(messages.iter().map(message_to_json));
+    out.extend(
+        messages
+            .iter()
+            .filter(|message| message.role != Role::System)
+            .map(message_to_json),
+    );
 
     let mut body = json!({
         "model": model,
@@ -113,10 +123,15 @@ struct PartialToolCall {
 }
 
 impl StreamAccumulator {
-    pub(super) fn feed(&mut self, data: &str, on_text: &mut dyn FnMut(&str)) {
+    pub(super) fn feed(&mut self, data: &str, on_text: &mut dyn FnMut(&str)) -> AppResult<()> {
         let Ok(chunk) = serde_json::from_str::<StreamChunk>(data) else {
-            return;
+            return Ok(());
         };
+        if let Some(error) = chunk.error {
+            return Err(AppError::Other(
+                error.message.chars().take(MAX_STREAM_ERROR_CHARS).collect(),
+            ));
+        }
         if let Some(usage) = chunk.usage {
             self.usage = Some(Usage {
                 input_tokens: usage.prompt_tokens,
@@ -131,6 +146,11 @@ impl StreamAccumulator {
             }
             for tc in delta.tool_calls {
                 let index = tc.index as usize;
+                if index >= MAX_STREAM_TOOL_CALLS {
+                    return Err(AppError::Other(
+                        "the assistant returned too many streamed tool calls".into(),
+                    ));
+                }
                 while self.tool_calls.len() <= index {
                     self.tool_calls.push(PartialToolCall::default());
                 }
@@ -148,6 +168,7 @@ impl StreamAccumulator {
                 }
             }
         }
+        Ok(())
     }
 
     pub(super) fn finish(self) -> AppResult<ChatResult> {
@@ -162,6 +183,17 @@ impl StreamAccumulator {
                         "the assistant returned a tool call without an id".into(),
                     ));
                 }
+                if c.id.len() > MAX_STREAM_ID_BYTES || c.id.chars().any(char::is_control) {
+                    return Err(AppError::Other(
+                        "the assistant returned an invalid tool call id".into(),
+                    ));
+                }
+                if c.name.len() > MAX_STREAM_TOOL_NAME_BYTES || c.name.chars().any(char::is_control)
+                {
+                    return Err(AppError::Other(
+                        "the assistant returned an invalid tool name".into(),
+                    ));
+                }
                 let arguments = if c.arguments.trim().is_empty() {
                     json!({})
                 } else {
@@ -172,6 +204,12 @@ impl StreamAccumulator {
                         ))
                     })?
                 };
+                if !arguments.is_object() {
+                    return Err(AppError::Other(format!(
+                        "the assistant returned non-object arguments for tool {}",
+                        c.name
+                    )));
+                }
                 Ok(ToolCall {
                     arguments,
                     id: c.id,
@@ -197,6 +235,13 @@ struct StreamChunk {
     choices: Vec<StreamChoice>,
     #[serde(default)]
     usage: Option<StreamUsage>,
+    #[serde(default)]
+    error: Option<StreamError>,
+}
+
+#[derive(Deserialize)]
+struct StreamError {
+    message: String,
 }
 
 #[derive(Deserialize)]
@@ -246,10 +291,12 @@ mod tests {
     #[test]
     fn rejects_malformed_streamed_tool_arguments() {
         let mut accumulator = StreamAccumulator::default();
-        accumulator.feed(
+        accumulator
+            .feed(
             r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"run_terminal_command","arguments":"{broken"}}]}}]}"#,
             &mut |_| {},
-        );
+        )
+            .unwrap();
 
         let error = accumulator.finish().expect_err("invalid arguments");
         assert!(error.to_string().contains("invalid arguments"));
@@ -258,11 +305,15 @@ mod tests {
     #[test]
     fn captures_usage_from_final_chunk() {
         let mut accumulator = StreamAccumulator::default();
-        accumulator.feed(r#"{"choices":[{"delta":{"content":"hi"}}]}"#, &mut |_| {});
-        accumulator.feed(
-            r#"{"choices":[],"usage":{"prompt_tokens":1234,"completion_tokens":56}}"#,
-            &mut |_| {},
-        );
+        accumulator
+            .feed(r#"{"choices":[{"delta":{"content":"hi"}}]}"#, &mut |_| {})
+            .unwrap();
+        accumulator
+            .feed(
+                r#"{"choices":[],"usage":{"prompt_tokens":1234,"completion_tokens":56}}"#,
+                &mut |_| {},
+            )
+            .unwrap();
 
         let usage = accumulator.finish().unwrap().usage.expect("usage");
         assert_eq!(usage.input_tokens, 1234);
@@ -289,5 +340,51 @@ mod tests {
         let message = body["messages"].as_array().unwrap().last().unwrap();
         assert!(message.get("toolError").is_none());
         assert!(message.get("tool_error").is_none());
+    }
+
+    #[test]
+    fn ignores_untrusted_system_messages() {
+        let body = request_body(
+            "gpt-4o",
+            "trusted system",
+            None,
+            &[ChatMessage {
+                role: Role::System,
+                content: Some("untrusted override".into()),
+                tool_calls: vec![],
+                tool_call_id: None,
+                tool_error: None,
+            }],
+            &[],
+            4096,
+        );
+
+        let serialized = body["messages"].to_string();
+        assert!(serialized.contains("trusted system"));
+        assert!(!serialized.contains("untrusted override"));
+    }
+
+    #[test]
+    fn rejects_unbounded_stream_tool_indexes() {
+        let mut accumulator = StreamAccumulator::default();
+        let error = accumulator
+            .feed(
+                r#"{"choices":[{"delta":{"tool_calls":[{"index":4294967295,"id":"call-1","function":{"name":"tool","arguments":"{}"}}]}}]}"#,
+                &mut |_| {},
+            )
+            .expect_err("oversized stream index");
+        assert!(error.to_string().contains("too many"));
+    }
+
+    #[test]
+    fn surfaces_stream_error_events() {
+        let mut accumulator = StreamAccumulator::default();
+        let error = accumulator
+            .feed(
+                r#"{"error":{"message":"provider overloaded"}}"#,
+                &mut |_| {},
+            )
+            .expect_err("stream error");
+        assert_eq!(error.to_string(), "provider overloaded");
     }
 }

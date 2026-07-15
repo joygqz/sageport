@@ -191,6 +191,31 @@ describe("runAgentLoop", () => {
     expect(run.state().requestId).toBeNull();
   });
 
+  it("stops promptly while model limits are still loading", async () => {
+    let resolveLimits!: (value: {
+      contextWindow: number;
+      maxOutputTokens: number;
+    }) => void;
+    modelLimits.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveLimits = resolve;
+        }),
+    );
+    const run = harness();
+
+    const pending = runAgentLoop(run.host, "session", "slow-model");
+    await Promise.resolve();
+    run.host.patch("session", (state) => ({
+      ...state,
+      stopRequested: true,
+    }));
+    await pending;
+    resolveLimits({ contextWindow: 128_000, maxOutputTokens: 16_000 });
+
+    expect(chat).not.toHaveBeenCalled();
+  });
+
   it("never executes a terminal command after approval is denied", async () => {
     useTabsStore.setState({
       tabs: [
@@ -282,6 +307,36 @@ describe("runAgentLoop", () => {
         kind: "tool",
         toolCallId: "call-1",
         status: "done",
+      }),
+    );
+  });
+
+  it("rejects an answer that was not offered by ask_user", async () => {
+    chat
+      .mockResolvedValueOnce({
+        toolCalls: [
+          {
+            id: "call-question",
+            name: "ask_user",
+            arguments: {
+              question: "Choose a region",
+              options: ["east", "west"],
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "handled" });
+    const run = harness();
+    run.host.requestAnswer = vi.fn(() => Promise.resolve("forged"));
+
+    await runAgentLoop(run.host, "session", "model");
+
+    expect(run.state().history).toContainEqual(
+      expect.objectContaining({
+        role: "tool",
+        toolCallId: "call-question",
+        toolError: true,
+        content: expect.stringContaining("not one of the offered options"),
       }),
     );
   });

@@ -11,6 +11,7 @@ import {
   deriveTitle,
   redactSensitiveHistory,
   repairHistory,
+  MAX_AI_PROMPT_CHARS,
   type RuntimeSession,
 } from "./transcript";
 
@@ -81,8 +82,11 @@ export const useAiStore = create<AiStoreState>((set, get) => {
   >();
   const persistenceFailures = new Set<string>();
   const deleting = new Set<string>();
+  const removedSessionIds = new Set<string>();
   const saveQueues = new Map<string, Promise<void>>();
   let sessionsLoad: Promise<void> | null = null;
+  let sessionCreate: Promise<string> | null = null;
+  let sessionMutationVersion = 0;
 
   const patch = (id: string, fn: (r: RuntimeSession) => RuntimeSession) => {
     set((s) => {
@@ -187,10 +191,28 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       if (!sessionsLoad) {
         sessionsLoad = (async () => {
           try {
-            const sessions = await ipc.ai.session.list();
-            set({ sessions, sessionsLoaded: true });
-            if (sessions.length > 0) {
-              await get().openSession(sessions[0].id);
+            const version = sessionMutationVersion;
+            let sessions = await ipc.ai.session.list();
+            if (version !== sessionMutationVersion) {
+              sessions = await ipc.ai.session.list();
+            }
+            sessions = sessions.filter(
+              (session) => !removedSessionIds.has(session.id),
+            );
+            set((state) => {
+              const remoteIds = new Set(sessions.map((session) => session.id));
+              const localOnly = state.sessions.filter(
+                (session) =>
+                  !remoteIds.has(session.id) && !deleting.has(session.id),
+              );
+              return {
+                sessions: [...localOnly, ...sessions],
+                sessionsLoaded: true,
+              };
+            });
+            const state = get();
+            if (!state.activeId && state.sessions.length > 0) {
+              await state.openSession(state.sessions[0].id);
             }
           } catch (err) {
             toast.error(t("ai.error"), errorMessage(err));
@@ -207,6 +229,12 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       if (get().runtime[id]) return;
       try {
         const session = await ipc.ai.session.get(id);
+        if (
+          deleting.has(id) ||
+          !get().sessions.some((item) => item.id === id)
+        ) {
+          return;
+        }
         const history = repairHistory(session.messages);
         set((s) => ({
           runtime: {
@@ -225,24 +253,35 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     },
 
     newSession: async () => {
-      const session = await ipc.ai.session.create();
-      set((s) => ({
-        sessions: [
-          {
-            id: session.id,
-            title: session.title,
-            createdAt: session.createdAt,
-            updatedAt: session.updatedAt,
-          },
-          ...s.sessions,
-        ],
-        runtime: { ...s.runtime, [session.id]: emptyRuntime() },
-        activeId: session.id,
-      }));
-      return session.id;
+      if (!sessionCreate) {
+        sessionCreate = (async () => {
+          try {
+            const session = await ipc.ai.session.create();
+            sessionMutationVersion += 1;
+            set((s) => ({
+              sessions: [
+                {
+                  id: session.id,
+                  title: session.title,
+                  createdAt: session.createdAt,
+                  updatedAt: session.updatedAt,
+                },
+                ...s.sessions.filter((item) => item.id !== session.id),
+              ],
+              runtime: { ...s.runtime, [session.id]: emptyRuntime() },
+              activeId: session.id,
+            }));
+            return session.id;
+          } finally {
+            sessionCreate = null;
+          }
+        })();
+      }
+      return sessionCreate;
     },
 
     deleteSession: async (id) => {
+      sessionMutationVersion += 1;
       deleting.add(id);
       get().stop(id);
       try {
@@ -252,15 +291,20 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         toast.error(t("ai.error"), errorMessage(err));
         return;
       }
+      let nextId: string | null = null;
       set((s) => {
         const sessions = s.sessions.filter((x) => x.id !== id);
         const runtime = { ...s.runtime };
         delete runtime[id];
-        const activeId = s.activeId === id ? null : s.activeId;
+        const activeId =
+          s.activeId === id ? (sessions[0]?.id ?? null) : s.activeId;
+        if (s.activeId === id) nextId = activeId;
         return { sessions, runtime, activeId };
       });
       persistenceFailures.delete(id);
+      removedSessionIds.add(id);
       deleting.delete(id);
+      if (nextId) await get().openSession(nextId);
     },
 
     send: async (
@@ -273,7 +317,15 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     ) => {
       const trimmed = prompt.trim();
       const runtime = get().runtime[sessionId];
-      if (!trimmed || !model || !runtime || runtime.pending) return;
+      if (
+        !trimmed ||
+        trimmed.length > MAX_AI_PROMPT_CHARS ||
+        !model ||
+        !runtime ||
+        runtime.pending
+      ) {
+        return;
+      }
 
       const isFirstTurn = runtime.history.length === 0;
       const title = isFirstTurn ? deriveTitle(trimmed) : null;

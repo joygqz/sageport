@@ -39,9 +39,10 @@ import {
 } from "@/workbench/PanelHeader";
 import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
+import { safeExternalUrl } from "./links";
 import { pickSuggestionsForSession } from "./suggestions";
 import { useAiStore } from "./store";
-import type { AgentLogItem } from "./transcript";
+import { MAX_AI_PROMPT_CHARS, type AgentLogItem } from "./transcript";
 import { askUserOptions, askUserQuestion } from "./tools";
 import { resolveEnabledToolNames, TOOL_GROUPS } from "./tools/registry";
 import { QuestionPrompt, ToolActivity } from "./ToolActivity";
@@ -52,7 +53,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
   const { data: config } = useAiConfig();
   const setModel = useSetAiModel();
-  const configured = Boolean(config?.apiKey);
+  const configured = Boolean(config?.apiKey.trim());
   const { data: fetchedModels, error: modelsError } = useAiModels(configured);
   const toggleAux = useLayoutStore((s) => s.toggleAux);
   const openSettings = useOverlayStore((s) => s.openSettings);
@@ -163,6 +164,10 @@ export function AssistantPanel({ width }: { width: number }) {
 
   const sendPrompt = async (prompt: string): Promise<boolean> => {
     if (!prompt || pending || !model) return false;
+    if (prompt.length > MAX_AI_PROMPT_CHARS) {
+      toast.error(t("ai.error"), t("ai.promptTooLong"));
+      return false;
+    }
     stickToBottom.current = true;
     try {
       const sessionId = activeId ?? (await newSession());
@@ -394,6 +399,7 @@ export function AssistantPanel({ width }: { width: number }) {
                 ref={inputRef}
                 rows={1}
                 value={input}
+                maxLength={MAX_AI_PROMPT_CHARS}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -609,12 +615,18 @@ const MARKDOWN_COMPONENTS: Components = {
     <a
       href={href}
       className="text-link underline underline-offset-2 hover:opacity-80"
+      {...props}
       onClick={(e) => {
         e.preventDefault();
-        if (href) void openUrl(href);
+        const safeUrl = href ? safeExternalUrl(href) : null;
+        if (safeUrl) void openUrl(safeUrl).catch(() => {});
       }}
-      {...props}
     />
+  ),
+  img: ({ node: _node, alt }) => (
+    <span className="text-sm text-muted-foreground">
+      {alt ? `[Image: ${alt}]` : "[Image]"}
+    </span>
   ),
   ul: ({ node: _node, ...props }) => (
     <ul
@@ -689,9 +701,13 @@ function CodeBlock({ code }: { code: string }) {
   const sendToTerminal = useTabsStore((s) => s.sendToTerminal);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      toast.error(t("ai.error"), errorMessage(err));
+    }
   };
 
   const run = () => {

@@ -5,6 +5,11 @@ use crate::error::{AppError, AppResult};
 
 use super::{ChatMessage, ChatResult, Role, ToolCall, ToolSpec, Usage};
 
+const MAX_STREAM_BLOCKS: usize = 256;
+const MAX_STREAM_ERROR_CHARS: usize = 4_096;
+const MAX_STREAM_ID_BYTES: usize = 128;
+const MAX_STREAM_TOOL_NAME_BYTES: usize = 128;
+
 pub(super) fn request_body(
     model: &str,
     system: &str,
@@ -13,7 +18,7 @@ pub(super) fn request_body(
     tools: &[ToolSpec],
     max_tokens: u32,
 ) -> Value {
-    let mut out: Vec<Value> = messages.iter().map(message_to_json).collect();
+    let mut out: Vec<Value> = messages.iter().filter_map(message_to_json).collect();
     merge_tool_results(&mut out);
     mark_cache_breakpoint(&mut out);
 
@@ -51,8 +56,8 @@ pub(super) fn request_body(
     body
 }
 
-fn message_to_json(m: &ChatMessage) -> Value {
-    match m.role {
+fn message_to_json(m: &ChatMessage) -> Option<Value> {
+    Some(match m.role {
         Role::User => json!({
             "role": "user",
             "content": m.content.clone().unwrap_or_default(),
@@ -74,16 +79,19 @@ fn message_to_json(m: &ChatMessage) -> Value {
             }
             json!({ "role": "assistant", "content": blocks })
         }
-        Role::Tool => json!({
-            "role": "user",
-            "content": [{
+        Role::Tool => {
+            let mut result = json!({
                 "type": "tool_result",
                 "tool_use_id": m.tool_call_id.clone().unwrap_or_default(),
                 "content": m.content.clone().unwrap_or_default(),
-            }],
-        }),
-        Role::System => unreachable!("filtered out before mapping"),
-    }
+            });
+            if m.tool_error == Some(true) {
+                result["is_error"] = json!(true);
+            }
+            json!({ "role": "user", "content": [result] })
+        }
+        Role::System => return None,
+    })
 }
 
 fn merge_tool_results(messages: &mut Vec<Value>) {
@@ -173,6 +181,11 @@ impl StreamAccumulator {
             }
             "content_block_start" => {
                 let index = event.index as usize;
+                if index >= MAX_STREAM_BLOCKS {
+                    return Err(AppError::Other(
+                        "the assistant returned too many streamed content blocks".into(),
+                    ));
+                }
                 while self.blocks.len() <= index {
                     self.blocks.push(Block::Text(String::new()));
                 }
@@ -194,6 +207,11 @@ impl StreamAccumulator {
             }
             "content_block_delta" => {
                 let index = event.index as usize;
+                if index >= MAX_STREAM_BLOCKS {
+                    return Err(AppError::Other(
+                        "the assistant returned too many streamed content blocks".into(),
+                    ));
+                }
                 let Some(block) = self.blocks.get_mut(index) else {
                     return Ok(());
                 };
@@ -218,7 +236,9 @@ impl StreamAccumulator {
                     .error
                     .map(|e| e.message)
                     .unwrap_or_else(|| "the provider reported a stream error".into());
-                return Err(AppError::Other(message));
+                return Err(AppError::Other(
+                    message.chars().take(MAX_STREAM_ERROR_CHARS).collect(),
+                ));
             }
             _ => {}
         }
@@ -252,6 +272,17 @@ impl StreamAccumulator {
                             "the assistant returned a tool call without an id".into(),
                         ));
                     }
+                    if id.len() > MAX_STREAM_ID_BYTES || id.chars().any(char::is_control) {
+                        return Err(AppError::Other(
+                            "the assistant returned an invalid tool call id".into(),
+                        ));
+                    }
+                    if name.len() > MAX_STREAM_TOOL_NAME_BYTES || name.chars().any(char::is_control)
+                    {
+                        return Err(AppError::Other(
+                            "the assistant returned an invalid tool name".into(),
+                        ));
+                    }
                     let arguments = if input_json.trim().is_empty() {
                         json!({})
                     } else {
@@ -261,6 +292,11 @@ impl StreamAccumulator {
                             ))
                         })?
                     };
+                    if !arguments.is_object() {
+                        return Err(AppError::Other(format!(
+                            "the assistant returned non-object arguments for tool {name}"
+                        )));
+                    }
                     tool_calls.push(ToolCall {
                         id,
                         name,
@@ -408,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn local_tool_error_metadata_is_not_sent_to_provider() {
+    fn maps_local_tool_errors_to_anthropic_is_error() {
         let body = request_body(
             "claude-sonnet",
             "system",
@@ -427,5 +463,40 @@ mod tests {
         let serialized = body["messages"].to_string();
         assert!(!serialized.contains("toolError"));
         assert!(!serialized.contains("tool_error"));
+        assert_eq!(body["messages"][0]["content"][0]["is_error"], true);
+    }
+
+    #[test]
+    fn ignores_untrusted_system_messages_without_panicking() {
+        let body = request_body(
+            "claude-sonnet",
+            "trusted system",
+            None,
+            &[ChatMessage {
+                role: Role::System,
+                content: Some("untrusted override".into()),
+                tool_calls: vec![],
+                tool_call_id: None,
+                tool_error: None,
+            }],
+            &[],
+            4096,
+        );
+
+        assert!(body["messages"].as_array().unwrap().is_empty());
+        assert!(body["system"].to_string().contains("trusted system"));
+        assert!(!body["system"].to_string().contains("untrusted override"));
+    }
+
+    #[test]
+    fn rejects_unbounded_stream_block_indexes() {
+        let mut accumulator = StreamAccumulator::default();
+        let error = accumulator
+            .feed(
+                r#"{"type":"content_block_start","index":4294967295,"content_block":{"type":"text","text":"bad"}}"#,
+                &mut |_| {},
+            )
+            .expect_err("oversized stream index");
+        assert!(error.to_string().contains("too many"));
     }
 }

@@ -25,6 +25,24 @@ pub async fn set(pool: &SqlitePool, key: &str, value: &str) -> AppResult<()> {
     Ok(())
 }
 
+pub async fn set_many(pool: &SqlitePool, entries: &[(String, String)]) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    let ts = now();
+    for (key, value) in entries {
+        sqlx::query(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        )
+        .bind(key)
+        .bind(value)
+        .bind(&ts)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn all(pool: &SqlitePool) -> AppResult<Vec<(String, String)>> {
     let rows: Vec<(String, String)> =
         sqlx::query_as("SELECT key, value FROM settings ORDER BY key")

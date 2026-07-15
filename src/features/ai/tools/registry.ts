@@ -134,6 +134,28 @@ function validateSchema(
   }
   if (value === null) return null;
 
+  if (typeof value === "string") {
+    if (
+      typeof schema.minLength === "number" &&
+      value.length < schema.minLength
+    ) {
+      return `${path} must contain at least ${schema.minLength} character(s)`;
+    }
+    if (
+      typeof schema.maxLength === "number" &&
+      value.length > schema.maxLength
+    ) {
+      return `${path} allows at most ${schema.maxLength} character(s)`;
+    }
+  } else if (typeof value === "number") {
+    if (typeof schema.minimum === "number" && value < schema.minimum) {
+      return `${path} must be at least ${schema.minimum}`;
+    }
+    if (typeof schema.maximum === "number" && value > schema.maximum) {
+      return `${path} must be at most ${schema.maximum}`;
+    }
+  }
+
   if (Array.isArray(value)) {
     if (typeof schema.minItems === "number" && value.length < schema.minItems) {
       return `${path} needs at least ${schema.minItems} item(s)`;

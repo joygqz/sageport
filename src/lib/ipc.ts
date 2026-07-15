@@ -330,7 +330,22 @@ export const ipc = {
       },
     ) => {
       const onDelta = new Channel<{ type: "text"; text: string }>();
-      onDelta.onmessage = (e) => opts?.onDelta?.(e.text);
+      let bufferedDelta = "";
+      let flushTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+      const flush = () => {
+        if (flushTimer !== null) globalThis.clearTimeout(flushTimer);
+        flushTimer = null;
+        if (!bufferedDelta) return;
+        const text = bufferedDelta;
+        bufferedDelta = "";
+        opts?.onDelta?.(text);
+      };
+      onDelta.onmessage = (event) => {
+        bufferedDelta += event.text;
+        if (flushTimer === null) {
+          flushTimer = globalThis.setTimeout(flush, 16);
+        }
+      };
       return invoke<AiChatResult>("ai_chat", {
         input: {
           model,
@@ -341,7 +356,16 @@ export const ipc = {
           requestId: opts?.requestId ?? null,
         },
         onDelta,
-      });
+      }).then(
+        (result) => {
+          flush();
+          return result;
+        },
+        (error) => {
+          flush();
+          throw error;
+        },
+      );
     },
 
     cancel: (requestId: string) =>

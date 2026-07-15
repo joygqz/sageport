@@ -1,7 +1,7 @@
 import { detectLocale } from "@/i18n/config";
 import { ipc } from "@/lib/ipc";
 import { errorCode, errorMessage } from "@/lib/toast";
-import type { AiChatMessage, AiToolCall } from "@/types/models";
+import type { AiChatMessage, AiModelLimits, AiToolCall } from "@/types/models";
 import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
 import {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
@@ -54,6 +54,39 @@ export interface RunnerHost {
 
 const wait = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function waitForRetry(
+  host: RunnerHost,
+  sessionId: string,
+  delayMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + delayMs;
+  while (!stopped(host, sessionId)) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return true;
+    await wait(Math.min(remaining, 50));
+  }
+  return false;
+}
+
+async function resolveLimitsForRun(
+  host: RunnerHost,
+  sessionId: string,
+  model: string,
+): Promise<AiModelLimits | null> {
+  const pending = resolveModelLimits(model).then((value) => ({
+    done: true as const,
+    value,
+  }));
+  while (!stopped(host, sessionId)) {
+    const result = await Promise.race([
+      pending,
+      wait(50).then(() => ({ done: false as const })),
+    ]);
+    if (result.done) return result.value;
+  }
+  return null;
+}
 
 function buildContext(
   omittedHistoryMessages: number,
@@ -305,8 +338,13 @@ async function requestStep(
         contextShrinks += 1;
         historyScale *= CONTEXT_SHRINK_FACTOR;
       } else {
-        await wait(RETRY_DELAYS_MS[networkAttempt]);
+        const retry = await waitForRetry(
+          host,
+          sessionId,
+          RETRY_DELAYS_MS[networkAttempt],
+        );
         networkAttempt += 1;
+        if (!retry) return null;
       }
       if (stopped(host, sessionId)) return null;
     }
@@ -394,6 +432,11 @@ async function runToolCall(
       if (option === null) {
         resultText = STOPPED_RESULT;
         setToolStatus("denied", resultText);
+      } else if (!askUserOptions(args).includes(option)) {
+        resultText =
+          "Error: the selected answer is not one of the offered options.";
+        resultIsError = true;
+        setToolStatus("error", resultText);
       } else {
         resultText = selectionResult(option);
         setToolStatus("done", resultText);
@@ -529,7 +572,8 @@ export async function runAgentLoop(
   enabledToolNames: readonly string[] = [],
   maxHistoryTokens?: number | null,
 ): Promise<void> {
-  const limits = await resolveModelLimits(model);
+  const limits = await resolveLimitsForRun(host, sessionId, model);
+  if (stopped(host, sessionId)) return;
   const tools = enabledToolSpecs(enabledToolNames);
   const run: RunConfig = {
     model,

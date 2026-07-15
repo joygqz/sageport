@@ -711,6 +711,7 @@ export const en = {
     deny: "Deny",
     modelLabel: "Model",
     modelLoading: "Loading models…",
+    promptTooLong: "The message is too long to send.",
     contextUsage: "Context {percent}% · {used} / {total} tokens",
     autonomousMode: "Autonomous",
     autonomousModeHint:
@@ -808,6 +809,9 @@ export const en = {
       },
       baseUrlLabel: "Base URL",
       baseUrlHint: "OpenAI-compatible endpoints usually end with /v1.",
+      modelLabel: "Model",
+      modelHint:
+        "Enter a model id manually when the compatible endpoint does not expose a model list.",
       apiKeyLabel: "API key",
       apiKeyHint:
         "Sent only to the AI endpoint you configure; included in end-to-end encrypted backups when sync is enabled.",

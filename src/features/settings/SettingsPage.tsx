@@ -63,6 +63,7 @@ import {
   defaultBaseUrl,
   useAiConfig,
   useSetAiConfig,
+  useSetAiModel,
 } from "@/features/ai/api";
 import {
   CORE_TOOL_NAMES,
@@ -489,9 +490,11 @@ function AiSection() {
 function AiForm({ config }: { config: AiConfig }) {
   const { t } = useI18n();
   const setConfig = useSetAiConfig();
+  const setModelMutation = useSetAiModel();
   const [protocol, setProtocol] = useState<AiProtocol>(config.protocol);
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
   const [apiKey, setApiKey] = useState(config.apiKey);
+  const [model, setModel] = useState(config.model);
   const [autoApprove, setAutoApprove] = useState(config.autoApprove);
   const [enabledTools, setEnabledTools] = useState(() =>
     resolveEnabledToolNames(config.enabledTools),
@@ -503,6 +506,7 @@ function AiForm({ config }: { config: AiConfig }) {
     () => new Set(),
   );
   const mutate = setConfig.mutate;
+  const mutateModel = setModelMutation.mutate;
   const skipSave = useRef(true);
   const pendingSave = useRef<{
     baseUrl: string;
@@ -512,10 +516,18 @@ function AiForm({ config }: { config: AiConfig }) {
     enabledTools: string[];
     maxHistoryTokens: number | null;
   } | null>(null);
+  const skipModelSave = useRef(true);
+  const pendingModelSave = useRef<string | null>(null);
 
   const changeProtocol = (next: AiProtocol) => {
     setProtocol(next);
     setBaseUrl(defaultBaseUrl(next));
+    setModel("");
+  };
+
+  const changeBaseUrl = (next: string) => {
+    setBaseUrl(next);
+    setModel("");
   };
 
   useEffect(() => {
@@ -560,6 +572,22 @@ function AiForm({ config }: { config: AiConfig }) {
     t,
   ]);
 
+  useEffect(() => {
+    if (skipModelSave.current) {
+      skipModelSave.current = false;
+      return;
+    }
+    pendingModelSave.current = model;
+    const timer = setTimeout(() => {
+      pendingModelSave.current = null;
+      mutateModel(model, {
+        onError: (err) =>
+          toast.error(t("settings.ai.saveError"), errorMessage(err)),
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [model, mutateModel, t]);
+
   const toggleTool = (name: string, checked: boolean) => {
     setEnabledTools((current) =>
       normalizeEnabledToolNames(
@@ -599,6 +627,18 @@ function AiForm({ config }: { config: AiConfig }) {
     [mutate, t],
   );
 
+  useEffect(
+    () => () => {
+      if (pendingModelSave.current !== null) {
+        mutateModel(pendingModelSave.current, {
+          onError: (err) =>
+            toast.error(t("settings.ai.saveError"), errorMessage(err)),
+        });
+      }
+    },
+    [mutateModel, t],
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4">
@@ -619,8 +659,23 @@ function AiForm({ config }: { config: AiConfig }) {
         >
           <Input
             value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
+            maxLength={8192}
+            onChange={(e) => changeBaseUrl(e.target.value)}
             placeholder={defaultBaseUrl(protocol)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </Field>
+
+        <Field
+          label={t("settings.ai.modelLabel")}
+          hint={t("settings.ai.modelHint")}
+        >
+          <Input
+            value={model}
+            maxLength={1024}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="provider/model-id"
             autoComplete="off"
             spellCheck={false}
           />
@@ -632,6 +687,7 @@ function AiForm({ config }: { config: AiConfig }) {
         >
           <PasswordInput
             value={apiKey}
+            maxLength={16384}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="sk-…"
             autoComplete="off"
@@ -667,6 +723,7 @@ function AiForm({ config }: { config: AiConfig }) {
           <Input
             type="number"
             min={0}
+            max={4294967295}
             step={1000}
             value={maxHistoryTokens ?? ""}
             onChange={(e) => {

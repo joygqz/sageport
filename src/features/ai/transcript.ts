@@ -13,6 +13,7 @@ const TOOL_RESULT_MAX_CHARS =
   TOOL_RESULT_HEAD_CHARS + TOOL_RESULT_TAIL_CHARS + 500;
 
 const TITLE_MAX_LEN = 60;
+export const MAX_AI_PROMPT_CHARS = 256_000;
 
 export type ToolStatus =
   | "awaiting-approval"

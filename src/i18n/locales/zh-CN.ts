@@ -681,6 +681,7 @@ export const zhCN: Dictionary = {
     deny: "拒绝",
     modelLabel: "模型",
     modelLoading: "正在加载模型…",
+    promptTooLong: "消息过长，无法发送。",
     contextUsage: "上下文 {percent}% · {used} / {total} tokens",
     autonomousMode: "自动",
     autonomousModeHint: "操作将被自动批准。打开 AI 设置即可关闭此模式。",
@@ -776,6 +777,8 @@ export const zhCN: Dictionary = {
       },
       baseUrlLabel: "接口地址",
       baseUrlHint: "OpenAI 兼容接口的地址通常以 /v1 结尾。",
+      modelLabel: "模型",
+      modelHint: "兼容接口未提供模型列表时，可在此手动填写模型 ID。",
       apiKeyLabel: "API 密钥",
       apiKeyHint:
         "仅发送到你配置的 AI 服务地址；启用同步时会包含在端到端加密备份中。",

@@ -574,7 +574,11 @@ export const fileTools: AiTool[] = [
         type: "object",
         properties: {
           path: { type: "string", description: "File path." },
-          content: { type: "string", description: "Full file contents." },
+          content: {
+            type: "string",
+            maxLength: 2 * 1024 * 1024,
+            description: "Full file contents.",
+          },
           ...HOST_ARG,
         },
         required: ["path", "content"],

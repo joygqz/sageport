@@ -70,8 +70,13 @@ fn sanitize_base_url(value: &str) -> Option<String> {
         return Some(String::new());
     }
     let parsed = url::Url::parse(value).ok()?;
-    (matches!(parsed.scheme(), "http" | "https") && parsed.host_str().is_some())
-        .then(|| value.to_string())
+    (matches!(parsed.scheme(), "http" | "https")
+        && parsed.host_str().is_some()
+        && parsed.username().is_empty()
+        && parsed.password().is_none()
+        && parsed.query().is_none()
+        && parsed.fragment().is_none())
+    .then(|| value.to_string())
 }
 
 fn sanitize_enabled_tools(value: &str) -> Option<String> {
@@ -150,6 +155,12 @@ mod tests {
         assert!(sanitize(&setting("appearance.zoomLevel", "99")).is_none());
         assert!(sanitize(&setting("ai.protocol", "removed-protocol")).is_none());
         assert!(sanitize(&setting("ai.base_url", "not a url")).is_none());
+        assert!(sanitize(&setting("ai.base_url", "https://user:pass@example.com")).is_none());
+        assert!(sanitize(&setting(
+            "ai.base_url",
+            "https://example.com/v1?token=secret"
+        ))
+        .is_none());
         assert!(sanitize(&setting("ai.auto_approve", "1")).is_none());
         assert!(sanitize(&setting("future.setting", "value")).is_none());
         assert!(sanitize(&setting("sync.connection", "secret")).is_none());
