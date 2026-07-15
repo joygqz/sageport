@@ -32,6 +32,15 @@ export function useGenerateSshKey() {
   });
 }
 
+export function useUpdateSshKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: SshKeyInput }) =>
+      ipc.keys.update(id, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: credentialKeys.sshKeys }),
+  });
+}
+
 export function useImportSshKeyFile() {
   return useMutation({
     mutationFn: (path: string) => ipc.keys.importFile(path),

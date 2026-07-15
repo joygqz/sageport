@@ -1,5 +1,7 @@
+use std::io::Read;
 use std::path::Path;
 
+use russh::keys::{decode_secret_key, HashAlg as RusshHashAlg};
 use serde::Serialize;
 use ssh_key::private::RsaKeypair;
 use ssh_key::rand_core::OsRng;
@@ -8,33 +10,53 @@ use ssh_key::{Algorithm, EcdsaCurve, HashAlg, LineEnding, PrivateKey};
 use crate::domain::KeyAlgorithm;
 use crate::error::{AppError, AppResult};
 
+const MAX_PRIVATE_KEY_FILE_SIZE: u64 = 1024 * 1024;
+
 #[derive(Debug)]
 pub struct KeyInsight {
     pub public_key: String,
+    pub encrypted: bool,
+}
+
+fn is_encrypted_format(private_key: &str) -> bool {
+    if let Ok(key) = PrivateKey::from_openssh(private_key.trim()) {
+        return key.is_encrypted();
+    }
+
+    private_key.contains("-----BEGIN ENCRYPTED PRIVATE KEY-----")
+        || private_key.contains("DEK-Info:")
+        || private_key.lines().any(|line| {
+            line.strip_prefix("Encryption:")
+                .is_some_and(|value| !value.trim().eq_ignore_ascii_case("none"))
+        })
 }
 
 pub fn inspect(private_key: &str, passphrase: Option<&str>) -> AppResult<Option<KeyInsight>> {
-    let key = match PrivateKey::from_openssh(private_key.trim()) {
+    let encrypted = is_encrypted_format(private_key);
+    let passphrase = passphrase.filter(|value| !value.is_empty());
+    let key = match decode_secret_key(private_key.trim(), passphrase) {
         Ok(key) => key,
-        Err(_) => return Ok(None),
-    };
-
-    let key = if key.is_encrypted() {
-        match passphrase.filter(|p| !p.is_empty()) {
-            Some(pass) => key
-                .decrypt(pass)
-                .map_err(|_| AppError::Invalid("incorrect passphrase for this key".into()))?,
-            None => key,
+        Err(_) if encrypted && passphrase.is_none() => {
+            return Err(AppError::Invalid(
+                "passphrase is required for this key".into(),
+            ));
         }
-    } else {
-        key
+        Err(_) if encrypted => {
+            return Err(AppError::Invalid(
+                "incorrect passphrase for this key".into(),
+            ));
+        }
+        Err(_) => return Ok(None),
     };
 
     let public_key = key
         .public_key()
         .to_openssh()
         .map_err(|e| AppError::Crypto(e.to_string()))?;
-    Ok(Some(KeyInsight { public_key }))
+    Ok(Some(KeyInsight {
+        public_key,
+        encrypted,
+    }))
 }
 
 pub struct GeneratedKey {
@@ -117,7 +139,29 @@ pub struct KeyFile {
 
 pub fn read_file(path: &str) -> AppResult<KeyFile> {
     let path = Path::new(path);
-    let private_key = std::fs::read_to_string(path)?.trim().to_string();
+    let file = std::fs::File::open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(AppError::Invalid(
+            "the selected key path is not a regular file".into(),
+        ));
+    }
+    if metadata.len() > MAX_PRIVATE_KEY_FILE_SIZE {
+        return Err(AppError::Invalid(format!(
+            "private key file exceeds the {} byte limit",
+            MAX_PRIVATE_KEY_FILE_SIZE
+        )));
+    }
+    let mut private_key = String::new();
+    file.take(MAX_PRIVATE_KEY_FILE_SIZE + 1)
+        .read_to_string(&mut private_key)?;
+    if private_key.len() as u64 > MAX_PRIVATE_KEY_FILE_SIZE {
+        return Err(AppError::Invalid(format!(
+            "private key file exceeds the {} byte limit",
+            MAX_PRIVATE_KEY_FILE_SIZE
+        )));
+    }
+    let private_key = private_key.trim().to_string();
     let name = path
         .file_name()
         .and_then(|s| s.to_str())
@@ -125,22 +169,31 @@ pub fn read_file(path: &str) -> AppResult<KeyFile> {
         .unwrap_or("imported-key")
         .to_string();
 
-    let pub_path = path.with_file_name(format!("{name}.pub"));
-    let mut public_key = std::fs::read_to_string(&pub_path)
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
-
-    let mut fingerprint = None;
-    let mut algorithm = None;
-    if let Ok(key) = PrivateKey::from_openssh(&private_key) {
-        let public = key.public_key();
-        if public_key.is_none() {
-            public_key = public.to_openssh().ok();
-        }
-        fingerprint = Some(public.fingerprint(HashAlg::Sha256).to_string());
-        algorithm = Some(key.algorithm().to_string());
+    let decoded = decode_secret_key(&private_key, None).ok();
+    if decoded.is_none() && !is_encrypted_format(&private_key) {
+        return Err(AppError::Invalid(
+            "invalid or unsupported SSH private key file".into(),
+        ));
     }
+    let (public_key, fingerprint, algorithm) = if let Some(key) = decoded.as_ref() {
+        let public = key.public_key();
+        (
+            public.to_openssh().ok(),
+            Some(public.fingerprint(RusshHashAlg::Sha256).to_string()),
+            Some(public.algorithm().to_string()),
+        )
+    } else if let Ok(key) = PrivateKey::from_openssh(&private_key) {
+        // OpenSSH encrypted keys carry their public half in plaintext, so it
+        // can still be displayed before the user supplies the passphrase.
+        let public = key.public_key();
+        (
+            public.to_openssh().ok(),
+            Some(public.fingerprint(HashAlg::Sha256).to_string()),
+            Some(public.algorithm().to_string()),
+        )
+    } else {
+        (None, None, None)
+    };
 
     Ok(KeyFile {
         name,
@@ -190,15 +243,8 @@ mod tests {
         let err = inspect(&generated.private_key, Some("wrong")).unwrap_err();
         assert!(matches!(err, AppError::Invalid(_)));
 
-        let insight = inspect(&generated.private_key, None)
-            .expect("inspect without passphrase")
-            .expect("should still parse the public part");
-        let key_blob = |s: &str| s.split(' ').take(2).collect::<Vec<_>>().join(" ");
-        assert_eq!(
-            key_blob(&insight.public_key),
-            key_blob(&generated.public_key)
-        );
-        assert!(!insight.public_key.contains("test@sageport"));
+        let err = inspect(&generated.private_key, None).unwrap_err();
+        assert!(matches!(err, AppError::Invalid(_)));
     }
 
     #[test]
@@ -208,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn read_file_picks_up_sibling_pub_file() {
+    fn read_file_derives_public_key_instead_of_trusting_sibling_file() {
         let dir = std::env::temp_dir().join(format!("sageport-keytest-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let priv_path = dir.join("id_test");
@@ -216,7 +262,7 @@ mod tests {
 
         let generated = generate(KeyAlgorithm::Ed25519, None, "test@sageport").unwrap();
         std::fs::write(&priv_path, &generated.private_key).unwrap();
-        std::fs::write(&pub_path, &generated.public_key).unwrap();
+        std::fs::write(&pub_path, "ssh-ed25519 mismatched sibling").unwrap();
 
         let file = read_file(priv_path.to_str().unwrap()).unwrap();
         assert_eq!(file.name, "id_test");
@@ -230,5 +276,43 @@ mod tests {
         );
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn read_file_rejects_non_private_key_content() {
+        let path =
+            std::env::temp_dir().join(format!("sageport-invalid-keytest-{}", std::process::id()));
+        std::fs::write(&path, "ssh-ed25519 not-a-private-key").unwrap();
+
+        assert!(matches!(
+            read_file(path.to_str().unwrap()),
+            Err(AppError::Invalid(_))
+        ));
+
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn read_file_accepts_encrypted_openssh_key_before_passphrase_entry() {
+        let path =
+            std::env::temp_dir().join(format!("sageport-encrypted-keytest-{}", std::process::id()));
+        let generated = generate(KeyAlgorithm::Ed25519, Some("secret"), "encrypted-file")
+            .expect("generate encrypted key");
+        std::fs::write(&path, &generated.private_key).unwrap();
+
+        let file = read_file(path.to_str().unwrap()).expect("read encrypted key");
+        let key_blob = |value: &str| {
+            value
+                .split_whitespace()
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        assert_eq!(
+            file.public_key.as_deref().map(key_blob),
+            Some(key_blob(&generated.public_key))
+        );
+
+        std::fs::remove_file(path).ok();
     }
 }

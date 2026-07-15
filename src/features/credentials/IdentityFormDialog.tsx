@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import {
+  Button,
   Field,
   FormBody,
   FormDialog,
@@ -12,6 +13,7 @@ import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import type { AuthType, Identity } from "@/types/models";
 import { useCreateIdentity, useSshKeys, useUpdateIdentity } from "./api";
+import { identityPasswordSubmissionValue } from "./identityForm";
 
 export function IdentityFormDialog({
   open,
@@ -56,6 +58,7 @@ function IdentityFormBody({
     identity?.authType ?? "password",
   );
   const [password, setPassword] = useState("");
+  const [clearSavedPassword, setClearSavedPassword] = useState(false);
   const [keyId, setKeyId] = useState(identity?.keyId ?? "");
 
   const editing = Boolean(identity);
@@ -64,18 +67,20 @@ function IdentityFormBody({
     if (!name.trim() || !username.trim()) {
       return toast.error(t("credentials.identities.nameUsernameRequired"));
     }
+    if (authType === "key" && !keyId) {
+      return toast.error(t("credentials.identities.keyRequired"));
+    }
     const input = {
       name: name.trim(),
       username: username.trim(),
       authType,
       keyId: authType === "key" ? keyId || null : null,
 
-      password:
-        authType === "password"
-          ? editing && !password
-            ? undefined
-            : password || null
-          : null,
+      password: identityPasswordSubmissionValue({
+        authType,
+        value: password,
+        clearSavedPassword,
+      }),
     };
     try {
       if (identity) {
@@ -127,18 +132,42 @@ function IdentityFormBody({
       </Field>
 
       {authType === "password" && (
-        <Field
-          label={t("credentials.identities.password")}
-          hint={
-            editing ? t("credentials.identities.passwordKeepHint") : undefined
-          }
-        >
-          <PasswordInput
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="off"
-          />
-        </Field>
+        <div className="space-y-2">
+          <Field
+            label={t("credentials.identities.password")}
+            hint={
+              clearSavedPassword
+                ? t("credentials.identities.passwordWillClear")
+                : editing
+                  ? t("credentials.identities.passwordKeepHint")
+                  : undefined
+            }
+          >
+            <PasswordInput
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                if (event.target.value) setClearSavedPassword(false);
+              }}
+              placeholder="••••••••"
+              disabled={clearSavedPassword}
+              autoComplete="new-password"
+            />
+          </Field>
+          {identity?.hasPassword && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-auto px-0 py-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
+              onClick={() => setClearSavedPassword((value) => !value)}
+            >
+              {clearSavedPassword
+                ? t("credentials.identities.passwordClearUndo")
+                : t("credentials.identities.passwordClear")}
+            </Button>
+          )}
+        </div>
       )}
 
       {authType === "key" && (
@@ -149,6 +178,7 @@ function IdentityFormBody({
               ? t("credentials.identities.noKeysHint")
               : undefined
           }
+          required
         >
           <Select
             value={keyId}

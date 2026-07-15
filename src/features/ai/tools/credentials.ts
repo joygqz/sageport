@@ -68,7 +68,7 @@ function identityInput(
       base?.authType ??
       "password") as AuthType,
     keyId: keyId === undefined ? (base?.keyId ?? null) : keyId,
-    password: password === undefined ? (base?.password ?? null) : password,
+    password: password === undefined ? undefined : (password ?? ""),
   };
 }
 
@@ -123,7 +123,7 @@ async function listSshKeys(): Promise<ToolExecutionResult> {
         id: k.id,
         name: k.name,
         publicKey: k.publicKey ?? undefined,
-        hasPrivateKey: Boolean(k.privateKey),
+        hasPrivateKey: k.hasPrivateKey,
       })),
     ),
   );

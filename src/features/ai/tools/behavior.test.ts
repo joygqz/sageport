@@ -192,14 +192,12 @@ describe("list_ssh_keys", () => {
         id: "k1",
         name: "prod",
         publicKey: "ssh-ed25519 AAAA...",
-        privateKey: "-----BEGIN OPENSSH PRIVATE KEY-----secret",
-        passphrase: "hunter2",
+        hasPrivateKey: true,
+        hasPassphrase: true,
       },
     ]);
 
     const result = await getTool("list_ssh_keys")!.execute!({}, {});
-    expect(result.content).not.toContain("BEGIN OPENSSH PRIVATE KEY");
-    expect(result.content).not.toContain("hunter2");
     const parsed = JSON.parse(result.content);
     expect(parsed[0]).toMatchObject({ name: "prod", hasPrivateKey: true });
     expect(parsed[0].privateKey).toBeUndefined();

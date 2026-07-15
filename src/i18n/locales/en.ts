@@ -402,6 +402,7 @@ export const en = {
       sectionTitle: "SSH keys",
       add: "New key",
       formTitle: "New SSH key",
+      editTitle: "Edit SSH key",
       modeGenerate: "Generate",
       modeImport: "Import",
       name: "Name",
@@ -418,10 +419,16 @@ export const en = {
       },
       passphrase: "Passphrase",
       passphraseHint: "Required only if the key is encrypted.",
+      passphraseRequiresPrivateKey:
+        "Choose or paste a replacement private key before changing its passphrase.",
       generatePassphraseHint: "Optional. Encrypts the generated private key.",
       privateKey: "Private key",
       privateKeyHint: "PEM or OpenSSH format.",
+      privateKeyReplaceHint:
+        "Leave blank to keep the current key, or paste/choose a replacement.",
+      privateKeyKeepPlaceholder: "Leave blank to keep the current private key",
       privateKeyRequired: "Private key is required",
+      publicKey: "Public key",
       chooseFile: "Choose file",
       import: {
         chooseFile: "Choose a private key file",
@@ -430,6 +437,7 @@ export const en = {
       generateAction: "Generate key",
       importAction: "Save key",
       copyPublicKey: "Copy public key",
+      copyError: "Failed to copy public key",
       empty: "No keys yet. Generate one or import an existing key.",
       addError: "Failed to save key",
       delete: {
@@ -450,7 +458,12 @@ export const en = {
       authentication: "Authentication",
       password: "Password",
       passwordKeepHint: "Leave blank to keep the current password.",
+      passwordClear: "Clear saved password",
+      passwordClearUndo: "Undo password removal",
+      passwordWillClear:
+        "The saved password will be removed. You can enter it when connecting.",
       sshKey: "SSH key",
+      keyRequired: "Select an SSH key.",
       noKeysHint: "Add an SSH key first to use key authentication.",
       empty:
         "No identities yet. An identity bundles a username with an authentication method so many hosts can share one login.",

@@ -148,7 +148,7 @@ export interface Identity {
   username: string;
   authType: AuthType;
   keyId: string | null;
-  password: string | null;
+  hasPassword: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -159,8 +159,8 @@ export interface SshKey {
   id: string;
   name: string;
   publicKey: string | null;
-  privateKey: string | null;
-  passphrase: string | null;
+  hasPrivateKey: boolean;
+  hasPassphrase: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;

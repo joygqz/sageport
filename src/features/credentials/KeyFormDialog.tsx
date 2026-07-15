@@ -15,8 +15,13 @@ import {
 } from "@/components/ui";
 import { useI18n, type TKey } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
-import type { SshKeyAlgorithm } from "@/types/models";
-import { useCreateSshKey, useGenerateSshKey, useImportSshKeyFile } from "./api";
+import type { SshKey, SshKeyAlgorithm } from "@/types/models";
+import {
+  useCreateSshKey,
+  useGenerateSshKey,
+  useImportSshKeyFile,
+  useUpdateSshKey,
+} from "./api";
 
 type Mode = "generate" | "import";
 
@@ -31,9 +36,11 @@ const ALGORITHMS: { value: SshKeyAlgorithm; labelKey: TKey }[] = [
 
 export function KeyFormDialog({
   open: isOpen,
+  sshKey,
   onClose,
 }: {
   open: boolean;
+  sshKey: SshKey | null;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -42,34 +49,46 @@ export function KeyFormDialog({
       open={isOpen}
       onClose={onClose}
       width="w-[520px]"
-      title={t("credentials.keys.formTitle")}
+      title={
+        sshKey
+          ? t("credentials.keys.editTitle")
+          : t("credentials.keys.formTitle")
+      }
     >
-      <KeyFormBody onClose={onClose} />
+      <KeyFormBody sshKey={sshKey} onClose={onClose} />
     </FormDialog>
   );
 }
 
-function KeyFormBody({ onClose }: { onClose: () => void }) {
+function KeyFormBody({
+  sshKey,
+  onClose,
+}: {
+  sshKey: SshKey | null;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
   const createKey = useCreateSshKey();
   const generateKey = useGenerateSshKey();
   const importFile = useImportSshKeyFile();
+  const updateKey = useUpdateSshKey();
 
   const [mode, setMode] = useState<Mode>("generate");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(sshKey?.name ?? "");
   const [passphrase, setPassphrase] = useState("");
   const [algorithm, setAlgorithm] = useState<SshKeyAlgorithm>("ed25519");
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
+  const editing = Boolean(sshKey);
 
   const pickFile = async () => {
-    const selected = await open({
-      title: t("credentials.keys.import.chooseFile"),
-      multiple: false,
-    });
-    const path = Array.isArray(selected) ? selected[0] : selected;
-    if (!path) return;
     try {
+      const selected = await open({
+        title: t("credentials.keys.import.chooseFile"),
+        multiple: false,
+      });
+      const path = Array.isArray(selected) ? selected[0] : selected;
+      if (!path) return;
       const file = await importFile.mutateAsync(path);
       setName((prev) => prev || file.name);
       setPrivateKey(file.privateKey);
@@ -83,8 +102,28 @@ function KeyFormBody({ onClose }: { onClose: () => void }) {
     if (!name.trim()) {
       return toast.error(t("credentials.keys.nameRequired"));
     }
+    if (editing && passphrase && !privateKey.trim()) {
+      return toast.error(t("credentials.keys.passphraseRequiresPrivateKey"));
+    }
     try {
-      if (mode === "generate") {
+      if (sshKey) {
+        const replacingMaterial = privateKey.trim().length > 0;
+        await updateKey.mutateAsync({
+          id: sshKey.id,
+          input: {
+            name: name.trim(),
+            ...(replacingMaterial
+              ? {
+                  privateKey,
+                  publicKey: publicKey || null,
+                  // An empty value explicitly clears an old passphrase when
+                  // the replacement key is unencrypted.
+                  passphrase: passphrase || "",
+                }
+              : {}),
+          },
+        });
+      } else if (mode === "generate") {
         await generateKey.mutateAsync({
           name: name.trim(),
           algorithm,
@@ -112,20 +151,29 @@ function KeyFormBody({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       onSubmit={submit}
       submitLabel={
-        mode === "generate"
-          ? t("credentials.keys.generateAction")
-          : t("credentials.keys.importAction")
+        editing
+          ? t("common.saveChanges")
+          : mode === "generate"
+            ? t("credentials.keys.generateAction")
+            : t("credentials.keys.importAction")
       }
-      pending={generateKey.isPending || createKey.isPending}
+      pending={
+        generateKey.isPending ||
+        createKey.isPending ||
+        updateKey.isPending ||
+        importFile.isPending
+      }
     >
-      <SegmentedControl
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: "generate", label: t("credentials.keys.modeGenerate") },
-          { value: "import", label: t("credentials.keys.modeImport") },
-        ]}
-      />
+      {!editing && (
+        <SegmentedControl
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "generate", label: t("credentials.keys.modeGenerate") },
+            { value: "import", label: t("credentials.keys.modeImport") },
+          ]}
+        />
+      )}
 
       <Field label={t("credentials.keys.name")} required>
         <Input
@@ -136,7 +184,18 @@ function KeyFormBody({ onClose }: { onClose: () => void }) {
         />
       </Field>
 
-      {mode === "generate" ? (
+      {editing && sshKey?.publicKey && (
+        <Field label={t("credentials.keys.publicKey")}>
+          <Textarea
+            rows={3}
+            value={sshKey.publicKey}
+            readOnly
+            className="font-mono text-xs"
+          />
+        </Field>
+      )}
+
+      {!editing && mode === "generate" ? (
         <>
           <Field label={t("credentials.keys.algorithmLabel")}>
             <Select
@@ -163,15 +222,23 @@ function KeyFormBody({ onClose }: { onClose: () => void }) {
         <>
           <Field
             label={t("credentials.keys.privateKey")}
-            required
-            hint={t("credentials.keys.privateKeyHint")}
+            required={!editing}
+            hint={
+              editing
+                ? t("credentials.keys.privateKeyReplaceHint")
+                : t("credentials.keys.privateKeyHint")
+            }
           >
             <div className="flex flex-col gap-2">
               <Textarea
                 rows={5}
                 value={privateKey}
                 onChange={(e) => setPrivateKey(e.target.value)}
-                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                placeholder={
+                  editing
+                    ? t("credentials.keys.privateKeyKeepPlaceholder")
+                    : "-----BEGIN OPENSSH PRIVATE KEY-----"
+                }
                 className="font-mono text-xs"
               />
               <Button

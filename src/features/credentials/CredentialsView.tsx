@@ -61,7 +61,10 @@ export function CredentialsView() {
     isError: identitiesError,
     refetch: refetchIdentities,
   } = useIdentities();
-  const [keyFormOpen, setKeyFormOpen] = useState(false);
+  const [keyForm, setKeyForm] = useState<{
+    open: boolean;
+    sshKey: SshKey | null;
+  }>({ open: false, sshKey: null });
   const [identityForm, setIdentityForm] = useState<{
     open: boolean;
     identity: Identity | null;
@@ -130,7 +133,10 @@ export function CredentialsView() {
             fill
             action={
               <div className="flex flex-wrap justify-center gap-2">
-                <Button size="sm" onClick={() => setKeyFormOpen(true)}>
+                <Button
+                  size="sm"
+                  onClick={() => setKeyForm({ open: true, sshKey: null })}
+                >
                   <Plus /> {t("credentials.keys.add")}
                 </Button>
                 <Button
@@ -152,13 +158,14 @@ export function CredentialsView() {
             {(!searching || filteredKeys.length > 0) && (
               <Section
                 title={t("credentials.keys.sectionTitle")}
-                onAdd={() => setKeyFormOpen(true)}
+                onAdd={() => setKeyForm({ open: true, sshKey: null })}
                 addLabel={t("credentials.keys.add")}
                 forceExpanded={searching}
               >
                 <KeyList
                   keys={filteredKeys}
                   setConfirmState={setConfirmState}
+                  onEdit={(sshKey) => setKeyForm({ open: true, sshKey })}
                 />
               </Section>
             )}
@@ -183,7 +190,11 @@ export function CredentialsView() {
         )}
       </PanelContent>
 
-      <KeyFormDialog open={keyFormOpen} onClose={() => setKeyFormOpen(false)} />
+      <KeyFormDialog
+        open={keyForm.open}
+        sshKey={keyForm.sshKey}
+        onClose={() => setKeyForm((state) => ({ ...state, open: false }))}
+      />
       <IdentityFormDialog
         open={identityForm.open}
         identity={identityForm.identity}
@@ -247,9 +258,11 @@ function algorithmTag(publicKey: string | null): string | null {
 function KeyList({
   keys,
   setConfirmState,
+  onEdit,
 }: {
   keys: SshKey[];
   setConfirmState: (state: ConfirmState) => void;
+  onEdit: (key: SshKey) => void;
 }) {
   const { t } = useI18n();
   const deleteKey = useDeleteSshKey();
@@ -284,7 +297,12 @@ function KeyList({
   return (
     <div className={PANEL_LIST_CLASS}>
       {keys.map((key) => (
-        <KeyRow key={key.id} sshKey={key} onDelete={() => requestDelete(key)} />
+        <KeyRow
+          key={key.id}
+          sshKey={key}
+          onEdit={() => onEdit(key)}
+          onDelete={() => requestDelete(key)}
+        />
       ))}
     </div>
   );
@@ -292,9 +310,11 @@ function KeyList({
 
 function KeyRow({
   sshKey,
+  onEdit,
   onDelete,
 }: {
   sshKey: SshKey;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const { t } = useI18n();
@@ -303,15 +323,25 @@ function KeyRow({
 
   const copyPublicKey = async () => {
     if (!sshKey.publicKey) return;
-    await navigator.clipboard.writeText(sshKey.publicKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(sshKey.publicKey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      toast.error(t("credentials.keys.copyError"), errorMessage(err));
+    }
   };
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className={PANEL_LIST_ITEM_CLASS}>
+        <div
+          className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
+          onDoubleClick={(event) => {
+            if ((event.target as HTMLElement).closest("button")) return;
+            onEdit();
+          }}
+        >
           <div className={PANEL_LIST_ICON_CLASS}>
             <KeyRound className="size-4" strokeWidth={1.7} />
           </div>
@@ -348,9 +378,25 @@ function KeyRow({
               </button>
             </Tooltip>
           )}
+          <Tooltip content={t("common.edit")}>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit();
+              }}
+              className={PANEL_LIST_ACTION_CLASS}
+            >
+              <Pencil className="size-3.5" />
+            </button>
+          </Tooltip>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
+        <ContextMenuItem onSelect={onEdit}>
+          <Pencil /> {t("common.edit")}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         {sshKey.publicKey && (
           <>
             <ContextMenuItem onSelect={() => void copyPublicKey()}>

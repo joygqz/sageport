@@ -17,6 +17,42 @@ pub struct SshKey {
     pub revision: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshKeyView {
+    pub id: String,
+    pub name: String,
+    pub public_key: Option<String>,
+    pub has_private_key: bool,
+    pub has_passphrase: bool,
+    pub created_at: String,
+    pub updated_at: String,
+    pub deleted_at: Option<String>,
+    pub revision: i64,
+}
+
+impl From<SshKey> for SshKeyView {
+    fn from(key: SshKey) -> Self {
+        Self {
+            id: key.id,
+            name: key.name,
+            public_key: key.public_key,
+            has_private_key: key
+                .private_key
+                .as_deref()
+                .is_some_and(|value| !value.is_empty()),
+            has_passphrase: key
+                .passphrase
+                .as_deref()
+                .is_some_and(|value| !value.is_empty()),
+            created_at: key.created_at,
+            updated_at: key.updated_at,
+            deleted_at: key.deleted_at,
+            revision: key.revision,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SshKeyInput {
