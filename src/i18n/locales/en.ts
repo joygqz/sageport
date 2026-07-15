@@ -265,6 +265,19 @@ export const en = {
       submit: "Import {count}",
       success: "Imported {count} hosts",
       error: "Failed to import from SSH config",
+      warning: {
+        identityUnreadable:
+          "IdentityFile cannot be read. Check its path and permissions.",
+        proxyUnresolved: "ProxyJump host cannot be resolved.",
+        usernameMissing: "Username is missing. Add User to the SSH config.",
+        matchUnsupported: "The config contains unsupported match conditions.",
+        includeUnreadable:
+          "An include file cannot be read or the pattern has no matches.",
+        includeDepth: "Include nesting exceeds the supported limit.",
+        invalidPort: "The SSH port is invalid.",
+        unsupportedToken:
+          "HostName contains an unsupported substitution token.",
+      },
     },
     empty: {
       title: "No hosts yet",
@@ -325,12 +338,18 @@ export const en = {
     usingIdentityHint:
       "Username and authentication come from the selected identity.",
     username: "Username",
+    usernameRequired: "Username is required.",
     usernamePlaceholder: "root",
     authentication: "Authentication",
     password: "Password",
     passwordKeepHint: "Leave blank to keep the current password.",
+    passwordClear: "Clear saved password",
+    passwordClearUndo: "Undo password removal",
+    passwordWillClear:
+      "The saved password will be removed. You can enter it when connecting.",
     sshKey: "SSH key",
     selectKey: "Select a key",
+    keyRequired: "Select an SSH key.",
     noKeysHint: "No keys yet. Add one on the credentials page.",
     jumpHost: "Jump host",
     noJumpHost: "Connect directly",
@@ -360,10 +379,13 @@ export const en = {
 
   groupForm: {
     newTitle: "New group",
-    editTitle: "Rename group",
+    editTitle: "Edit group",
     name: "Name",
     namePlaceholder: "Production",
     nameRequired: "Name is required",
+    parent: "Parent group",
+    noParent: "Top level",
+    parentHint: "Optionally nest this group inside another group.",
     saveError: "Failed to save group",
   },
 

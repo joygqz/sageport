@@ -1,13 +1,14 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
-import { Field, FormBody, FormDialog, Input } from "@/components/ui";
+import { Field, FormBody, FormDialog, Input, Select } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { useCreateGroup, useGroups, useUpdateGroup } from "./api";
 
 interface FormValues {
   name: string;
+  parentId: string;
 }
 
 export function GroupFormDialog({
@@ -49,16 +50,44 @@ function GroupFormBody({
   const {
     register,
     handleSubmit,
+    control,
+    reset,
     setFocus,
     formState: { errors },
-  } = useForm<FormValues>({ defaultValues: { name: group?.name ?? "" } });
+  } = useForm<FormValues>({
+    defaultValues: { name: "", parentId: "" },
+  });
 
   useEffect(() => {
+    reset({ name: group?.name ?? "", parentId: group?.parentId ?? "" });
     setFocus("name");
-  }, [setFocus]);
+  }, [group, reset, setFocus]);
+
+  const unavailable = new Set<string>();
+  if (groupId) {
+    unavailable.add(groupId);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const candidate of groups) {
+        if (
+          candidate.parentId &&
+          unavailable.has(candidate.parentId) &&
+          !unavailable.has(candidate.id)
+        ) {
+          unavailable.add(candidate.id);
+          changed = true;
+        }
+      }
+    }
+  }
 
   const onSubmit = handleSubmit(async (values) => {
-    const input = { name: values.name.trim() };
+    const input = {
+      name: values.name.trim(),
+      parentId: values.parentId || null,
+      sortOrder: group?.sortOrder ?? 0,
+    };
     try {
       if (groupId) {
         await updateGroup.mutateAsync({ id: groupId, input });
@@ -82,6 +111,28 @@ function GroupFormBody({
         <Input
           placeholder={t("groupForm.namePlaceholder")}
           {...register("name", { required: t("groupForm.nameRequired") })}
+        />
+      </Field>
+      <Field label={t("groupForm.parent")} hint={t("groupForm.parentHint")}>
+        <Controller
+          control={control}
+          name="parentId"
+          render={({ field }) => (
+            <Select
+              value={field.value}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+              options={[
+                { value: "", label: t("groupForm.noParent") },
+                ...groups
+                  .filter((candidate) => !unavailable.has(candidate.id))
+                  .map((candidate) => ({
+                    value: candidate.id,
+                    label: candidate.name,
+                  })),
+              ]}
+            />
+          )}
         />
       </Field>
     </FormBody>

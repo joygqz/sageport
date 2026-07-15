@@ -26,7 +26,7 @@ export interface Host {
   notes: string | null;
   jumpHostId: string | null;
   startupCommand: string | null;
-  password: string | null;
+  hasPassword: boolean;
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -126,6 +126,7 @@ export interface SshConfigHost {
   identityFile: string | null;
   proxyJump: string | null;
   existing: boolean;
+  warnings: string[];
 }
 
 export type HostHealthStatus = "online" | "offline";

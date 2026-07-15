@@ -272,7 +272,8 @@ function inputFromArgs(args: Record<string, unknown>, base?: Host): HostInput {
     notes: notes === undefined ? (base?.notes ?? null) : notes,
     jumpHostId: base?.jumpHostId ?? null,
     startupCommand: base?.startupCommand ?? null,
-    password: password === undefined ? (base?.password ?? null) : password,
+    password:
+      password === undefined ? undefined : password === null ? "" : password,
   };
 }
 
@@ -281,8 +282,12 @@ async function createHost(
 ): Promise<ToolExecutionResult> {
   const label = optionalStr(args, "label");
   const address = optionalStr(args, "address");
-  if (!label || !address) {
-    return toolFailure("Error: label and address are required.");
+  const username = optionalStr(args, "username");
+  const identityId = optionalStr(args, "identityId");
+  if (!label || !address || (!username && !identityId)) {
+    return toolFailure(
+      "Error: label, address, and either username or identityId are required.",
+    );
   }
   const host = await ipc.hosts.create(inputFromArgs(args));
   invalidateHosts();
@@ -340,7 +345,9 @@ async function moveHost(
 
 async function importSshConfig(): Promise<ToolExecutionResult> {
   const preview = await ipc.hosts.importPreview();
-  const importable = preview.filter((h) => !h.existing);
+  const importable = preview.filter(
+    (host) => !host.existing && host.warnings.length === 0,
+  );
   if (importable.length === 0) {
     return toolSuccess(
       "No new hosts to import — ~/.ssh/config has none, or they are all saved already.",

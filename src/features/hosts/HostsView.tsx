@@ -186,19 +186,92 @@ export function HostsView() {
       const key = host.groupId ?? UNGROUPED;
       byGroup.set(key, [...(byGroup.get(key) ?? []), host]);
     }
-    const ordered = groups
-      .map((g) => ({ id: g.id, name: g.name, hosts: byGroup.get(g.id) ?? [] }))
-      .filter((s) => !searching || s.hosts.length > 0);
+    const groupById = new Map(groups.map((group) => [group.id, group]));
+    const included = new Set<string>();
+    if (searching) {
+      for (const group of groups) {
+        if ((byGroup.get(group.id) ?? []).length === 0) continue;
+        let current: typeof group | undefined = group;
+        const ancestry = new Set<string>();
+        while (current && !ancestry.has(current.id)) {
+          ancestry.add(current.id);
+          included.add(current.id);
+          current = current.parentId
+            ? groupById.get(current.parentId)
+            : undefined;
+        }
+      }
+    } else {
+      for (const group of groups) included.add(group.id);
+    }
+
+    const children = new Map<string | null, typeof groups>();
+    for (const group of groups) {
+      if (!included.has(group.id)) continue;
+      const parent =
+        group.parentId && groupById.has(group.parentId) ? group.parentId : null;
+      children.set(parent, [...(children.get(parent) ?? []), group]);
+    }
+
+    const ordered: Array<{
+      id: string;
+      name: string;
+      hosts: Host[];
+      depth: number;
+      ancestors: string[];
+    }> = [];
+    const visited = new Set<string>();
+    const append = (
+      parentId: string | null,
+      depth: number,
+      ancestors: string[],
+    ) => {
+      for (const group of children.get(parentId) ?? []) {
+        if (visited.has(group.id)) continue;
+        visited.add(group.id);
+        ordered.push({
+          id: group.id,
+          name: group.name,
+          hosts: byGroup.get(group.id) ?? [],
+          depth,
+          ancestors,
+        });
+        append(group.id, depth + 1, [...ancestors, group.id]);
+      }
+    };
+    append(null, 0, []);
+    for (const group of groups) {
+      if (included.has(group.id) && !visited.has(group.id)) {
+        ordered.push({
+          id: group.id,
+          name: group.name,
+          hosts: byGroup.get(group.id) ?? [],
+          depth: 0,
+          ancestors: [],
+        });
+      }
+    }
     const ungrouped = byGroup.get(UNGROUPED) ?? [];
     if (ungrouped.length > 0) {
       ordered.push({
         id: UNGROUPED,
         name: t("hosts.ungrouped"),
         hosts: ungrouped,
+        depth: 0,
+        ancestors: [],
       });
     }
     return ordered;
   }, [filtered, groups, searching, t]);
+
+  const visibleSections = useMemo(
+    () =>
+      sections.filter(
+        (section) =>
+          searching || section.ancestors.every((id) => !collapsed[id]),
+      ),
+    [collapsed, searching, sections],
+  );
 
   const requestDeleteHost = (host: Host) => {
     setConfirmState({
@@ -406,13 +479,14 @@ export function HostsView() {
             fill={!searching}
           />
         ) : (
-          sections.map((section) => (
+          visibleSections.map((section) => (
             <GroupSection
               key={section.id}
               id={section.id}
               isGroup={section.id !== UNGROUPED}
               name={section.name}
               count={section.hosts.length}
+              depth={section.depth}
               collapsed={Boolean(collapsed[section.id]) && !searching}
               onToggle={() =>
                 setCollapsed((c) => ({ ...c, [section.id]: !c[section.id] }))
@@ -429,10 +503,10 @@ export function HostsView() {
                     health={healthByHost[host.id]}
                     checking={(checkingHosts[host.id] ?? 0) > 0}
                     dragging={dragState?.host.id === host.id}
-                    onDragStart={(pointer) => beginHostDrag(host, pointer)}
+                    onDragStart={beginHostDrag}
                     onDragMove={updateHostDrag}
                     onDragEnd={endHostDrag}
-                    onCheckHealth={() => runHealthCheck([host.id])}
+                    onCheckHealth={runHealthCheck}
                     onEdit={() => openHostForm(host.id)}
                     onDelete={() => requestDeleteHost(host)}
                   />
@@ -461,6 +535,7 @@ function GroupSection({
   isGroup,
   name,
   count,
+  depth,
   collapsed,
   isDropTarget,
   onToggle,
@@ -472,6 +547,7 @@ function GroupSection({
   isGroup: boolean;
   name: string;
   count: number;
+  depth: number;
   collapsed: boolean;
   isDropTarget: boolean;
   onToggle: () => void;
@@ -497,6 +573,9 @@ function GroupSection({
   return (
     <div
       data-host-group-id={id}
+      style={
+        depth > 0 ? { marginLeft: `${Math.min(depth, 6) * 12}px` } : undefined
+      }
       className={cn(
         "rounded-lg transition-[background-color,box-shadow]",
         isDropTarget && "bg-list-hover ring-1 ring-inset ring-ring/50",
@@ -539,10 +618,10 @@ function HostRow({
   health?: HostHealthCheck;
   checking: boolean;
   dragging: boolean;
-  onDragStart: (pointer: HostDragPointer) => void;
+  onDragStart: (host: Host, pointer: HostDragPointer) => void;
   onDragMove: (clientX: number, clientY: number) => void;
   onDragEnd: (didDrag: boolean) => void;
-  onCheckHealth: () => void;
+  onCheckHealth: (hostIds: string[]) => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -601,7 +680,7 @@ function HostRow({
       );
       if (distance < 5) return;
       drag.active = true;
-      onDragStart({
+      onDragStart(host, {
         clientX: e.clientX,
         clientY: e.clientY,
         rect: e.currentTarget.getBoundingClientRect(),
@@ -685,7 +764,7 @@ function HostRow({
                 disabled={checking}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onCheckHealth();
+                  onCheckHealth([host.id]);
                 }}
                 className={cn(PANEL_LIST_ACTION_CLASS, "disabled:opacity-40")}
               >
@@ -716,7 +795,7 @@ function HostRow({
         <ContextMenuItem onSelect={openSftp}>
           <FolderSync /> {t("hosts.openSftp")}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={onCheckHealth}>
+        <ContextMenuItem onSelect={() => onCheckHealth([host.id])}>
           <RefreshCw /> {t("hosts.health.check")}
         </ContextMenuItem>
         <ContextMenuSeparator />

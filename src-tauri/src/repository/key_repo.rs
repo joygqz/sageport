@@ -1,4 +1,4 @@
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::domain::{new_id, now, SshKey, SshKeyInput};
 use crate::error::{AppError, AppResult};
@@ -45,6 +45,14 @@ fn with_derived_public_key(mut input: SshKeyInput) -> AppResult<SshKeyInput> {
 }
 
 pub async fn create(pool: &SqlitePool, input: SshKeyInput) -> AppResult<SshKey> {
+    let mut connection = pool.acquire().await?;
+    create_in(&mut connection, input).await
+}
+
+pub(crate) async fn create_in(
+    connection: &mut SqliteConnection,
+    input: SshKeyInput,
+) -> AppResult<SshKey> {
     let input = with_derived_public_key(normalize(input)?)?;
     let id = new_id();
     let ts = now();
@@ -59,10 +67,14 @@ pub async fn create(pool: &SqlitePool, input: SshKeyInput) -> AppResult<SshKey> 
     .bind(none_if_empty(input.passphrase.as_deref()))
     .bind(&ts)
     .bind(&ts)
-    .execute(pool)
+    .execute(&mut *connection)
     .await?;
 
-    get(pool, &id).await
+    sqlx::query_as::<_, SshKey>("SELECT * FROM keys WHERE id = ? AND deleted_at IS NULL")
+        .bind(&id)
+        .fetch_optional(&mut *connection)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("key {id}")))
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResult<SshKey> {

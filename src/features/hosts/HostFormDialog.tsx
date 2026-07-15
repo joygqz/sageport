@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 
 import {
   Field,
+  Button,
+  ErrorState,
   FormBody,
   FormDialog,
   FormLoading,
@@ -24,6 +26,7 @@ import {
   useHosts,
   useUpdateHost,
 } from "./api";
+import { passwordSubmissionValue } from "./hostForm";
 
 interface FormValues {
   label: string;
@@ -92,8 +95,14 @@ function HostFormBody({
     useIdentities();
   const createHost = useCreateHost();
   const updateHost = useUpdateHost();
+  const [clearSavedPassword, setClearSavedPassword] = useState(false);
 
-  const { data: host, isLoading } = useQuery({
+  const {
+    data: host,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: hostKeys.detail(hostId ?? ""),
     queryFn: () => ipc.hosts.get(hostId!),
     enabled: Boolean(hostId),
@@ -120,13 +129,14 @@ function HostFormBody({
         identityId: host.identityId ?? "",
         username: host.username ?? "",
         authType: (host.authType ?? "password") as AuthType,
-        password: host.password ?? "",
+        password: "",
         keyId: host.keyId ?? "",
         groupId: host.groupId ?? "",
         jumpHostId: host.jumpHostId ?? "",
         startupCommand: host.startupCommand ?? "",
         notes: host.notes ?? "",
       });
+      setClearSavedPassword(false);
     }
   }, [host, hostId, identitiesLoading, keysLoading, reset]);
 
@@ -161,8 +171,11 @@ function HostFormBody({
           authType: values.authType,
           keyId: values.authType === "key" ? values.keyId || null : null,
 
-          password:
-            values.authType === "password" ? values.password : undefined,
+          password: passwordSubmissionValue({
+            authType: values.authType,
+            value: values.password,
+            clearSavedPassword,
+          }),
         };
 
     try {
@@ -178,6 +191,16 @@ function HostFormBody({
   });
 
   if (hostId && isLoading) return <FormLoading />;
+  if (hostId && isError) {
+    return (
+      <ErrorState
+        title={t("common.loadError")}
+        retryLabel={t("common.retry")}
+        onRetry={() => void refetch()}
+        fill
+      />
+    );
+  }
 
   return (
     <FormBody
@@ -285,10 +308,16 @@ function HostFormBody({
 
       {!useIdentity && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t("hostForm.username")}>
+          <Field
+            label={t("hostForm.username")}
+            error={errors.username?.message}
+            required
+          >
             <Input
               placeholder={t("hostForm.usernamePlaceholder")}
-              {...register("username")}
+              {...register("username", {
+                required: t("hostForm.usernameRequired"),
+              })}
             />
           </Field>
           <Field label={t("hostForm.authentication")}>
@@ -316,26 +345,55 @@ function HostFormBody({
       )}
 
       {!useIdentity && authType === "password" && (
-        <Field
-          label={t("hostForm.password")}
-          hint={hostId ? t("hostForm.passwordKeepHint") : undefined}
-        >
-          <PasswordInput
-            placeholder="••••••••"
-            autoComplete="off"
-            {...register("password")}
-          />
-        </Field>
+        <div className="space-y-2">
+          <Field
+            label={t("hostForm.password")}
+            hint={
+              clearSavedPassword
+                ? t("hostForm.passwordWillClear")
+                : hostId
+                  ? t("hostForm.passwordKeepHint")
+                  : undefined
+            }
+          >
+            <PasswordInput
+              placeholder="••••••••"
+              autoComplete="new-password"
+              disabled={clearSavedPassword}
+              {...register("password", {
+                onChange: (event) => {
+                  if (event.target.value) setClearSavedPassword(false);
+                },
+              })}
+            />
+          </Field>
+          {host?.hasPassword && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-auto px-0 py-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
+              onClick={() => setClearSavedPassword((value) => !value)}
+            >
+              {clearSavedPassword
+                ? t("hostForm.passwordClearUndo")
+                : t("hostForm.passwordClear")}
+            </Button>
+          )}
+        </div>
       )}
 
       {!useIdentity && authType === "key" && (
         <Field
           label={t("hostForm.sshKey")}
+          error={errors.keyId?.message}
           hint={keys.length === 0 ? t("hostForm.noKeysHint") : undefined}
+          required
         >
           <Controller
             control={control}
             name="keyId"
+            rules={{ required: t("hostForm.keyRequired") }}
             render={({ field }) => (
               <Select
                 value={field.value}

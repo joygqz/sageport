@@ -48,7 +48,11 @@ function ImportBody({ onClose }: { onClose: () => void }) {
       (found) => {
         setEntries(found);
         setSelected(
-          new Set(found.filter((h) => !h.existing).map((h) => h.alias)),
+          new Set(
+            found
+              .filter((host) => !host.existing && host.warnings.length === 0)
+              .map((host) => host.alias),
+          ),
         );
       },
       (err) => {
@@ -60,18 +64,49 @@ function ImportBody({ onClose }: { onClose: () => void }) {
 
   if (entries === null) return <FormLoading />;
 
-  const allSelected = entries.length > 0 && selected.size === entries.length;
+  const selectable = entries.filter(
+    (entry) => !entry.existing && entry.warnings.length === 0,
+  );
+  const allSelected =
+    selectable.length > 0 && selected.size === selectable.length;
 
-  const toggle = (alias: string) =>
+  const toggle = (entry: SshConfigHost) => {
+    if (entry.existing || entry.warnings.length > 0) return;
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(alias)) next.delete(alias);
-      else next.add(alias);
+      if (next.has(entry.alias)) next.delete(entry.alias);
+      else next.add(entry.alias);
       return next;
     });
+  };
 
   const toggleAll = () =>
-    setSelected(allSelected ? new Set() : new Set(entries.map((h) => h.alias)));
+    setSelected(
+      allSelected ? new Set() : new Set(selectable.map((host) => host.alias)),
+    );
+
+  const warningLabel = (warning: string) => {
+    switch (warning) {
+      case "identity_unreadable":
+        return t("hosts.import.warning.identityUnreadable");
+      case "proxy_unresolved":
+        return t("hosts.import.warning.proxyUnresolved");
+      case "username_missing":
+        return t("hosts.import.warning.usernameMissing");
+      case "match_unsupported":
+        return t("hosts.import.warning.matchUnsupported");
+      case "include_unreadable":
+        return t("hosts.import.warning.includeUnreadable");
+      case "include_depth":
+        return t("hosts.import.warning.includeDepth");
+      case "invalid_port":
+        return t("hosts.import.warning.invalidPort");
+      case "unsupported_token":
+        return t("hosts.import.warning.unsupportedToken");
+      default:
+        return warning;
+    }
+  };
 
   const submit = async () => {
     const chosen = entries.filter((h) => selected.has(h.alias));
@@ -111,6 +146,7 @@ function ImportBody({ onClose }: { onClose: () => void }) {
       onSubmit={submit}
       submitLabel={t("hosts.import.submit", { count: String(selected.size) })}
       pending={saving}
+      submitDisabled={selected.size === 0}
       footerStart={
         <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
           <Switch checked={allSelected} onCheckedChange={toggleAll} />
@@ -124,6 +160,7 @@ function ImportBody({ onClose }: { onClose: () => void }) {
       <div className="overflow-hidden rounded-lg border border-border bg-surface">
         {entries.map((entry, index) => {
           const on = selected.has(entry.alias);
+          const disabled = entry.existing || entry.warnings.length > 0;
           return (
             <div
               key={entry.alias}
@@ -131,16 +168,19 @@ function ImportBody({ onClose }: { onClose: () => void }) {
                 "flex w-full items-center text-sm transition-colors hover:bg-list-hover",
                 index > 0 && "border-t border-border",
                 on && "bg-list-hover",
+                disabled && "opacity-60",
               )}
             >
               <Switch
                 className="ml-3"
                 checked={on}
-                onCheckedChange={() => toggle(entry.alias)}
+                disabled={disabled}
+                onCheckedChange={() => toggle(entry)}
               />
               <button
                 type="button"
-                onClick={() => toggle(entry.alias)}
+                onClick={() => toggle(entry)}
+                disabled={disabled}
                 className="min-w-0 flex-1 py-2 pl-3 pr-3 text-left"
               >
                 <div className="flex items-baseline gap-2">
@@ -161,6 +201,14 @@ function ImportBody({ onClose }: { onClose: () => void }) {
                   {entry.hostName}
                   {entry.port !== 22 ? `:${entry.port}` : ""}
                 </span>
+                {entry.warnings.map((warning) => (
+                  <span
+                    key={warning}
+                    className="block text-2xs leading-relaxed text-danger"
+                  >
+                    {warningLabel(warning)}
+                  </span>
+                ))}
               </button>
             </div>
           );
