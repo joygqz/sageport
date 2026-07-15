@@ -1,10 +1,12 @@
 import {
   Fragment,
   memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { ISearchOptions } from "@xterm/addon-search";
@@ -152,7 +154,9 @@ function SplitView({
   return (
     <div
       ref={containerRef}
-      className={horizontal ? "flex h-full w-full" : "flex h-full w-full flex-col"}
+      className={
+        horizontal ? "flex h-full w-full" : "flex h-full w-full flex-col"
+      }
     >
       {node.children.map((child, i) => (
         <Fragment key={child.type === "leaf" ? child.paneId : child.id}>
@@ -198,18 +202,17 @@ function PaneView({
   const closePane = useTabsStore((s) => s.closePane);
   const searchOpen = useTerminalSearch((s) => s.openFor === pane.id);
   const paneActive = active && tab.activePaneId === pane.id;
-  const [hasSelection, setHasSelection] = useState(
-    () => getSession(pane.id)?.term.hasSelection() ?? false,
+  const term = getSession(pane.id)?.term;
+  const hasSelection = useSyncExternalStore(
+    useCallback(
+      (onSelectionChange) => {
+        const sub = term?.onSelectionChange(onSelectionChange);
+        return () => sub?.dispose();
+      },
+      [term],
+    ),
+    () => term?.hasSelection() ?? false,
   );
-
-  useEffect(() => {
-    const term = getSession(pane.id)?.term;
-    if (!term) return;
-    const sub = term.onSelectionChange(() =>
-      setHasSelection(term.hasSelection()),
-    );
-    return () => sub.dispose();
-  }, [pane.id]);
 
   const runAndRefocus = (action: () => void) => () => {
     action();
@@ -253,7 +256,9 @@ function PaneView({
         <ContextMenuItem onSelect={runAndRefocus(() => selectPaneAll(pane.id))}>
           <SquareDashedMousePointer /> {t("terminal.menu.selectAll")}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={runAndRefocus(() => clearPaneBuffer(pane.id))}>
+        <ContextMenuItem
+          onSelect={runAndRefocus(() => clearPaneBuffer(pane.id))}
+        >
           <Eraser /> {t("terminal.menu.clear")}
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -262,7 +267,9 @@ function PaneView({
         >
           <SquareSplitHorizontal /> {t("commands.terminal.splitRight")}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={runAndRefocus(() => splitPane(pane.id, "down"))}>
+        <ContextMenuItem
+          onSelect={runAndRefocus(() => splitPane(pane.id, "down"))}
+        >
           <SquareSplitVertical /> {t("commands.terminal.splitDown")}
         </ContextMenuItem>
         <ContextMenuSeparator />

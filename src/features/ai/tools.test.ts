@@ -154,7 +154,9 @@ describe("reusableHostSession", () => {
     stale.hostId = "same-host";
     live.hostId = "same-host";
 
-    expect(reusableHostSession([tabOf(stale), tabOf(live)], "same-host")).toBe(live);
+    expect(reusableHostSession([tabOf(stale), tabOf(live)], "same-host")).toBe(
+      live,
+    );
   });
 
   it("returns a closed matching tab so it can be reconnected in place", () => {

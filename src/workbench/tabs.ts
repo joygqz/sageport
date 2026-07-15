@@ -171,9 +171,7 @@ export function paneTab(
 }
 
 export function activePane(tab: TerminalTab): TerminalPane {
-  return (
-    tab.panes.find((pane) => pane.id === tab.activePaneId) ?? tab.panes[0]
-  );
+  return tab.panes.find((pane) => pane.id === tab.activePaneId) ?? tab.panes[0];
 }
 
 export function tabTitle(tab: EditorTab): string {
@@ -222,7 +220,9 @@ function localPaneTitle(tabs: EditorTab[]): string {
 export const useTabsStore = create<TabsState>((set, get) => {
   const canOpenSession = () => {
     if (terminalPanes(get().tabs).length < MAX_TERMINAL_SESSIONS) return true;
-    toast.warning(t("editor.tabLimitReached", { count: MAX_TERMINAL_SESSIONS }));
+    toast.warning(
+      t("editor.tabLimitReached", { count: MAX_TERMINAL_SESSIONS }),
+    );
     return false;
   };
 

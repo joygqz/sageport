@@ -11,7 +11,12 @@ import {
   type PaneLayout,
 } from "./pane-layout";
 
-function split(layout: PaneLayout, target: string, next: string, dir: "row" | "column") {
+function split(
+  layout: PaneLayout,
+  target: string,
+  next: string,
+  dir: "row" | "column",
+) {
   return splitLayout(layout, target, next, dir);
 }
 
@@ -35,9 +40,9 @@ describe("splitLayout", () => {
     );
     layout = split(layout, "a", "c", "row");
     expect(layoutPaneIds(layout)).toEqual(["a", "c", "b"]);
-    expect(
-      (layout as Extract<PaneLayout, { type: "split" }>).sizes,
-    ).toEqual([0.3, 0.3, 0.4]);
+    expect((layout as Extract<PaneLayout, { type: "split" }>).sizes).toEqual([
+      0.3, 0.3, 0.4,
+    ]);
   });
 
   it("nests a split when the direction differs", () => {
@@ -140,9 +145,9 @@ describe("resizeSplitNode", () => {
     let layout = split(leafLayout("a"), "a", "b", "row");
     const id = (layout as Extract<PaneLayout, { type: "split" }>).id;
     layout = resizeSplitNode(layout, id, [0.7, 0.3]);
-    expect(
-      (layout as Extract<PaneLayout, { type: "split" }>).sizes,
-    ).toEqual([0.7, 0.3]);
+    expect((layout as Extract<PaneLayout, { type: "split" }>).sizes).toEqual([
+      0.7, 0.3,
+    ]);
     expect(resizeSplitNode(layout, id, [1])).toBe(layout);
     expect(resizeSplitNode(layout, "other", [0.2, 0.8])).toBe(layout);
   });

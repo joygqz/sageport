@@ -28,7 +28,11 @@ import { PanelContent } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { STATUS_DOT_CLASS } from "@/workbench/tab-styles";
-import { terminalPanes, useTabsStore, type TerminalPane } from "@/workbench/tabs";
+import {
+  terminalPanes,
+  useTabsStore,
+  type TerminalPane,
+} from "@/workbench/tabs";
 
 export function MonitorView() {
   const { t } = useI18n();

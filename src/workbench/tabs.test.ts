@@ -439,9 +439,7 @@ describe("moveTab", () => {
     useTabsStore.getState().moveTab(tabIdOf(a), 2);
 
     const reorderedTabs = useTabsStore.getState().tabs;
-    expect(reorderedTabs.map((tab) => tab.id)).toEqual(
-      [b, c, a].map(tabIdOf),
-    );
+    expect(reorderedTabs.map((tab) => tab.id)).toEqual([b, c, a].map(tabIdOf));
     expect(useTabsStore.getState().activeId).toBe(tabIdOf(b));
   });
 
@@ -460,9 +458,9 @@ describe("moveTab", () => {
       .getState()
       .tabs.find((tab) => tab.id === tabIdOf(connected));
     expect(reorderedTab).toBe(connectedTab);
-    expect(
-      terminalPanes([reorderedTab!]).map((pane) => pane.status),
-    ).toEqual(["connected"]);
+    expect(terminalPanes([reorderedTab!]).map((pane) => pane.status)).toEqual([
+      "connected",
+    ]);
     expect(useTabsStore.getState().tabs.map((tab) => tab.id)).toEqual(
       [connecting, connected].map(tabIdOf),
     );
