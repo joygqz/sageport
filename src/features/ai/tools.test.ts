@@ -15,7 +15,7 @@ vi.mock("@/lib/ipc", () => ({
   },
 }));
 
-import type { TerminalTab } from "@/workbench/tabs";
+import type { TerminalPane, TerminalTab } from "@/workbench/tabs";
 import { useTabsStore } from "@/workbench/tabs";
 import {
   defaultTerminalOption,
@@ -28,10 +28,9 @@ import {
 function terminal(
   id: string,
   title: string,
-  status: TerminalTab["status"] = "connected",
-): TerminalTab {
+  status: TerminalPane["status"] = "connected",
+): TerminalPane {
   return {
-    kind: "terminal",
     id,
     target: "ssh",
     hostId: `host-${id}`,
@@ -41,11 +40,21 @@ function terminal(
   };
 }
 
+function tabOf(pane: TerminalPane): TerminalTab {
+  return {
+    kind: "terminal",
+    id: pane.id,
+    panes: [pane],
+    layout: { type: "leaf", paneId: pane.id },
+    activePaneId: pane.id,
+  };
+}
+
 beforeEach(() => {
   useTabsStore.setState({
     tabs: [],
     activeId: null,
-    lastTerminalId: null,
+    lastPaneId: null,
     pendingCloseId: null,
   });
 });
@@ -58,9 +67,9 @@ describe("defaultTerminalOption", () => {
     const current = terminal("current-id", "DMIT CORONA");
     const other = terminal("other-id", "10.10.30.56");
     useTabsStore.setState({
-      tabs: [other, current],
+      tabs: [tabOf(other), tabOf(current)],
       activeId: current.id,
-      lastTerminalId: current.id,
+      lastPaneId: current.id,
     });
 
     expect(
@@ -72,9 +81,9 @@ describe("defaultTerminalOption", () => {
     const current = terminal("current-id", "DMIT CORONA");
     const other = terminal("other-id", "10.10.30.56");
     useTabsStore.setState({
-      tabs: [current, other],
+      tabs: [tabOf(current), tabOf(other)],
       activeId: current.id,
-      lastTerminalId: current.id,
+      lastPaneId: current.id,
     });
 
     expect(
@@ -86,9 +95,9 @@ describe("defaultTerminalOption", () => {
     const current = terminal("current-id", "DMIT CORONA");
     const other = terminal("other-id", "10.10.30.56");
     useTabsStore.setState({
-      tabs: [current, other],
+      tabs: [tabOf(current), tabOf(other)],
       activeId: current.id,
-      lastTerminalId: current.id,
+      lastPaneId: current.id,
     });
 
     expect(
@@ -102,9 +111,9 @@ describe("defaultTerminalOption", () => {
   it("does not override an explicitly named host that is not open yet", () => {
     const current = terminal("current-id", "DMIT CORONA");
     useTabsStore.setState({
-      tabs: [current],
+      tabs: [tabOf(current)],
       activeId: current.id,
-      lastTerminalId: current.id,
+      lastPaneId: current.id,
     });
 
     expect(
@@ -121,9 +130,9 @@ describe("defaultTerminalOption", () => {
   it("does not swallow non-terminal choices or disconnected targets", () => {
     const current = terminal("current-id", "DMIT CORONA", "closed");
     useTabsStore.setState({
-      tabs: [current],
+      tabs: [tabOf(current)],
       activeId: current.id,
-      lastTerminalId: current.id,
+      lastPaneId: current.id,
     });
 
     expect(
@@ -145,14 +154,16 @@ describe("reusableHostSession", () => {
     stale.hostId = "same-host";
     live.hostId = "same-host";
 
-    expect(reusableHostSession([stale, live], "same-host")).toBe(live);
+    expect(reusableHostSession([tabOf(stale), tabOf(live)], "same-host")).toBe(
+      live,
+    );
   });
 
   it("returns a closed matching tab so it can be reconnected in place", () => {
     const stale = terminal("stale", "Host", "closed");
     stale.hostId = "same-host";
 
-    expect(reusableHostSession([stale], "same-host")).toBe(stale);
+    expect(reusableHostSession([tabOf(stale)], "same-host")).toBe(stale);
   });
 });
 

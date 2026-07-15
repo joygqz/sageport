@@ -1,10 +1,11 @@
 import { MessageCircleQuestion } from "lucide-react";
 
 import {
-  targetTerminalId,
-  terminalTabs,
+  findPane,
+  targetPaneId,
+  terminalPanes,
   useTabsStore,
-  type TerminalTab,
+  type TerminalPane,
 } from "@/workbench/tabs";
 import type { AiTool, PreparedCall } from "./types";
 
@@ -39,16 +40,15 @@ function comparableText(value: string): string {
     .trim();
 }
 
-function resolveCurrentTab(): TerminalTab | null {
+function resolveCurrentPane(): TerminalPane | null {
   const state = useTabsStore.getState();
-  const id = targetTerminalId(state);
-  return terminalTabs(state.tabs).find((s) => s.id === id) ?? null;
+  return findPane(state.tabs, targetPaneId(state)) ?? null;
 }
 
 export function defaultTerminalOption(
   args: Record<string, unknown>,
   userPrompt: string,
-): { option: string; tab: TerminalTab } | null {
+): { option: string; tab: TerminalPane } | null {
   const question = askUserQuestion(args);
   const options = askUserOptions(args);
   if (!question || options.length < 2 || !TARGET_QUESTION_RE.test(question)) {
@@ -56,14 +56,14 @@ export function defaultTerminalOption(
   }
 
   const state = useTabsStore.getState();
-  const current = resolveCurrentTab();
+  const current = resolveCurrentPane();
   if (!current || current.status !== "connected") return null;
 
   const prompt = comparableText(userPrompt);
   if (MULTI_TARGET_RE.test(prompt)) return null;
 
-  const otherTargets = terminalTabs(state.tabs).filter(
-    (tab) => tab.id !== current.id,
+  const otherTargets = terminalPanes(state.tabs).filter(
+    (pane) => pane.id !== current.id,
   );
   if (
     otherTargets.some((tab) => {
@@ -104,7 +104,7 @@ export function defaultTerminalOption(
 
 export function automaticTerminalSelectionResult(
   option: string,
-  tab: TerminalTab,
+  tab: TerminalPane,
 ): string {
   return `The app automatically selected the current terminal: ${option} (title: "${tab.title}", sessionId: ${tab.id}). Continue without asking the user to choose a server.`;
 }

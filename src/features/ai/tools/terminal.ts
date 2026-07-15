@@ -3,11 +3,13 @@ import { Eye, History, ListTree, Terminal as TerminalIcon } from "lucide-react";
 import { isShellPromptLine } from "@/features/terminal/autocomplete/engine";
 import { getSession, readTerminalContext } from "@/features/terminal/sessions";
 import { ipc } from "@/lib/ipc";
+import { layoutPaneIds } from "@/workbench/pane-layout";
 import {
-  targetTerminalId,
+  targetPaneId,
+  terminalPanes,
   terminalTabs,
   useTabsStore,
-  type TerminalTab,
+  type TerminalPane,
 } from "@/workbench/tabs";
 import {
   num,
@@ -27,13 +29,13 @@ export function sleep(ms: number): Promise<void> {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-export function resolveTerminalTab(requested?: string): TerminalTab | null {
+export function resolveTerminalPane(requested?: string): TerminalPane | null {
   const state = useTabsStore.getState();
-  const sessions = terminalTabs(state.tabs);
+  const sessions = terminalPanes(state.tabs);
   if (requested) {
     return sessions.find((s) => s.id === requested) ?? null;
   }
-  const id = targetTerminalId(state);
+  const id = targetPaneId(state);
   return sessions.find((s) => s.id === id) ?? null;
 }
 
@@ -43,8 +45,8 @@ export function noTerminalSessionError(requested?: string): string {
     : "Error: no active terminal session. Call list_terminal_sessions to pick one, or connect_host to open one.";
 }
 
-export function sessionNotConnectedError(tab: TerminalTab): string {
-  return `Error: terminal session "${tab.title}" (${tab.id}) is not connected (status: ${tab.status}). Reconnect it with connect_host or pick a connected session from list_terminal_sessions.`;
+export function sessionNotConnectedError(pane: TerminalPane): string {
+  return `Error: terminal session "${pane.title}" (${pane.id}) is not connected (status: ${pane.status}). Reconnect it with connect_host or pick a connected session from list_terminal_sessions.`;
 }
 
 export function prepareTerminalTarget(
@@ -52,17 +54,17 @@ export function prepareTerminalTarget(
 ): PreparedCall {
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
-  const tab = resolveTerminalTab(requested);
-  if (!tab) {
+  const pane = resolveTerminalPane(requested);
+  if (!pane) {
     return { args, preflightError: noTerminalSessionError(requested) };
   }
-  if (tab.status !== "connected") {
+  if (pane.status !== "connected") {
     return {
-      args: { ...args, sessionId: tab.id },
-      preflightError: sessionNotConnectedError(tab),
+      args: { ...args, sessionId: pane.id },
+      preflightError: sessionNotConnectedError(pane),
     };
   }
-  return { args: { ...args, sessionId: tab.id } };
+  return { args: { ...args, sessionId: pane.id } };
 }
 
 export function terminalReadLineLimit(value: unknown): number {
@@ -133,22 +135,35 @@ async function waitForSettledOutput(
 
 function listSessions(): ToolExecutionResult {
   const state = useTabsStore.getState();
-  const sessions = terminalTabs(state.tabs);
-  if (sessions.length === 0) {
+  const tabs = terminalTabs(state.tabs);
+  if (tabs.length === 0) {
     return toolSuccess(
       "No terminal sessions are open right now. Use connect_host to open one.",
     );
   }
-  const focusedId = targetTerminalId(state);
+  const focusedId = targetPaneId(state);
   return toolSuccess(
     JSON.stringify(
-      sessions.map((s) => ({
-        id: s.id,
-        title: s.title,
-        hostId: s.hostId || undefined,
-        status: s.status,
-        current: s.id === focusedId,
-      })),
+      tabs.flatMap((tab) => {
+        const ordered = layoutPaneIds(tab.layout);
+        return ordered.flatMap((paneId, index) => {
+          const pane = tab.panes.find((item) => item.id === paneId);
+          if (!pane) return [];
+          return [
+            {
+              id: pane.id,
+              title: pane.title,
+              hostId: pane.hostId || undefined,
+              status: pane.status,
+              current: pane.id === focusedId,
+              pane:
+                ordered.length > 1
+                  ? `${index + 1}/${ordered.length}`
+                  : undefined,
+            },
+          ];
+        });
+      }),
     ),
   );
 }
@@ -156,11 +171,11 @@ function listSessions(): ToolExecutionResult {
 function readOutput(args: Record<string, unknown>): ToolExecutionResult {
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
-  const tab = resolveTerminalTab(requested);
-  if (!tab) return toolFailure(noTerminalSessionError(requested));
+  const pane = resolveTerminalPane(requested);
+  if (!pane) return toolFailure(noTerminalSessionError(requested));
 
   const lines = terminalReadLineLimit(args.lines);
-  const text = readTerminalContext(tab.id, lines);
+  const text = readTerminalContext(pane.id, lines);
   return toolSuccess(text || "(the terminal has no output yet)");
 }
 
@@ -173,10 +188,10 @@ export async function executeTerminalCommand(
 
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
-  const tab = resolveTerminalTab(requested);
-  if (!tab) return toolFailure(noTerminalSessionError(requested));
-  if (tab.status !== "connected") {
-    return toolFailure(sessionNotConnectedError(tab));
+  const pane = resolveTerminalPane(requested);
+  if (!pane) return toolFailure(noTerminalSessionError(requested));
+  if (pane.status !== "connected") {
+    return toolFailure(sessionNotConnectedError(pane));
   }
 
   const timeoutMs = Math.min(
@@ -186,13 +201,13 @@ export async function executeTerminalCommand(
     30_000,
   );
 
-  const session = getSession(tab.id);
+  const session = getSession(pane.id);
   if (!session) return toolFailure(noTerminalSessionError(requested));
-  const before = readTerminalContext(tab.id, MAX_TERMINAL_READ_LINES) ?? "";
+  const before = readTerminalContext(pane.id, MAX_TERMINAL_READ_LINES) ?? "";
   const promptBefore = before.split("\n").at(-1) ?? "";
   session.sendCommand(command);
   const after = await waitForSettledOutput(
-    tab.id,
+    pane.id,
     timeoutMs,
     context.isCancelled,
     isShellPromptLine(promptBefore),
@@ -231,7 +246,7 @@ export const terminalTools: AiTool[] = [
     spec: {
       name: "list_terminal_sessions",
       description:
-        "List open terminal ids, titles, statuses, and the current marker. Do not call merely to reconfirm the Current terminal in app context.",
+        "List open terminal ids, titles, statuses, and the current marker. Split panes are separate sessions; a pane field like 1/2 marks panes sharing one tab. Do not call merely to reconfirm the Current terminal in app context.",
       parameters: {
         type: "object",
         properties: {},

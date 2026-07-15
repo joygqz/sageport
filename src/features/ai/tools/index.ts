@@ -9,7 +9,7 @@ export {
   executeTerminalCommand,
   newOutput,
   noTerminalSessionError,
-  resolveTerminalTab,
+  resolveTerminalPane,
   sessionNotConnectedError,
   terminalReadLineLimit,
 } from "./terminal";

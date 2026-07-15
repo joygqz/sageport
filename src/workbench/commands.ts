@@ -18,6 +18,14 @@ export interface WorkbenchCommand {
   run: () => void;
 }
 
+function splitActivePane(direction: "right" | "down") {
+  const state = useTabsStore.getState();
+  const active = state.tabs.find((tab) => tab.id === state.activeId);
+  if (active?.kind === "terminal") {
+    state.splitPane(active.activePaneId, direction);
+  }
+}
+
 export function useCommands(): WorkbenchCommand[] {
   const { t } = useI18n();
   const { setTheme } = useTheme();
@@ -54,6 +62,27 @@ export function useCommands(): WorkbenchCommand[] {
         label: t("commands.terminal.toggleBroadcast"),
         shortcut: ["mod", "shift", "B"],
         run: () => useBroadcastStore.getState().toggle(),
+      },
+      {
+        id: "terminal.splitRight",
+        categoryKey: "commands.category.terminal",
+        label: t("commands.terminal.splitRight"),
+        shortcut: ["mod", "\\"],
+        run: () => splitActivePane("right"),
+      },
+      {
+        id: "terminal.splitDown",
+        categoryKey: "commands.category.terminal",
+        label: t("commands.terminal.splitDown"),
+        shortcut: ["mod", "shift", "\\"],
+        run: () => splitActivePane("down"),
+      },
+      {
+        id: "terminal.focusNextPane",
+        categoryKey: "commands.category.terminal",
+        label: t("commands.terminal.focusNextPane"),
+        shortcut: ["mod", "]"],
+        run: () => useTabsStore.getState().focusPaneNext(1),
       },
       {
         id: "view.toggleSidebar",

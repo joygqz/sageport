@@ -169,6 +169,9 @@ export const en = {
     terminal: {
       newLocal: "New local terminal",
       toggleBroadcast: "Toggle terminal input broadcasting",
+      splitRight: "Split terminal right",
+      splitDown: "Split terminal down",
+      focusNextPane: "Focus next terminal pane",
     },
     view: {
       toggleSidebar: "Toggle sidebar",
@@ -258,6 +261,17 @@ export const en = {
       wholeWord: "Match whole word",
       regex: "Use regular expression",
     },
+    menu: {
+      paste: "Paste",
+      selectAll: "Select all",
+      clear: "Clear terminal",
+      closePane: "Close pane",
+      closeTerminal: "Close terminal",
+    },
+    splitLimitReachedRow:
+      "You can split into at most {count} panes horizontally",
+    splitLimitReachedColumn:
+      "You can split into at most {count} panes vertically",
   },
 
   hosts: {

@@ -49,7 +49,7 @@ import {
 } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
-import { terminalTabs, useTabsStore } from "@/workbench/tabs";
+import { terminalPanes, useTabsStore } from "@/workbench/tabs";
 import { useSftpStore } from "@/features/sftp/store";
 import { useMonitorStore } from "@/features/terminal/monitor";
 import {
@@ -629,7 +629,7 @@ function HostRow({
   const { t } = useI18n();
   const openTerminal = useTabsStore((s) => s.openTerminal);
   const tabs = useTabsStore((s) => s.tabs);
-  const hostSessions = terminalTabs(tabs).filter((x) => x.hostId === host.id);
+  const hostSessions = terminalPanes(tabs).filter((x) => x.hostId === host.id);
   const connected = hostSessions.some((x) => x.status === "connected");
   const detectedOs = useMonitorStore((s) =>
     hostSessions

@@ -19,7 +19,7 @@ import { useUpdateStatus } from "@/features/updates/api";
 import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { STATUS_DOT_CLASS } from "./tab-styles";
-import { targetTerminalId, terminalTabs, useTabsStore } from "./tabs";
+import { findPane, targetPaneId, useTabsStore } from "./tabs";
 
 export function StatusBar() {
   const { t } = useI18n();
@@ -68,11 +68,11 @@ function SessionItem() {
   const { t } = useI18n();
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
-  const lastTerminalId = useTabsStore((s) => s.lastTerminalId);
+  const lastPaneId = useTabsStore((s) => s.lastPaneId);
   const setActive = useTabsStore((s) => s.setActive);
 
-  const id = targetTerminalId({ tabs, activeId, lastTerminalId });
-  const session = terminalTabs(tabs).find((x) => x.id === id);
+  const id = targetPaneId({ tabs, activeId, lastPaneId });
+  const session = findPane(tabs, id);
   if (!session) return null;
 
   return (
@@ -93,12 +93,12 @@ function MonitorItem() {
   const { t } = useI18n();
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
-  const lastTerminalId = useTabsStore((s) => s.lastTerminalId);
+  const lastPaneId = useTabsStore((s) => s.lastPaneId);
   const bySession = useMonitorStore((s) => s.bySession);
 
-  const id = targetTerminalId({ tabs, activeId, lastTerminalId });
+  const id = targetPaneId({ tabs, activeId, lastPaneId });
   if (!id) return null;
-  const session = terminalTabs(tabs).find((tab) => tab.id === id);
+  const session = findPane(tabs, id);
   const entry = bySession[id];
   if (!session || entry?.attempt !== session.attempt || !entry.stats) {
     return null;

@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useI18n } from "@/i18n";
 import { useTheme } from "@/themes/useTheme";
 import {
-  terminalTabs,
+  terminalPanes,
   useTabsStore,
   type AdhocTarget,
   type TerminalTarget,
@@ -120,8 +120,8 @@ export function TerminalView({
       onUserInput: (data) => {
         autocomplete.handleData(data);
         if (useBroadcastStore.getState().enabled) {
-          const tabs = terminalTabs(useTabsStore.getState().tabs);
-          for (const other of broadcastTargets(tabs, sessionId)) {
+          const panes = terminalPanes(useTabsStore.getState().tabs);
+          for (const other of broadcastTargets(panes, sessionId)) {
             getSession(other.id)?.send(data);
           }
         }

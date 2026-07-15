@@ -1,16 +1,18 @@
 import { create } from "zustand";
 
-import type { TerminalTab } from "@/workbench/tabs";
+import type { TerminalPane } from "@/workbench/tabs";
 
 export function broadcastTargets(
-  tabs: readonly TerminalTab[],
+  panes: readonly TerminalPane[],
   sourceId: string,
-): TerminalTab[] {
-  if (!tabs.some((tab) => tab.id === sourceId && tab.status === "connected")) {
+): TerminalPane[] {
+  if (
+    !panes.some((pane) => pane.id === sourceId && pane.status === "connected")
+  ) {
     return [];
   }
-  return tabs.filter(
-    (tab) => tab.id !== sourceId && tab.status === "connected",
+  return panes.filter(
+    (pane) => pane.id !== sourceId && pane.status === "connected",
   );
 }
 

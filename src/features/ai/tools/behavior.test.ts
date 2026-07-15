@@ -31,19 +31,25 @@ vi.mock("@/lib/ipc", () => ({
 }));
 
 import { queryClient } from "@/lib/query";
-import type { TerminalTab } from "@/workbench/tabs";
+import type { TerminalPane, TerminalTab } from "@/workbench/tabs";
 import { useTabsStore } from "@/workbench/tabs";
 import { getTool } from "./registry";
 
 function terminal(id: string): TerminalTab {
-  return {
-    kind: "terminal",
+  const pane: TerminalPane = {
     id,
     target: "ssh",
     hostId: `host-${id}`,
     title: id,
     status: "connected",
     attempt: 0,
+  };
+  return {
+    kind: "terminal",
+    id,
+    panes: [pane],
+    layout: { type: "leaf", paneId: id },
+    activePaneId: id,
   };
 }
 
@@ -52,7 +58,7 @@ beforeEach(() => {
   useTabsStore.setState({
     tabs: [],
     activeId: null,
-    lastTerminalId: null,
+    lastPaneId: null,
     pendingCloseId: null,
   });
 });
@@ -63,7 +69,7 @@ describe("run_snippet prepare", () => {
     useTabsStore.setState({
       tabs: [current],
       activeId: current.id,
-      lastTerminalId: current.id,
+      lastPaneId: current.id,
     });
   });
 
@@ -107,7 +113,7 @@ describe("SFTP target preparation", () => {
     useTabsStore.setState({
       tabs: [current],
       activeId: current.id,
-      lastTerminalId: current.id,
+      lastPaneId: current.id,
     });
 
     const prepared = await getTool("write_file")!.prepare!(

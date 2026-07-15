@@ -166,6 +166,9 @@ export const zhCN: Dictionary = {
     terminal: {
       newLocal: "新建本地终端",
       toggleBroadcast: "切换终端输入广播",
+      splitRight: "向右拆分终端",
+      splitDown: "向下拆分终端",
+      focusNextPane: "聚焦下一个终端窗格",
     },
     view: {
       toggleSidebar: "切换侧边栏",
@@ -254,6 +257,15 @@ export const zhCN: Dictionary = {
       wholeWord: "全字匹配",
       regex: "使用正则表达式",
     },
+    menu: {
+      paste: "粘贴",
+      selectAll: "全选",
+      clear: "清屏",
+      closePane: "关闭窗格",
+      closeTerminal: "关闭终端",
+    },
+    splitLimitReachedRow: "水平方向最多只能拆分成 {count} 个窗格",
+    splitLimitReachedColumn: "垂直方向最多只能拆分成 {count} 个窗格",
   },
 
   hosts: {

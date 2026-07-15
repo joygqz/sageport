@@ -73,7 +73,7 @@ beforeEach(() => {
   useTabsStore.setState({
     tabs: [],
     activeId: null,
-    lastTerminalId: null,
+    lastPaneId: null,
     pendingCloseId: null,
   });
 });
@@ -222,15 +222,22 @@ describe("runAgentLoop", () => {
         {
           kind: "terminal",
           id: "terminal-1",
-          target: "ssh",
-          hostId: "host-1",
-          title: "Production",
-          status: "connected",
-          attempt: 0,
+          panes: [
+            {
+              id: "terminal-1",
+              target: "ssh",
+              hostId: "host-1",
+              title: "Production",
+              status: "connected",
+              attempt: 0,
+            },
+          ],
+          layout: { type: "leaf", paneId: "terminal-1" },
+          activePaneId: "terminal-1",
         },
       ],
       activeId: "terminal-1",
-      lastTerminalId: "terminal-1",
+      lastPaneId: "terminal-1",
     });
     chat
       .mockResolvedValueOnce({
@@ -267,15 +274,22 @@ describe("runAgentLoop", () => {
         {
           kind: "terminal",
           id: "terminal-1",
-          target: "ssh",
-          hostId: "host-1",
-          title: "Production",
-          status: "connected",
-          attempt: 0,
+          panes: [
+            {
+              id: "terminal-1",
+              target: "ssh",
+              hostId: "host-1",
+              title: "Production",
+              status: "connected",
+              attempt: 0,
+            },
+          ],
+          layout: { type: "leaf", paneId: "terminal-1" },
+          activePaneId: "terminal-1",
         },
       ],
       activeId: "terminal-1",
-      lastTerminalId: "terminal-1",
+      lastPaneId: "terminal-1",
     });
     chat
       .mockResolvedValueOnce({

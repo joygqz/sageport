@@ -1,6 +1,7 @@
 export function workbenchShortcutKey(event: KeyboardEvent): string {
   if (event.code === "BracketLeft") return "[";
   if (event.code === "BracketRight") return "]";
+  if (event.code === "Backslash") return "\\";
   return event.key.toLowerCase();
 }
 
@@ -19,7 +20,8 @@ export function isWorkbenchShortcut(
   if (key === ",") return !event.shiftKey;
   if (key === "t") return event.shiftKey;
   if (["j", "l", "w", "f"].includes(key)) return !event.shiftKey;
-  if (key === "[" || key === "]") return event.shiftKey;
+  if (key === "[" || key === "]") return true;
+  if (key === "\\") return true;
   return (
     key === "=" || key === "+" || key === "-" || key === "_" || key === "0"
   );

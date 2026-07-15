@@ -2,7 +2,7 @@ import { detectLocale } from "@/i18n/config";
 import { ipc } from "@/lib/ipc";
 import { errorCode, errorMessage } from "@/lib/toast";
 import type { AiChatMessage, AiModelLimits, AiToolCall } from "@/types/models";
-import { targetTerminalId, terminalTabs, useTabsStore } from "@/workbench/tabs";
+import { findPane, targetPaneId, useTabsStore } from "@/workbench/tabs";
 import {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
   estimateTextTokens,
@@ -94,9 +94,7 @@ function buildContext(
   summary = "",
 ): string {
   const state = useTabsStore.getState();
-  const sessions = terminalTabs(state.tabs);
-  const currentId = targetTerminalId(state);
-  const current = sessions.find((session) => session.id === currentId);
+  const current = findPane(state.tabs, targetPaneId(state));
   const lines = [
     `App: Sageport v${__APP_VERSION__}, a desktop SSH client.`,
     `UI language: ${detectLocale()}.`,
