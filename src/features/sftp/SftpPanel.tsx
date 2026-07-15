@@ -176,17 +176,21 @@ function TransferStrip() {
                 style={{ width: `${indeterminate ? 100 : pct}%` }}
               />
             </div>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
-              {indeterminate ? "…" : `${pct}%`}
-            </span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
-              {speed}
-            </span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
-              {tx.etaSeconds !== null && tx.speedBps > 0
-                ? t("sftp.remaining", { time: formatEta(tx.etaSeconds) })
-                : ""}
-            </span>
+            {!indeterminate && (
+              <>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
+                  {pct}%
+                </span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
+                  {speed}
+                </span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
+                  {tx.etaSeconds !== null && tx.speedBps > 0
+                    ? t("sftp.remaining", { time: formatEta(tx.etaSeconds) })
+                    : ""}
+                </span>
+              </>
+            )}
             <Tooltip content={t("sftp.cancelTransfer")}>
               <Button
                 size="icon"
