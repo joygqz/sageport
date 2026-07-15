@@ -16,7 +16,14 @@ vi.stubGlobal("localStorage", { getItem: vi.fn(() => "en") });
 import { ipc } from "@/lib/ipc";
 import { useToastStore } from "@/lib/toast";
 import type { FileEntry, TransferEvent } from "@/types/models";
-import { MAX_SFTP_TABS, useSftpStore, type SftpTab } from "./store";
+import {
+  isValidEntryName,
+  MAX_SFTP_TABS,
+  parentPath,
+  pathBaseName,
+  useSftpStore,
+  type SftpTab,
+} from "./store";
 
 const refreshDirectory = useSftpStore.getState().refresh;
 
@@ -60,6 +67,59 @@ describe("SFTP navigation state", () => {
     });
     expect(tab?.navigationPath).toBeUndefined();
     expect(tab?.error).toBeUndefined();
+  });
+
+  it("ignores a slower directory response after a newer navigation wins", async () => {
+    let resolveSlow: ((entries: FileEntry[]) => void) | undefined;
+    let resolveFast: ((entries: FileEntry[]) => void) | undefined;
+    vi.mocked(ipc.sftp.list)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSlow = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFast = resolve;
+          }),
+      );
+
+    const slow = useSftpStore.getState().navigate("left", "local-tab", "/slow");
+    const fast = useSftpStore.getState().navigate("left", "local-tab", "/fast");
+    resolveFast?.([]);
+    await fast;
+    resolveSlow?.([]);
+    await slow;
+
+    const tab = useSftpStore.getState().panes.left.tabs[0];
+    expect(tab?.cwd).toBe("/fast");
+    expect(tab?.history.at(-1)).toBe("/fast");
+  });
+});
+
+describe("SFTP path and name helpers", () => {
+  it("finds parent folders without escaping POSIX, drive, or UNC roots", () => {
+    expect(parentPath("/home/test/")).toBe("/home");
+    expect(parentPath("/")).toBe("/");
+    expect(parentPath("C:\\Users\\test")).toBe("C:\\Users");
+    expect(parentPath("C:\\")).toBe("C:\\");
+    expect(parentPath("\\\\server\\share\\folder")).toBe("\\\\server\\share\\");
+    expect(parentPath("\\\\server\\share\\")).toBe("\\\\server\\share\\");
+  });
+
+  it("derives bookmark labels from POSIX and Windows paths", () => {
+    expect(pathBaseName("/home/test/")).toBe("test");
+    expect(pathBaseName("C:\\Users\\test\\")).toBe("test");
+  });
+
+  it("rejects path traversal and overlong inline names", () => {
+    expect(isValidEntryName("report.txt")).toBe(true);
+    expect(isValidEntryName("..")).toBe(false);
+    expect(isValidEntryName("nested/file")).toBe(false);
+    expect(isValidEntryName("nested\\file")).toBe(false);
+    expect(isValidEntryName("x".repeat(256))).toBe(false);
   });
 });
 

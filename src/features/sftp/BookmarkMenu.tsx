@@ -12,14 +12,12 @@ import {
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { useBookmarks, useCreateBookmark, useDeleteBookmark } from "./api";
-import type { PaneSide, SftpTab } from "./store";
-import { useSftpStore } from "./store";
-
-function baseName(path: string): string {
-  const trimmed = path.replace(/\/+$/, "");
-  const name = trimmed.split("/").pop();
-  return name && name.length > 0 ? name : path;
-}
+import {
+  pathBaseName,
+  useSftpStore,
+  type PaneSide,
+  type SftpTab,
+} from "./store";
 
 export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
   const { t } = useI18n();
@@ -35,7 +33,7 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
   const addCurrent = () => {
     if (!tab.cwd) return;
     void createBookmark
-      .mutateAsync({ hostId, label: baseName(tab.cwd), path: tab.cwd })
+      .mutateAsync({ hostId, label: pathBaseName(tab.cwd), path: tab.cwd })
       .catch((err) =>
         toast.error(t("sftp.bookmarks.error"), errorMessage(err)),
       );
@@ -59,7 +57,7 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
       >
         <DropdownMenuItem
           onSelect={addCurrent}
-          disabled={!tab.cwd || !!current}
+          disabled={!tab.cwd || !!current || createBookmark.isPending}
         >
           <BookmarkPlus /> {t("sftp.bookmarks.add")}
         </DropdownMenuItem>
@@ -76,7 +74,12 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
               aria-label={t("common.delete")}
               onClick={(e) => {
                 e.stopPropagation();
-                void deleteBookmark.mutateAsync(bookmark.id).catch(() => {});
+                void deleteBookmark.mutateAsync(bookmark.id).catch((err) => {
+                  toast.error(
+                    t("sftp.bookmarks.deleteError"),
+                    errorMessage(err),
+                  );
+                });
               }}
               className="pointer-events-none -ml-2 flex h-4 w-0 shrink-0 items-center justify-center overflow-hidden rounded text-muted-foreground opacity-0 outline-none transition-[color,opacity] hover:text-danger focus-visible:pointer-events-auto focus-visible:ml-0 focus-visible:w-4 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/35 group-hover/bm:pointer-events-auto group-hover/bm:ml-0 group-hover/bm:w-4 group-hover/bm:opacity-100 group-focus/bm:pointer-events-auto group-focus/bm:ml-0 group-focus/bm:w-4 group-focus/bm:opacity-100"
             >

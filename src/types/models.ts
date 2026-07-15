@@ -436,6 +436,7 @@ export interface FileEntry {
 
   permissions: number | null;
   isSymlink: boolean;
+  hidden?: boolean;
 }
 
 export type SftpStatusKind = "connecting" | "connected" | "closed" | "error";

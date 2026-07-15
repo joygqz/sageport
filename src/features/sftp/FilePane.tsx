@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   FilePlus,
   FolderPlus,
   HardDrive,
@@ -37,7 +38,7 @@ import {
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { useDragCursor } from "@/lib/pointerDrag";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorCode, errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
 import { useHosts } from "@/features/hosts/api";
@@ -56,6 +57,7 @@ import { BookmarkMenu } from "./BookmarkMenu";
 import { PermissionsDialog } from "./PermissionsDialog";
 import {
   joinPath,
+  isValidEntryName,
   parentPath,
   useSftpStore,
   type PaneSide,
@@ -83,9 +85,11 @@ export function FilePane({ side }: { side: PaneSide }) {
   const closeTab = useSftpStore((s) => s.closeTab);
   const moveTab = useSftpStore((s) => s.moveTab);
   const setActive = useSftpStore((s) => s.setActive);
+  const navigate = useSftpStore((s) => s.navigate);
   const navigateToHistory = useSftpStore((s) => s.navigateToHistory);
   const restoreLoadedPath = useSftpStore((s) => s.restoreLoadedPath);
   const refresh = useSftpStore((s) => s.refresh);
+  const applyStatus = useSftpStore((s) => s.applyStatus);
   const { data: hosts = [] } = useHosts();
 
   const tabStripRef = useRef<HTMLDivElement>(null);
@@ -211,6 +215,10 @@ export function FilePane({ side }: { side: PaneSide }) {
     kind: "file" | "folder",
     name: string,
   ) => {
+    if (!isValidEntryName(name)) {
+      toast.error(t("sftp.invalidName"));
+      return false;
+    }
     try {
       const path = joinPath(tab.cwd, name);
       if (kind === "folder") {
@@ -222,6 +230,9 @@ export function FilePane({ side }: { side: PaneSide }) {
       await refresh(side, tab.id);
       return true;
     } catch (err) {
+      if (tab.connectionId && errorCode(err) === "network") {
+        applyStatus(tab.connectionId, "error", errorMessage(err), "network");
+      }
       toast.error(
         t(kind === "folder" ? "sftp.mkdirError" : "sftp.createFileError"),
         errorMessage(err),
@@ -232,6 +243,10 @@ export function FilePane({ side }: { side: PaneSide }) {
 
   const onRename = async (tab: SftpTab, entry: FileEntry, name: string) => {
     if (name === entry.name) return true;
+    if (!isValidEntryName(name)) {
+      toast.error(t("sftp.invalidName"));
+      return false;
+    }
     try {
       await ipc.sftp.rename(
         tab.connectionId,
@@ -241,6 +256,9 @@ export function FilePane({ side }: { side: PaneSide }) {
       await refresh(side, tab.id);
       return true;
     } catch (err) {
+      if (tab.connectionId && errorCode(err) === "network") {
+        applyStatus(tab.connectionId, "error", errorMessage(err), "network");
+      }
       toast.error(t("sftp.renameError"), errorMessage(err));
       return false;
     }
@@ -258,6 +276,9 @@ export function FilePane({ side }: { side: PaneSide }) {
         changed = true;
       }
     } catch (err) {
+      if (tab.connectionId && errorCode(err) === "network") {
+        applyStatus(tab.connectionId, "error", errorMessage(err), "network");
+      }
       toast.error(t("sftp.deleteError"), errorMessage(err));
     } finally {
       if (changed) await refresh(side, tab.id);
@@ -446,6 +467,21 @@ export function FilePane({ side }: { side: PaneSide }) {
                   onClick={() => void refresh(side, active.id)}
                 >
                   <RefreshCw className="size-3.5" />
+                </Button>
+              </Tooltip>
+              <Tooltip content={t("sftp.parent")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6"
+                  disabled={
+                    !activeReady || parentPath(active.cwd) === active.cwd
+                  }
+                  onClick={() =>
+                    void navigate(side, active.id, parentPath(active.cwd))
+                  }
+                >
+                  <ChevronUp className="size-3.5" />
                 </Button>
               </Tooltip>
               <Tooltip content={t("sftp.newFolder")}>

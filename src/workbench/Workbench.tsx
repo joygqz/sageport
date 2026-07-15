@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { ResizeHandle, Spinner } from "@/components/ui";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { errorMessage, toast } from "@/lib/toast";
 import { useSettingSync } from "@/lib/settingSync";
 import { IS_MACOS } from "@/lib/platform";
 import { Toaster } from "@/components/ui/toaster";
@@ -48,12 +50,15 @@ const SettingsDialog = lazy(() =>
 );
 
 export function Workbench() {
+  const { t } = useI18n();
   useKeybindings();
   useUpdateNotifier();
 
   useEffect(() => {
-    bridgeSftpEvents();
-  }, []);
+    void bridgeSftpEvents().catch((error) =>
+      toast.error(t("sftp.listenerError"), errorMessage(error)),
+    );
+  }, [t]);
 
   useEffect(() => {
     const reclamp = () => useLayoutStore.getState().clampToViewport();

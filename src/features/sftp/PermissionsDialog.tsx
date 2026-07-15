@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Field, FormBody, FormDialog, Input, Switch } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type { FileEntry } from "@/types/models";
 import {
   hasBit,
@@ -13,6 +13,7 @@ import {
   type PermBit,
   type PermClass,
 } from "./permissions";
+import { useSftpStore } from "./store";
 
 const CLASSES: PermClass[] = ["owner", "group", "others"];
 const BITS: PermBit[] = ["read", "write", "execute"];
@@ -63,6 +64,7 @@ function PermissionsBody({
   const [mode, setMode] = useState((entry.permissions ?? 0o644) & 0o777);
   const [octal, setOctal] = useState(modeToOctal(mode));
   const [saving, setSaving] = useState(false);
+  const parsedOctal = octalToMode(octal);
 
   const setBoth = (next: number) => {
     setMode(next);
@@ -76,6 +78,11 @@ function PermissionsBody({
       onSaved();
       onClose();
     } catch (err) {
+      if (connectionId && errorCode(err) === "network") {
+        useSftpStore
+          .getState()
+          .applyStatus(connectionId, "error", errorMessage(err), "network");
+      }
       toast.error(t("sftp.permissions.error"), errorMessage(err));
     } finally {
       setSaving(false);
@@ -88,6 +95,7 @@ function PermissionsBody({
       onSubmit={submit}
       submitLabel={t("common.save")}
       pending={saving}
+      submitDisabled={parsedOctal === null}
     >
       <div className="overflow-hidden rounded-lg border border-border bg-surface">
         <div className="grid grid-cols-[1fr_repeat(3,3.5rem)] items-center border-b border-border bg-surface px-3 py-1.5 text-2xs font-medium text-muted-foreground">
@@ -116,7 +124,12 @@ function PermissionsBody({
         ))}
       </div>
 
-      <Field label={t("sftp.permissions.octal")}>
+      <Field
+        label={t("sftp.permissions.octal")}
+        error={
+          parsedOctal === null ? t("sftp.permissions.invalidOctal") : undefined
+        }
+      >
         <Input
           value={octal}
           inputMode="numeric"

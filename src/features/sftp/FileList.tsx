@@ -159,7 +159,9 @@ export function FileList({
 
   const entries = showHidden
     ? tab.entries
-    : tab.entries.filter((entry) => !entry.name.startsWith("."));
+    : tab.entries.filter(
+        (entry) => !(entry.hidden ?? entry.name.startsWith(".")),
+      );
   const visiblePaths = entries.map((entry) => entry.path);
   const renamingPath =
     renameTarget?.tabId === tab.id && renameTarget.cwd === tab.cwd

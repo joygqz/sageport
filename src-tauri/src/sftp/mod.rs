@@ -5,6 +5,7 @@ pub mod transfer;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use russh_sftp::client::SftpSession;
@@ -23,6 +24,7 @@ pub const EVENT_STATUS: &str = "sftp://status";
 pub const EVENT_TRANSFER: &str = "sftp://transfer";
 
 pub const MAX_EDIT_BYTES: u64 = 2 * 1024 * 1024;
+const SUBSYSTEM_OPEN_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub fn edit_too_large_error() -> AppError {
     AppError::Invalid("file is too large to edit (2 MB max)".into())
@@ -38,6 +40,7 @@ pub struct FileEntry {
     pub modified: Option<i64>,
     pub permissions: Option<u32>,
     pub is_symlink: bool,
+    pub hidden: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -307,9 +310,13 @@ async fn open(
     params: &SftpConnectParams,
 ) -> AppResult<Conn> {
     let ssh = establish(app, prompts, &params.connection_id, &params.hops).await?;
-    let channel = ssh.handle.channel_open_session().await?;
-    channel.request_subsystem(true, "sftp").await?;
-    let session = SftpSession::new(channel.into_stream()).await?;
+    let session = tokio::time::timeout(SUBSYSTEM_OPEN_TIMEOUT, async {
+        let channel = ssh.handle.channel_open_session().await?;
+        channel.request_subsystem(true, "sftp").await?;
+        Ok::<_, AppError>(SftpSession::new(channel.into_stream()).await?)
+    })
+    .await
+    .map_err(|_| AppError::Timeout("timed out opening SFTP subsystem".into()))??;
     Ok(Conn {
         ssh,
         session,

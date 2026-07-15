@@ -121,9 +121,16 @@ const otherSide = (side: PaneSide): PaneSide =>
   side === "left" ? "right" : "left";
 
 export function parentPath(path: string): string {
-  const trimmed = path.replace(/[/\\]+$/, "");
+  const root =
+    path.match(/^([A-Za-z]:[\\/]|[\\/]{2}[^\\/]+[\\/]+[^\\/]+[\\/]?)/)?.[0] ??
+    (path.startsWith("/") ? "/" : "");
+  const trimmed = path.replace(/[/\\]+$/, "") || root || "/";
+  if (trimmed === "/") return "/";
+  if (root && trimmed.replace(/[/\\]+$/, "") === root.replace(/[/\\]+$/, "")) {
+    return root;
+  }
   const idx = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
-  if (idx <= 0) return trimmed.startsWith("/") ? "/" : trimmed || "/";
+  if (idx < root.length) return root || trimmed;
   return trimmed.slice(0, idx);
 }
 
@@ -132,20 +139,52 @@ export function joinPath(dir: string, name: string): string {
   return dir.endsWith(sep) ? `${dir}${name}` : `${dir}${sep}${name}`;
 }
 
+export function pathBaseName(path: string): string {
+  const trimmed = path.replace(/[/\\]+$/, "");
+  const name = trimmed.split(/[/\\]/).pop();
+  return name && name.length > 0 ? name : path;
+}
+
+export function isValidEntryName(name: string): boolean {
+  return (
+    name.length > 0 &&
+    name !== "." &&
+    name !== ".." &&
+    !name.includes("/") &&
+    !name.includes("\\") &&
+    !name.includes("\0") &&
+    new TextEncoder().encode(name).length <= 255
+  );
+}
+
 const emptyPane = (): PaneState => ({ tabs: [], activeTabId: null });
 
 let eventsBridged = false;
-export function bridgeSftpEvents(): void {
-  if (eventsBridged) return;
-  eventsBridged = true;
+let eventBridgePromise: Promise<void> | null = null;
+export function bridgeSftpEvents(): Promise<void> {
+  if (eventsBridged) return Promise.resolve();
   const { applyStatus, applyTransfer } = useSftpStore.getState();
-  void ipc.sftp.onStatus((e) =>
-    applyStatus(e.connectionId, e.status, e.message, e.code),
-  );
-  void ipc.sftp.onTransfer((e) => applyTransfer(e));
+  eventBridgePromise ??= (async () => {
+    const unlistenStatus = await ipc.sftp.onStatus((e) =>
+      applyStatus(e.connectionId, e.status, e.message, e.code),
+    );
+    try {
+      await ipc.sftp.onTransfer((e) => applyTransfer(e));
+      eventsBridged = true;
+    } catch (error) {
+      unlistenStatus();
+      throw error;
+    }
+  })().catch((error) => {
+    eventBridgePromise = null;
+    throw error;
+  });
+  return eventBridgePromise;
 }
 
 export const useSftpStore = create<SftpState>((set, get) => {
+  const navigationRequests = new Map<string, number>();
+
   const canAddTab = (notify = true) => {
     const { left, right } = get().panes;
     if (left.tabs.length + right.tabs.length < MAX_SFTP_TABS) return true;
@@ -201,6 +240,9 @@ export const useSftpStore = create<SftpState>((set, get) => {
     ) {
       return;
     }
+    const requestId = (navigationRequests.get(tabId) ?? 0) + 1;
+    navigationRequests.set(tabId, requestId);
+    const isCurrent = () => navigationRequests.get(tabId) === requestId;
     patchTab(side, tabId, {
       loading: true,
       error: undefined,
@@ -208,6 +250,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
     });
     try {
       const entries = await ipc.sftp.list(tab.connectionId, path);
+      if (!isCurrent()) return;
       patchTab(side, tabId, (current) => ({
         cwd: path,
         navigationPath: undefined,
@@ -221,6 +264,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
             : { historyIndex }),
       }));
     } catch (err) {
+      if (!isCurrent()) return;
       const code = errorCode(err);
       patchTab(side, tabId, {
         loading: false,
@@ -338,6 +382,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
     closeTab: (side, tabId) => {
       const pane = get().panes[side];
       const tab = pane.tabs.find((t) => t.id === tabId);
+      navigationRequests.delete(tabId);
       if (tab?.kind === "remote" && tab.connectionId) {
         for (const transfer of Object.values(get().transfers)) {
           if (
@@ -398,11 +443,14 @@ export const useSftpStore = create<SftpState>((set, get) => {
       return loadEntries(side, tabId, path, historyIndex);
     },
 
-    restoreLoadedPath: (side, tabId) =>
+    restoreLoadedPath: (side, tabId) => {
+      navigationRequests.set(tabId, (navigationRequests.get(tabId) ?? 0) + 1);
       patchTab(side, tabId, {
         navigationPath: undefined,
+        loading: false,
         error: undefined,
-      }),
+      });
+    },
 
     refresh: (side, tabId) => {
       const tab = get().panes[side].tabs.find((t) => t.id === tabId);

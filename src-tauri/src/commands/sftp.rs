@@ -7,6 +7,39 @@ use crate::repository::transfer_repo::{self, TransferRow};
 use crate::sftp::{self, ops, Endpoint, FileEntry, SftpConnectParams};
 use crate::state::AppState;
 
+const MAX_CONNECTION_ID_BYTES: usize = 128;
+const MAX_PATH_BYTES: usize = 32 * 1024;
+
+fn validate_connection_id(connection_id: &str) -> AppResult<()> {
+    if connection_id.trim().is_empty() || connection_id.len() > MAX_CONNECTION_ID_BYTES {
+        return Err(AppError::Invalid("invalid SFTP connection id".into()));
+    }
+    Ok(())
+}
+
+fn validate_optional_connection_id(connection_id: Option<&str>) -> AppResult<()> {
+    if let Some(connection_id) = connection_id {
+        validate_connection_id(connection_id)?;
+    }
+    Ok(())
+}
+
+fn validate_path(path: &str) -> AppResult<()> {
+    if path.is_empty() || path.len() > MAX_PATH_BYTES || path.contains('\0') {
+        return Err(AppError::Invalid("invalid file path".into()));
+    }
+    Ok(())
+}
+
+fn validate_mode(mode: u32) -> AppResult<()> {
+    if mode > 0o777 {
+        return Err(AppError::Invalid(
+            "file mode must be between 000 and 777".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EndpointInput {
@@ -66,8 +99,13 @@ pub async fn fs_connect(
     connection_id: String,
     host_id: String,
 ) -> AppResult<()> {
+    validate_connection_id(&connection_id)?;
+    if host_id.trim().is_empty() || host_id.len() > MAX_CONNECTION_ID_BYTES {
+        return Err(AppError::Invalid("invalid host id".into()));
+    }
     let host = host_repo::get(&state.db, &host_id).await?;
     let hops = super::ssh::build_hops(&state, &host).await?;
+    host_repo::touch_last_used(&state.db, &host_id).await?;
 
     state.sftp.connect(
         app,
@@ -86,6 +124,7 @@ pub async fn fs_disconnect(
     state: State<'_, AppState>,
     connection_id: String,
 ) -> AppResult<()> {
+    validate_connection_id(&connection_id)?;
     state.sftp.disconnect(&app, &connection_id);
     Ok(())
 }
@@ -96,6 +135,7 @@ pub async fn fs_home(
     state: State<'_, AppState>,
     connection_id: Option<String>,
 ) -> AppResult<String> {
+    validate_optional_connection_id(connection_id.as_deref())?;
     match connection_id {
         None => {
             let home = app
@@ -114,6 +154,8 @@ pub async fn fs_list(
     connection_id: Option<String>,
     path: String,
 ) -> AppResult<Vec<FileEntry>> {
+    validate_optional_connection_id(connection_id.as_deref())?;
+    validate_path(&path)?;
     match connection_id {
         None => local(move || ops::local_list(&path)).await,
         Some(id) => state.sftp.list(&id, &path).await,
@@ -126,6 +168,8 @@ pub async fn fs_mkdir(
     connection_id: Option<String>,
     path: String,
 ) -> AppResult<()> {
+    validate_optional_connection_id(connection_id.as_deref())?;
+    validate_path(&path)?;
     match connection_id {
         None => local(move || Ok(std::fs::create_dir(&path)?)).await,
         Some(id) => state.sftp.mkdir(&id, &path).await,
@@ -139,6 +183,9 @@ pub async fn fs_rename(
     from: String,
     to: String,
 ) -> AppResult<()> {
+    validate_optional_connection_id(connection_id.as_deref())?;
+    validate_path(&from)?;
+    validate_path(&to)?;
     match connection_id {
         None => local(move || Ok(std::fs::rename(&from, &to)?)).await,
         Some(id) => state.sftp.rename(&id, &from, &to).await,
@@ -152,18 +199,10 @@ pub async fn fs_delete(
     path: String,
     is_dir: bool,
 ) -> AppResult<()> {
+    validate_optional_connection_id(connection_id.as_deref())?;
+    validate_path(&path)?;
     match connection_id {
-        None => {
-            local(move || {
-                if is_dir {
-                    std::fs::remove_dir_all(&path)?;
-                } else {
-                    std::fs::remove_file(&path)?;
-                }
-                Ok(())
-            })
-            .await
-        }
+        None => local(move || ops::local_remove(&path)).await,
         Some(id) => state.sftp.remove(&id, &path, is_dir).await,
     }
 }
@@ -175,6 +214,9 @@ pub async fn fs_chmod(
     path: String,
     mode: u32,
 ) -> AppResult<()> {
+    validate_optional_connection_id(connection_id.as_deref())?;
+    validate_path(&path)?;
+    validate_mode(mode)?;
     match connection_id {
         None => local(move || ops::local_chmod(&path, mode)).await,
         Some(id) => state.sftp.chmod(&id, &path, mode).await,
@@ -187,6 +229,8 @@ pub async fn fs_read_text(
     connection_id: Option<String>,
     path: String,
 ) -> AppResult<String> {
+    validate_optional_connection_id(connection_id.as_deref())?;
+    validate_path(&path)?;
     let bytes = match connection_id {
         None => {
             local(move || {
@@ -209,6 +253,8 @@ pub async fn fs_write_text(
     path: String,
     content: String,
 ) -> AppResult<()> {
+    validate_optional_connection_id(connection_id.as_deref())?;
+    validate_path(&path)?;
     match connection_id {
         None => local(move || Ok(std::fs::write(&path, content)?)).await,
         Some(id) => state.sftp.write_file(&id, &path, content.as_bytes()).await,
@@ -288,4 +334,28 @@ where
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|e| AppError::Other(format!("task join error: {e}")))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_connection_id, validate_mode, validate_path, MAX_PATH_BYTES};
+
+    #[test]
+    fn validates_connection_ids_and_paths() {
+        assert!(validate_connection_id("").is_err());
+        assert!(validate_connection_id(&"x".repeat(129)).is_err());
+        assert!(validate_connection_id("sftp-1").is_ok());
+
+        assert!(validate_path("").is_err());
+        assert!(validate_path("bad\0path").is_err());
+        assert!(validate_path(&"x".repeat(MAX_PATH_BYTES + 1)).is_err());
+        assert!(validate_path("/home/user").is_ok());
+    }
+
+    #[test]
+    fn rejects_modes_outside_the_supported_permission_bits() {
+        assert!(validate_mode(0o000).is_ok());
+        assert!(validate_mode(0o777).is_ok());
+        assert!(validate_mode(0o1000).is_err());
+    }
 }
