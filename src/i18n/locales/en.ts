@@ -261,6 +261,13 @@ export const en = {
       wholeWord: "Match whole word",
       regex: "Use regular expression",
     },
+    menu: {
+      paste: "Paste",
+      selectAll: "Select all",
+      clear: "Clear terminal",
+      closePane: "Close pane",
+      closeTerminal: "Close terminal",
+    },
   },
 
   hosts: {

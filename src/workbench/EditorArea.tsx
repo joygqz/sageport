@@ -60,6 +60,12 @@ const TerminalEditor = lazy(() =>
   })),
 );
 
+const TerminalTabActions = lazy(() =>
+  import("@/features/terminal/TerminalEditor").then((module) => ({
+    default: module.TerminalTabActions,
+  })),
+);
+
 interface TabDragPointer {
   clientX: number;
   clientY: number;
@@ -82,6 +88,9 @@ export function EditorArea() {
   const moveTab = useTabsStore((s) => s.moveTab);
   const saveFile = useTabsStore((s) => s.saveFile);
   const openPalette = useOverlayStore((s) => s.openPalette);
+  const activeTab = tabs.find((tab) => tab.id === activeId);
+  const activePaneId =
+    activeTab?.kind === "terminal" ? activeTab.activePaneId : null;
   const stripRef = useRef<HTMLDivElement>(null);
   const preserveTabFocusRef = useRef(false);
   const [dragState, setDragState] = useState<TabDragState | null>(null);
@@ -270,12 +279,9 @@ export function EditorArea() {
       preserveTabFocusRef.current = false;
       return;
     }
-    const active = useTabsStore
-      .getState()
-      .tabs.find((tab) => tab.id === activeId);
-    if (active?.kind === "terminal") focusTerminal(active.activePaneId);
+    if (activePaneId) focusTerminal(activePaneId);
     else focusFileEditor(activeId);
-  }, [activeId]);
+  }, [activeId, activePaneId]);
 
   if (tabs.length === 0) return <Watermark />;
 
@@ -327,6 +333,11 @@ export function EditorArea() {
                 />
               ))}
             </TabsList>
+            {activeTab?.kind === "terminal" && (
+              <Suspense fallback={null}>
+                <TerminalTabActions paneId={activeTab.activePaneId} />
+              </Suspense>
+            )}
             <Tooltip content={t("editor.newSession")}>
               <button
                 type="button"

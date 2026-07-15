@@ -257,6 +257,13 @@ export const zhCN: Dictionary = {
       wholeWord: "全字匹配",
       regex: "使用正则表达式",
     },
+    menu: {
+      paste: "粘贴",
+      selectAll: "全选",
+      clear: "清屏",
+      closePane: "关闭窗格",
+      closeTerminal: "关闭终端",
+    },
   },
 
   hosts: {

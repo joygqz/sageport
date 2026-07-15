@@ -6,27 +6,40 @@ import {
   useRef,
   useState,
 } from "react";
+import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { ISearchOptions } from "@xterm/addon-search";
 import {
   ArrowDown,
   ArrowUp,
   CaseSensitive,
+  ClipboardPaste,
+  Copy,
+  Eraser,
   Loader2,
   PlugZap,
   Regex,
   ServerCrash,
+  SquareDashedMousePointer,
+  SquareSplitHorizontal,
+  SquareSplitVertical,
   WholeWord,
   X,
 } from "lucide-react";
 
 import {
   Button,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
   FindActionButton,
   FindBar,
   FindCount,
   FindInput,
   FindToggleButton,
   ResizeHandle,
+  Tooltip,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { isValidRegex } from "@/lib/utils";
@@ -43,7 +56,56 @@ import { useTerminalSearch } from "./search";
 import { focusTerminal, getSession } from "./sessions";
 import { TerminalView } from "./TerminalView";
 
+async function copyPaneSelection(paneId: string) {
+  const term = getSession(paneId)?.term;
+  if (!term?.hasSelection()) return;
+  await writeText(term.getSelection());
+}
+
+async function pastePaneClipboard(paneId: string) {
+  const session = getSession(paneId);
+  if (!session) return;
+  const text = await readText().catch(() => "");
+  if (text) session.term.paste(text);
+}
+
+function selectPaneAll(paneId: string) {
+  getSession(paneId)?.term.selectAll();
+}
+
+function clearPaneBuffer(paneId: string) {
+  getSession(paneId)?.term.clear();
+}
+
 const MIN_PANE_PX = 90;
+
+export function TerminalTabActions({ paneId }: { paneId: string }) {
+  const { t } = useI18n();
+  const splitPane = useTabsStore((s) => s.splitPane);
+
+  return (
+    <>
+      <Tooltip content={t("commands.terminal.splitRight")}>
+        <button
+          type="button"
+          onClick={() => splitPane(paneId, "right")}
+          className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+        >
+          <SquareSplitHorizontal className="size-4" />
+        </button>
+      </Tooltip>
+      <Tooltip content={t("commands.terminal.splitDown")}>
+        <button
+          type="button"
+          onClick={() => splitPane(paneId, "down")}
+          className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+        >
+          <SquareSplitVertical className="size-4" />
+        </button>
+      </Tooltip>
+    </>
+  );
+}
 
 export const TerminalEditor = memo(function TerminalEditor({
   tab,
@@ -158,30 +220,91 @@ function PaneView({
   tab: TerminalTab;
   active: boolean;
 }) {
+  const { t } = useI18n();
   const reconnect = useTabsStore((s) => s.reconnectTerminal);
   const focusPane = useTabsStore((s) => s.focusPane);
+  const splitPane = useTabsStore((s) => s.splitPane);
+  const closePane = useTabsStore((s) => s.closePane);
   const searchOpen = useTerminalSearch((s) => s.openFor === pane.id);
   const paneActive = active && tab.activePaneId === pane.id;
+  const [hasSelection, setHasSelection] = useState(
+    () => getSession(pane.id)?.term.hasSelection() ?? false,
+  );
+
+  useEffect(() => {
+    const term = getSession(pane.id)?.term;
+    if (!term) return;
+    const sub = term.onSelectionChange(() =>
+      setHasSelection(term.hasSelection()),
+    );
+    return () => sub.dispose();
+  }, [pane.id]);
+
+  const runAndRefocus = (action: () => void) => () => {
+    action();
+    getSession(pane.id)?.focus();
+  };
 
   return (
-    <div
-      className="relative h-full w-full bg-terminal-background"
-      onFocusCapture={() => {
-        if (tab.activePaneId !== pane.id) focusPane(pane.id);
-      }}
-    >
-      <TerminalView
-        sessionId={pane.id}
-        target={pane.target}
-        hostId={pane.hostId}
-        adhoc={pane.adhoc}
-        attempt={pane.attempt}
-        active={paneActive}
-      />
-      <StickyCommand key={pane.attempt} sessionId={pane.id} />
-      {searchOpen && active && <SearchBar sessionId={pane.id} />}
-      <StatusOverlay pane={pane} onReconnect={() => reconnect(pane.id)} />
-    </div>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className="relative h-full w-full bg-terminal-background"
+          onFocusCapture={() => {
+            if (tab.activePaneId !== pane.id) focusPane(pane.id);
+          }}
+        >
+          <TerminalView
+            sessionId={pane.id}
+            target={pane.target}
+            hostId={pane.hostId}
+            adhoc={pane.adhoc}
+            attempt={pane.attempt}
+            active={paneActive}
+          />
+          <StickyCommand key={pane.attempt} sessionId={pane.id} />
+          {searchOpen && active && <SearchBar sessionId={pane.id} />}
+          <StatusOverlay pane={pane} onReconnect={() => reconnect(pane.id)} />
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem
+          disabled={!hasSelection}
+          onSelect={runAndRefocus(() => void copyPaneSelection(pane.id))}
+        >
+          <Copy /> {t("common.copy")}
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={runAndRefocus(() => void pastePaneClipboard(pane.id))}
+        >
+          <ClipboardPaste /> {t("terminal.menu.paste")}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={runAndRefocus(() => selectPaneAll(pane.id))}>
+          <SquareDashedMousePointer /> {t("terminal.menu.selectAll")}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={runAndRefocus(() => clearPaneBuffer(pane.id))}>
+          <Eraser /> {t("terminal.menu.clear")}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onSelect={runAndRefocus(() => splitPane(pane.id, "right"))}
+        >
+          <SquareSplitHorizontal /> {t("commands.terminal.splitRight")}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={runAndRefocus(() => splitPane(pane.id, "down"))}>
+          <SquareSplitVertical /> {t("commands.terminal.splitDown")}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem destructive onSelect={() => closePane(pane.id)}>
+          <X />{" "}
+          {t(
+            tab.panes.length > 1
+              ? "terminal.menu.closePane"
+              : "terminal.menu.closeTerminal",
+          )}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -224,8 +347,6 @@ function StickyCommand({ sessionId }: { sessionId: string }) {
         fontFamily: monoFontFamily(),
         fontSize: terminalFontSize(),
         lineHeight: 1.25,
-        paddingLeft: 20,
-        paddingRight: 20,
       }}
     >
       {sticky.text}
