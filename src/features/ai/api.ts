@@ -7,20 +7,20 @@ import { clearModelLimitsCache } from "./model-limits";
 const configKey = ["ai", "config"] as const;
 const modelsKey = ["ai", "models"] as const;
 
-export const AI_PROTOCOLS: { value: AiProtocol; defaultBaseUrl: string }[] = [
-  { value: "openai", defaultBaseUrl: "https://api.openai.com/v1" },
-  { value: "anthropic", defaultBaseUrl: "https://api.anthropic.com" },
+export const AI_PROTOCOLS: { value: AiProtocol; exampleBaseUrl: string }[] = [
+  { value: "openai", exampleBaseUrl: "https://api.openai.com/v1" },
+  { value: "anthropic", exampleBaseUrl: "https://api.anthropic.com" },
 ];
 
-export function defaultBaseUrl(protocol: AiProtocol): string {
+export function exampleBaseUrl(protocol: AiProtocol): string {
   return (
-    AI_PROTOCOLS.find((p) => p.value === protocol)?.defaultBaseUrl ??
-    AI_PROTOCOLS[0].defaultBaseUrl
+    AI_PROTOCOLS.find((p) => p.value === protocol)?.exampleBaseUrl ??
+    AI_PROTOCOLS[0].exampleBaseUrl
   );
 }
 
-function effectiveBaseUrl(baseUrl: string, protocol: AiProtocol): string {
-  return (baseUrl.trim() || defaultBaseUrl(protocol)).replace(/\/+$/, "");
+function effectiveBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, "");
 }
 
 export function useAiConfig() {
@@ -34,30 +34,31 @@ export function useSetAiConfig() {
     mutationFn: ipc.ai.setConfig,
     onSuccess: (_, input) => {
       clearModelLimitsCache();
-      qc.setQueryData<AiConfig>(configKey, (prev) =>
-        prev
-          ? {
-              ...input,
-              model:
-                prev.protocol === input.protocol &&
-                effectiveBaseUrl(prev.baseUrl, prev.protocol) ===
-                  effectiveBaseUrl(input.baseUrl, input.protocol)
-                  ? prev.model
-                  : "",
-            }
-          : prev,
-      );
+      const prev = qc.getQueryData<AiConfig>(configKey);
+      const endpointChanged =
+        !prev ||
+        prev.protocol !== input.protocol ||
+        effectiveBaseUrl(prev.baseUrl) !== effectiveBaseUrl(input.baseUrl);
+      if (prev) {
+        qc.setQueryData<AiConfig>(configKey, {
+          ...input,
+          model: endpointChanged ? "" : prev.model,
+        });
+      }
+      if (endpointChanged || !prev || prev.apiKey !== input.apiKey) {
+        qc.removeQueries({ queryKey: modelsKey });
+      }
       qc.invalidateQueries({ queryKey: configKey });
-      qc.invalidateQueries({ queryKey: modelsKey });
     },
   });
 }
 
 export function useAiModels(enabled: boolean) {
+  const { data: config } = useAiConfig();
   return useQuery({
     queryKey: modelsKey,
     queryFn: ipc.ai.listModels,
-    enabled,
+    enabled: enabled && Boolean(config?.baseUrl.trim()),
     retry: false,
     staleTime: 5 * 60_000,
   });

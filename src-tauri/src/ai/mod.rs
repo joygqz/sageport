@@ -122,12 +122,6 @@ impl Protocol {
         }
     }
 
-    pub fn default_base_url(self) -> &'static str {
-        match self {
-            Protocol::Openai => "https://api.openai.com/v1",
-            Protocol::Anthropic => "https://api.anthropic.com",
-        }
-    }
 }
 
 pub struct Endpoint<'a> {
@@ -143,10 +137,21 @@ impl Endpoint<'_> {
 
     fn authorize(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         match self.protocol {
-            Protocol::Openai => req.bearer_auth(self.api_key),
-            Protocol::Anthropic => req
-                .header("x-api-key", self.api_key)
-                .header("anthropic-version", ANTHROPIC_VERSION),
+            Protocol::Openai => {
+                if self.api_key.is_empty() {
+                    req
+                } else {
+                    req.bearer_auth(self.api_key)
+                }
+            }
+            Protocol::Anthropic => {
+                let req = req.header("anthropic-version", ANTHROPIC_VERSION);
+                if self.api_key.is_empty() {
+                    req
+                } else {
+                    req.header("x-api-key", self.api_key)
+                }
+            }
         }
     }
 }

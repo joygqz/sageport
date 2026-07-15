@@ -60,7 +60,7 @@ import {
 import type { AiConfig, AiProtocol } from "@/types/models";
 import {
   AI_PROTOCOLS,
-  defaultBaseUrl,
+  exampleBaseUrl,
   useAiConfig,
   useSetAiConfig,
   useSetAiModel,
@@ -288,15 +288,24 @@ function FontField() {
   const family = useFontStore((s) => s.family);
   const setFamily = useFontStore((s) => s.setFamily);
   const [draft, setDraft] = useState<string | null>(null);
+  const draftRef = useRef<string | null>(null);
 
   useEffect(() => {
+    draftRef.current = draft;
+  });
+
+  useEffect(
+    () => () => {
+      if (draftRef.current !== null) setFamily(draftRef.current);
+    },
+    [setFamily],
+  );
+
+  const commit = () => {
     if (draft === null) return;
-    const timer = setTimeout(() => {
-      setFamily(draft);
-      setDraft(null);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [draft, setFamily]);
+    setFamily(draft);
+    setDraft(null);
+  };
 
   return (
     <Field
@@ -307,6 +316,7 @@ function FontField() {
         value={draft ?? family}
         maxLength={1024}
         onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
         placeholder='"JetBrains Mono Variable"'
         autoComplete="off"
         spellCheck={false}
@@ -503,27 +513,76 @@ function AiForm({ config }: { config: AiConfig }) {
   const [maxHistoryTokens, setMaxHistoryTokens] = useState(
     config.maxHistoryTokens,
   );
+  const [committed, setCommitted] = useState({
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    maxHistoryTokens: config.maxHistoryTokens,
+  });
   const [expandedToolGroups, setExpandedToolGroups] = useState<Set<string>>(
     () => new Set(),
   );
   const mutate = setConfig.mutate;
   const mutateModel = setModelMutation.mutate;
   const skipSave = useRef(true);
-  const pendingSave = useRef<{
-    baseUrl: string;
-    protocol: AiProtocol;
-    apiKey: string;
-    autoApprove: boolean;
-    enabledTools: string[];
-    maxHistoryTokens: number | null;
-  } | null>(null);
-  const skipModelSave = useRef(true);
-  const pendingModelSave = useRef<string | null>(null);
+  const pendingSave = useRef(false);
+  const lastSavedModel = useRef(config.model);
+  const live = useRef({
+    input: {
+      baseUrl,
+      protocol,
+      apiKey,
+      autoApprove,
+      enabledTools,
+      maxHistoryTokens,
+    },
+    committed,
+    model,
+  });
+
+  useEffect(() => {
+    live.current = {
+      input: {
+        baseUrl,
+        protocol,
+        apiKey,
+        autoApprove,
+        enabledTools,
+        maxHistoryTokens,
+      },
+      committed,
+      model,
+    };
+  });
+
+  const saveModel = (next: string) => {
+    if (next === lastSavedModel.current) return;
+    lastSavedModel.current = next;
+    mutateModel(next, {
+      onError: (err) =>
+        toast.error(t("settings.ai.saveError"), errorMessage(err)),
+    });
+  };
+
+  const commitDrafts = () => {
+    if (committed.baseUrl !== baseUrl) lastSavedModel.current = "";
+    setCommitted((current) =>
+      current.baseUrl === baseUrl &&
+      current.apiKey === apiKey &&
+      current.maxHistoryTokens === maxHistoryTokens
+        ? current
+        : { baseUrl, apiKey, maxHistoryTokens },
+    );
+    saveModel(model);
+  };
 
   const changeProtocol = (next: AiProtocol) => {
     setProtocol(next);
-    setBaseUrl(defaultBaseUrl(next));
+    setBaseUrl("");
     setModel("");
+    lastSavedModel.current = "";
+    setCommitted((current) =>
+      current.baseUrl === "" ? current : { ...current, baseUrl: "" },
+    );
   };
 
   const changeBaseUrl = (next: string) => {
@@ -536,24 +595,17 @@ function AiForm({ config }: { config: AiConfig }) {
       skipSave.current = false;
       return;
     }
-    pendingSave.current = {
-      baseUrl,
-      protocol,
-      apiKey,
-      autoApprove,
-      enabledTools,
-      maxHistoryTokens,
-    };
+    pendingSave.current = true;
     const timer = setTimeout(() => {
-      pendingSave.current = null;
+      pendingSave.current = false;
       mutate(
         {
-          baseUrl,
+          baseUrl: committed.baseUrl,
           protocol,
-          apiKey,
+          apiKey: committed.apiKey,
           autoApprove,
           enabledTools,
-          maxHistoryTokens,
+          maxHistoryTokens: committed.maxHistoryTokens,
         },
         {
           onError: (err) =>
@@ -562,32 +614,7 @@ function AiForm({ config }: { config: AiConfig }) {
       );
     }, 500);
     return () => clearTimeout(timer);
-  }, [
-    protocol,
-    baseUrl,
-    apiKey,
-    autoApprove,
-    enabledTools,
-    maxHistoryTokens,
-    mutate,
-    t,
-  ]);
-
-  useEffect(() => {
-    if (skipModelSave.current) {
-      skipModelSave.current = false;
-      return;
-    }
-    pendingModelSave.current = model;
-    const timer = setTimeout(() => {
-      pendingModelSave.current = null;
-      mutateModel(model, {
-        onError: (err) =>
-          toast.error(t("settings.ai.saveError"), errorMessage(err)),
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [model, mutateModel, t]);
+  }, [protocol, committed, autoApprove, enabledTools, mutate, t]);
 
   const toggleTool = (name: string, checked: boolean) => {
     setEnabledTools((current) =>
@@ -618,26 +645,28 @@ function AiForm({ config }: { config: AiConfig }) {
 
   useEffect(
     () => () => {
-      if (pendingSave.current) {
-        mutate(pendingSave.current, {
+      const { input, committed, model } = live.current;
+      if (
+        pendingSave.current ||
+        input.baseUrl !== committed.baseUrl ||
+        input.apiKey !== committed.apiKey ||
+        input.maxHistoryTokens !== committed.maxHistoryTokens
+      ) {
+        pendingSave.current = false;
+        mutate(input, {
+          onError: (err) =>
+            toast.error(t("settings.ai.saveError"), errorMessage(err)),
+        });
+      }
+      if (model !== lastSavedModel.current) {
+        lastSavedModel.current = model;
+        mutateModel(model, {
           onError: (err) =>
             toast.error(t("settings.ai.saveError"), errorMessage(err)),
         });
       }
     },
-    [mutate, t],
-  );
-
-  useEffect(
-    () => () => {
-      if (pendingModelSave.current !== null) {
-        mutateModel(pendingModelSave.current, {
-          onError: (err) =>
-            toast.error(t("settings.ai.saveError"), errorMessage(err)),
-        });
-      }
-    },
-    [mutateModel, t],
+    [mutate, mutateModel, t],
   );
 
   return (
@@ -662,7 +691,8 @@ function AiForm({ config }: { config: AiConfig }) {
             value={baseUrl}
             maxLength={8192}
             onChange={(e) => changeBaseUrl(e.target.value)}
-            placeholder={defaultBaseUrl(protocol)}
+            onBlur={commitDrafts}
+            placeholder={exampleBaseUrl(protocol)}
             autoComplete="off"
             spellCheck={false}
           />
@@ -676,6 +706,7 @@ function AiForm({ config }: { config: AiConfig }) {
             value={model}
             maxLength={1024}
             onChange={(e) => setModel(e.target.value)}
+            onBlur={commitDrafts}
             placeholder="provider/model-id"
             autoComplete="off"
             spellCheck={false}
@@ -690,6 +721,7 @@ function AiForm({ config }: { config: AiConfig }) {
             value={apiKey}
             maxLength={16384}
             onChange={(e) => setApiKey(e.target.value)}
+            onBlur={commitDrafts}
             placeholder="sk-…"
             autoComplete="off"
             spellCheck={false}
@@ -733,6 +765,7 @@ function AiForm({ config }: { config: AiConfig }) {
                 Number.isFinite(parsed) && parsed > 0 ? parsed : null,
               );
             }}
+            onBlur={commitDrafts}
             placeholder="200000"
             autoComplete="off"
             spellCheck={false}

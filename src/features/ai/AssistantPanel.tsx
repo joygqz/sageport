@@ -53,7 +53,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
   const { data: config } = useAiConfig();
   const setModel = useSetAiModel();
-  const configured = Boolean(config?.apiKey.trim());
+  const configured = Boolean(config?.baseUrl.trim());
   const { data: fetchedModels, error: modelsError } = useAiModels(configured);
   const toggleAux = useLayoutStore((s) => s.toggleAux);
   const openSettings = useOverlayStore((s) => s.openSettings);
@@ -118,8 +118,9 @@ export function AssistantPanel({ width }: { width: number }) {
   }, [configured, loadSessions]);
 
   useEffect(() => {
-    if (modelsError) toast.error(t("ai.error"), errorMessage(modelsError));
-  }, [modelsError, t]);
+    if (configured && modelsError)
+      toast.error(t("ai.error"), errorMessage(modelsError));
+  }, [configured, modelsError, t]);
 
   const models = [
     ...new Set([config?.model, ...(fetchedModels ?? [])].filter(Boolean)),

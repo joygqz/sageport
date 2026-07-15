@@ -645,7 +645,7 @@ export const en = {
     setup: {
       title: "Set up the assistant",
       description:
-        "Connect an OpenAI-compatible or Anthropic-compatible endpoint to start chatting.",
+        "Set the base URL of an OpenAI-compatible or Anthropic-compatible endpoint to start chatting.",
       action: "Open settings",
     },
     empty: {
@@ -808,7 +808,7 @@ export const en = {
     },
     ai: {
       description:
-        "Bring your own API key. Works with Anthropic and any OpenAI-compatible endpoint. Changes are saved automatically.",
+        "Works with Anthropic and any OpenAI-compatible endpoint, including local ones like Ollama. Changes are saved automatically.",
       protocolLabel: "API format",
       protocol: {
         openai: "OpenAI-compatible",
@@ -821,7 +821,7 @@ export const en = {
         "Enter a model id manually when the compatible endpoint does not expose a model list.",
       apiKeyLabel: "API key",
       apiKeyHint:
-        "Sent only to the AI endpoint you configure; included in end-to-end encrypted backups when sync is enabled.",
+        "Leave empty for endpoints that need no key, such as Ollama. Sent only to the AI endpoint you configure; included in end-to-end encrypted backups when sync is enabled.",
       autonomousModeLabel: "Assistant mode",
       autonomousMode: "Autonomous operation",
       autonomousModeHint:

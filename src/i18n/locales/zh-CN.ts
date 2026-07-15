@@ -622,7 +622,7 @@ export const zhCN: Dictionary = {
     hidePanel: "隐藏面板",
     setup: {
       title: "配置助手",
-      description: "连接 OpenAI 或 Anthropic 兼容接口后即可开始对话。",
+      description: "填写 OpenAI 或 Anthropic 兼容接口的地址后即可开始对话。",
       action: "打开设置",
     },
     empty: {
@@ -776,7 +776,7 @@ export const zhCN: Dictionary = {
     },
     ai: {
       description:
-        "使用你自己的 API 密钥，支持 Anthropic 和任意 OpenAI 兼容接口。更改会自动保存。",
+        "支持 Anthropic 和任意 OpenAI 兼容接口，包括 Ollama 等本地服务。更改会自动保存。",
       protocolLabel: "接口格式",
       protocol: {
         openai: "OpenAI 兼容",
@@ -788,7 +788,7 @@ export const zhCN: Dictionary = {
       modelHint: "兼容接口未提供模型列表时，可在此手动填写模型 ID。",
       apiKeyLabel: "API 密钥",
       apiKeyHint:
-        "仅发送到你配置的 AI 服务地址；启用同步时会包含在端到端加密备份中。",
+        "Ollama 等无需密钥的接口可留空。仅发送到你配置的 AI 服务地址；启用同步时会包含在端到端加密备份中。",
       autonomousModeLabel: "助手模式",
       autonomousMode: "自动执行",
       autonomousModeHint:

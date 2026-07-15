@@ -62,20 +62,14 @@ async fn stored_protocol(state: &AppState) -> AppResult<Protocol> {
     ))
 }
 
-async fn stored_base_url(state: &AppState, protocol: Protocol) -> AppResult<String> {
+async fn stored_base_url(state: &AppState) -> AppResult<String> {
     Ok(settings_repo::get(&state.db, BASE_URL_SETTING)
         .await?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| protocol.default_base_url().to_string()))
+        .unwrap_or_default())
 }
 
-fn effective_base_url(raw: &str, protocol: Protocol) -> String {
-    let trimmed = raw.trim().trim_end_matches('/');
-    if trimmed.is_empty() {
-        protocol.default_base_url().to_string()
-    } else {
-        trimmed.to_string()
-    }
+fn effective_base_url(raw: &str) -> String {
+    raw.trim().trim_end_matches('/').to_string()
 }
 
 fn bounded_text<'a>(value: &'a str, field: &str, max_bytes: usize) -> AppResult<&'a str> {
@@ -92,8 +86,11 @@ fn bounded_text<'a>(value: &'a str, field: &str, max_bytes: usize) -> AppResult<
     Ok(value)
 }
 
-fn validate_base_url(raw: &str, protocol: Protocol) -> AppResult<String> {
-    let value = effective_base_url(bounded_text(raw, "base URL", MAX_BASE_URL_BYTES)?, protocol);
+fn validate_base_url(raw: &str) -> AppResult<String> {
+    let value = effective_base_url(bounded_text(raw, "base URL", MAX_BASE_URL_BYTES)?);
+    if value.is_empty() {
+        return Ok(value);
+    }
     let parsed = url::Url::parse(&value)
         .map_err(|_| AppError::Invalid("base URL is not a valid URL".into()))?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
@@ -253,7 +250,7 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
         .await?
         .unwrap_or_default();
     let protocol = stored_protocol(&state).await?;
-    let base_url = stored_base_url(&state, protocol).await?;
+    let base_url = stored_base_url(&state).await?;
     let model = settings_repo::get(&state.db, MODEL_SETTING)
         .await?
         .unwrap_or_default();
@@ -297,7 +294,7 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
 
 #[tauri::command]
 pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> AppResult<()> {
-    let base_url = validate_base_url(&input.base_url, input.protocol)?;
+    let base_url = validate_base_url(&input.base_url)?;
     let api_key = input
         .api_key
         .as_deref()
@@ -310,9 +307,9 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
         )));
     }
     let previous_protocol = stored_protocol(&state).await?;
-    let previous_base_url = stored_base_url(&state, previous_protocol).await?;
+    let previous_base_url = stored_base_url(&state).await?;
     let endpoint_changed = previous_protocol != input.protocol
-        || effective_base_url(&previous_base_url, previous_protocol) != base_url;
+        || effective_base_url(&previous_base_url) != base_url;
     let mut enabled_tools = input
         .enabled_tools
         .into_iter()
@@ -364,14 +361,16 @@ pub async fn ai_set_model(state: State<'_, AppState>, model: String) -> AppResul
 }
 
 async fn endpoint(state: &AppState) -> AppResult<(String, String, Protocol)> {
+    let protocol = stored_protocol(state).await?;
+    let base_url = validate_base_url(&stored_base_url(state).await?)?;
+    if base_url.is_empty() {
+        return Err(AppError::Invalid("no base URL configured".into()));
+    }
     let api_key = settings_repo::get(&state.db, API_KEY_SETTING)
         .await?
-        .filter(|k| !k.trim().is_empty())
-        .ok_or_else(|| AppError::Invalid("no API key configured".into()))?;
-    bounded_text(api_key.trim(), "API key", MAX_API_KEY_BYTES)?;
-    let protocol = stored_protocol(state).await?;
-    let base_url = validate_base_url(&stored_base_url(state, protocol).await?, protocol)?;
-    Ok((base_url, api_key.trim().to_string(), protocol))
+        .unwrap_or_default();
+    let api_key = bounded_text(api_key.trim(), "API key", MAX_API_KEY_BYTES)?;
+    Ok((base_url, api_key.to_string(), protocol))
 }
 
 #[tauri::command]
@@ -588,26 +587,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn effective_url_normalizes_defaults_and_trailing_slashes() {
+    fn effective_url_normalizes_trailing_slashes() {
+        assert_eq!(effective_base_url(""), "");
         assert_eq!(
-            effective_base_url("", Protocol::Openai),
-            "https://api.openai.com/v1"
-        );
-        assert_eq!(
-            effective_base_url(" https://example.com/v1/// ", Protocol::Openai),
+            effective_base_url(" https://example.com/v1/// "),
             "https://example.com/v1"
         );
     }
 
     #[test]
     fn validates_ai_endpoint_urls() {
+        assert_eq!(validate_base_url("  ").unwrap(), "");
         assert_eq!(
-            validate_base_url(" http://localhost:11434/v1/ ", Protocol::Openai).unwrap(),
+            validate_base_url(" http://localhost:11434/v1/ ").unwrap(),
             "http://localhost:11434/v1"
         );
-        assert!(validate_base_url("file:///tmp/provider", Protocol::Openai).is_err());
-        assert!(validate_base_url("https://user:secret@example.com", Protocol::Openai).is_err());
-        assert!(validate_base_url("https://example.com/v1?key=secret", Protocol::Openai).is_err());
+        assert!(validate_base_url("file:///tmp/provider").is_err());
+        assert!(validate_base_url("https://user:secret@example.com").is_err());
+        assert!(validate_base_url("https://example.com/v1?key=secret").is_err());
     }
 
     #[test]

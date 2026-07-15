@@ -72,6 +72,7 @@ describe("locale parity", () => {
       "MinIO",
       "Nextcloud",
       "OAuth",
+      "Ollama",
       "OneDrive",
       "OpenAI",
       "OpenAI-compatible",
