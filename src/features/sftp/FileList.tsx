@@ -6,6 +6,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
   AudioLines,
   Database,
   File,
@@ -19,9 +21,14 @@ import {
   FileText,
   FileVideo,
   Folder,
+  FolderOpen,
   FolderSymlink,
   Loader2,
+  Lock,
   Package,
+  SquarePen,
+  TextCursorInput,
+  Trash2,
   WifiOff,
   type LucideIcon,
 } from "lucide-react";
@@ -328,6 +335,7 @@ export function FileList({
   }
 
   const sendLabel = side === "left" ? t("sftp.sendRight") : t("sftp.sendLeft");
+  const SendIcon = side === "left" ? ArrowRight : ArrowLeft;
 
   return (
     <ScrollArea className="min-h-0 flex-1">
@@ -490,18 +498,18 @@ export function FileList({
                     <ContextMenuItem
                       onSelect={() => void transfer(side, actionEntries)}
                     >
-                      {sendLabel}
+                      <SendIcon /> {sendLabel}
                     </ContextMenuItem>
                     {single && entry.kind === "dir" && (
                       <ContextMenuItem
                         onSelect={() => void navigate(side, tab.id, entry.path)}
                       >
-                        {t("sftp.open")}
+                        <FolderOpen /> {t("sftp.open")}
                       </ContextMenuItem>
                     )}
                     {single && entry.kind === "file" && (
                       <ContextMenuItem onSelect={() => openEditor(entry)}>
-                        {t("common.edit")}
+                        <SquarePen /> {t("common.edit")}
                       </ContextMenuItem>
                     )}
                     {single && <ContextMenuSeparator />}
@@ -515,21 +523,22 @@ export function FileList({
                           };
                         }}
                       >
-                        {t("sftp.rename")}
+                        <TextCursorInput /> {t("sftp.rename")}
                       </ContextMenuItem>
                     )}
                     {single &&
                       entry.permissions !== null &&
                       !entry.isSymlink && (
                         <ContextMenuItem onSelect={() => onPermissions(entry)}>
-                          {t("sftp.permissions.action")}
+                          <Lock /> {t("sftp.permissions.action")}
                         </ContextMenuItem>
                       )}
+                    <ContextMenuSeparator />
                     <ContextMenuItem
                       destructive
                       onSelect={() => onDelete(actionEntries)}
                     >
-                      {t("common.delete")}
+                      <Trash2 /> {t("common.delete")}
                     </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>

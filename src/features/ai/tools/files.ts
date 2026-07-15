@@ -4,7 +4,7 @@ import {
   Folder,
   FolderInput,
   FolderPlus,
-  KeyRound,
+  Lock,
   SquarePen,
   Trash2,
 } from "lucide-react";
@@ -675,7 +675,7 @@ export const fileTools: AiTool[] = [
         additionalProperties: false,
       },
     },
-    icon: KeyRound,
+    icon: Lock,
     labelKey: "ai.tool.chmodPath",
     requiresApproval: true,
     prepare: prepareSftpTarget,
