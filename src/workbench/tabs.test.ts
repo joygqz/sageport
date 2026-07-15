@@ -10,12 +10,20 @@ vi.mock("@/lib/ipc", () => ({
       readText: vi.fn(() => new Promise(() => {})),
       writeText: vi.fn(() => Promise.resolve()),
     },
+    history: {
+      add: vi.fn(() => Promise.resolve()),
+    },
   },
 }));
 
 vi.stubGlobal("localStorage", { getItem: vi.fn(() => "en") });
 
 import { ipc } from "@/lib/ipc";
+import {
+  registerSession,
+  unregisterSession,
+} from "@/features/terminal/sessions";
+import type { TerminalSession } from "@/features/terminal/session";
 import {
   isFileDirty,
   MAX_TERMINAL_TABS,
@@ -301,5 +309,20 @@ describe("selectors", () => {
     expect(isFileDirty(base)).toBe(false);
     expect(isFileDirty({ ...base, content: "y" })).toBe(true);
     expect(isFileDirty({ ...base, content: null })).toBe(false);
+  });
+});
+
+describe("sendToTerminal", () => {
+  it("sends to a connected terminal and records scoped history", () => {
+    const id = openHost("a");
+    const sendCommand = vi.fn();
+    registerSession(id, { sendCommand } as unknown as TerminalSession);
+    useTabsStore.getState().setTerminalStatus(id, "connected");
+
+    expect(useTabsStore.getState().sendToTerminal("uptime")).toBe("sent");
+    expect(sendCommand).toHaveBeenCalledWith("uptime");
+    expect(ipc.history.add).toHaveBeenCalledWith("a", "uptime");
+
+    unregisterSession(id);
   });
 });

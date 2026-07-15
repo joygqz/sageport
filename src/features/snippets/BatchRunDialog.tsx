@@ -1,10 +1,18 @@
-import { useState } from "react";
-import { CheckCircle2, ChevronRight, Loader2, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  Loader2,
+  XCircle,
+} from "lucide-react";
 
 import {
   Button,
+  ErrorState,
   Field,
   FormDialog,
+  LoadingState,
   ScrollArea,
   Switch,
   Textarea,
@@ -22,6 +30,8 @@ interface Result {
   exitCode?: number;
   message?: string;
 }
+
+const MAX_BATCH_HOSTS = 100;
 
 export function BatchRunDialog({
   open,
@@ -53,30 +63,57 @@ function BatchBody({
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const { data: hosts = [] } = useHosts();
+  const {
+    data: hosts = [],
+    isLoading: hostsLoading,
+    isError: hostsError,
+    refetch: refetchHosts,
+  } = useHosts();
   const [command, setCommand] = useState(initialCommand);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<Record<string, Result>>({});
   const [running, setRunning] = useState(false);
+  const requestRef = useRef<string | null>(null);
 
-  const toggle = (id: string) =>
+  useEffect(
+    () => () => {
+      const requestId = requestRef.current;
+      requestRef.current = null;
+      if (requestId) void ipc.hosts.cancelRun(requestId).catch(() => {});
+    },
+    [],
+  );
+
+  const toggle = (id: string) => {
+    if (!selected.has(id) && selected.size >= MAX_BATCH_HOSTS) {
+      toast.warning(t("snippets.batch.hostLimit", { count: MAX_BATCH_HOSTS }));
+      return;
+    }
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
 
   const run = async () => {
-    if (!command.trim() || selected.size === 0) return;
+    if (!command.trim() || selected.size === 0 || requestRef.current) return;
+    const requestId = crypto.randomUUID();
+    requestRef.current = requestId;
     setRunning(true);
-    setResults({});
     const hostIds = [...selected];
+    setResults(
+      Object.fromEntries(
+        hostIds.map((hostId) => [hostId, { status: "queued" as const }]),
+      ),
+    );
     try {
       await ipc.hosts.runCommand(
         hostIds,
         command.trim(),
         (e: BatchExecEvent) => {
+          if (requestRef.current !== requestId) return;
           setResults((prev) => ({
             ...prev,
             [e.hostId]: {
@@ -87,11 +124,17 @@ function BatchBody({
             },
           }));
         },
+        requestId,
       );
     } catch (err) {
-      toast.error(t("snippets.batch.error"), errorMessage(err));
+      if (requestRef.current === requestId) {
+        toast.error(t("snippets.batch.error"), errorMessage(err));
+      }
     } finally {
-      setRunning(false);
+      if (requestRef.current === requestId) {
+        requestRef.current = null;
+        setRunning(false);
+      }
     }
   };
 
@@ -106,12 +149,22 @@ function BatchBody({
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           className="font-mono text-xs"
+          disabled={running}
+          maxLength={32 * 1024}
         />
       </Field>
 
       <Field label={t("snippets.batch.hosts")}>
         <ScrollArea className="max-h-40 rounded-lg border border-border bg-surface">
-          {hosts.length === 0 ? (
+          {hostsLoading ? (
+            <LoadingState label={t("common.loading")} />
+          ) : hostsError ? (
+            <ErrorState
+              title={t("common.loadError")}
+              retryLabel={t("common.retry")}
+              onRetry={() => void refetchHosts()}
+            />
+          ) : hosts.length === 0 ? (
             <p className="p-3 text-xs text-muted-foreground">
               {t("snippets.batch.noHosts")}
             </p>
@@ -125,6 +178,7 @@ function BatchBody({
                 <Switch
                   checked={selected.has(host.id)}
                   onCheckedChange={() => toggle(host.id)}
+                  disabled={running}
                 />
               </label>
             ))
@@ -167,7 +221,9 @@ function ResultRow({ name, result }: { name: string; result: Result }) {
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-list-hover"
       >
-        {result.status === "running" ? (
+        {result.status === "queued" ? (
+          <Clock3 className="size-3.5 shrink-0 text-muted-foreground" />
+        ) : result.status === "running" ? (
           <Loader2 className="size-3.5 shrink-0 animate-spin text-warning" />
         ) : result.status === "error" || (result.exitCode ?? 0) !== 0 ? (
           <XCircle className="size-3.5 shrink-0 text-danger" />

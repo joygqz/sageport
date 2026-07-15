@@ -34,7 +34,7 @@ export interface Host {
   revision: number;
 }
 
-export type BatchExecStatus = "running" | "done" | "error";
+export type BatchExecStatus = "queued" | "running" | "done" | "error";
 
 export interface BatchExecEvent {
   hostId: string;
@@ -180,6 +180,15 @@ export interface Snippet {
   updatedAt: string;
   deletedAt: string | null;
   revision: number;
+}
+
+export interface CommandHistoryEntry {
+  id: string;
+  hostId: string;
+  hostLabel: string | null;
+  command: string;
+  usedAt: string;
+  useCount: number;
 }
 
 export interface GroupInput {

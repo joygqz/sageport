@@ -3,6 +3,7 @@ import {
   Pencil,
   Play,
   Plus,
+  History,
   Server,
   SquareTerminal,
   Terminal,
@@ -40,6 +41,7 @@ import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { useTabsStore } from "@/workbench/tabs";
 import { useDeleteSnippet, useSnippets } from "./api";
 import { BatchRunDialog } from "./BatchRunDialog";
+import { CommandHistoryDialog } from "./CommandHistoryDialog";
 import { SnippetFormDialog } from "./SnippetFormDialog";
 import { SnippetRunDialog } from "./SnippetRunDialog";
 import { parseVariables } from "./variables";
@@ -55,8 +57,12 @@ export function SnippetsView() {
     snippet: null,
   });
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
-  const [runSnippet, setRunSnippet] = useState<Snippet | null>(null);
-  const [batch, setBatch] = useState<Snippet | null>(null);
+  const [runRequest, setRunRequest] = useState<{
+    snippet: Snippet;
+    target: "terminal" | "batch";
+  } | null>(null);
+  const [batchCommand, setBatchCommand] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [query, setQuery] = useState("");
   const searching = query.trim().length > 0;
 
@@ -85,11 +91,16 @@ export function SnippetsView() {
     }
   };
 
-  const run = (snippet: Snippet) => {
+  const dispatchRun = (target: "terminal" | "batch", command: string) => {
+    if (target === "batch") setBatchCommand(command);
+    else send(command);
+  };
+
+  const run = (snippet: Snippet, target: "terminal" | "batch" = "terminal") => {
     if (parseVariables(snippet.command).length > 0) {
-      setRunSnippet(snippet);
+      setRunRequest({ snippet, target });
     } else {
-      send(snippet.command);
+      dispatchRun(target, snippet.command);
     }
   };
 
@@ -115,16 +126,28 @@ export function SnippetsView() {
     <SideBarView
       title={t("snippets.viewTitle")}
       actions={
-        <Tooltip content={t("snippets.new")}>
-          <Button
-            size="icon"
-            variant="ghost"
-            className={PANEL_HEADER_ACTION_CLASS}
-            onClick={() => setForm({ open: true, snippet: null })}
-          >
-            <Plus className="size-4" />
-          </Button>
-        </Tooltip>
+        <>
+          <Tooltip content={t("snippets.history.title")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={PANEL_HEADER_ACTION_CLASS}
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="size-4" />
+            </Button>
+          </Tooltip>
+          <Tooltip content={t("snippets.new")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={PANEL_HEADER_ACTION_CLASS}
+              onClick={() => setForm({ open: true, snippet: null })}
+            >
+              <Plus className="size-4" />
+            </Button>
+          </Tooltip>
+        </>
       }
       topContent={
         <SideBarFilter
@@ -203,7 +226,7 @@ export function SnippetsView() {
                 <ContextMenuItem onSelect={() => run(snippet)}>
                   <Play /> {t("snippets.run")}
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => setBatch(snippet)}>
+                <ContextMenuItem onSelect={() => run(snippet, "batch")}>
                   <Server /> {t("snippets.batch.action")}
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -234,15 +257,18 @@ export function SnippetsView() {
         onClose={() => setConfirmState(null)}
       />
       <SnippetRunDialog
-        snippet={runSnippet}
-        onClose={() => setRunSnippet(null)}
-        onRun={send}
+        snippet={runRequest?.snippet ?? null}
+        onClose={() => setRunRequest(null)}
+        onRun={(command) =>
+          dispatchRun(runRequest?.target ?? "terminal", command)
+        }
       />
       <BatchRunDialog
-        open={batch !== null}
-        initialCommand={batch?.command ?? ""}
-        onClose={() => setBatch(null)}
+        open={batchCommand !== null}
+        initialCommand={batchCommand ?? ""}
+        onClose={() => setBatchCommand(null)}
       />
+      <CommandHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
     </SideBarView>
   );
 }

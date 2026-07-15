@@ -400,6 +400,9 @@ export const useTabsStore = create<TabsState>((set, get) => {
       if (!id || !tab || !session) return "no-terminal";
       if (tab.status !== "connected") return "not-connected";
       session.sendCommand(command);
+      void ipc.history
+        .add(tab.target === "ssh" ? tab.hostId : null, command)
+        .catch(() => {});
       get().setActive(id);
       return "sent";
     },

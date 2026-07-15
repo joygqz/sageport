@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::domain::CommandHistoryEntry;
 use crate::error::AppResult;
 use crate::repository::history_repo;
 use crate::state::AppState;
@@ -28,6 +29,22 @@ pub async fn history_search(
         host_id.as_deref().unwrap_or(""),
         &prefix,
         limit.unwrap_or(5),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn history_list(
+    state: State<'_, AppState>,
+    host_id: Option<String>,
+    query: Option<String>,
+    limit: Option<i64>,
+) -> AppResult<Vec<CommandHistoryEntry>> {
+    history_repo::list(
+        &state.db,
+        host_id.as_deref(),
+        query.as_deref(),
+        limit.unwrap_or(200),
     )
     .await
 }

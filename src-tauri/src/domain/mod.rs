@@ -1,6 +1,7 @@
 mod bookmark;
 mod forward;
 mod group;
+mod history;
 mod host;
 mod identity;
 mod key;
@@ -9,6 +10,7 @@ mod snippet;
 pub use bookmark::*;
 pub use forward::*;
 pub use group::*;
+pub use history::*;
 pub use host::*;
 pub use identity::*;
 pub use key::*;

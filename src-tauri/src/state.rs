@@ -37,6 +37,8 @@ pub struct AppState {
 
     pub ai_cancels: Mutex<HashMap<String, oneshot::Sender<()>>>,
 
+    pub batch_cancels: Mutex<HashMap<String, Option<oneshot::Sender<()>>>>,
+
     pub sync_oauth: Mutex<SyncOAuthSlot>,
 }
 
@@ -52,6 +54,7 @@ impl AppState {
             connection_prompts: new_connection_prompts(),
             update: UpdateManager::new(),
             ai_cancels: Mutex::new(HashMap::new()),
+            batch_cancels: Mutex::new(HashMap::new()),
             sync_oauth: Mutex::new(SyncOAuthSlot::default()),
         }
     }

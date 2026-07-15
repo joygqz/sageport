@@ -77,6 +77,7 @@ function SnippetFormBody({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("snippets.namePlaceholder")}
+          maxLength={255}
         />
       </Field>
       <Field
@@ -90,6 +91,7 @@ function SnippetFormBody({
           onChange={(e) => setCommand(e.target.value)}
           placeholder={t("snippets.commandPlaceholder")}
           className="font-mono text-xs"
+          maxLength={32 * 1024}
         />
       </Field>
       <Field label={t("snippets.description")}>
@@ -97,6 +99,7 @@ function SnippetFormBody({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t("snippets.descriptionPlaceholder")}
+          maxLength={4 * 1024}
         />
       </Field>
     </FormBody>

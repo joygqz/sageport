@@ -36,6 +36,7 @@ export function createAutocomplete(opts: {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let seq = 0;
   let disposed = false;
+  const subscriptions: Array<{ dispose: () => void }> = [];
 
   const clearGhost = () => {
     ghost = "";
@@ -115,12 +116,15 @@ export function createAutocomplete(opts: {
   };
 
   const attach = (instance: XTerm) => {
+    if (disposed || term) return;
     term = instance;
-    instance.onCursorMove(() => schedule());
-    instance.onResize(() => {
-      clearGhost();
-      schedule();
-    });
+    subscriptions.push(
+      instance.onCursorMove(() => schedule()),
+      instance.onResize(() => {
+        clearGhost();
+        schedule();
+      }),
+    );
     instance.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       if (isWorkbenchShortcut(e)) return false;
@@ -146,8 +150,13 @@ export function createAutocomplete(opts: {
 
   const dispose = () => {
     disposed = true;
+    seq += 1;
     if (timer) clearTimeout(timer);
+    timer = null;
     clearGhost();
+    for (const subscription of subscriptions.splice(0)) {
+      subscription.dispose();
+    }
     term = null;
   };
 

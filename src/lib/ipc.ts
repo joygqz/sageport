@@ -11,6 +11,7 @@ import type {
   AiSessionSummary,
   AiToolSpec,
   BatchExecEvent,
+  CommandHistoryEntry,
   FileEntry,
   FsEndpoint,
   GeneratedSshKey,
@@ -81,15 +82,19 @@ export const ipc = {
       hostIds: string[],
       command: string,
       onEvent: (e: BatchExecEvent) => void,
+      requestId = crypto.randomUUID(),
     ) => {
       const channel = new Channel<BatchExecEvent>();
       channel.onmessage = onEvent;
       return invoke<void>("hosts_run_command", {
         hostIds,
         command,
+        requestId,
         onEvent: channel,
       });
     },
+    cancelRun: (requestId: string) =>
+      invoke<void>("hosts_cancel_run", { requestId }),
     importPreview: () => invoke<SshConfigHost[]>("ssh_config_import_preview"),
     importApply: (hosts: SshConfigHost[]) =>
       invoke<number>("ssh_config_import_apply", { hosts }),
@@ -358,6 +363,12 @@ export const ipc = {
       invoke<void>("history_add", { hostId, command }),
     search: (hostId: string | null, prefix: string, limit?: number) =>
       invoke<string[]>("history_search", { hostId, prefix, limit }),
+    list: (hostId: string | null, query: string, limit?: number) =>
+      invoke<CommandHistoryEntry[]>("history_list", {
+        hostId,
+        query,
+        limit,
+      }),
     clear: () => invoke<void>("history_clear"),
   },
   monitor: {

@@ -4,6 +4,7 @@ import { ipc } from "@/lib/ipc";
 import type { SnippetInput } from "@/types/models";
 
 export const snippetsKey = ["snippets"] as const;
+export const commandHistoryKey = ["commandHistory"] as const;
 
 export function useSnippets() {
   return useQuery({ queryKey: snippetsKey, queryFn: ipc.snippets.list });
@@ -31,5 +32,25 @@ export function useDeleteSnippet() {
   return useMutation({
     mutationFn: (id: string) => ipc.snippets.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: snippetsKey }),
+  });
+}
+
+export function useCommandHistory(
+  hostId: string | null,
+  query: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [...commandHistoryKey, hostId, query],
+    queryFn: () => ipc.history.list(hostId, query, 500),
+    enabled,
+  });
+}
+
+export function useClearCommandHistory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ipc.history.clear,
+    onSuccess: () => qc.invalidateQueries({ queryKey: commandHistoryKey }),
   });
 }

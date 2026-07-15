@@ -22,9 +22,15 @@ export function substitute(
   command: string,
   values: Record<string, string>,
 ): string {
+  const defaults = new Map(
+    parseVariables(command).map((variable) => [
+      variable.name,
+      variable.defaultValue,
+    ]),
+  );
   return command.replace(PATTERN, (_, name: string, fallback?: string) => {
     const provided = values[name];
-    if (provided !== undefined && provided !== "") return provided;
-    return (fallback ?? "").trim();
+    if (provided !== undefined && provided.trim() !== "") return provided;
+    return defaults.get(name) ?? (fallback ?? "").trim();
   });
 }
