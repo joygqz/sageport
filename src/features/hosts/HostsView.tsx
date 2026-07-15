@@ -14,6 +14,7 @@ import {
   Plus,
   RefreshCw,
   Server,
+  TextCursorInput,
   Trash2,
 } from "lucide-react";
 
@@ -586,7 +587,7 @@ function GroupSection({
           <ContextMenuTrigger asChild>{header}</ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem onSelect={onEdit}>
-              <Pencil /> {t("common.rename")}
+              <TextCursorInput /> {t("common.rename")}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem destructive onSelect={onDelete}>
