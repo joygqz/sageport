@@ -43,14 +43,6 @@ pub async fn set_many(pool: &SqlitePool, entries: &[(String, String)]) -> AppRes
     Ok(())
 }
 
-pub async fn all(pool: &SqlitePool) -> AppResult<Vec<(String, String)>> {
-    let rows: Vec<(String, String)> =
-        sqlx::query_as("SELECT key, value FROM settings ORDER BY key")
-            .fetch_all(pool)
-            .await?;
-    Ok(rows)
-}
-
 pub async fn all_excluding_prefixes(
     pool: &SqlitePool,
     prefixes: &[&str],

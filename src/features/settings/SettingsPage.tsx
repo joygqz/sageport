@@ -305,6 +305,7 @@ function FontField() {
     >
       <Input
         value={draft ?? family}
+        maxLength={1024}
         onChange={(e) => setDraft(e.target.value)}
         placeholder='"JetBrains Mono Variable"'
         autoComplete="off"

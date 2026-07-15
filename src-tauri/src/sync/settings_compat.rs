@@ -17,10 +17,10 @@ pub(super) fn sanitize(entry: &SettingEntry) -> Option<SettingEntry> {
     // Intentionally allow-list persisted settings. New settings must define
     // their backup compatibility here before they can be restored or exported.
     let value = match entry.key.as_str() {
-        "appearance.theme" => sanitize_theme(&entry.value)?,
+        "appearance.theme" => sanitize_appearance_value(&entry.key, &entry.value)?,
         "appearance.locale" => one_of(&entry.value, &["en", "zh-CN"])?,
-        "appearance.zoomLevel" => sanitize_zoom(&entry.value)?,
-        "appearance.fontFamily" => bounded_text(&entry.value, MAX_FONT_FAMILY_BYTES)?.to_string(),
+        "appearance.zoomLevel" => sanitize_appearance_value(&entry.key, &entry.value)?,
+        "appearance.fontFamily" => sanitize_appearance_value(&entry.key, &entry.value)?,
         "ai.protocol" => one_of(&entry.value, &["openai", "anthropic"])?,
         "ai.base_url" => sanitize_base_url(&entry.value)?,
         "ai.api_key" => bounded_text(&entry.value, MAX_API_KEY_BYTES)?.to_string(),
@@ -62,6 +62,16 @@ fn is_current_theme(value: &str) -> bool {
 fn sanitize_zoom(value: &str) -> Option<String> {
     let level = value.parse::<i32>().ok()?;
     (-3..=5).contains(&level).then(|| level.to_string())
+}
+
+pub(crate) fn sanitize_appearance_value(key: &str, value: &str) -> Option<String> {
+    match key {
+        "appearance.theme" => sanitize_theme(value),
+        "appearance.locale" => one_of(value, &["en", "zh-CN"]),
+        "appearance.zoomLevel" => sanitize_zoom(value),
+        "appearance.fontFamily" => bounded_text(value, MAX_FONT_FAMILY_BYTES).map(str::to_string),
+        _ => None,
+    }
 }
 
 fn sanitize_base_url(value: &str) -> Option<String> {

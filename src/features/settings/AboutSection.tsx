@@ -11,8 +11,9 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui";
-import { useI18n } from "@/i18n";
+import { useI18n, type TFunction } from "@/i18n";
 import { ipc } from "@/lib/ipc";
+import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { UpdateStatus } from "@/types/models";
 import {
@@ -23,6 +24,14 @@ import {
 
 const AUTHOR_NAME = "Quincy Zhang";
 const AUTHOR_URL = "https://github.com/joygqz";
+const LICENSE_NAME = "GNU GPL v3.0 only";
+const LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html";
+
+function openExternal(url: string, t: TFunction): void {
+  void openUrl(url).catch((error) =>
+    toast.error(t("settings.about.openLinkError"), errorMessage(error)),
+  );
+}
 
 export function AboutSection() {
   const { t } = useI18n();
@@ -47,9 +56,19 @@ export function AboutSection() {
             <button
               type="button"
               className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/35"
-              onClick={() => void openUrl(AUTHOR_URL)}
+              onClick={() => openExternal(AUTHOR_URL, t)}
             >
               {AUTHOR_NAME}
+            </button>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {t("settings.about.license")}{" "}
+            <button
+              type="button"
+              className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/35"
+              onClick={() => openExternal(LICENSE_URL, t)}
+            >
+              {LICENSE_NAME}
             </button>
           </p>
         </div>
@@ -112,7 +131,7 @@ function UpdateStatusCard({
         {t("settings.about.update.install")}
       </Button>
     ) : (
-      <Button size="sm" onClick={() => void openUrl(RELEASES_URL)}>
+      <Button size="sm" onClick={() => openExternal(RELEASES_URL, t)}>
         <ExternalLink />
         {t("settings.about.update.viewRelease")}
       </Button>

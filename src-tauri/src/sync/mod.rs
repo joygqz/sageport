@@ -8,6 +8,7 @@ mod settings_compat;
 mod webdav;
 
 pub use provider::{make_provider, ProviderConfig, ProviderKind, SyncProvider, SyncVersion};
+pub(crate) use settings_compat::sanitize_appearance_value;
 
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};

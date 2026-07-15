@@ -142,7 +142,6 @@ export const ipc = {
     get: (key: string) => invoke<string | null>("settings_get", { key }),
     set: (key: string, value: string) =>
       invoke<void>("settings_set", { key, value }),
-    all: () => invoke<Record<string, string>>("settings_all"),
   },
   ssh: {
     connect: (params: {

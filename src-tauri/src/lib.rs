@@ -102,7 +102,6 @@ pub fn run() {
             commands::snippets::snippets_delete,
             commands::settings::settings_get,
             commands::settings::settings_set,
-            commands::settings::settings_all,
             commands::ssh::ssh_connect,
             commands::ssh::ssh_connect_adhoc,
             commands::ssh::ssh_send,

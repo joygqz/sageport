@@ -1,37 +1,104 @@
-import { useCallback, useEffect, useEffectEvent, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
 
+interface SettingQueryData {
+  value: string | null;
+  revision: number;
+}
+
+interface SettingSyncOptions {
+  onLoadError?: (error: unknown) => void;
+  onSaveError?: (error: unknown) => void;
+}
+
+/**
+ * Keeps a validated UI preference synchronized with SQLite.
+ *
+ * Writes are serialized so rapid changes cannot finish out of order. Query
+ * results carry the local revision they started with, preventing a slow first
+ * read from overwriting a newer user action.
+ */
 export function useSettingSync(
   key: string,
   current: string,
   onRemote: (value: string) => void,
+  options: SettingSyncOptions = {},
 ) {
   const qc = useQueryClient();
   const queryKey = useMemo(() => ["settings", key] as const, [key]);
-
-  const { data } = useQuery({
-    queryKey,
-    queryFn: () => ipc.settings.get(key),
-  });
-  const applyRemote = useEffectEvent(onRemote);
+  const revisionRef = useRef(0);
+  const currentRef = useRef(current);
+  const writeChainRef = useRef<Promise<void>>(Promise.resolve());
+  const callbacksRef = useRef({ onRemote, ...options });
 
   useEffect(() => {
-    if (data === undefined || data === current) return;
-    if (data === null) {
-      void ipc.settings.set(key, current).catch(() => {});
-      qc.setQueryData(queryKey, current);
+    currentRef.current = current;
+    callbacksRef.current = { onRemote, ...options };
+  }, [current, onRemote, options]);
+
+  const enqueueWrite = useCallback(
+    (value: string) => {
+      const write = writeChainRef.current
+        .catch(() => undefined)
+        .then(() => ipc.settings.set(key, value));
+      writeChainRef.current = write;
+      void write.catch((error) => callbacksRef.current.onSaveError?.(error));
+    },
+    [key],
+  );
+
+  const { data, error } = useQuery({
+    queryKey,
+    queryFn: async (): Promise<SettingQueryData> => {
+      const revision = revisionRef.current;
+      return { value: await ipc.settings.get(key), revision };
+    },
+  });
+
+  useEffect(() => {
+    if (error) callbacksRef.current.onLoadError?.(error);
+  }, [error]);
+
+  useEffect(() => {
+    if (data === undefined) return;
+
+    if (data.revision !== revisionRef.current) {
+      qc.setQueryData<SettingQueryData>(queryKey, {
+        value: currentRef.current,
+        revision: revisionRef.current,
+      });
       return;
     }
-    applyRemote(data);
-  }, [data, current, key, qc, queryKey]);
+
+    if (data.value === null) {
+      qc.setQueryData<SettingQueryData>(queryKey, {
+        value: currentRef.current,
+        revision: revisionRef.current,
+      });
+      enqueueWrite(currentRef.current);
+      return;
+    }
+
+    if (data.value !== currentRef.current) {
+      callbacksRef.current.onRemote(data.value);
+    }
+  }, [data, enqueueWrite, qc, queryKey]);
 
   return useCallback(
     (value: string) => {
-      qc.setQueryData(queryKey, value);
-      void ipc.settings.set(key, value).catch(() => {});
+      const cached = qc.getQueryData<SettingQueryData>(queryKey);
+      if (cached?.value === value) return;
+
+      revisionRef.current += 1;
+      currentRef.current = value;
+      qc.setQueryData<SettingQueryData>(queryKey, {
+        value,
+        revision: revisionRef.current,
+      });
+      enqueueWrite(value);
     },
-    [key, qc, queryKey],
+    [enqueueWrite, qc, queryKey],
   );
 }

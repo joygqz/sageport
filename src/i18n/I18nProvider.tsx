@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useSettingSync } from "@/lib/settingSync";
+import { errorMessage, toast } from "@/lib/toast";
 import {
   detectLocale,
   isLocale,
@@ -19,11 +20,27 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = locale;
   }, [locale]);
 
-  const pushLocale = useSettingSync(LOCALE_SYNC_KEY, locale, (remote) => {
-    if (!isLocale(remote)) return;
-    setLocaleState(remote);
-    localStorage.setItem(LOCALE_STORAGE_KEY, remote);
-  });
+  const pushLocale = useSettingSync(
+    LOCALE_SYNC_KEY,
+    locale,
+    (remote) => {
+      if (!isLocale(remote)) return;
+      setLocaleState(remote);
+      localStorage.setItem(LOCALE_STORAGE_KEY, remote);
+    },
+    {
+      onLoadError: (error) =>
+        toast.error(
+          translate(locale, "settings.persistence.loadError"),
+          errorMessage(error),
+        ),
+      onSaveError: (error) =>
+        toast.error(
+          translate(locale, "settings.persistence.saveError"),
+          errorMessage(error),
+        ),
+    },
+  );
 
   const setLocale = useCallback(
     (next: Locale) => {

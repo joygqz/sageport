@@ -116,6 +116,12 @@ export function Workbench() {
       const level = Number(remote);
       if (Number.isFinite(level)) useZoomStore.getState().setLevel(level);
     },
+    {
+      onLoadError: (error) =>
+        toast.error(t("settings.persistence.loadError"), errorMessage(error)),
+      onSaveError: (error) =>
+        toast.error(t("settings.persistence.saveError"), errorMessage(error)),
+    },
   );
   useEffect(() => {
     return useZoomStore.subscribe((state, prev) => {
@@ -124,9 +130,19 @@ export function Workbench() {
   }, [pushZoom]);
 
   const fontFamily = useFontStore((s) => s.family);
-  const pushFont = useSettingSync(FONT_SYNC_KEY, fontFamily, (remote) => {
-    useFontStore.getState().setFamily(remote);
-  });
+  const pushFont = useSettingSync(
+    FONT_SYNC_KEY,
+    fontFamily,
+    (remote) => {
+      useFontStore.getState().setFamily(remote);
+    },
+    {
+      onLoadError: (error) =>
+        toast.error(t("settings.persistence.loadError"), errorMessage(error)),
+      onSaveError: (error) =>
+        toast.error(t("settings.persistence.saveError"), errorMessage(error)),
+    },
+  );
   useEffect(() => {
     return useFontStore.subscribe((state, prev) => {
       if (state.family !== prev.family) pushFont(state.family);

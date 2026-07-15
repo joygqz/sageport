@@ -770,6 +770,10 @@ export const en = {
 
   settings: {
     title: "Settings",
+    persistence: {
+      loadError: "Failed to load settings",
+      saveError: "Failed to save settings",
+    },
     nav: {
       appearance: "Appearance",
       ai: "AI",
@@ -957,6 +961,8 @@ export const en = {
     about: {
       version: "Version {version}",
       author: "Author: ",
+      license: "License:",
+      openLinkError: "Failed to open link",
       update: {
         title: "Software update",
         idle: "Check whether a new version of Sageport is available.",

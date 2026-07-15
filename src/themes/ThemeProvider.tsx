@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useSettingSync } from "@/lib/settingSync";
+import { useI18n } from "@/i18n";
+import { errorMessage, toast } from "@/lib/toast";
 import {
   applyTheme,
   parseThemePreference,
@@ -25,6 +27,7 @@ function systemAppearance(): ThemeAppearance {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [preference, setPreference] = useState(readStoredThemePreference);
   const [systemTheme, setSystemTheme] = useState(systemAppearance);
   const theme = useMemo(
@@ -50,6 +53,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     THEME_SYNC_KEY,
     serializedPreference,
     (remoteValue) => setPreference(parseThemePreference(remoteValue)),
+    {
+      onLoadError: (error) =>
+        toast.error(t("settings.persistence.loadError"), errorMessage(error)),
+      onSaveError: (error) =>
+        toast.error(t("settings.persistence.saveError"), errorMessage(error)),
+    },
   );
 
   const updatePreference = useCallback(

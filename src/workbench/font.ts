@@ -2,6 +2,9 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { applyTerminalFontFamily } from "@/features/terminal/sessions";
+import { normalizeFontFamily } from "./appearance";
+
+export { normalizeFontFamily } from "./appearance";
 
 export const FONT_SYNC_KEY = "appearance.fontFamily";
 
@@ -28,10 +31,19 @@ export const useFontStore = create<FontState>()(
     (set) => ({
       family: "",
       setFamily: (family: string) => {
-        set({ family });
-        applyTerminalFontFamily(monoFontFamily(family));
+        const normalized = normalizeFontFamily(family);
+        set({ family: normalized });
+        applyTerminalFontFamily(monoFontFamily(normalized));
       },
     }),
-    { name: "sageport.font" },
+    {
+      name: "sageport.font",
+      merge: (persisted, current) => ({
+        ...current,
+        family: normalizeFontFamily(
+          (persisted as Partial<FontState> | undefined)?.family,
+        ),
+      }),
+    },
   ),
 );

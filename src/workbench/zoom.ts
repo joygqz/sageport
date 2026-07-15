@@ -4,15 +4,19 @@ import { persist } from "zustand/middleware";
 import { applyTerminalFontSize } from "@/features/terminal/sessions";
 import { ipc } from "@/lib/ipc";
 import { IS_MACOS } from "@/lib/platform";
+import { normalizeZoomLevel } from "./appearance";
+
+export {
+  normalizeZoomLevel,
+  ZOOM_LEVEL_MAX,
+  ZOOM_LEVEL_MIN,
+} from "./appearance";
 
 const BASE_ROOT_FONT_PERCENT = 93.75;
 
 const TERMINAL_FONT_BASE = 13;
 
 const STEP = 0.1;
-export const ZOOM_LEVEL_MIN = -3;
-export const ZOOM_LEVEL_MAX = 5;
-
 export const ZOOM_SYNC_KEY = "appearance.zoomLevel";
 
 export function zoomFactor(level: number): number {
@@ -51,9 +55,6 @@ function applyZoom(level: number) {
   syncTrafficLights();
 }
 
-const clamp = (level: number) =>
-  Math.max(ZOOM_LEVEL_MIN, Math.min(level, ZOOM_LEVEL_MAX));
-
 interface ZoomState {
   level: number;
   zoomIn: () => void;
@@ -69,18 +70,27 @@ export const useZoomStore = create<ZoomState>()(
   persist(
     (set, get) => {
       const setLevel = (level: number) => {
-        set({ level });
-        applyZoom(level);
+        const normalized = normalizeZoomLevel(level);
+        set({ level: normalized });
+        applyZoom(normalized);
       };
       return {
         level: 0,
-        zoomIn: () => setLevel(clamp(get().level + 1)),
-        zoomOut: () => setLevel(clamp(get().level - 1)),
+        zoomIn: () => setLevel(get().level + 1),
+        zoomOut: () => setLevel(get().level - 1),
         resetZoom: () => setLevel(0),
-        setLevel: (level: number) => setLevel(clamp(level)),
+        setLevel,
         init: () => applyZoom(get().level),
       };
     },
-    { name: "sageport.zoom" },
+    {
+      name: "sageport.zoom",
+      merge: (persisted, current) => ({
+        ...current,
+        level: normalizeZoomLevel(
+          (persisted as Partial<ZoomState> | undefined)?.level,
+        ),
+      }),
+    },
   ),
 );

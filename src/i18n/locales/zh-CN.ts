@@ -739,6 +739,10 @@ export const zhCN: Dictionary = {
 
   settings: {
     title: "设置",
+    persistence: {
+      loadError: "加载设置失败",
+      saveError: "保存设置失败",
+    },
     nav: {
       appearance: "外观",
       ai: "AI",
@@ -920,6 +924,8 @@ export const zhCN: Dictionary = {
     about: {
       version: "版本 {version}",
       author: "作者：",
+      license: "许可证：",
+      openLinkError: "打开链接失败",
       update: {
         title: "版本更新",
         idle: "检查 Sageport 是否有可用的新版本。",
