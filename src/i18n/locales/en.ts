@@ -55,6 +55,8 @@ export const en = {
     maximize: "Maximize",
     restore: "Restore",
     close: "Close",
+    actionError: "Window action failed",
+    listenerError: "Failed to initialize window events",
   },
 
   titleBar: {
@@ -182,6 +184,7 @@ export const en = {
     tabList: "Open sessions",
     closeTab: "Close tab",
     tabLimitReached: "You can open up to {count} terminal sessions",
+    fileTabLimitReached: "You can open up to {count} files",
     unsavedTitle: "Unsaved changes",
     unsavedDescription:
       "{name} has unsaved changes. Your changes will be lost if you don't save them.",

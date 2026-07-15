@@ -52,6 +52,8 @@ export const zhCN: Dictionary = {
     maximize: "最大化",
     restore: "还原",
     close: "关闭",
+    actionError: "窗口操作失败",
+    listenerError: "窗口事件初始化失败",
   },
 
   titleBar: {
@@ -179,6 +181,7 @@ export const zhCN: Dictionary = {
     tabList: "已打开的会话",
     closeTab: "关闭标签页",
     tabLimitReached: "最多可打开 {count} 个终端会话",
+    fileTabLimitReached: "最多可打开 {count} 个文件",
     unsavedTitle: "未保存的更改",
     unsavedDescription: "{name} 有未保存的更改，不保存将丢失这些更改。",
     unsavedWindowDescription:

@@ -31,6 +31,7 @@ import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
 import { syncTrafficLights, useZoomStore, ZOOM_SYNC_KEY } from "./zoom";
 import { isFileDirty, useTabsStore } from "./tabs";
+import { installWindowListener } from "./window-listener";
 
 const AssistantPanel = lazy(() =>
   import("@/features/ai/AssistantPanel").then((module) => ({
@@ -62,36 +63,31 @@ export function Workbench() {
   }, [t]);
 
   useEffect(() => {
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-    void getCurrentWindow()
-      .onCloseRequested((event) => {
-        if (useTabsStore.getState().requestWindowClose()) {
-          event.preventDefault();
-        }
-      })
-      .then((cleanup) => {
-        if (disposed) cleanup();
-        else unlisten = cleanup;
-      });
+    const unlisten = installWindowListener(
+      () =>
+        getCurrentWindow().onCloseRequested((event) => {
+          if (useTabsStore.getState().requestWindowClose()) {
+            event.preventDefault();
+          }
+        }),
+      (error) =>
+        toast.error(t("windowControls.listenerError"), errorMessage(error)),
+    );
 
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (
-        useTabsStore
-          .getState()
-          .tabs.some((tab) => tab.kind === "file" && isFileDirty(tab))
-      ) {
+      const tabs = useTabsStore.getState();
+      if (tabs.pendingWindowClose) return;
+      if (tabs.tabs.some((tab) => tab.kind === "file" && isFileDirty(tab))) {
         event.preventDefault();
         event.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", beforeUnload);
     return () => {
-      disposed = true;
-      unlisten?.();
+      unlisten();
       window.removeEventListener("beforeunload", beforeUnload);
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const reclamp = () => useLayoutStore.getState().clampToViewport();
@@ -151,14 +147,12 @@ export function Workbench() {
 
   useEffect(() => {
     if (!IS_MACOS) return;
-    let unlisten: (() => void) | undefined;
-    void getCurrentWindow()
-      .onThemeChanged(() => syncTrafficLights())
-      .then((un) => {
-        unlisten = un;
-      });
-    return () => unlisten?.();
-  }, []);
+    return installWindowListener(
+      () => getCurrentWindow().onThemeChanged(() => syncTrafficLights()),
+      (error) =>
+        toast.error(t("windowControls.listenerError"), errorMessage(error)),
+    );
+  }, [t]);
 
   const layout = useLayoutStore();
   const overlay = useOverlayStore((s) => s.overlay);

@@ -22,6 +22,7 @@ export type TerminalTarget = "ssh" | "local" | "ssh-adhoc";
 export type SendToTerminalResult = "sent" | "no-terminal" | "not-connected";
 
 export const MAX_TERMINAL_TABS = 10;
+export const MAX_FILE_TABS = 10;
 
 export interface AdhocTarget {
   host: string;
@@ -117,6 +118,10 @@ export function terminalTabs(tabs: EditorTab[]): TerminalTab[] {
   return tabs.filter(isTerminal);
 }
 
+function fileTabCount(tabs: EditorTab[]): number {
+  return tabs.filter((tab) => tab.kind === "file").length;
+}
+
 function findOpenTerminal(tabs: EditorTab[], id: string | null) {
   return tabs.find((t): t is TerminalTab => t.id === id && isTerminal(t));
 }
@@ -171,7 +176,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
       const shouldBlock = get().tabs.some(
         (tab) => tab.kind === "file" && isFileDirty(tab),
       );
-      if (shouldBlock) set({ pendingWindowClose: true });
+      set({ pendingWindowClose: shouldBlock });
       return shouldBlock;
     },
     clearPendingWindowClose: () => set({ pendingWindowClose: false }),
@@ -252,6 +257,12 @@ export const useTabsStore = create<TabsState>((set, get) => {
       );
       if (existing) {
         get().setActive(existing.id);
+        return;
+      }
+      if (fileTabCount(get().tabs) >= MAX_FILE_TABS) {
+        toast.warning(
+          t("editor.fileTabLimitReached", { count: MAX_FILE_TABS }),
+        );
         return;
       }
       const id = crypto.randomUUID();

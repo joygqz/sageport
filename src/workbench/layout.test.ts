@@ -17,6 +17,7 @@ import {
   bottomPanelLimits,
   horizontalPanelLimits,
 } from "./layout-sizing";
+import { DEFAULT_LAYOUT, normalizeLayoutSnapshot } from "./layout-state";
 
 const DEFAULT_WINDOW = { width: 1280, height: 800 };
 const MIN_WINDOW = { width: 960, height: 600 };
@@ -32,6 +33,57 @@ describe("workbench layout sizing", () => {
         MIN_WINDOW,
       );
     }
+  });
+
+  it("recovers malformed persisted layout values", () => {
+    const normalized = normalizeLayoutSnapshot(
+      {
+        activity: "missing",
+        sidebarVisible: "yes",
+        sidebarWidth: Number.NaN,
+        panelVisible: 1,
+        panelHeight: Number.POSITIVE_INFINITY,
+        auxVisible: null,
+        auxWidth: -500,
+      },
+      { viewportWidth: 1280, viewportHeight: 800, scale: 1 },
+    );
+
+    expect(normalized).toEqual({
+      ...DEFAULT_LAYOUT,
+      auxWidth: AUX_MIN,
+    });
+  });
+
+  it("reclaims editor room when independently enlarged side panes are shown", () => {
+    const normalized = normalizeLayoutSnapshot(
+      {
+        ...DEFAULT_LAYOUT,
+        sidebarVisible: true,
+        sidebarWidth: 800,
+        auxVisible: true,
+        auxWidth: 800,
+      },
+      { viewportWidth: 1280, viewportHeight: 800, scale: 1 },
+    );
+
+    expect(
+      1280 - ACTIVITY_BAR_W - normalized.sidebarWidth - normalized.auxWidth,
+    ).toBeGreaterThanOrEqual(EDITOR_MIN_W);
+    expect(normalized.sidebarWidth).toBeGreaterThanOrEqual(SIDEBAR_MIN);
+    expect(normalized.auxWidth).toBeGreaterThanOrEqual(AUX_MIN);
+  });
+
+  it("clamps restored panel heights at the current zoom and viewport", () => {
+    const scale = 1.5;
+    const normalized = normalizeLayoutSnapshot(
+      { ...DEFAULT_LAYOUT, panelVisible: true, panelHeight: 10_000 },
+      { viewportWidth: 1280, viewportHeight: 800, scale },
+    );
+
+    expect(
+      800 - (TITLE_BAR_H + STATUS_BAR_H) * scale - normalized.panelHeight,
+    ).toBeGreaterThanOrEqual(EDITOR_MIN_H * scale);
   });
 
   it("keeps every default pane usable when all panes are visible", () => {

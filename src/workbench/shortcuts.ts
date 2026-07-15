@@ -4,8 +4,14 @@ export function workbenchShortcutKey(event: KeyboardEvent): string {
   return event.key.toLowerCase();
 }
 
-export function isWorkbenchShortcut(event: KeyboardEvent): boolean {
-  if (!(event.metaKey || event.ctrlKey) || event.altKey) return false;
+export function isWorkbenchShortcut(
+  event: KeyboardEvent,
+  isMacOS = typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform),
+): boolean {
+  const primaryModifier = isMacOS ? event.metaKey : event.ctrlKey;
+  const secondaryModifier = isMacOS ? event.ctrlKey : event.metaKey;
+  if (!primaryModifier || secondaryModifier || event.altKey) return false;
 
   const key = workbenchShortcutKey(event);
   if (key === "p" || key === "b") return true;

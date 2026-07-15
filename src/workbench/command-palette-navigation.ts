@@ -14,6 +14,18 @@ export function movePaletteIndex(
   );
 }
 
+export function fuzzyPaletteMatch(query: string, text: string): boolean {
+  const queryCharacters = Array.from(query.toLocaleLowerCase());
+  if (queryCharacters.length === 0) return true;
+
+  let index = 0;
+  for (const character of text.toLocaleLowerCase()) {
+    if (character === queryCharacters[index]) index += 1;
+    if (index === queryCharacters.length) return true;
+  }
+  return false;
+}
+
 type PointerPosition = { x: number; y: number };
 
 export function hasPointerMoved(

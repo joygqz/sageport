@@ -1,9 +1,22 @@
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 #[cfg(target_os = "macos")]
 const DEFAULT_INSET_X: f64 = 13.0;
 #[cfg(target_os = "macos")]
 const DEFAULT_INSET_HEIGHT: f64 = 33.75;
+
+const MAX_TRAFFIC_LIGHT_INSET: f64 = 256.0;
+
+fn validate_traffic_light_inset(x: f64, height: f64) -> AppResult<()> {
+    if !x.is_finite()
+        || !height.is_finite()
+        || !(0.0..=MAX_TRAFFIC_LIGHT_INSET).contains(&x)
+        || !(1.0..=MAX_TRAFFIC_LIGHT_INSET).contains(&height)
+    {
+        return Err(AppError::Invalid("invalid traffic light inset".into()));
+    }
+    Ok(())
+}
 
 pub fn preset_traffic_light_inset(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
@@ -16,6 +29,7 @@ pub fn preset_traffic_light_inset(window: &tauri::WebviewWindow) {
 
 #[tauri::command]
 pub fn window_set_traffic_light_inset(window: tauri::Window, x: f64, height: f64) -> AppResult<()> {
+    validate_traffic_light_inset(x, height)?;
     #[cfg(target_os = "macos")]
     {
         let win = window.clone();
@@ -32,6 +46,29 @@ pub fn window_set_traffic_light_inset(window: tauri::Window, x: f64, height: f64
         let _ = (window, x, height);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_traffic_light_geometry() {
+        assert!(validate_traffic_light_inset(13.0, 37.5).is_ok());
+        for (x, height) in [
+            (-1.0, 37.5),
+            (13.0, 0.0),
+            (300.0, 37.5),
+            (13.0, 300.0),
+            (f64::NAN, 37.5),
+            (13.0, f64::INFINITY),
+        ] {
+            assert!(matches!(
+                validate_traffic_light_inset(x, height),
+                Err(AppError::Invalid(_))
+            ));
+        }
+    }
 }
 
 #[cfg(target_os = "macos")]

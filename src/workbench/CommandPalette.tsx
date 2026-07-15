@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import type { Host } from "@/types/models";
 import {
   clampPaletteIndex,
+  fuzzyPaletteMatch,
   hasPointerMoved,
   movePaletteIndex,
 } from "./command-palette-navigation";
@@ -48,17 +49,6 @@ export function CommandPalette({
   );
 }
 
-function fuzzyMatch(query: string, text: string): boolean {
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
-  let i = 0;
-  for (const ch of t) {
-    if (ch === q[i]) i++;
-    if (i === q.length) return true;
-  }
-  return q.length === 0;
-}
-
 type PaletteItem =
   | { type: "host"; host: Host }
   | { type: "command"; command: WorkbenchCommand }
@@ -91,8 +81,8 @@ function PaletteBody({
       return commands
         .filter(
           (c) =>
-            fuzzyMatch(query, c.label) ||
-            fuzzyMatch(query, `${t(c.categoryKey)} ${c.label}`),
+            fuzzyPaletteMatch(query, c.label) ||
+            fuzzyPaletteMatch(query, `${t(c.categoryKey)} ${c.label}`),
         )
         .map((command) => ({ type: "command", command }));
     }
@@ -102,9 +92,9 @@ function PaletteBody({
     const matches: PaletteItem[] = sorted
       .filter(
         (h) =>
-          fuzzyMatch(query, h.label) ||
-          fuzzyMatch(query, h.address) ||
-          fuzzyMatch(query, h.username ?? ""),
+          fuzzyPaletteMatch(query, h.label) ||
+          fuzzyPaletteMatch(query, h.address) ||
+          fuzzyPaletteMatch(query, h.username ?? ""),
       )
       .map((host) => ({ type: "host", host }));
     const adhoc = parseQuickConnect(query);
@@ -112,7 +102,7 @@ function PaletteBody({
     const quickActions = ["terminal.newLocal", "host.new"];
     for (const id of quickActions) {
       const command = commands.find((c) => c.id === id);
-      if (command && fuzzyMatch(query, command.label))
+      if (command && fuzzyPaletteMatch(query, command.label))
         matches.push({ type: "command", command });
     }
     return matches;

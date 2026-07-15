@@ -16,22 +16,40 @@ function key(
   } as KeyboardEvent;
 }
 
+const shortcut = (event: KeyboardEvent) => isWorkbenchShortcut(event, false);
+
 describe("isWorkbenchShortcut", () => {
   it("recognizes shortcuts that must not be sent to a terminal", () => {
-    expect(isWorkbenchShortcut(key("b"))).toBe(true);
-    expect(isWorkbenchShortcut(key("B", { shiftKey: true }))).toBe(true);
-    expect(isWorkbenchShortcut(key("T", { shiftKey: true }))).toBe(true);
-    expect(isWorkbenchShortcut(key("F"))).toBe(true);
+    expect(shortcut(key("b"))).toBe(true);
+    expect(shortcut(key("B", { shiftKey: true }))).toBe(true);
+    expect(shortcut(key("T", { shiftKey: true }))).toBe(true);
+    expect(shortcut(key("F"))).toBe(true);
+    expect(shortcut(key("{", { shiftKey: true, code: "BracketLeft" }))).toBe(
+      true,
+    );
+    expect(shortcut(key("+", { shiftKey: true }))).toBe(true);
+  });
+
+  it("uses Command on macOS without swallowing terminal Control keys", () => {
+    expect(isWorkbenchShortcut(key("b"), true)).toBe(false);
     expect(
-      isWorkbenchShortcut(key("{", { shiftKey: true, code: "BracketLeft" })),
+      isWorkbenchShortcut(key("b", { ctrlKey: false, metaKey: true }), true),
     ).toBe(true);
-    expect(isWorkbenchShortcut(key("+", { shiftKey: true }))).toBe(true);
+    expect(
+      isWorkbenchShortcut(key("b", { ctrlKey: true, metaKey: true }), true),
+    ).toBe(false);
+  });
+
+  it("does not treat the Windows key as Ctrl on other platforms", () => {
+    expect(
+      isWorkbenchShortcut(key("b", { ctrlKey: false, metaKey: true }), false),
+    ).toBe(false);
   });
 
   it("allows terminal control keys and unsupported modifier variants", () => {
-    expect(isWorkbenchShortcut(key("c"))).toBe(false);
-    expect(isWorkbenchShortcut(key("n", { shiftKey: true }))).toBe(false);
-    expect(isWorkbenchShortcut(key("b", { altKey: true }))).toBe(false);
-    expect(isWorkbenchShortcut(key("b", { ctrlKey: false }))).toBe(false);
+    expect(shortcut(key("c"))).toBe(false);
+    expect(shortcut(key("n", { shiftKey: true }))).toBe(false);
+    expect(shortcut(key("b", { altKey: true }))).toBe(false);
+    expect(shortcut(key("b", { ctrlKey: false }))).toBe(false);
   });
 });

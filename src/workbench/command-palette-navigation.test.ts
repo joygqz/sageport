@@ -2,11 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import {
   clampPaletteIndex,
+  fuzzyPaletteMatch,
   hasPointerMoved,
   movePaletteIndex,
 } from "./command-palette-navigation";
 
 describe("command palette navigation", () => {
+  it("fuzzy-matches Unicode code points and subsequences", () => {
+    expect(fuzzyPaletteMatch("sp", "Sageport")).toBe(true);
+    expect(fuzzyPaletteMatch("🛰️服", "🛰️服务器")).toBe(true);
+    expect(fuzzyPaletteMatch("🛰️x", "🛰️服务器")).toBe(false);
+  });
+
   it("keeps an empty list at a valid neutral index", () => {
     expect(clampPaletteIndex(-1, 0)).toBe(0);
     expect(movePaletteIndex(0, 1, 0)).toBe(0);

@@ -3,16 +3,19 @@ import { persist } from "zustand/middleware";
 
 import { useZoomStore, zoomFactor } from "./zoom";
 import {
-  AUX_DEFAULT,
   AUX_MIN,
-  PANEL_DEFAULT,
   PANEL_MIN,
-  SIDEBAR_DEFAULT,
   SIDEBAR_MIN,
   bottomPanelLimits,
   horizontalPanelLimits,
   type SashLimits,
 } from "./layout-sizing";
+import {
+  DEFAULT_LAYOUT,
+  normalizeLayoutSnapshot,
+  type Activity,
+  type LayoutSnapshot,
+} from "./layout-state";
 
 export {
   AUX_DEFAULT,
@@ -23,13 +26,9 @@ export {
   SIDEBAR_MIN,
 } from "./layout-sizing";
 
-export type Activity =
-  "hosts" | "credentials" | "snippets" | "forwards" | "monitor";
+export type { Activity } from "./layout-state";
 
 const uiScale = () => zoomFactor(useZoomStore.getState().level);
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.max(min, Math.min(value, max));
 
 interface LayoutState {
   activity: Activity;
@@ -90,73 +89,128 @@ export function panelLimits(
   return bottomPanelLimits(viewportHeight, scale);
 }
 
-function clampSidebar(
-  width: number,
-  s: { auxVisible: boolean; auxWidth: number },
-) {
-  const { min, max } = sidebarLimits(s);
-  return clamp(width, min, max);
+function snapshot(state: LayoutSnapshot): LayoutSnapshot {
+  return {
+    activity: state.activity,
+    sidebarVisible: state.sidebarVisible,
+    sidebarWidth: state.sidebarWidth,
+    panelVisible: state.panelVisible,
+    panelHeight: state.panelHeight,
+    auxVisible: state.auxVisible,
+    auxWidth: state.auxWidth,
+  };
 }
 
-function clampAux(
-  width: number,
-  s: { sidebarVisible: boolean; sidebarWidth: number },
-) {
-  const { min, max } = auxLimits(s);
-  return clamp(width, min, max);
+function environment() {
+  return {
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    scale: uiScale(),
+  };
 }
 
-function clampPanel(height: number) {
-  const { min, max } = panelLimits();
-  return clamp(height, min, max);
+function normalize(
+  value: unknown,
+  fallback: LayoutSnapshot = DEFAULT_LAYOUT,
+): LayoutSnapshot {
+  return normalizeLayoutSnapshot(value, environment(), fallback);
+}
+
+function finite(value: number): boolean {
+  return Number.isFinite(value);
+}
+
+function clampToLimits(value: number, limits: SashLimits): number {
+  return Math.max(limits.min, Math.min(value, limits.max));
 }
 
 export const useLayoutStore = create<LayoutState>()(
   persist(
     (set, get) => ({
-      activity: "hosts",
-      sidebarVisible: true,
-      sidebarWidth: SIDEBAR_DEFAULT,
-      panelVisible: false,
-      panelHeight: PANEL_DEFAULT,
-      auxVisible: false,
-      auxWidth: AUX_DEFAULT,
+      ...DEFAULT_LAYOUT,
 
       selectActivity: (activity) =>
         set((s) =>
-          s.activity === activity
-            ? { sidebarVisible: !s.sidebarVisible }
-            : { activity, sidebarVisible: true },
+          normalize(
+            {
+              ...snapshot(s),
+              activity,
+              sidebarVisible:
+                s.activity === activity ? !s.sidebarVisible : true,
+            },
+            s,
+          ),
         ),
-      toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
+      toggleSidebar: () =>
+        set((s) =>
+          normalize({ ...snapshot(s), sidebarVisible: !s.sidebarVisible }, s),
+        ),
       setSidebarWidth: (width) =>
-        set((s) => ({
-          sidebarWidth: clampSidebar(width, s),
-          sidebarVisible: width >= (SIDEBAR_MIN * uiScale()) / 2,
-        })),
-      togglePanel: () => set((s) => ({ panelVisible: !s.panelVisible })),
-      setPanelVisible: (visible) => set({ panelVisible: visible }),
+        set((s) =>
+          normalize(
+            {
+              ...snapshot(s),
+              sidebarWidth: finite(width)
+                ? clampToLimits(width, sidebarLimits(s))
+                : s.sidebarWidth,
+              sidebarVisible: finite(width)
+                ? width >= (SIDEBAR_MIN * uiScale()) / 2
+                : s.sidebarVisible,
+            },
+            s,
+          ),
+        ),
+      togglePanel: () =>
+        set((s) =>
+          normalize({ ...snapshot(s), panelVisible: !s.panelVisible }, s),
+        ),
+      setPanelVisible: (visible) =>
+        set((s) => normalize({ ...snapshot(s), panelVisible: visible }, s)),
       setPanelHeight: (height) =>
-        set({
-          panelHeight: clampPanel(height),
-          panelVisible: height >= (PANEL_MIN * uiScale()) / 2,
-        }),
-      toggleAux: () => set((s) => ({ auxVisible: !s.auxVisible })),
+        set((s) =>
+          normalize(
+            {
+              ...snapshot(s),
+              panelHeight: finite(height)
+                ? clampToLimits(height, panelLimits())
+                : s.panelHeight,
+              panelVisible: finite(height)
+                ? height >= (PANEL_MIN * uiScale()) / 2
+                : s.panelVisible,
+            },
+            s,
+          ),
+        ),
+      toggleAux: () =>
+        set((s) => normalize({ ...snapshot(s), auxVisible: !s.auxVisible }, s)),
       setAuxWidth: (width) =>
-        set((s) => ({
-          auxWidth: clampAux(width, s),
-          auxVisible: width >= (AUX_MIN * uiScale()) / 2,
-        })),
+        set((s) =>
+          normalize(
+            {
+              ...snapshot(s),
+              auxWidth: finite(width)
+                ? clampToLimits(width, auxLimits(s))
+                : s.auxWidth,
+              auxVisible: finite(width)
+                ? width >= (AUX_MIN * uiScale()) / 2
+                : s.auxVisible,
+            },
+            s,
+          ),
+        ),
 
       clampToViewport: () => {
         const s = get();
-        set({
-          sidebarWidth: clampSidebar(s.sidebarWidth, s),
-          auxWidth: clampAux(s.auxWidth, s),
-          panelHeight: clampPanel(s.panelHeight),
-        });
+        set(normalize(snapshot(s), s));
       },
     }),
-    { name: "sageport.workbench" },
+    {
+      name: "sageport.workbench",
+      partialize: (state) => snapshot(state),
+      merge: (persisted, current) => ({
+        ...current,
+        ...normalize(persisted, current),
+      }),
+    },
   ),
 );

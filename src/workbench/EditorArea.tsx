@@ -24,6 +24,7 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { useDragCursor } from "@/lib/pointerDrag";
+import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
 import { focusTerminal } from "@/features/terminal/sessions";
@@ -91,6 +92,17 @@ export function EditorArea() {
     (s) => s.clearPendingWindowClose,
   );
   const [savingBeforeWindowClose, setSavingBeforeWindowClose] = useState(false);
+  const savingBeforeWindowCloseRef = useRef(false);
+
+  const destroyWindow = async () => {
+    try {
+      await getCurrentWindow().destroy();
+      return true;
+    } catch (error) {
+      toast.error(t("windowControls.actionError"), errorMessage(error));
+      return false;
+    }
+  };
 
   useDragCursor(isDragging);
 
@@ -194,14 +206,14 @@ export function EditorArea() {
           {
             label: t("editor.discardAll"),
             variant: "secondary",
-            onSelect: async () => {
-              await getCurrentWindow().destroy();
-            },
+            onSelect: destroyWindow,
           },
           {
             label: t("editor.saveAll"),
             loading: savingBeforeWindowClose,
             onSelect: async () => {
+              if (savingBeforeWindowCloseRef.current) return false;
+              savingBeforeWindowCloseRef.current = true;
               setSavingBeforeWindowClose(true);
               try {
                 for (const tab of dirtyTabs) {
@@ -213,9 +225,9 @@ export function EditorArea() {
                   .getState()
                   .tabs.some((tab) => tab.kind === "file" && isFileDirty(tab));
                 if (stillDirty) return false;
-                await getCurrentWindow().destroy();
-                return true;
+                return destroyWindow();
               } finally {
+                savingBeforeWindowCloseRef.current = false;
                 setSavingBeforeWindowClose(false);
               }
             },
@@ -465,7 +477,10 @@ function TabItem({
     onDragMove(e.clientX, e.clientY);
   };
 
-  const finishPointerDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const finishPointerDrag = (
+    e: ReactPointerEvent<HTMLDivElement>,
+    cancelled = false,
+  ) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
     if (drag.active) e.preventDefault();
@@ -473,7 +488,7 @@ function TabItem({
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    onDragEnd(drag.active);
+    onDragEnd(drag.active && !cancelled);
   };
 
   return (
@@ -482,13 +497,17 @@ function TabItem({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={finishPointerDrag}
-      onPointerCancel={finishPointerDrag}
+      onPointerCancel={(event) => finishPointerDrag(event, true)}
+      onLostPointerCapture={(event) => finishPointerDrag(event, true)}
       onDoubleClick={(event) => {
         if ((event.target as HTMLElement).closest("[data-tab-close]")) return;
         reopen?.();
       }}
       onAuxClick={(e) => {
-        if (e.button === 1) onClose();
+        if (e.button === 1) {
+          e.preventDefault();
+          onClose();
+        }
       }}
       className={cn(
         WORKBENCH_TAB_CLASS,
@@ -538,6 +557,7 @@ function TabItem({
       <button
         data-tab-close
         type="button"
+        tabIndex={active ? 0 : -1}
         onClick={(e) => {
           e.stopPropagation();
           onClose();

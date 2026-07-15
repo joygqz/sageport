@@ -26,6 +26,7 @@ import {
 import type { TerminalSession } from "@/features/terminal/session";
 import {
   isFileDirty,
+  MAX_FILE_TABS,
   MAX_TERMINAL_TABS,
   targetTerminalId,
   terminalTabs,
@@ -88,6 +89,32 @@ describe("openTerminal", () => {
       }),
     ).not.toBeNull();
     expect(useTabsStore.getState().tabs).toHaveLength(MAX_TERMINAL_TABS);
+  });
+});
+
+describe("openFile", () => {
+  it("limits mounted file editors while still activating an existing file", () => {
+    const store = useTabsStore.getState();
+    for (let i = 0; i < MAX_FILE_TABS; i++) {
+      store.openFile({
+        connectionId: null,
+        path: `/tmp/${i}`,
+        name: String(i),
+      });
+    }
+
+    store.openFile({
+      connectionId: null,
+      path: "/tmp/overflow",
+      name: "overflow",
+    });
+    expect(useTabsStore.getState().tabs).toHaveLength(MAX_FILE_TABS);
+
+    useTabsStore.getState().setActive(useTabsStore.getState().tabs[0]!.id);
+    store.openFile({ connectionId: null, path: "/tmp/9", name: "9" });
+    expect(useTabsStore.getState().activeId).toBe(
+      useTabsStore.getState().tabs[9]!.id,
+    );
   });
 });
 
@@ -155,7 +182,6 @@ describe("close", () => {
     expect(useTabsStore.getState().requestWindowClose()).toBe(true);
     expect(useTabsStore.getState().pendingWindowClose).toBe(true);
 
-    useTabsStore.getState().clearPendingWindowClose();
     useTabsStore.setState({
       tabs: [{ ...tab, savedContent: "changed" }],
     });
