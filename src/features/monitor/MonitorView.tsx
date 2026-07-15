@@ -38,13 +38,11 @@ export function MonitorView() {
   const searching = query.trim().length > 0;
 
   useEffect(() => {
-    bridgeMonitorEvents();
+    void bridgeMonitorEvents().catch(() => {});
   }, []);
 
   const groups = groupByHost(
-    terminalTabs(tabs).filter(
-      (tab) => tab.target !== "local" && tab.status !== "error",
-    ),
+    terminalTabs(tabs).filter((tab) => tab.target !== "local"),
   );
   const hostById = new Map(hosts.map((host) => [host.id, host]));
   const q = query.trim().toLowerCase();
@@ -104,7 +102,12 @@ export function MonitorView() {
 function hostKey(tab: TerminalTab): string {
   if (tab.target === "ssh") return `host:${tab.hostId}`;
   if (tab.adhoc)
-    return `adhoc:${tab.adhoc.username}@${tab.adhoc.host}:${tab.adhoc.port}`;
+    return JSON.stringify([
+      "adhoc",
+      tab.adhoc.username,
+      tab.adhoc.host.toLowerCase(),
+      tab.adhoc.port,
+    ]);
   return tab.id;
 }
 
@@ -154,18 +157,34 @@ function HostCard({
   const { t } = useI18n();
   const setActive = useTabsStore((s) => s.setActive);
   const activeId = useTabsStore((s) => s.activeId);
-  const entry = useMonitorStore((s) =>
-    sessions
-      .map((session) => s.bySession[session.id])
-      .find((candidate) => candidate?.stats),
+  const connectedSessions = sessions.filter(
+    (session) => session.status === "connected",
   );
-  const unsupported = useMonitorStore((s) =>
-    sessions.some((session) => s.bySession[session.id]?.unsupported),
+  const entry = useMonitorStore((s) =>
+    connectedSessions
+      .map((session) => s.bySession[session.id])
+      .find(
+        (candidate, index) =>
+          candidate?.attempt === connectedSessions[index]?.attempt &&
+          Boolean(candidate.stats),
+      ),
+  );
+  const unsupported = useMonitorStore(
+    (s) =>
+      connectedSessions.length > 0 &&
+      connectedSessions.every((session) => {
+        const candidate = s.bySession[session.id];
+        return (
+          candidate?.attempt === session.attempt &&
+          candidate.unsupported === true
+        );
+      }),
   );
 
   const primary =
+    connectedSessions.find((session) => session.id === activeId) ??
+    connectedSessions[0] ??
     sessions.find((session) => session.id === activeId) ??
-    sessions.find((session) => session.status === "connected") ??
     sessions[0];
   const active = sessions.some((session) => session.id === activeId);
   const connected = sessions.some((session) => session.status === "connected");

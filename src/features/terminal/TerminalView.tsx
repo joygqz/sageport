@@ -71,7 +71,7 @@ export function TerminalView({
       : target === "ssh-adhoc" && adhoc
         ? sshAdhocTransport(sessionId, attempt, adhoc)
         : sshTransport(sessionId, hostId, attempt);
-    if (isSshLike) bridgeMonitorEvents();
+    if (isSshLike) void bridgeMonitorEvents().catch(() => {});
 
     const describeError = (code?: string | null, message?: string) => {
       const translate = translateRef.current;
@@ -100,9 +100,10 @@ export function TerminalView({
       watchHostKey: isSshLike,
       onStatus: (e) => {
         if (isSshLike) {
-          if (e.status === "connected") startMonitor(sessionId);
-          else if (e.status === "closed" || e.status === "error") {
-            stopMonitor(sessionId);
+          if (e.status === "connected") {
+            void startMonitor(sessionId, attempt).catch(() => {});
+          } else if (e.status === "closed" || e.status === "error") {
+            stopMonitor(sessionId, attempt);
             useHostKeyStore.getState().rejectSession(sessionId);
             usePasswordPromptStore.getState().cancelSession(sessionId);
           }
@@ -128,7 +129,7 @@ export function TerminalView({
       onDispose: () => {
         autocomplete.dispose();
         if (isSshLike) {
-          stopMonitor(sessionId);
+          stopMonitor(sessionId, attempt);
           useHostKeyStore.getState().rejectSession(sessionId);
           usePasswordPromptStore.getState().cancelSession(sessionId);
         }

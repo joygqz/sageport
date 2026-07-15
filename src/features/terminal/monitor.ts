@@ -4,6 +4,7 @@ import { ipc } from "@/lib/ipc";
 import type { HostStats } from "@/types/models";
 
 interface MonitorEntry {
+  attempt: number;
   stats?: HostStats;
   unsupported: boolean;
 }
@@ -15,15 +16,15 @@ export interface StatsPercents {
 }
 
 export function statsPercents(stats: HostStats): StatsPercents {
+  const percent = (value: number) =>
+    Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0;
   return {
-    cpu: Math.round((stats.cpuLoad / Math.max(stats.cpuCount, 1)) * 100),
+    cpu: percent((stats.cpuLoad / Math.max(stats.cpuCount, 1)) * 100),
     mem:
-      stats.memTotal > 0
-        ? Math.round((stats.memUsed / stats.memTotal) * 100)
-        : 0,
+      stats.memTotal > 0 ? percent((stats.memUsed / stats.memTotal) * 100) : 0,
     disk:
       stats.diskTotal > 0
-        ? Math.round((stats.diskUsed / stats.diskTotal) * 100)
+        ? percent((stats.diskUsed / stats.diskTotal) * 100)
         : 0,
   };
 }
@@ -46,30 +47,57 @@ export const useMonitorStore = create<MonitorState>((set) => ({
     }),
 }));
 
-let bridged = false;
+let bridgePromise: Promise<void> | undefined;
+let monitorUnlisten: (() => void) | undefined;
 
-export function bridgeMonitorEvents() {
-  if (bridged) return;
-  bridged = true;
-  void ipc.monitor.onStats((event) => {
-    useMonitorStore.getState().set(event.sessionId, {
-      stats: event.stats,
-      unsupported: event.unsupported,
+export function bridgeMonitorEvents(): Promise<void> {
+  if (monitorUnlisten) return Promise.resolve();
+  if (bridgePromise) return bridgePromise;
+
+  bridgePromise = ipc.monitor
+    .onStats((event) => {
+      if (started.get(event.sessionId) !== event.attempt) return;
+      useMonitorStore.getState().set(event.sessionId, {
+        attempt: event.attempt,
+        stats: event.stats,
+        unsupported: event.unsupported,
+      });
+    })
+    .then((unlisten) => {
+      monitorUnlisten = unlisten;
+    })
+    .finally(() => {
+      bridgePromise = undefined;
     });
-  });
+  return bridgePromise;
 }
 
-const started = new Set<string>();
+const started = new Map<string, number>();
 
-export function startMonitor(sessionId: string) {
-  if (started.has(sessionId)) return;
-  started.add(sessionId);
-  void ipc.monitor.start(sessionId).catch(() => started.delete(sessionId));
+export async function startMonitor(sessionId: string, attempt: number) {
+  if (started.get(sessionId) === attempt) return;
+  started.set(sessionId, attempt);
+  const current = useMonitorStore.getState().bySession[sessionId];
+  if (current && current.attempt !== attempt) {
+    useMonitorStore.getState().clear(sessionId);
+  }
+  void bridgeMonitorEvents()
+    .catch(() => bridgeMonitorEvents())
+    .catch(() => {});
+  try {
+    await ipc.monitor.start(sessionId, attempt);
+  } catch (error) {
+    if (started.get(sessionId) === attempt) started.delete(sessionId);
+    throw error;
+  }
 }
 
-export function stopMonitor(sessionId: string) {
-  if (!started.has(sessionId)) return;
+export function stopMonitor(sessionId: string, attempt: number) {
+  if (started.get(sessionId) !== attempt) return;
   started.delete(sessionId);
-  void ipc.monitor.stop(sessionId).catch(() => {});
-  useMonitorStore.getState().clear(sessionId);
+  void ipc.monitor.stop(sessionId, attempt).catch(() => {});
+  const entry = useMonitorStore.getState().bySession[sessionId];
+  if (!entry || entry.attempt === attempt) {
+    useMonitorStore.getState().clear(sessionId);
+  }
 }

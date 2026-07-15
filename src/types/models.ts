@@ -59,6 +59,7 @@ export interface HostStats {
 
 export interface MonitorStatsEvent {
   sessionId: string;
+  attempt: number;
   stats?: HostStats;
   unsupported: boolean;
 }

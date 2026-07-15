@@ -632,7 +632,10 @@ function HostRow({
   const connected = hostSessions.some((x) => x.status === "connected");
   const detectedOs = useMonitorStore((s) =>
     hostSessions
-      .map((session) => s.bySession[session.id]?.stats?.os)
+      .map((session) => {
+        const entry = s.bySession[session.id];
+        return entry?.attempt === session.attempt ? entry.stats?.os : undefined;
+      })
       .find((os): os is string => Boolean(os)),
   );
   const { mutate: setHostOsHint, isPending: settingHostOsHint } =

@@ -78,8 +78,12 @@ async function getHostStats(
     return toolFailure(sessionNotConnectedError(tab));
   }
 
-  bridgeMonitorEvents();
-  startMonitor(tab.id);
+  void bridgeMonitorEvents().catch(() => {});
+  try {
+    await startMonitor(tab.id, tab.attempt);
+  } catch {
+    return toolFailure(`Error: could not start monitoring "${tab.title}".`);
+  }
 
   const deadline = Date.now() + 6_000;
   while (Date.now() < deadline) {

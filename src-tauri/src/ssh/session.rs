@@ -68,11 +68,11 @@ impl SessionManager {
         Self::default()
     }
 
-    pub fn connection(&self, id: &str) -> Option<Arc<SshConnection>> {
+    pub fn connection_for_attempt(&self, id: &str, attempt: u32) -> Option<Arc<SshConnection>> {
         self.connections
             .lock()
             .get(id)
-            .map(|entry| entry.connection.clone())
+            .and_then(|entry| (entry.attempt == attempt).then(|| entry.connection.clone()))
     }
 
     pub fn reserve(&self, id: String, attempt: u32) -> Option<SessionReservation> {

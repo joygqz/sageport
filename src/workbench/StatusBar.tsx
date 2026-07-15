@@ -98,8 +98,11 @@ function MonitorItem() {
 
   const id = targetTerminalId({ tabs, activeId, lastTerminalId });
   if (!id) return null;
+  const session = terminalTabs(tabs).find((tab) => tab.id === id);
   const entry = bySession[id];
-  if (!entry?.stats) return null;
+  if (!session || entry?.attempt !== session.attempt || !entry.stats) {
+    return null;
+  }
 
   const { memUsed, memTotal, diskUsed, diskTotal } = entry.stats;
   const {

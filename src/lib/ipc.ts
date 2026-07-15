@@ -361,8 +361,10 @@ export const ipc = {
     clear: () => invoke<void>("history_clear"),
   },
   monitor: {
-    start: (sessionId: string) => invoke<void>("monitor_start", { sessionId }),
-    stop: (sessionId: string) => invoke<void>("monitor_stop", { sessionId }),
+    start: (sessionId: string, attempt: number) =>
+      invoke<void>("monitor_start", { sessionId, attempt }),
+    stop: (sessionId: string, attempt: number) =>
+      invoke<void>("monitor_stop", { sessionId, attempt }),
     onStats: (handler: (e: MonitorStatsEvent) => void): Promise<UnlistenFn> =>
       listen<MonitorStatsEvent>("monitor://stats", (event) =>
         handler(event.payload),
