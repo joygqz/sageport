@@ -4,6 +4,34 @@ import { readFileSync } from "node:fs";
 const root = new URL("..", import.meta.url).pathname;
 const problems = [];
 
+const packageJson = JSON.parse(readFileSync(root + "package.json", "utf8"));
+const tauriConfig = JSON.parse(
+  readFileSync(root + "src-tauri/tauri.conf.json", "utf8"),
+);
+const cargoToml = readFileSync(root + "src-tauri/Cargo.toml", "utf8");
+const cargoVersion = cargoToml.match(
+  /^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/m,
+)?.[1];
+const versions = new Map([
+  ["package.json", packageJson.version],
+  ["src-tauri/tauri.conf.json", tauriConfig.version],
+  ["src-tauri/Cargo.toml", cargoVersion],
+]);
+for (const [file, version] of versions) {
+  if (version !== packageJson.version) {
+    problems.push(
+      `${file}: version ${String(version)} does not match package.json ${packageJson.version}`,
+    );
+  }
+}
+
+const releaseTag = process.env.SAGEPORT_RELEASE_TAG;
+if (releaseTag && releaseTag !== `v${packageJson.version}`) {
+  problems.push(
+    `release tag ${releaseTag} does not match application version v${packageJson.version}`,
+  );
+}
+
 function tracked(glob) {
   return execSync(`git ls-files ${glob}`, { cwd: root, encoding: "utf8" })
     .split("\n")

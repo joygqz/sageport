@@ -11,6 +11,9 @@ use crate::state::AppState;
 pub const EVENT: &str = "update://status";
 
 const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(4 * 60 * 60);
+const CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+const DOWNLOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+const MAX_RELEASE_NOTES_BYTES: usize = 16 * 1024;
 
 const LAST_CHECKED_AT_KEY: &str = "update.last_checked_at";
 const LAST_KNOWN_VERSION_KEY: &str = "update.last_known_version";
@@ -35,14 +38,24 @@ pub enum UpdateStatus {
         version: String,
     },
     Error {
+        operation: UpdateOperation,
         message: String,
     },
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum UpdateOperation {
+    Check,
+    Install,
+}
+
 pub struct UpdateManager {
     status: Mutex<UpdateStatus>,
-
     pending: Mutex<Option<Update>>,
+    /// Prevents a periodic check, a manual check, and repeated install clicks
+    /// from racing and replacing each other's status or pending package.
+    operation: tokio::sync::Mutex<()>,
 }
 
 impl UpdateManager {
@@ -50,6 +63,7 @@ impl UpdateManager {
         Self {
             status: Mutex::new(UpdateStatus::Idle),
             pending: Mutex::new(None),
+            operation: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -61,7 +75,9 @@ impl UpdateManager {
 pub fn can_self_update() -> bool {
     #[cfg(target_os = "linux")]
     {
-        std::env::var_os("APPIMAGE").is_some()
+        std::env::var_os("APPIMAGE")
+            .filter(|path| !path.is_empty())
+            .is_some_and(|path| std::path::Path::new(&path).is_file())
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -69,15 +85,32 @@ pub fn can_self_update() -> bool {
     }
 }
 
+fn release_notes(body: Option<&str>) -> Option<String> {
+    let body = body?.trim();
+    if body.is_empty() {
+        return None;
+    }
+
+    let mut end = body.len().min(MAX_RELEASE_NOTES_BYTES);
+    while !body.is_char_boundary(end) {
+        end -= 1;
+    }
+    let mut notes = body[..end].to_string();
+    if end < body.len() {
+        notes.push('…');
+    }
+    Some(notes)
+}
+
 fn set_status(app: &AppHandle, mgr: &UpdateManager, status: UpdateStatus) {
     *mgr.status.lock() = status.clone();
     let _ = app.emit(EVENT, status);
 }
 
-async fn persist_check(pool: &SqlitePool, update: Option<&Update>) {
+async fn persist_check(pool: &SqlitePool, update: Option<(&str, Option<&str>)>) {
     let _ = settings_repo::set(pool, LAST_CHECKED_AT_KEY, &now()).await;
     let (version, body) = match update {
-        Some(u) => (u.version.as_str(), u.body.as_deref().unwrap_or("")),
+        Some((version, body)) => (version, body.unwrap_or("")),
         None => ("", ""),
     };
     let _ = settings_repo::set(pool, LAST_KNOWN_VERSION_KEY, version).await;
@@ -99,19 +132,31 @@ pub async fn run_periodic(app: AppHandle) {
 
 pub async fn check(app: &AppHandle) -> UpdateStatus {
     let state = app.state::<AppState>();
+    let Ok(_operation) = state.update.operation.try_lock() else {
+        return state.update.snapshot();
+    };
+
+    let current = state.update.snapshot();
+    if matches!(
+        current,
+        UpdateStatus::Downloading { .. } | UpdateStatus::Ready { .. }
+    ) {
+        return current;
+    }
     set_status(app, &state.update, UpdateStatus::Checking);
 
-    let outcome = match app.updater() {
+    let outcome = match app.updater_builder().timeout(CHECK_TIMEOUT).build() {
         Ok(updater) => updater.check().await,
         Err(e) => Err(e),
     };
 
     let status = match outcome {
         Ok(Some(update)) => {
-            persist_check(&state.db, Some(&update)).await;
+            let body = release_notes(update.body.as_deref());
+            persist_check(&state.db, Some((&update.version, body.as_deref()))).await;
             let status = UpdateStatus::Available {
                 version: update.version.clone(),
-                body: update.body.clone(),
+                body,
             };
             *state.update.pending.lock() = Some(update);
             status
@@ -122,6 +167,7 @@ pub async fn check(app: &AppHandle) -> UpdateStatus {
             UpdateStatus::UpToDate
         }
         Err(e) => UpdateStatus::Error {
+            operation: UpdateOperation::Check,
             message: e.to_string(),
         },
     };
@@ -132,9 +178,23 @@ pub async fn check(app: &AppHandle) -> UpdateStatus {
 
 pub async fn install(app: &AppHandle) -> UpdateStatus {
     let state = app.state::<AppState>();
-    let update = state.update.pending.lock().clone();
-    let Some(update) = update else {
+
+    if !can_self_update() {
         let status = UpdateStatus::Error {
+            operation: UpdateOperation::Install,
+            message: "self-update is unavailable for this installation".to_string(),
+        };
+        set_status(app, &state.update, status.clone());
+        return status;
+    }
+
+    let Ok(_operation) = state.update.operation.try_lock() else {
+        return state.update.snapshot();
+    };
+
+    let Some(mut update) = state.update.pending.lock().clone() else {
+        let status = UpdateStatus::Error {
+            operation: UpdateOperation::Install,
             message: "no update available to install".to_string(),
         };
         set_status(app, &state.update, status.clone());
@@ -142,6 +202,7 @@ pub async fn install(app: &AppHandle) -> UpdateStatus {
     };
 
     let version = update.version.clone();
+    update.timeout = Some(DOWNLOAD_TIMEOUT);
     set_status(
         app,
         &state.update,
@@ -158,7 +219,7 @@ pub async fn install(app: &AppHandle) -> UpdateStatus {
     let result = update
         .download_and_install(
             move |chunk_len, total| {
-                downloaded += chunk_len as u64;
+                downloaded = downloaded.saturating_add(chunk_len as u64);
                 let state = app_progress.state::<AppState>();
                 set_status(
                     &app_progress,
@@ -177,9 +238,37 @@ pub async fn install(app: &AppHandle) -> UpdateStatus {
     let status = match result {
         Ok(()) => UpdateStatus::Ready { version },
         Err(e) => UpdateStatus::Error {
+            operation: UpdateOperation::Install,
             message: e.to_string(),
         },
     };
     set_status(app, &state.update, status.clone());
     status
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn release_notes_trim_empty_and_bound_utf8() {
+        assert_eq!(release_notes(None), None);
+        assert_eq!(release_notes(Some(" \n\t ")), None);
+        assert_eq!(release_notes(Some("  fixes  ")).as_deref(), Some("fixes"));
+
+        let long = "界".repeat(MAX_RELEASE_NOTES_BYTES);
+        let notes = release_notes(Some(&long)).unwrap();
+        assert!(notes.len() <= MAX_RELEASE_NOTES_BYTES + '…'.len_utf8());
+        assert!(notes.ends_with('…'));
+        assert!(notes.is_char_boundary(notes.len()));
+    }
+
+    #[tokio::test]
+    async fn update_operations_are_exclusive() {
+        let manager = UpdateManager::new();
+        let first = manager.operation.try_lock().unwrap();
+        assert!(manager.operation.try_lock().is_err());
+        drop(first);
+        assert!(manager.operation.try_lock().is_ok());
+    }
 }

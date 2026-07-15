@@ -33,6 +33,13 @@ function openExternal(url: string, t: TFunction): void {
   );
 }
 
+function runUpdateAction(
+  action: () => Promise<unknown>,
+  errorTitle: string,
+): void {
+  void action().catch((error) => toast.error(errorTitle, errorMessage(error)));
+}
+
 export function AboutSection() {
   const { t } = useI18n();
   const state = useUpdateStatus();
@@ -84,7 +91,7 @@ function UpdateStatusCard({
   canSelfUpdate,
 }: {
   state: UpdateStatus;
-  canSelfUpdate: boolean;
+  canSelfUpdate: boolean | null;
 }) {
   const { t } = useI18n();
   const progress =
@@ -97,7 +104,13 @@ function UpdateStatusCard({
   let icon = <RefreshCw />;
   let iconClassName = "text-muted-foreground";
   let action: ReactNode = (
-    <Button variant="outline" size="sm" onClick={() => void ipc.update.check()}>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() =>
+        runUpdateAction(ipc.update.check, t("settings.about.update.checkError"))
+      }
+    >
       <RefreshCw />
       {t("settings.about.update.check")}
     </Button>
@@ -125,17 +138,26 @@ function UpdateStatusCard({
       t("settings.about.update.currentVersion", { version: __APP_VERSION__ });
     icon = <Sparkles />;
     iconClassName = "text-link";
-    action = canSelfUpdate ? (
-      <Button size="sm" onClick={() => void ipc.update.install()}>
-        <Download />
-        {t("settings.about.update.install")}
-      </Button>
-    ) : (
-      <Button size="sm" onClick={() => openExternal(RELEASES_URL, t)}>
-        <ExternalLink />
-        {t("settings.about.update.viewRelease")}
-      </Button>
-    );
+    action =
+      canSelfUpdate === true ? (
+        <Button
+          size="sm"
+          onClick={() =>
+            runUpdateAction(
+              ipc.update.install,
+              t("settings.about.update.installError"),
+            )
+          }
+        >
+          <Download />
+          {t("settings.about.update.install")}
+        </Button>
+      ) : (
+        <Button size="sm" onClick={() => openExternal(RELEASES_URL, t)}>
+          <ExternalLink />
+          {t("settings.about.update.viewRelease")}
+        </Button>
+      );
   } else if (state.status === "downloading") {
     title = t("settings.about.update.downloadingVersion", {
       version: state.version,
@@ -155,13 +177,22 @@ function UpdateStatusCard({
     icon = <CheckCircle2 />;
     iconClassName = "text-success";
     action = (
-      <Button size="sm" onClick={() => void relaunch()}>
+      <Button
+        size="sm"
+        onClick={() =>
+          runUpdateAction(relaunch, t("settings.about.update.restartError"))
+        }
+      >
         <RefreshCw />
         {t("settings.about.update.restart")}
       </Button>
     );
   } else if (state.status === "error") {
-    title = t("settings.about.update.errorTitle");
+    title = t(
+      state.operation === "install"
+        ? "settings.about.update.installError"
+        : "settings.about.update.checkError",
+    );
     description = state.message;
     icon = <CircleAlert />;
     iconClassName = "text-danger";

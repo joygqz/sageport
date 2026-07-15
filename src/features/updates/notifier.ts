@@ -4,12 +4,17 @@ import { relaunch } from "@tauri-apps/plugin-process";
 
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
-import { useToastStore } from "@/lib/toast";
+import { errorMessage, toast, useToastStore } from "@/lib/toast";
 import { useOverlayStore } from "@/workbench/overlays";
 import { RELEASES_URL, useCanSelfUpdate, useUpdateStatus } from "./api";
 
 const notified = new Set<string>();
 let availableToastId: string | null = null;
+let availableToastVersion: string | null = null;
+
+function runAction(action: () => Promise<unknown>, errorTitle: string): void {
+  void action().catch((error) => toast.error(errorTitle, errorMessage(error)));
+}
 
 export function useUpdateNotifier() {
   const { t } = useI18n();
@@ -19,16 +24,21 @@ export function useUpdateNotifier() {
   useEffect(() => {
     const { push, dismiss } = useToastStore.getState();
 
-    if (
-      (state.status === "downloading" || state.status === "ready") &&
-      availableToastId
-    ) {
+    if (state.status !== "available" && availableToastId) {
       dismiss(availableToastId);
       availableToastId = null;
+      availableToastVersion = null;
     }
 
-    if (state.status === "available" && !notified.has(state.version)) {
+    if (
+      state.status === "available" &&
+      canSelfUpdate !== null &&
+      !notified.has(state.version)
+    ) {
       notified.add(state.version);
+      if (availableToastId && availableToastVersion !== state.version) {
+        dismiss(availableToastId);
+      }
       if (canSelfUpdate) {
         availableToastId = push({
           kind: "info",
@@ -39,7 +49,11 @@ export function useUpdateNotifier() {
           actions: [
             {
               label: t("settings.about.update.install"),
-              onClick: () => void ipc.update.install(),
+              onClick: () =>
+                runAction(
+                  ipc.update.install,
+                  t("settings.about.update.installError"),
+                ),
             },
             {
               label: t("settings.about.update.details"),
@@ -48,7 +62,7 @@ export function useUpdateNotifier() {
           ],
         });
       } else {
-        push({
+        availableToastId = push({
           kind: "info",
           title: t("settings.about.update.available", {
             version: state.version,
@@ -56,11 +70,16 @@ export function useUpdateNotifier() {
           actions: [
             {
               label: t("settings.about.update.viewRelease"),
-              onClick: () => void openUrl(RELEASES_URL),
+              onClick: () =>
+                runAction(
+                  () => openUrl(RELEASES_URL),
+                  t("settings.about.openLinkError"),
+                ),
             },
           ],
         });
       }
+      availableToastVersion = state.version;
     }
 
     if (state.status === "ready" && !notified.has(`ready:${state.version}`)) {
@@ -72,9 +91,23 @@ export function useUpdateNotifier() {
         actions: [
           {
             label: t("settings.about.update.restart"),
-            onClick: () => void relaunch(),
+            onClick: () =>
+              runAction(relaunch, t("settings.about.update.restartError")),
           },
         ],
+      });
+    }
+
+    if (
+      state.status === "error" &&
+      state.operation === "install" &&
+      !notified.has(`install-error:${state.message}`)
+    ) {
+      notified.add(`install-error:${state.message}`);
+      push({
+        kind: "error",
+        title: t("settings.about.update.installError"),
+        description: state.message,
       });
     }
   }, [state, t, canSelfUpdate]);

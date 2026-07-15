@@ -25,7 +25,14 @@ jobs:
     steps:
       - name: Resolve tag
         id: tag
-        run: echo "value=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+        env:
+          CANDIDATE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if [[ ! "$CANDIDATE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Invalid release tag: $CANDIDATE_TAG" >&2
+            exit 1
+          fi
+          printf 'value=%s\n' "$CANDIDATE_TAG" >> "$GITHUB_OUTPUT"
 
   verify:
     needs: prepare

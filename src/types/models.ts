@@ -510,4 +510,8 @@ export type UpdateStatus =
       total: number | null;
     }
   | { status: "ready"; version: string }
-  | { status: "error"; message: string };
+  | {
+      status: "error";
+      operation: "check" | "install";
+      message: string;
+    };

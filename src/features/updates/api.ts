@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { ipc } from "@/lib/ipc";
+import { errorMessage } from "@/lib/toast";
 import type { UpdateStatus } from "@/types/models";
+import { initializeUpdateStatus, probeSelfUpdate } from "./subscription";
 
 export const RELEASES_URL =
   "https://github.com/joygqz/sageport/releases/latest";
@@ -9,12 +11,14 @@ export const RELEASES_URL =
 let canSelfUpdatePromise: Promise<boolean> | null = null;
 
 function fetchCanSelfUpdate(): Promise<boolean> {
-  canSelfUpdatePromise ??= ipc.update.canSelfUpdate().catch(() => true);
+  // A failed capability probe must never expose an install action that the
+  // current package may not support (notably deb/rpm builds on Linux).
+  canSelfUpdatePromise ??= probeSelfUpdate(ipc.update.canSelfUpdate);
   return canSelfUpdatePromise;
 }
 
-export function useCanSelfUpdate(): boolean {
-  const [canSelfUpdate, setCanSelfUpdate] = useState(true);
+export function useCanSelfUpdate(): boolean | null {
+  const [canSelfUpdate, setCanSelfUpdate] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,15 +38,34 @@ export function useUpdateStatus(): UpdateStatus {
 
   useEffect(() => {
     let cancelled = false;
-    void ipc.update.status().then((s) => {
-      if (!cancelled) setState(s);
-    });
-    const unlisten = ipc.update.onStatus((s) => {
-      if (!cancelled) setState(s);
-    });
+    let unlisten: (() => void) | undefined;
+
+    void initializeUpdateStatus({
+      listen: ipc.update.onStatus,
+      read: ipc.update.status,
+      apply: setState,
+      active: () => !cancelled,
+    })
+      .then((stop) => {
+        if (cancelled) {
+          stop();
+        } else {
+          unlisten = stop;
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setState({
+            status: "error",
+            operation: "check",
+            message: errorMessage(error),
+          });
+        }
+      });
+
     return () => {
       cancelled = true;
-      void unlisten.then((un) => un());
+      unlisten?.();
     };
   }, []);
 
