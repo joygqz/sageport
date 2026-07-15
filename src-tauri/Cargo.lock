@@ -5083,7 +5083,7 @@ dependencies = [
  "rusty-s3",
  "serde",
  "serde_json",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "sqlx",
  "ssh-key 0.6.7",
  "tar",

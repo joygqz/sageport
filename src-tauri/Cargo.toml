@@ -56,7 +56,7 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "que
 parking_lot = "0.12"
 
 async-trait = "0.1"
-sha2 = "0.10"
+sha2 = "0.11"
 url = "2"
 quick-xml = "0.41"
 rusty-s3 = "0.10"
