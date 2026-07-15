@@ -54,6 +54,7 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             let db_path = data_dir.join("sageport.db");
             let pool = tauri::async_runtime::block_on(db::init(&db_path))?;
+            tauri::async_runtime::block_on(repository::transfer_repo::mark_interrupted(&pool))?;
             app.manage(AppState::new(pool));
 
             if let Some(window) = app.get_webview_window("main") {

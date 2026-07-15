@@ -93,20 +93,109 @@ pub async fn list(pool: &SqlitePool, limit: i64) -> AppResult<Vec<TransferRow>> 
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
-    let affected = sqlx::query("DELETE FROM sftp_transfers WHERE id = ?")
+    let affected = sqlx::query("DELETE FROM sftp_transfers WHERE id = ? AND status != 'active'")
         .bind(id)
         .execute(pool)
         .await?
         .rows_affected();
     if affected == 0 {
+        let active: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM sftp_transfers WHERE id = ? AND status = 'active')",
+        )
+        .bind(id)
+        .fetch_one(pool)
+        .await?;
+        if active {
+            return Err(AppError::InUse(format!("transfer {id} is still active")));
+        }
         return Err(AppError::NotFound(format!("transfer {id}")));
     }
     Ok(())
 }
 
 pub async fn clear(pool: &SqlitePool) -> AppResult<()> {
-    sqlx::query("DELETE FROM sftp_transfers")
+    sqlx::query("DELETE FROM sftp_transfers WHERE status != 'active'")
         .execute(pool)
         .await?;
     Ok(())
+}
+
+pub async fn mark_interrupted(pool: &SqlitePool) -> AppResult<u64> {
+    let ts = now();
+    let result = sqlx::query(
+        "UPDATE sftp_transfers
+         SET status = 'error', message = 'application closed before transfer completed',
+             finished_at = ?
+         WHERE status = 'active'",
+    )
+    .bind(ts)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clear, create, delete, finish, list, mark_interrupted};
+    use crate::error::AppError;
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    async fn pool() -> sqlx::SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("connect sqlite");
+        sqlx::query(
+            "CREATE TABLE sftp_transfers (
+                id TEXT PRIMARY KEY NOT NULL,
+                source_label TEXT NOT NULL,
+                source_path TEXT NOT NULL,
+                source_connection_id TEXT,
+                dest_path TEXT NOT NULL,
+                dest_connection_id TEXT,
+                total_bytes INTEGER NOT NULL DEFAULT 0,
+                transferred_bytes INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'active',
+                message TEXT,
+                started_at TEXT NOT NULL,
+                finished_at TEXT
+            )",
+        )
+        .execute(&pool)
+        .await
+        .expect("create transfer table");
+        pool
+    }
+
+    #[tokio::test]
+    async fn protects_active_history_and_recovers_interrupted_transfers() {
+        let pool = pool().await;
+        create(&pool, "active", "a", "/a", None, "/dest", None)
+            .await
+            .expect("create active transfer");
+        create(&pool, "done", "b", "/b", None, "/dest", None)
+            .await
+            .expect("create finished transfer");
+        finish(&pool, "done", 2, 2, "done", None)
+            .await
+            .expect("finish transfer");
+
+        assert!(matches!(
+            delete(&pool, "active").await,
+            Err(AppError::InUse(_))
+        ));
+        clear(&pool).await.expect("clear finished history");
+        assert_eq!(list(&pool, 10).await.expect("list history").len(), 1);
+
+        assert_eq!(mark_interrupted(&pool).await.expect("recover active"), 1);
+        let rows = list(&pool, 10).await.expect("list recovered history");
+        assert_eq!(rows[0].status, "error");
+        assert!(rows[0].finished_at.is_some());
+        clear(&pool).await.expect("clear recovered history");
+        assert!(list(&pool, 10)
+            .await
+            .expect("list empty history")
+            .is_empty());
+    }
 }

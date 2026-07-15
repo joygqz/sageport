@@ -15,6 +15,7 @@ vi.mock("@/lib/ipc", () => ({
 
 vi.stubGlobal("localStorage", { getItem: vi.fn(() => "en") });
 
+import { ipc } from "@/lib/ipc";
 import {
   isFileDirty,
   MAX_TERMINAL_TABS,
@@ -33,11 +34,14 @@ function openHost(id: string): string {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(ipc.sftp.writeText).mockResolvedValue(undefined);
   useTabsStore.setState({
     tabs: [],
     activeId: null,
     lastTerminalId: null,
     pendingCloseId: null,
+    pendingWindowClose: false,
   });
 });
 
@@ -125,6 +129,85 @@ describe("close", () => {
     expect(s.tabs).toHaveLength(1);
     useTabsStore.getState().close("f1", { force: true });
     expect(useTabsStore.getState().tabs).toHaveLength(0);
+  });
+
+  it("blocks a window close while any file has unsaved content", () => {
+    const tab: FileTab = {
+      kind: "file",
+      id: "dirty",
+      connectionId: null,
+      path: "/tmp/dirty",
+      title: "dirty",
+      content: "changed",
+      savedContent: "original",
+      saving: false,
+    };
+    useTabsStore.setState({ tabs: [tab] });
+
+    expect(useTabsStore.getState().requestWindowClose()).toBe(true);
+    expect(useTabsStore.getState().pendingWindowClose).toBe(true);
+
+    useTabsStore.getState().clearPendingWindowClose();
+    useTabsStore.setState({
+      tabs: [{ ...tab, savedContent: "changed" }],
+    });
+    expect(useTabsStore.getState().requestWindowClose()).toBe(false);
+    expect(useTabsStore.getState().pendingWindowClose).toBe(false);
+  });
+});
+
+describe("saveFile", () => {
+  it("uses the loaded content as an optimistic concurrency guard", async () => {
+    const tab: FileTab = {
+      kind: "file",
+      id: "file",
+      connectionId: "remote",
+      path: "/etc/app.conf",
+      title: "app.conf",
+      content: "new",
+      savedContent: "old",
+      saving: false,
+    };
+    useTabsStore.setState({ tabs: [tab] });
+
+    await expect(useTabsStore.getState().saveFile(tab.id)).resolves.toBe(true);
+    expect(ipc.sftp.writeText).toHaveBeenCalledWith(
+      "remote",
+      "/etc/app.conf",
+      "new",
+      "old",
+    );
+  });
+
+  it("stays dirty when the buffer changes while a save is in flight", async () => {
+    let finish: (() => void) | undefined;
+    vi.mocked(ipc.sftp.writeText).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const tab: FileTab = {
+      kind: "file",
+      id: "file",
+      connectionId: null,
+      path: "/tmp/file",
+      title: "file",
+      content: "first edit",
+      savedContent: "old",
+      saving: false,
+    };
+    useTabsStore.setState({ tabs: [tab] });
+
+    const saving = useTabsStore.getState().saveFile(tab.id);
+    useTabsStore.getState().updateFileContent(tab.id, "second edit");
+    finish?.();
+
+    await expect(saving).resolves.toBe(false);
+    const current = useTabsStore.getState().tabs[0] as FileTab;
+    expect(current.savedContent).toBe("first edit");
+    expect(current.content).toBe("second edit");
+    expect(isFileDirty(current)).toBe(true);
   });
 });
 

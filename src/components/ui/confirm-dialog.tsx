@@ -15,7 +15,8 @@ export interface ConfirmAction {
   variant?: ButtonProps["variant"];
   loading?: boolean;
   disabled?: boolean;
-  onSelect: () => void | Promise<void>;
+  /** Return false to keep the confirmation open after an unsuccessful action. */
+  onSelect: () => void | boolean | Promise<void | boolean>;
 }
 
 export interface ConfirmState {
@@ -66,8 +67,7 @@ export function ConfirmDialog({
                     disabled={action.disabled || busy}
                     onClick={async (event) => {
                       event.preventDefault();
-                      await action.onSelect();
-                      onClose();
+                      if ((await action.onSelect()) !== false) onClose();
                     }}
                   >
                     {action.label}

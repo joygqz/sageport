@@ -167,16 +167,25 @@ pub async fn transfer(
         last_emit: Arc::new(Mutex::new(Instant::now())),
     };
 
+    let staged_name = format!(".sageport-transfer-{}", uuid::Uuid::new_v4());
     let mut done = 0u64;
-    let result = tokio::select! {
+    let copy_result = tokio::select! {
         biased;
         _ = progress.cancel.cancelled() => Err(AppError::Cancelled),
-        result = transfer_node(app, mgr, source, dest_dir, &name, &progress, &mut done) => result,
+        result = transfer_node(app, mgr, source, dest_dir, &staged_name, &progress, &mut done) => result,
     };
+    let result = match copy_result {
+        Ok(()) if progress.cancel.is_cancelled() => Err(AppError::Cancelled),
+        Ok(()) => commit_staged(mgr, dest_dir, &staged_name, &name).await,
+        Err(error) => Err(error),
+    };
+    if result.is_err() {
+        cleanup_staged(mgr, dest_dir, &staged_name, source_is_dir).await;
+    }
     match result {
         Ok(()) => {
-            emit(app, &at(&progress, &name), total, "done", None);
-            outcome(total, total, "done", None)
+            emit(app, &at(&progress, &name), done, "done", None);
+            outcome(done, done, "done", None)
         }
         Err(AppError::Cancelled) => {
             emit(app, &at(&progress, &name), done, "cancelled", None);
@@ -268,6 +277,11 @@ async fn transfer_node(
     if progress.cancel.is_cancelled() {
         return Err(AppError::Cancelled);
     }
+    if is_symlink(mgr, source).await? {
+        return Err(AppError::Invalid(
+            "symbolic link transfer requires archive support".into(),
+        ));
+    }
     let dest_path = dest_join(dest_dir.connection_id.as_deref(), &dest_dir.path, name);
 
     if is_dir(mgr, source).await? {
@@ -292,6 +306,7 @@ async fn transfer_node(
             ))
             .await?;
         }
+        copy_permissions(mgr, source, &dest_child).await?;
         Ok(())
     } else {
         let dest = Endpoint {
@@ -309,12 +324,12 @@ async fn copy_file(
     dest: &Endpoint,
     progress: &ProgressCtx,
     done: &mut u64,
-    label: &str,
+    _dest_name: &str,
 ) -> AppResult<()> {
     let size = file_size(mgr, source).await?;
     let ctx = ProgressCtx {
         base: *done,
-        label: label.to_string(),
+        label: base_name(&source.path),
         ..progress.clone()
     };
 
@@ -347,8 +362,46 @@ async fn copy_file(
         }
     }
 
+    copy_permissions(mgr, source, dest).await?;
     *done += size;
     Ok(())
+}
+
+async fn copy_permissions(mgr: &SftpManager, source: &Endpoint, dest: &Endpoint) -> AppResult<()> {
+    let mode = match &source.connection_id {
+        None => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                Some(fs::metadata(&source.path).await?.permissions().mode() & 0o7777)
+            }
+            #[cfg(not(unix))]
+            None
+        }
+        Some(id) => mgr
+            .get(id)?
+            .session()
+            .metadata(&source.path)
+            .await?
+            .permissions
+            .map(|permissions| permissions & 0o7777),
+    };
+    let Some(mode) = mode else {
+        return Ok(());
+    };
+    match &dest.connection_id {
+        None => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&dest.path, std::fs::Permissions::from_mode(mode)).await?;
+            }
+            #[cfg(not(unix))]
+            let _ = mode;
+            Ok(())
+        }
+        Some(id) => mgr.chmod(id, &dest.path, mode).await,
+    }
 }
 
 async fn copy_stream<R, W>(
@@ -401,6 +454,11 @@ async fn validate_transfer_target(
     dest_dir: &Endpoint,
     name: &str,
 ) -> AppResult<()> {
+    if target_exists(mgr, dest_dir, name).await? {
+        return Err(AppError::Conflict(format!(
+            "destination already contains {name}"
+        )));
+    }
     if source.connection_id != dest_dir.connection_id {
         return Ok(());
     }
@@ -440,6 +498,9 @@ async fn validate_transfer_target(
 }
 
 async fn source_size(mgr: &SftpManager, ep: &Endpoint) -> AppResult<u64> {
+    if !is_dir(mgr, ep).await? {
+        return file_size(mgr, ep).await;
+    }
     match &ep.connection_id {
         None => {
             let path = ep.path.clone();
@@ -452,15 +513,77 @@ async fn source_size(mgr: &SftpManager, ep: &Endpoint) -> AppResult<u64> {
 }
 
 async fn remote_size(mgr: &SftpManager, id: &str, path: &str) -> AppResult<u64> {
-    let mut total = 0;
+    let mut total: u64 = 0;
     for entry in mgr.list(id, path).await? {
-        if entry.kind == "dir" {
-            total += Box::pin(remote_size(mgr, id, &entry.path)).await?;
-        } else {
-            total += entry.size;
+        if entry.is_symlink {
+            return Err(AppError::Invalid(
+                "symbolic link transfer requires archive support".into(),
+            ));
         }
+        let size = if entry.kind == "dir" {
+            Box::pin(remote_size(mgr, id, &entry.path)).await?
+        } else {
+            entry.size
+        };
+        total = total
+            .checked_add(size)
+            .ok_or_else(|| AppError::Invalid("transfer is too large".into()))?;
     }
     Ok(total)
+}
+
+async fn target_exists(mgr: &SftpManager, dest_dir: &Endpoint, name: &str) -> AppResult<bool> {
+    match &dest_dir.connection_id {
+        None => Ok(fs::try_exists(Path::new(&dest_dir.path).join(name)).await?),
+        Some(id) => Ok(mgr
+            .list(id, &dest_dir.path)
+            .await?
+            .iter()
+            .any(|entry| entry.name == name)),
+    }
+}
+
+async fn commit_staged(
+    mgr: &SftpManager,
+    dest_dir: &Endpoint,
+    staged_name: &str,
+    final_name: &str,
+) -> AppResult<()> {
+    if target_exists(mgr, dest_dir, final_name).await? {
+        return Err(AppError::Conflict(format!(
+            "destination already contains {final_name}"
+        )));
+    }
+    let from = dest_join(
+        dest_dir.connection_id.as_deref(),
+        &dest_dir.path,
+        staged_name,
+    );
+    let to = dest_join(
+        dest_dir.connection_id.as_deref(),
+        &dest_dir.path,
+        final_name,
+    );
+    match &dest_dir.connection_id {
+        None => Ok(fs::rename(from, to).await?),
+        Some(id) => mgr.rename(id, &from, &to).await,
+    }
+}
+
+async fn cleanup_staged(mgr: &SftpManager, dest_dir: &Endpoint, staged_name: &str, is_dir: bool) {
+    let path = dest_join(
+        dest_dir.connection_id.as_deref(),
+        &dest_dir.path,
+        staged_name,
+    );
+    let cleanup = async {
+        match &dest_dir.connection_id {
+            None if is_dir => fs::remove_dir_all(&path).await.map_err(AppError::from),
+            None => fs::remove_file(&path).await.map_err(AppError::from),
+            Some(id) => mgr.remove(id, &path, is_dir).await,
+        }
+    };
+    let _ = tokio::time::timeout(Duration::from_secs(5), cleanup).await;
 }
 
 async fn file_size(mgr: &SftpManager, ep: &Endpoint) -> AppResult<u64> {
@@ -491,6 +614,25 @@ async fn is_dir(mgr: &SftpManager, ep: &Endpoint) -> AppResult<bool> {
                 }
             }
             Ok(false)
+        }
+    }
+}
+
+async fn is_symlink(mgr: &SftpManager, ep: &Endpoint) -> AppResult<bool> {
+    match &ep.connection_id {
+        None => Ok(fs::symlink_metadata(&ep.path)
+            .await?
+            .file_type()
+            .is_symlink()),
+        Some(id) => {
+            let name = base_name(&ep.path);
+            let parent = parent_remote(&ep.path);
+            Ok(mgr
+                .list(id, &parent)
+                .await?
+                .iter()
+                .find(|entry| entry.name == name)
+                .is_some_and(|entry| entry.is_symlink))
         }
     }
 }
@@ -658,6 +800,7 @@ async fn upload_archive(
         _ = ctx.cancel.cancelled() => return Err(AppError::Cancelled),
         result = conn.session().create(remote) => result?,
     };
+    mgr.chmod(dst_id, remote, 0o600).await?;
     copy_stream(app, &mut reader, false, &mut writer, true, ctx).await?;
     tokio::select! {
         biased;
@@ -681,7 +824,12 @@ async fn download_archive(
         _ = ctx.cancel.cancelled() => return Err(AppError::Cancelled),
         result = conn.session().open(remote) => result?,
     };
-    let mut writer = fs::File::create(local).await?;
+    let mut writer = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(local)
+        .await?;
+    set_private_local_permissions(local).await?;
     copy_stream(app, &mut reader, true, &mut writer, false, ctx).await?;
     Ok(())
 }
@@ -707,6 +855,10 @@ async fn compressed_local_to_remote(
     let size = fs::metadata(&tmp).await?.len();
 
     let remote_archive = join_remote(dst_dir, &remote_archive_name());
+    let stage = join_remote(
+        dst_dir,
+        &format!(".sageport-transfer-{}", uuid::Uuid::new_v4()),
+    );
     let res = async {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -728,22 +880,26 @@ async fn compressed_local_to_remote(
             None,
             None,
         );
+        mgr.mkdir(dst_id, &stage).await?;
+        mgr.chmod(dst_id, &stage, 0o700).await?;
         exec_with_cancel(
             mgr,
             dst_id,
             &format!(
                 "tar -xzf {} -C {}",
                 sh_quote(&remote_archive),
-                sh_quote(dst_dir)
+                sh_quote(&stage)
             ),
             &cancel,
         )
         .await?;
+        commit_remote_stage(mgr, dst_id, &stage, name, dst_dir).await?;
         Ok(())
     }
     .await;
 
     cleanup_remote(mgr, dst_id, &remote_archive).await;
+    cleanup_remote_tree(mgr, dst_id, &stage).await;
     let _ = fs::remove_file(&tmp).await;
     res.map(|()| size)
 }
@@ -765,7 +921,7 @@ async fn compressed_remote_to_local(
         mgr,
         src_id,
         &format!(
-            "tar -czf {} -C {} {}",
+            "umask 077 && tar -czf {} -C {} {}",
             sh_quote(&remote_archive),
             sh_quote(&parent),
             sh_quote(name)
@@ -776,6 +932,7 @@ async fn compressed_remote_to_local(
 
     let tmp = local_temp_archive();
     let dst = PathBuf::from(dst_dir);
+    let stage = dst.join(format!(".sageport-transfer-{}", uuid::Uuid::new_v4()));
     let res = async {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -804,16 +961,21 @@ async fn compressed_remote_to_local(
             None,
         );
         let archive = tmp.clone();
+        let extract_dir = stage.clone();
         let extract_cancel = cancel.clone();
-        tokio::task::spawn_blocking(move || extract_local_archive(&archive, &dst, &extract_cancel))
-            .await
-            .map_err(|e| AppError::Other(format!("task join error: {e}")))??;
+        tokio::task::spawn_blocking(move || {
+            extract_local_archive(&archive, &extract_dir, &extract_cancel)
+        })
+        .await
+        .map_err(|e| AppError::Other(format!("task join error: {e}")))??;
+        commit_local_stage(&stage, name, &dst).await?;
         Ok(size)
     }
     .await;
 
     cleanup_remote(mgr, src_id, &remote_archive).await;
     let _ = fs::remove_file(&tmp).await;
+    let _ = fs::remove_dir_all(&stage).await;
     res
 }
 
@@ -835,7 +997,7 @@ async fn compressed_remote_to_remote(
         mgr,
         src_id,
         &format!(
-            "tar -czf {} -C {} {}",
+            "umask 077 && tar -czf {} -C {} {}",
             sh_quote(&src_archive),
             sh_quote(&parent),
             sh_quote(name)
@@ -846,6 +1008,10 @@ async fn compressed_remote_to_remote(
 
     let tmp = local_temp_archive();
     let dst_archive = join_remote(dst_dir, &remote_archive_name());
+    let stage = join_remote(
+        dst_dir,
+        &format!(".sageport-transfer-{}", uuid::Uuid::new_v4()),
+    );
     let res = async {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -889,17 +1055,20 @@ async fn compressed_remote_to_remote(
             None,
             None,
         );
+        mgr.mkdir(dst_id, &stage).await?;
+        mgr.chmod(dst_id, &stage, 0o700).await?;
         exec_with_cancel(
             mgr,
             dst_id,
             &format!(
                 "tar -xzf {} -C {}",
                 sh_quote(&dst_archive),
-                sh_quote(dst_dir)
+                sh_quote(&stage)
             ),
             &cancel,
         )
         .await?;
+        commit_remote_stage(mgr, dst_id, &stage, name, dst_dir).await?;
         Ok(size)
     }
     .await;
@@ -909,7 +1078,42 @@ async fn compressed_remote_to_remote(
         cleanup_remote(mgr, dst_id, &dst_archive),
     );
     let _ = fs::remove_file(&tmp).await;
+    cleanup_remote_tree(mgr, dst_id, &stage).await;
     res
+}
+
+async fn commit_local_stage(stage: &Path, name: &str, dest_dir: &Path) -> AppResult<()> {
+    let source = stage.join(name);
+    let target = dest_dir.join(name);
+    if fs::try_exists(&target).await? {
+        return Err(AppError::Conflict(format!(
+            "destination already contains {name}"
+        )));
+    }
+    fs::rename(source, target).await?;
+    Ok(())
+}
+
+async fn commit_remote_stage(
+    mgr: &SftpManager,
+    connection_id: &str,
+    stage: &str,
+    name: &str,
+    dest_dir: &str,
+) -> AppResult<()> {
+    let source = join_remote(stage, name);
+    let target = join_remote(dest_dir, name);
+    if mgr
+        .list(connection_id, dest_dir)
+        .await?
+        .iter()
+        .any(|entry| entry.name == name)
+    {
+        return Err(AppError::Conflict(format!(
+            "destination already contains {name}"
+        )));
+    }
+    mgr.rename(connection_id, &source, &target).await
 }
 
 async fn exec_with_cancel(
@@ -930,6 +1134,14 @@ async fn cleanup_remote(mgr: &SftpManager, connection_id: &str, path: &str) {
     let _ = tokio::time::timeout(
         std::time::Duration::from_secs(2),
         mgr.exec(connection_id, &command),
+    )
+    .await;
+}
+
+async fn cleanup_remote_tree(mgr: &SftpManager, connection_id: &str, path: &str) {
+    let _ = tokio::time::timeout(
+        Duration::from_secs(5),
+        mgr.remove(connection_id, path, true),
     )
     .await;
 }
@@ -975,7 +1187,14 @@ fn create_local_archive(
         .file_name()
         .map(|n| n.to_owned())
         .ok_or_else(|| AppError::Other("source has no directory name".into()))?;
-    let file = std::fs::File::create(archive)?;
+    let mut options = std::fs::OpenOptions::new();
+    options.create_new(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(archive)?;
     let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::fast());
     let writer = CancelWriter {
         inner: encoder,
@@ -1000,6 +1219,11 @@ fn extract_local_archive(
     cancel: &Arc<TransferCancel>,
 ) -> AppResult<()> {
     std::fs::create_dir_all(dest_dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dest_dir, std::fs::Permissions::from_mode(0o700))?;
+    }
     let file = std::fs::File::open(archive)?;
     let reader = CancelReader {
         inner: file,
@@ -1016,6 +1240,17 @@ fn extract_local_archive(
 
 fn local_temp_archive() -> PathBuf {
     std::env::temp_dir().join(format!("sageport-{}.tar.gz", uuid::Uuid::new_v4()))
+}
+
+async fn set_private_local_permissions(path: &Path) -> AppResult<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await?;
+    }
+    #[cfg(not(unix))]
+    let _ = path;
+    Ok(())
 }
 
 fn remote_temp_archive() -> String {

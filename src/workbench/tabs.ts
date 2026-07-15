@@ -89,6 +89,9 @@ interface TabsState {
 
   pendingCloseId: string | null;
   clearPendingClose: () => void;
+  pendingWindowClose: boolean;
+  requestWindowClose: () => boolean;
+  clearPendingWindowClose: () => void;
 
   close: (id: string, opts?: { force?: boolean }) => void;
   moveTab: (id: string, toIndex: number) => void;
@@ -161,8 +164,17 @@ export const useTabsStore = create<TabsState>((set, get) => {
     activeId: null,
     lastTerminalId: null,
     pendingCloseId: null,
+    pendingWindowClose: false,
 
     clearPendingClose: () => set({ pendingCloseId: null }),
+    requestWindowClose: () => {
+      const shouldBlock = get().tabs.some(
+        (tab) => tab.kind === "file" && isFileDirty(tab),
+      );
+      if (shouldBlock) set({ pendingWindowClose: true });
+      return shouldBlock;
+    },
+    clearPendingWindowClose: () => set({ pendingWindowClose: false }),
 
     openTerminal: (host) => {
       if (!canOpenTerminal()) return null;
@@ -270,9 +282,17 @@ export const useTabsStore = create<TabsState>((set, get) => {
       const content = tab.content;
       patchFile(id, { saving: true });
       try {
-        await ipc.sftp.writeText(tab.connectionId, tab.path, content);
+        await ipc.sftp.writeText(
+          tab.connectionId,
+          tab.path,
+          content,
+          tab.savedContent,
+        );
         patchFile(id, { saving: false, savedContent: content });
-        return true;
+        const current = get().tabs.find(
+          (item): item is FileTab => item.id === id && item.kind === "file",
+        );
+        return Boolean(current && !isFileDirty(current));
       } catch (err) {
         patchFile(id, { saving: false });
         toast.error(t("sftp.editor.saveError"), errorMessage(err));

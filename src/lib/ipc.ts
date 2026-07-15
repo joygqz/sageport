@@ -229,8 +229,18 @@ export const ipc = {
       invoke<void>("fs_delete", { connectionId, path, isDir }),
     readText: (connectionId: string | null, path: string) =>
       invoke<string>("fs_read_text", { connectionId, path }),
-    writeText: (connectionId: string | null, path: string, content: string) =>
-      invoke<void>("fs_write_text", { connectionId, path, content }),
+    writeText: (
+      connectionId: string | null,
+      path: string,
+      content: string,
+      expectedContent?: string | null,
+    ) =>
+      invoke<void>("fs_write_text", {
+        connectionId,
+        path,
+        content,
+        expectedContent,
+      }),
     chmod: (connectionId: string | null, path: string, mode: number) =>
       invoke<void>("fs_chmod", { connectionId, path, mode }),
     transfer: (transferId: string, source: FsEndpoint, dest: FsEndpoint) =>

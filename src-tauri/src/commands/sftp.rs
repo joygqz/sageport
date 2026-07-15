@@ -9,6 +9,7 @@ use crate::state::AppState;
 
 const MAX_CONNECTION_ID_BYTES: usize = 128;
 const MAX_PATH_BYTES: usize = 32 * 1024;
+const MAX_TRANSFER_ID_BYTES: usize = 128;
 
 fn validate_connection_id(connection_id: &str) -> AppResult<()> {
     if connection_id.trim().is_empty() || connection_id.len() > MAX_CONNECTION_ID_BYTES {
@@ -29,6 +30,23 @@ fn validate_path(path: &str) -> AppResult<()> {
         return Err(AppError::Invalid("invalid file path".into()));
     }
     Ok(())
+}
+
+fn validate_transfer_id(transfer_id: &str) -> AppResult<()> {
+    if transfer_id.is_empty()
+        || transfer_id.len() > MAX_TRANSFER_ID_BYTES
+        || !transfer_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err(AppError::Invalid("invalid transfer id".into()));
+    }
+    Ok(())
+}
+
+fn validate_endpoint(endpoint: &EndpointInput) -> AppResult<()> {
+    validate_optional_connection_id(endpoint.connection_id.as_deref())?;
+    validate_path(&endpoint.path)
 }
 
 fn validate_mode(mode: u32) -> AppResult<()> {
@@ -232,15 +250,7 @@ pub async fn fs_read_text(
     validate_optional_connection_id(connection_id.as_deref())?;
     validate_path(&path)?;
     let bytes = match connection_id {
-        None => {
-            local(move || {
-                if std::fs::metadata(&path)?.len() > sftp::MAX_EDIT_BYTES {
-                    return Err(sftp::edit_too_large_error());
-                }
-                Ok(std::fs::read(&path)?)
-            })
-            .await?
-        }
+        None => local(move || ops::local_read(&path)).await?,
         Some(id) => state.sftp.read_file(&id, &path).await?,
     };
     String::from_utf8(bytes).map_err(|_| AppError::Invalid("file is not UTF-8 text".into()))
@@ -252,12 +262,35 @@ pub async fn fs_write_text(
     connection_id: Option<String>,
     path: String,
     content: String,
+    expected_content: Option<String>,
 ) -> AppResult<()> {
     validate_optional_connection_id(connection_id.as_deref())?;
     validate_path(&path)?;
+    if content.len() as u64 > sftp::MAX_EDIT_BYTES {
+        return Err(sftp::edit_too_large_error());
+    }
     match connection_id {
-        None => local(move || Ok(std::fs::write(&path, content)?)).await,
-        Some(id) => state.sftp.write_file(&id, &path, content.as_bytes()).await,
+        None => {
+            local(move || {
+                ops::local_write(
+                    &path,
+                    content.as_bytes(),
+                    expected_content.as_deref().map(str::as_bytes),
+                )
+            })
+            .await
+        }
+        Some(id) => {
+            state
+                .sftp
+                .write_file(
+                    &id,
+                    &path,
+                    content.as_bytes(),
+                    expected_content.as_deref().map(str::as_bytes),
+                )
+                .await
+        }
     }
 }
 
@@ -269,6 +302,15 @@ pub async fn fs_transfer(
     source: EndpointInput,
     dest: EndpointInput,
 ) -> AppResult<()> {
+    validate_transfer_id(&transfer_id)?;
+    validate_endpoint(&source)?;
+    validate_endpoint(&dest)?;
+    let source_name = sftp::base_name(&source.path);
+    if source_name.is_empty() || matches!(source_name.as_str(), "." | "..") {
+        return Err(AppError::Invalid(
+            "source path has no transferable name".into(),
+        ));
+    }
     let mgr = state.sftp.clone();
     let pool = state.db.clone();
     let source: Endpoint = source.into();
@@ -286,7 +328,13 @@ pub async fn fs_transfer(
 
     let cancel = mgr.register_transfer(&transfer_id);
     tokio::spawn(async move {
+        let permit = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => None,
+            permit = mgr.acquire_transfer_slot() => Some(permit),
+        };
         let outcome = sftp::transfer(&app, &mgr, &transfer_id, &source, &dest, cancel).await;
+        drop(permit);
         mgr.unregister_transfer(&transfer_id);
         let _ = transfer_repo::finish(
             &pool,
@@ -303,6 +351,7 @@ pub async fn fs_transfer(
 
 #[tauri::command]
 pub async fn fs_transfer_cancel(state: State<'_, AppState>, transfer_id: String) -> AppResult<()> {
+    validate_transfer_id(&transfer_id)?;
     state.sftp.cancel_transfer(&transfer_id);
     Ok(())
 }
@@ -318,6 +367,7 @@ pub async fn fs_history_list(
 
 #[tauri::command]
 pub async fn fs_history_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    validate_transfer_id(&id)?;
     transfer_repo::delete(&state.db, &id).await
 }
 
@@ -338,7 +388,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_connection_id, validate_mode, validate_path, MAX_PATH_BYTES};
+    use super::{
+        validate_connection_id, validate_endpoint, validate_mode, validate_path,
+        validate_transfer_id, EndpointInput, MAX_PATH_BYTES,
+    };
 
     #[test]
     fn validates_connection_ids_and_paths() {
@@ -357,5 +410,24 @@ mod tests {
         assert!(validate_mode(0o000).is_ok());
         assert!(validate_mode(0o777).is_ok());
         assert!(validate_mode(0o1000).is_err());
+    }
+
+    #[test]
+    fn validates_transfer_ids_and_endpoints_before_persisting_them() {
+        assert!(validate_transfer_id("transfer_01-a").is_ok());
+        assert!(validate_transfer_id("").is_err());
+        assert!(validate_transfer_id("bad/id").is_err());
+        assert!(validate_transfer_id(&"x".repeat(129)).is_err());
+
+        assert!(validate_endpoint(&EndpointInput {
+            connection_id: Some("remote-1".into()),
+            path: "/srv/file".into(),
+        })
+        .is_ok());
+        assert!(validate_endpoint(&EndpointInput {
+            connection_id: Some("".into()),
+            path: "/srv/file".into(),
+        })
+        .is_err());
     }
 }

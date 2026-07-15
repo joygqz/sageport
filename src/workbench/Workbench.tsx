@@ -30,6 +30,7 @@ import { SideBar } from "./SideBar";
 import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
 import { syncTrafficLights, useZoomStore, ZOOM_SYNC_KEY } from "./zoom";
+import { isFileDirty, useTabsStore } from "./tabs";
 
 const AssistantPanel = lazy(() =>
   import("@/features/ai/AssistantPanel").then((module) => ({
@@ -59,6 +60,38 @@ export function Workbench() {
       toast.error(t("sftp.listenerError"), errorMessage(error)),
     );
   }, [t]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWindow()
+      .onCloseRequested((event) => {
+        if (useTabsStore.getState().requestWindowClose()) {
+          event.preventDefault();
+        }
+      })
+      .then((cleanup) => {
+        if (disposed) cleanup();
+        else unlisten = cleanup;
+      });
+
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (
+        useTabsStore
+          .getState()
+          .tabs.some((tab) => tab.kind === "file" && isFileDirty(tab))
+      ) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => {
+      disposed = true;
+      unlisten?.();
+      window.removeEventListener("beforeunload", beforeUnload);
+    };
+  }, []);
 
   useEffect(() => {
     const reclamp = () => useLayoutStore.getState().clampToViewport();

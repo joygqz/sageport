@@ -11,8 +11,8 @@ use parking_lot::Mutex;
 use russh_sftp::client::SftpSession;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::Notify;
 use tokio::sync::OnceCell;
+use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore};
 
 use crate::error::{AppError, AppResult};
 use crate::ssh::{establish, exec_capture, ConnectionPrompts, Hop, SshConnection};
@@ -25,6 +25,7 @@ pub const EVENT_TRANSFER: &str = "sftp://transfer";
 
 pub const MAX_EDIT_BYTES: u64 = 2 * 1024 * 1024;
 const SUBSYSTEM_OPEN_TIMEOUT: Duration = Duration::from_secs(15);
+const MAX_CONCURRENT_TRANSFERS: usize = 4;
 
 pub fn edit_too_large_error() -> AppError {
     AppError::Invalid("file is too large to edit (2 MB max)".into())
@@ -148,11 +149,22 @@ impl Conn {
     }
 }
 
-#[derive(Default)]
 pub struct SftpManager {
     conns: Arc<Mutex<HashMap<String, Arc<Conn>>>>,
     connect_cancels: Arc<Mutex<HashMap<String, Arc<TransferCancel>>>>,
     cancel_flags: Mutex<HashMap<String, Arc<TransferCancel>>>,
+    transfer_slots: Arc<Semaphore>,
+}
+
+impl Default for SftpManager {
+    fn default() -> Self {
+        Self {
+            conns: Arc::new(Mutex::new(HashMap::new())),
+            connect_cancels: Arc::new(Mutex::new(HashMap::new())),
+            cancel_flags: Mutex::new(HashMap::new()),
+            transfer_slots: Arc::new(Semaphore::new(MAX_CONCURRENT_TRANSFERS)),
+        }
+    }
 }
 
 impl SftpManager {
@@ -176,6 +188,14 @@ impl SftpManager {
 
     pub fn unregister_transfer(&self, transfer_id: &str) {
         self.cancel_flags.lock().remove(transfer_id);
+    }
+
+    pub async fn acquire_transfer_slot(&self) -> OwnedSemaphorePermit {
+        self.transfer_slots
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("transfer semaphore must stay open")
     }
 
     pub fn connect(&self, app: AppHandle, prompts: ConnectionPrompts, params: SftpConnectParams) {
@@ -284,8 +304,14 @@ impl SftpManager {
         ops::remote_read(&self.get(id)?.session, path).await
     }
 
-    pub async fn write_file(&self, id: &str, path: &str, data: &[u8]) -> AppResult<()> {
-        ops::remote_write(&self.get(id)?.session, path, data).await
+    pub async fn write_file(
+        &self,
+        id: &str,
+        path: &str,
+        data: &[u8],
+        expected: Option<&[u8]>,
+    ) -> AppResult<()> {
+        ops::remote_write(&self.get(id)?.session, path, data, expected).await
     }
 
     pub async fn chmod(&self, id: &str, path: &str, mode: u32) -> AppResult<()> {
@@ -365,7 +391,7 @@ pub(crate) fn emit_transfer_event(
 
 #[cfg(test)]
 mod tests {
-    use super::TransferCancel;
+    use super::{SftpManager, TransferCancel, MAX_CONCURRENT_TRANSFERS};
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -381,5 +407,20 @@ mod tests {
             .await
             .expect("cancellation should wake immediately")
             .expect("wait task should finish");
+    }
+
+    #[tokio::test]
+    async fn transfer_slots_bound_concurrent_file_io() {
+        let manager = SftpManager::new();
+        let mut permits = Vec::new();
+        for _ in 0..MAX_CONCURRENT_TRANSFERS {
+            permits.push(manager.acquire_transfer_slot().await);
+        }
+
+        assert!(manager.transfer_slots.clone().try_acquire_owned().is_err());
+        permits.pop();
+        let _permit = tokio::time::timeout(Duration::from_secs(1), manager.acquire_transfer_slot())
+            .await
+            .expect("released transfer slot should wake the queue");
     }
 }

@@ -175,7 +175,11 @@ export const zhCN: Dictionary = {
     tabLimitReached: "最多可打开 {count} 个终端会话",
     unsavedTitle: "未保存的更改",
     unsavedDescription: "{name} 有未保存的更改，不保存将丢失这些更改。",
+    unsavedWindowDescription:
+      "有 {count} 个打开的文件包含未保存更改，是否在关闭 Sageport 前保存？",
     discard: "不保存",
+    discardAll: "全部不保存",
+    saveAll: "全部保存",
     find: {
       dialogLabel: "查找和替换",
       placeholder: "查找",

@@ -1,11 +1,13 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 use russh_sftp::client::fs::Metadata;
 use russh_sftp::client::SftpSession;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use super::path::sort_entries;
+use super::path::{join_remote, parent_remote, sort_entries};
 use super::{FileEntry, MAX_EDIT_BYTES};
 #[cfg(not(unix))]
 use crate::error::AppError;
@@ -89,12 +91,152 @@ pub async fn remote_read(session: &SftpSession, path: &str) -> AppResult<Vec<u8>
     if meta.size.unwrap_or(0) > MAX_EDIT_BYTES {
         return Err(super::edit_too_large_error());
     }
-    Ok(session.read(path).await?)
+    let file = session.open(path).await?;
+    let mut bytes = Vec::with_capacity(meta.size.unwrap_or(0) as usize);
+    file.take(MAX_EDIT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .await?;
+    if bytes.len() as u64 > MAX_EDIT_BYTES {
+        return Err(super::edit_too_large_error());
+    }
+    Ok(bytes)
 }
 
-pub async fn remote_write(session: &SftpSession, path: &str, data: &[u8]) -> AppResult<()> {
-    session.write(path, data).await?;
+pub async fn remote_write(
+    session: &SftpSession,
+    path: &str,
+    data: &[u8],
+    expected: Option<&[u8]>,
+) -> AppResult<()> {
+    if data.len() as u64 > MAX_EDIT_BYTES {
+        return Err(super::edit_too_large_error());
+    }
+    if let Some(expected) = expected {
+        if remote_read(session, path).await? != expected {
+            return Err(edit_conflict_error());
+        }
+    }
+
+    let existed = session.try_exists(path).await?;
+    let permissions = if existed {
+        session.metadata(path).await?.permissions
+    } else {
+        None
+    };
+    let parent = parent_remote(path);
+    let temp = join_remote(&parent, &format!(".sageport-save-{}", uuid::Uuid::new_v4()));
+    let backup = join_remote(
+        &parent,
+        &format!(".sageport-backup-{}", uuid::Uuid::new_v4()),
+    );
+
+    let write_result = async {
+        let mut file = session.create(&temp).await?;
+        file.write_all(data).await?;
+        file.flush().await?;
+        file.sync_all().await?;
+        file.shutdown().await?;
+        if let Some(permissions) = permissions {
+            session
+                .set_metadata(
+                    &temp,
+                    Metadata {
+                        permissions: Some(permissions),
+                        ..Metadata::default()
+                    },
+                )
+                .await?;
+        }
+        Ok::<(), crate::error::AppError>(())
+    }
+    .await;
+    if let Err(error) = write_result {
+        let _ = session.remove_file(&temp).await;
+        return Err(error);
+    }
+
+    if existed {
+        if let Err(error) = session.rename(path, &backup).await {
+            let _ = session.remove_file(&temp).await;
+            return Err(error.into());
+        }
+        if let Err(error) = session.rename(&temp, path).await {
+            let _ = session.rename(&backup, path).await;
+            let _ = session.remove_file(&temp).await;
+            return Err(error.into());
+        }
+        let _ = session.remove_file(&backup).await;
+    } else if let Err(error) = session.rename(&temp, path).await {
+        let _ = session.remove_file(&temp).await;
+        return Err(error.into());
+    }
     Ok(())
+}
+
+fn edit_conflict_error() -> crate::error::AppError {
+    crate::error::AppError::Conflict(
+        "file changed since it was opened; reload it before saving".into(),
+    )
+}
+
+pub fn local_read(path: &str) -> AppResult<Vec<u8>> {
+    let file = fs::File::open(path)?;
+    if file.metadata()?.len() > MAX_EDIT_BYTES {
+        return Err(super::edit_too_large_error());
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_EDIT_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_EDIT_BYTES {
+        return Err(super::edit_too_large_error());
+    }
+    Ok(bytes)
+}
+
+pub fn local_write(path: &str, data: &[u8], expected: Option<&[u8]>) -> AppResult<()> {
+    if data.len() as u64 > MAX_EDIT_BYTES {
+        return Err(super::edit_too_large_error());
+    }
+    if let Some(expected) = expected {
+        if local_read(path)? != expected {
+            return Err(edit_conflict_error());
+        }
+    }
+
+    let target = Path::new(path);
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let temp = parent.join(format!(".sageport-save-{}", uuid::Uuid::new_v4()));
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&temp)?;
+    let result = (|| -> AppResult<()> {
+        file.write_all(data)?;
+        file.sync_all()?;
+        if let Ok(metadata) = fs::metadata(target) {
+            fs::set_permissions(&temp, metadata.permissions())?;
+        }
+        #[cfg(not(windows))]
+        fs::rename(&temp, target)?;
+        #[cfg(windows)]
+        {
+            if target.exists() {
+                let backup = parent.join(format!(".sageport-backup-{}", uuid::Uuid::new_v4()));
+                fs::rename(target, &backup)?;
+                if let Err(error) = fs::rename(&temp, target) {
+                    let _ = fs::rename(&backup, target);
+                    return Err(error.into());
+                }
+                let _ = fs::remove_file(backup);
+            } else {
+                fs::rename(&temp, target)?;
+            }
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
 }
 
 pub async fn remote_chmod(session: &SftpSession, path: &str, mode: u32) -> AppResult<()> {
@@ -213,10 +355,17 @@ pub fn local_chmod(path: &str, mode: u32) -> AppResult<()> {
 
 pub fn local_size(path: &Path) -> AppResult<u64> {
     let meta = fs::symlink_metadata(path)?;
+    if meta.file_type().is_symlink() {
+        return Err(crate::error::AppError::Invalid(
+            "symbolic link transfer requires archive support".into(),
+        ));
+    }
     if meta.is_dir() {
-        let mut total = 0;
+        let mut total: u64 = 0;
         for entry in fs::read_dir(path)? {
-            total += local_size(&entry?.path())?;
+            total = total
+                .checked_add(local_size(&entry?.path())?)
+                .ok_or_else(|| crate::error::AppError::Invalid("transfer is too large".into()))?;
         }
         Ok(total)
     } else {
@@ -226,7 +375,8 @@ pub fn local_size(path: &Path) -> AppResult<u64> {
 
 #[cfg(all(test, unix))]
 mod tests {
-    use super::{local_list, local_remove};
+    use super::{local_list, local_read, local_remove, local_size, local_write};
+    use crate::error::AppError;
     use std::fs;
     use std::os::unix::fs::symlink;
 
@@ -255,10 +405,61 @@ mod tests {
             .iter()
             .find(|entry| entry.name == ".hidden")
             .is_some_and(|entry| entry.hidden));
+        assert!(matches!(
+            local_size(&root.join("link")),
+            Err(AppError::Invalid(_))
+        ));
 
         local_remove(link.path.as_str()).expect("remove symlink");
         assert!(target.join("keep.txt").exists());
         assert!(!root.join("link").exists());
+        fs::remove_dir_all(root).expect("clean temp tree");
+    }
+
+    #[test]
+    fn text_writes_replace_shorter_content_and_detect_external_changes() {
+        let root = std::env::temp_dir().join(format!(
+            "sageport-edit-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir_all(&root).expect("create temp tree");
+        let path = root.join("config.txt");
+        fs::write(&path, b"original content").expect("seed file");
+
+        local_write(
+            path.to_str().expect("utf-8 path"),
+            b"short",
+            Some(b"original content"),
+        )
+        .expect("replace content");
+        assert_eq!(
+            local_read(path.to_str().expect("utf-8 path")).expect("read replacement"),
+            b"short"
+        );
+
+        fs::write(&path, b"external edit").expect("external edit");
+        let error = local_write(
+            path.to_str().expect("utf-8 path"),
+            b"editor edit",
+            Some(b"short"),
+        )
+        .expect_err("stale editor content must not overwrite the file");
+        assert!(matches!(error, AppError::Conflict(_)));
+        assert_eq!(
+            fs::read(&path).expect("preserve external edit"),
+            b"external edit"
+        );
+
+        let oversized = vec![b'x'; super::MAX_EDIT_BYTES as usize + 1];
+        let error = local_write(path.to_str().expect("utf-8 path"), &oversized, None)
+            .expect_err("oversized editor writes must be rejected");
+        assert!(matches!(error, AppError::Invalid(_)));
+        assert_eq!(
+            fs::read(&path).expect("preserve content after oversized write"),
+            b"external edit"
+        );
+
         fs::remove_dir_all(root).expect("clean temp tree");
     }
 }

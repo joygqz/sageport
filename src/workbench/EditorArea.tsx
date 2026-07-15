@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FileText, Plus, TerminalSquare, X } from "lucide-react";
 
 import {
@@ -85,6 +86,11 @@ export function EditorArea() {
   const dropIndexRef = useRef<number | null>(null);
   const pendingCloseId = useTabsStore((s) => s.pendingCloseId);
   const clearPendingClose = useTabsStore((s) => s.clearPendingClose);
+  const pendingWindowClose = useTabsStore((s) => s.pendingWindowClose);
+  const clearPendingWindowClose = useTabsStore(
+    (s) => s.clearPendingWindowClose,
+  );
+  const [savingBeforeWindowClose, setSavingBeforeWindowClose] = useState(false);
 
   useDragCursor(isDragging);
 
@@ -174,29 +180,72 @@ export function EditorArea() {
   const pendingTab = tabs.find(
     (tab): tab is FileTab => tab.id === pendingCloseId && tab.kind === "file",
   );
-  const confirmState: ConfirmState | null = pendingTab
+  const dirtyTabs = tabs.filter(
+    (tab): tab is FileTab => tab.kind === "file" && isFileDirty(tab),
+  );
+  const confirmState: ConfirmState | null = pendingWindowClose
     ? {
         title: t("editor.unsavedTitle"),
-        description: t("editor.unsavedDescription", {
-          name: pendingTab.title,
+        description: t("editor.unsavedWindowDescription", {
+          count: dirtyTabs.length,
         }),
         cancelLabel: t("common.cancel"),
         actions: [
           {
-            label: t("editor.discard"),
+            label: t("editor.discardAll"),
             variant: "secondary",
-            onSelect: () => close(pendingTab.id, { force: true }),
+            onSelect: async () => {
+              await getCurrentWindow().destroy();
+            },
           },
           {
-            label: t("common.save"),
+            label: t("editor.saveAll"),
+            loading: savingBeforeWindowClose,
             onSelect: async () => {
-              if (await saveFile(pendingTab.id))
-                close(pendingTab.id, { force: true });
+              setSavingBeforeWindowClose(true);
+              try {
+                for (const tab of dirtyTabs) {
+                  if (!(await useTabsStore.getState().saveFile(tab.id))) {
+                    return false;
+                  }
+                }
+                const stillDirty = useTabsStore
+                  .getState()
+                  .tabs.some((tab) => tab.kind === "file" && isFileDirty(tab));
+                if (stillDirty) return false;
+                await getCurrentWindow().destroy();
+                return true;
+              } finally {
+                setSavingBeforeWindowClose(false);
+              }
             },
           },
         ],
       }
-    : null;
+    : pendingTab
+      ? {
+          title: t("editor.unsavedTitle"),
+          description: t("editor.unsavedDescription", {
+            name: pendingTab.title,
+          }),
+          cancelLabel: t("common.cancel"),
+          actions: [
+            {
+              label: t("editor.discard"),
+              variant: "secondary",
+              onSelect: () => close(pendingTab.id, { force: true }),
+            },
+            {
+              label: t("common.save"),
+              onSelect: async () => {
+                if (!(await saveFile(pendingTab.id))) return false;
+                close(pendingTab.id, { force: true });
+                return true;
+              },
+            },
+          ],
+        }
+      : null;
 
   useEffect(() => {
     if (!activeId) return;
@@ -316,7 +365,13 @@ export function EditorArea() {
           ))}
         </div>
 
-        <ConfirmDialog state={confirmState} onClose={clearPendingClose} />
+        <ConfirmDialog
+          state={confirmState}
+          onClose={() => {
+            if (pendingWindowClose) clearPendingWindowClose();
+            else clearPendingClose();
+          }}
+        />
       </div>
     </Tabs>
   );

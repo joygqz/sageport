@@ -35,6 +35,9 @@ pub enum AppError {
     #[error("in use: {0}")]
     InUse(String),
 
+    #[error("conflict: {0}")]
+    Conflict(String),
+
     #[error("{0}")]
     Network(String),
 
@@ -104,6 +107,7 @@ impl AppError {
             AppError::NotFound(_) => "not_found",
             AppError::Invalid(_) => "invalid",
             AppError::InUse(_) => "in_use",
+            AppError::Conflict(_) => "conflict",
             AppError::Network(_) => "network",
             AppError::Dns(_) => "dns",
             AppError::Timeout(_) => "timeout",

@@ -179,7 +179,11 @@ export const en = {
     unsavedTitle: "Unsaved changes",
     unsavedDescription:
       "{name} has unsaved changes. Your changes will be lost if you don't save them.",
+    unsavedWindowDescription:
+      "{count} open files have unsaved changes. Save them before closing Sageport?",
     discard: "Don't save",
+    discardAll: "Don't save any",
+    saveAll: "Save all",
     find: {
       dialogLabel: "Find and replace",
       placeholder: "Find",
