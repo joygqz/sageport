@@ -39,7 +39,6 @@ import {
   FindInput,
   FindToggleButton,
   ResizeHandle,
-  Tooltip,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { isValidRegex } from "@/lib/utils";
@@ -78,34 +77,6 @@ function clearPaneBuffer(paneId: string) {
 }
 
 const MIN_PANE_PX = 90;
-
-export function TerminalTabActions({ paneId }: { paneId: string }) {
-  const { t } = useI18n();
-  const splitPane = useTabsStore((s) => s.splitPane);
-
-  return (
-    <>
-      <Tooltip content={t("commands.terminal.splitRight")}>
-        <button
-          type="button"
-          onClick={() => splitPane(paneId, "right")}
-          className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
-        >
-          <SquareSplitHorizontal className="size-4" />
-        </button>
-      </Tooltip>
-      <Tooltip content={t("commands.terminal.splitDown")}>
-        <button
-          type="button"
-          onClick={() => splitPane(paneId, "down")}
-          className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
-        >
-          <SquareSplitVertical className="size-4" />
-        </button>
-      </Tooltip>
-    </>
-  );
-}
 
 export const TerminalEditor = memo(function TerminalEditor({
   tab,

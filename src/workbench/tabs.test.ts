@@ -128,14 +128,76 @@ describe("splitPane", () => {
   });
 
   it("counts panes toward the session limit", () => {
-    const first = openHost("a");
-    for (let i = 1; i < MAX_TERMINAL_SESSIONS; i++) {
-      expect(useTabsStore.getState().splitPane(first, "right")).not.toBeNull();
+    const roots = Array.from({ length: MAX_TERMINAL_SESSIONS / 2 }, (_, i) =>
+      openHost(String(i)),
+    );
+    for (const root of roots) {
+      expect(useTabsStore.getState().splitPane(root, "right")).not.toBeNull();
     }
-    expect(useTabsStore.getState().splitPane(first, "down")).toBeNull();
     expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(
       MAX_TERMINAL_SESSIONS,
     );
+    expect(useTabsStore.getState().splitPane(roots[0]!, "down")).toBeNull();
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(
+      MAX_TERMINAL_SESSIONS,
+    );
+  });
+
+  it("limits horizontal splits to three panes", () => {
+    const first = openHost("a");
+    const second = useTabsStore.getState().splitPane(first, "right")!;
+    const third = useTabsStore.getState().splitPane(second, "right")!;
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(3);
+
+    expect(useTabsStore.getState().splitPane(third, "right")).toBeNull();
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(3);
+  });
+
+  it("limits vertical splits to two panes", () => {
+    const first = openHost("a");
+    const second = useTabsStore.getState().splitPane(first, "down")!;
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(2);
+
+    expect(useTabsStore.getState().splitPane(second, "down")).toBeNull();
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(2);
+  });
+
+  it("allows a nested vertical split inside a full horizontal row", () => {
+    const first = openHost("a");
+    const second = useTabsStore.getState().splitPane(first, "right")!;
+    useTabsStore.getState().splitPane(second, "right");
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(3);
+
+    expect(useTabsStore.getState().splitPane(second, "down")).not.toBeNull();
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(4);
+  });
+
+  it("blocks a nested split that would widen the grid past the column cap", () => {
+    const first = openHost("a");
+    const second = useTabsStore.getState().splitPane(first, "right")!;
+    useTabsStore.getState().splitPane(second, "right");
+    const nested = useTabsStore.getState().splitPane(second, "down")!;
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(4);
+
+    // Splitting the nested pane sideways would make the bottom band 4 wide.
+    expect(useTabsStore.getState().splitPane(nested, "right")).toBeNull();
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(4);
+  });
+
+  it("permits building a full 3x2 grid but no further", () => {
+    const cols = [openHost("a")];
+    cols.push(useTabsStore.getState().splitPane(cols[0]!, "right")!);
+    cols.push(useTabsStore.getState().splitPane(cols[1]!, "right")!);
+    for (const col of cols) {
+      expect(useTabsStore.getState().splitPane(col, "down")).not.toBeNull();
+    }
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(6);
+
+    for (const col of cols) {
+      expect(useTabsStore.getState().splitPane(col, "down")).toBeNull();
+      expect(useTabsStore.getState().splitPane(col, "right")).toBeNull();
+    }
+    expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(6);
   });
 });
 

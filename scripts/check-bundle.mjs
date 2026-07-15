@@ -17,8 +17,8 @@ const initialAssets = [
 
 // The workbench shell includes accessible dialog, tabs, and toast primitives.
 // Keep roughly the same headroom as the previous 650 kB budget after adding them.
-// Bumped again for the terminal split-pane toolbar's lazy-loaded action slot.
-const INITIAL_JS_BUDGET = 704 * 1024;
+// Bumped slightly for the terminal split-pane focus-follow bookkeeping.
+const INITIAL_JS_BUDGET = 701 * 1024;
 const lazyOnlyPrefixes = [
   "AssistantPanel-",
   "FileEditor-",

@@ -106,6 +106,17 @@ export function resizeSplitNode(
     : { ...layout, children };
 }
 
+export function layoutExtent(
+  layout: PaneLayout,
+  axis: SplitDirection,
+): number {
+  if (layout.type === "leaf") return 1;
+  const extents = layout.children.map((child) => layoutExtent(child, axis));
+  return layout.direction === axis
+    ? extents.reduce((sum, n) => sum + n, 0)
+    : Math.max(...extents);
+}
+
 export function neighborPaneId(
   layout: PaneLayout,
   paneId: string,

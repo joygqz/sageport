@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  layoutExtent,
   layoutPaneIds,
   leafLayout,
   neighborPaneId,
@@ -97,6 +98,40 @@ describe("neighborPaneId", () => {
     expect(neighborPaneId(layout, "b")).toBe("c");
     expect(neighborPaneId(layout, "c")).toBe("b");
     expect(neighborPaneId(layout, "missing")).toBeNull();
+  });
+});
+
+describe("layoutExtent", () => {
+  it("reports 1 on both axes for a lone leaf", () => {
+    expect(layoutExtent(leafLayout("a"), "row")).toBe(1);
+    expect(layoutExtent(leafLayout("a"), "column")).toBe(1);
+  });
+
+  it("sums along the matching axis and takes the max across the other", () => {
+    let layout = split(leafLayout("a"), "a", "b", "row");
+    layout = split(layout, "b", "c", "row");
+    expect(layoutExtent(layout, "row")).toBe(3);
+    expect(layoutExtent(layout, "column")).toBe(1);
+  });
+
+  it("projects nested splits onto the grid axes", () => {
+    // row[a, column[b, row[d, e]], c] — visually 4 panes wide on the bottom band
+    let layout = split(leafLayout("a"), "a", "b", "row");
+    layout = split(layout, "b", "c", "row");
+    layout = split(layout, "b", "d", "column");
+    layout = split(layout, "d", "e", "row");
+    expect(layoutExtent(layout, "row")).toBe(4);
+    expect(layoutExtent(layout, "column")).toBe(2);
+  });
+
+  it("caps a full 3x2 grid at its outer dimensions", () => {
+    let layout = split(leafLayout("a"), "a", "b", "row");
+    layout = split(layout, "b", "c", "row");
+    layout = split(layout, "a", "d", "column");
+    layout = split(layout, "b", "e", "column");
+    layout = split(layout, "c", "f", "column");
+    expect(layoutExtent(layout, "row")).toBe(3);
+    expect(layoutExtent(layout, "column")).toBe(2);
   });
 });
 

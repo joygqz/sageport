@@ -8,6 +8,7 @@ import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import type { Host, SshStatusKind } from "@/types/models";
 import {
+  layoutExtent,
   layoutPaneIds,
   leafLayout,
   neighborPaneId,
@@ -35,6 +36,10 @@ export type PaneSplitDirection = "right" | "down";
 
 export const MAX_TERMINAL_SESSIONS = 10;
 export const MAX_FILE_TABS = 10;
+export const MAX_PANES_PER_DIRECTION: Record<SplitDirection, number> = {
+  row: 3,
+  column: 2,
+};
 
 export interface AdhocTarget {
   host: string;
@@ -353,9 +358,25 @@ export const useTabsStore = create<TabsState>((set, get) => {
       const tab = paneTab(get().tabs, paneId);
       const source = tab?.panes.find((pane) => pane.id === paneId);
       if (!tab || !source) return null;
+      const splitDirection: SplitDirection =
+        direction === "right" ? "row" : "column";
+      const newPaneId = crypto.randomUUID();
+      const layout = splitLayout(tab.layout, paneId, newPaneId, splitDirection);
+      const limit = MAX_PANES_PER_DIRECTION[splitDirection];
+      if (layoutExtent(layout, splitDirection) > limit) {
+        toast.warning(
+          t(
+            splitDirection === "row"
+              ? "terminal.splitLimitReachedRow"
+              : "terminal.splitLimitReachedColumn",
+            { count: limit },
+          ),
+        );
+        return null;
+      }
       if (!canOpenSession()) return null;
       const pane: TerminalPane = {
-        id: crypto.randomUUID(),
+        id: newPaneId,
         target: source.target,
         hostId: source.hostId,
         adhoc: source.adhoc,
@@ -364,13 +385,10 @@ export const useTabsStore = create<TabsState>((set, get) => {
         status: "idle",
         attempt: 0,
       };
-      const splitDirection: SplitDirection =
-        direction === "right" ? "row" : "column";
       set((s) => ({
         tabs: s.tabs.map((current) => {
           if (current.id !== tab.id || !isTerminal(current)) return current;
-          const at =
-            current.panes.findIndex((item) => item.id === paneId) + 1;
+          const at = current.panes.findIndex((item) => item.id === paneId) + 1;
           return {
             ...current,
             panes: [
@@ -378,12 +396,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
               pane,
               ...current.panes.slice(at),
             ],
-            layout: splitLayout(
-              current.layout,
-              paneId,
-              pane.id,
-              splitDirection,
-            ),
+            layout,
             activePaneId: pane.id,
           };
         }),

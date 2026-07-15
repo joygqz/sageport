@@ -264,6 +264,8 @@ export const zhCN: Dictionary = {
       closePane: "关闭窗格",
       closeTerminal: "关闭终端",
     },
+    splitLimitReachedRow: "水平方向最多只能拆分成 {count} 个窗格",
+    splitLimitReachedColumn: "垂直方向最多只能拆分成 {count} 个窗格",
   },
 
   hosts: {

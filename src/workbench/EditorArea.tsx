@@ -60,12 +60,6 @@ const TerminalEditor = lazy(() =>
   })),
 );
 
-const TerminalTabActions = lazy(() =>
-  import("@/features/terminal/TerminalEditor").then((module) => ({
-    default: module.TerminalTabActions,
-  })),
-);
-
 interface TabDragPointer {
   clientX: number;
   clientY: number;
@@ -333,11 +327,6 @@ export function EditorArea() {
                 />
               ))}
             </TabsList>
-            {activeTab?.kind === "terminal" && (
-              <Suspense fallback={null}>
-                <TerminalTabActions paneId={activeTab.activePaneId} />
-              </Suspense>
-            )}
             <Tooltip content={t("editor.newSession")}>
               <button
                 type="button"

@@ -268,6 +268,8 @@ export const en = {
       closePane: "Close pane",
       closeTerminal: "Close terminal",
     },
+    splitLimitReachedRow: "You can split into at most {count} panes horizontally",
+    splitLimitReachedColumn: "You can split into at most {count} panes vertically",
   },
 
   hosts: {
