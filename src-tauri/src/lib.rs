@@ -27,6 +27,7 @@ fn cleanup_orphaned_sessions(state: &AppState) {
     state.connection_prompts.host_keys.lock().clear();
     state.connection_prompts.passwords.lock().clear();
     state.ai_cancels.lock().clear();
+    state.batch_cancels.lock().clear();
     let mut oauth = state.sync_oauth.lock();
     oauth.generation = oauth.generation.wrapping_add(1);
     if let Some(cancel) = oauth.cancel.take() {
@@ -181,4 +182,33 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn page_reload_cleanup_cancels_running_batch_commands() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        let state = AppState::new(pool);
+
+        let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        state
+            .batch_cancels
+            .lock()
+            .insert("request-1".into(), Some(cancel_tx));
+
+        cleanup_orphaned_sessions(&state);
+
+        assert!(state.batch_cancels.lock().is_empty());
+        assert!(matches!(
+            cancel_rx.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+        ));
+    }
 }

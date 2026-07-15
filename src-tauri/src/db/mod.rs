@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::str::FromStr;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
@@ -15,8 +14,8 @@ pub async fn init(path: &Path) -> AppResult<SqlitePool> {
     }
     ensure_private_database_file(path)?;
 
-    let options = SqliteConnectOptions::from_str(&format!("sqlite://{}", path.display()))
-        .unwrap_or_else(|_| SqliteConnectOptions::new().filename(path))
+    let options = SqliteConnectOptions::new()
+        .filename(path)
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
         .foreign_keys(true);
@@ -62,6 +61,23 @@ fn set_private_dir_permissions(path: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn init_opens_databases_in_paths_with_spaces_and_special_characters() {
+        let dir = std::env::temp_dir().join(format!("sageport db #%{}", uuid::Uuid::new_v4()));
+        let path = dir.join("sageport.db");
+
+        let pool = init(&path).await.unwrap();
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM hosts")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        pool.close().await;
+
+        assert_eq!(count, 0);
+        assert!(path.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     #[cfg(unix)]
