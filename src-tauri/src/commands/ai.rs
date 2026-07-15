@@ -308,8 +308,8 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
     }
     let previous_protocol = stored_protocol(&state).await?;
     let previous_base_url = stored_base_url(&state).await?;
-    let endpoint_changed = previous_protocol != input.protocol
-        || effective_base_url(&previous_base_url) != base_url;
+    let endpoint_changed =
+        previous_protocol != input.protocol || effective_base_url(&previous_base_url) != base_url;
     let mut enabled_tools = input
         .enabled_tools
         .into_iter()

@@ -121,7 +121,6 @@ impl Protocol {
             Protocol::Anthropic => "anthropic",
         }
     }
-
 }
 
 pub struct Endpoint<'a> {

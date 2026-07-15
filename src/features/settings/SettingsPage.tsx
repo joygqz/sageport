@@ -283,40 +283,65 @@ function AppearanceSection() {
   );
 }
 
-function FontField() {
-  const { t } = useI18n();
-  const family = useFontStore((s) => s.family);
-  const setFamily = useFontStore((s) => s.setFamily);
+function DraftInput({
+  value,
+  onCommit,
+  password = false,
+  ...props
+}: Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "onBlur"> & {
+  value: string;
+  onCommit: (next: string) => void;
+  password?: boolean;
+}) {
   const [draft, setDraft] = useState<string | null>(null);
-  const draftRef = useRef<string | null>(null);
+  const pending = useRef({ draft, value, onCommit });
 
   useEffect(() => {
-    draftRef.current = draft;
+    pending.current = { draft, value, onCommit };
   });
 
   useEffect(
     () => () => {
-      if (draftRef.current !== null) setFamily(draftRef.current);
+      const { draft, value, onCommit } = pending.current;
+      if (draft !== null && draft !== value) onCommit(draft);
     },
-    [setFamily],
+    [],
   );
 
   const commit = () => {
     if (draft === null) return;
-    setFamily(draft);
     setDraft(null);
+    if (draft !== value) onCommit(draft);
   };
+
+  const inputProps = {
+    ...props,
+    value: draft ?? value,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setDraft(e.target.value),
+    onBlur: commit,
+  };
+  return password ? (
+    <PasswordInput {...inputProps} />
+  ) : (
+    <Input {...inputProps} />
+  );
+}
+
+function FontField() {
+  const { t } = useI18n();
+  const family = useFontStore((s) => s.family);
+  const setFamily = useFontStore((s) => s.setFamily);
 
   return (
     <Field
       label={t("settings.appearance.fontFamily")}
       hint={t("settings.appearance.fontFamilyHint")}
     >
-      <Input
-        value={draft ?? family}
+      <DraftInput
+        value={family}
+        onCommit={setFamily}
         maxLength={1024}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
         placeholder='"JetBrains Mono Variable"'
         autoComplete="off"
         spellCheck={false}
@@ -513,48 +538,50 @@ function AiForm({ config }: { config: AiConfig }) {
   const [maxHistoryTokens, setMaxHistoryTokens] = useState(
     config.maxHistoryTokens,
   );
-  const [committed, setCommitted] = useState({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
-    maxHistoryTokens: config.maxHistoryTokens,
-  });
   const [expandedToolGroups, setExpandedToolGroups] = useState<Set<string>>(
     () => new Set(),
   );
   const mutate = setConfig.mutate;
   const mutateModel = setModelMutation.mutate;
-  const skipSave = useRef(true);
-  const pendingSave = useRef(false);
   const lastSavedModel = useRef(config.model);
-  const live = useRef({
-    input: {
-      baseUrl,
-      protocol,
-      apiKey,
-      autoApprove,
-      enabledTools,
-      maxHistoryTokens,
+  const values = useRef({
+    baseUrl: config.baseUrl,
+    protocol: config.protocol,
+    apiKey: config.apiKey,
+    autoApprove: config.autoApprove,
+    enabledTools: resolveEnabledToolNames(config.enabledTools),
+    maxHistoryTokens: config.maxHistoryTokens,
+  });
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveConfig = (patch: Partial<typeof values.current>) => {
+    values.current = { ...values.current, ...patch };
+    if (saveTimer.current !== null) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      mutate(values.current, {
+        onError: (err) =>
+          toast.error(t("settings.ai.saveError"), errorMessage(err)),
+      });
+    }, 500);
+  };
+
+  useEffect(
+    () => () => {
+      if (saveTimer.current !== null) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        mutate(values.current, {
+          onError: (err) =>
+            toast.error(t("settings.ai.saveError"), errorMessage(err)),
+        });
+      }
     },
-    committed,
-    model,
-  });
+    [mutate, t],
+  );
 
-  useEffect(() => {
-    live.current = {
-      input: {
-        baseUrl,
-        protocol,
-        apiKey,
-        autoApprove,
-        enabledTools,
-        maxHistoryTokens,
-      },
-      committed,
-      model,
-    };
-  });
-
-  const saveModel = (next: string) => {
+  const commitModel = (next: string) => {
+    setModel(next);
     if (next === lastSavedModel.current) return;
     lastSavedModel.current = next;
     mutateModel(next, {
@@ -563,16 +590,23 @@ function AiForm({ config }: { config: AiConfig }) {
     });
   };
 
-  const commitDrafts = () => {
-    if (committed.baseUrl !== baseUrl) lastSavedModel.current = "";
-    setCommitted((current) =>
-      current.baseUrl === baseUrl &&
-      current.apiKey === apiKey &&
-      current.maxHistoryTokens === maxHistoryTokens
-        ? current
-        : { baseUrl, apiKey, maxHistoryTokens },
-    );
-    saveModel(model);
+  const commitBaseUrl = (next: string) => {
+    setBaseUrl(next);
+    setModel("");
+    lastSavedModel.current = "";
+    saveConfig({ baseUrl: next });
+  };
+
+  const commitApiKey = (next: string) => {
+    setApiKey(next);
+    saveConfig({ apiKey: next });
+  };
+
+  const commitMaxHistoryTokens = (raw: string) => {
+    const parsed = Number.parseInt(raw, 10);
+    const next = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    setMaxHistoryTokens(next);
+    saveConfig({ maxHistoryTokens: next });
   };
 
   const changeProtocol = (next: AiProtocol) => {
@@ -580,56 +614,35 @@ function AiForm({ config }: { config: AiConfig }) {
     setBaseUrl("");
     setModel("");
     lastSavedModel.current = "";
-    setCommitted((current) =>
-      current.baseUrl === "" ? current : { ...current, baseUrl: "" },
-    );
+    saveConfig({ protocol: next, baseUrl: "" });
   };
 
-  const changeBaseUrl = (next: string) => {
-    setBaseUrl(next);
-    setModel("");
+  const changeAutoApprove = (next: boolean) => {
+    setAutoApprove(next);
+    saveConfig({ autoApprove: next });
   };
 
-  useEffect(() => {
-    if (skipSave.current) {
-      skipSave.current = false;
-      return;
-    }
-    pendingSave.current = true;
-    const timer = setTimeout(() => {
-      pendingSave.current = false;
-      mutate(
-        {
-          baseUrl: committed.baseUrl,
-          protocol,
-          apiKey: committed.apiKey,
-          autoApprove,
-          enabledTools,
-          maxHistoryTokens: committed.maxHistoryTokens,
-        },
-        {
-          onError: (err) =>
-            toast.error(t("settings.ai.saveError"), errorMessage(err)),
-        },
-      );
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [protocol, committed, autoApprove, enabledTools, mutate, t]);
+  const changeEnabledTools = (next: string[]) => {
+    setEnabledTools(next);
+    saveConfig({ enabledTools: next });
+  };
 
   const toggleTool = (name: string, checked: boolean) => {
-    setEnabledTools((current) =>
+    changeEnabledTools(
       normalizeEnabledToolNames(
-        checked ? [...current, name] : current.filter((item) => item !== name),
+        checked
+          ? [...enabledTools, name]
+          : enabledTools.filter((item) => item !== name),
       ),
     );
   };
 
   const toggleToolGroup = (names: readonly string[], checked: boolean) => {
-    setEnabledTools((current) =>
+    changeEnabledTools(
       normalizeEnabledToolNames(
         checked
-          ? [...current, ...names]
-          : current.filter((name) => !names.includes(name)),
+          ? [...enabledTools, ...names]
+          : enabledTools.filter((name) => !names.includes(name)),
       ),
     );
   };
@@ -642,32 +655,6 @@ function AiForm({ config }: { config: AiConfig }) {
       return next;
     });
   };
-
-  useEffect(
-    () => () => {
-      const { input, committed, model } = live.current;
-      if (
-        pendingSave.current ||
-        input.baseUrl !== committed.baseUrl ||
-        input.apiKey !== committed.apiKey ||
-        input.maxHistoryTokens !== committed.maxHistoryTokens
-      ) {
-        pendingSave.current = false;
-        mutate(input, {
-          onError: (err) =>
-            toast.error(t("settings.ai.saveError"), errorMessage(err)),
-        });
-      }
-      if (model !== lastSavedModel.current) {
-        lastSavedModel.current = model;
-        mutateModel(model, {
-          onError: (err) =>
-            toast.error(t("settings.ai.saveError"), errorMessage(err)),
-        });
-      }
-    },
-    [mutate, mutateModel, t],
-  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -687,11 +674,10 @@ function AiForm({ config }: { config: AiConfig }) {
           label={t("settings.ai.baseUrlLabel")}
           hint={t("settings.ai.baseUrlHint")}
         >
-          <Input
+          <DraftInput
             value={baseUrl}
+            onCommit={commitBaseUrl}
             maxLength={8192}
-            onChange={(e) => changeBaseUrl(e.target.value)}
-            onBlur={commitDrafts}
             placeholder={exampleBaseUrl(protocol)}
             autoComplete="off"
             spellCheck={false}
@@ -702,11 +688,10 @@ function AiForm({ config }: { config: AiConfig }) {
           label={t("settings.ai.modelLabel")}
           hint={t("settings.ai.modelHint")}
         >
-          <Input
+          <DraftInput
             value={model}
+            onCommit={commitModel}
             maxLength={1024}
-            onChange={(e) => setModel(e.target.value)}
-            onBlur={commitDrafts}
             placeholder="provider/model-id"
             autoComplete="off"
             spellCheck={false}
@@ -717,11 +702,11 @@ function AiForm({ config }: { config: AiConfig }) {
           label={t("settings.ai.apiKeyLabel")}
           hint={t("settings.ai.apiKeyHint")}
         >
-          <PasswordInput
+          <DraftInput
+            password
             value={apiKey}
+            onCommit={commitApiKey}
             maxLength={16384}
-            onChange={(e) => setApiKey(e.target.value)}
-            onBlur={commitDrafts}
             placeholder="sk-…"
             autoComplete="off"
             spellCheck={false}
@@ -743,7 +728,7 @@ function AiForm({ config }: { config: AiConfig }) {
             </div>
             <Switch
               checked={autoApprove}
-              onCheckedChange={setAutoApprove}
+              onCheckedChange={changeAutoApprove}
               aria-label={t("settings.ai.autonomousMode")}
             />
           </div>
@@ -753,19 +738,13 @@ function AiForm({ config }: { config: AiConfig }) {
           label={t("settings.ai.maxHistoryTokensLabel")}
           hint={t("settings.ai.maxHistoryTokensHint")}
         >
-          <Input
+          <DraftInput
             type="number"
             min={0}
             max={4294967295}
             step={1000}
-            value={maxHistoryTokens ?? ""}
-            onChange={(e) => {
-              const parsed = Number.parseInt(e.target.value, 10);
-              setMaxHistoryTokens(
-                Number.isFinite(parsed) && parsed > 0 ? parsed : null,
-              );
-            }}
-            onBlur={commitDrafts}
+            value={maxHistoryTokens?.toString() ?? ""}
+            onCommit={commitMaxHistoryTokens}
             placeholder="200000"
             autoComplete="off"
             spellCheck={false}
