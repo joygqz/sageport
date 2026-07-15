@@ -477,6 +477,7 @@ function FilePassphraseForm({
         placeholder="••••••••"
         autoComplete="off"
         autoFocus
+        maxLength={4096}
       />
       <DialogFooter>
         <Button variant="ghost" onClick={onCancel}>

@@ -7,7 +7,10 @@ use url::Url;
 
 use crate::error::{AppError, AppResult};
 
-use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
+use super::provider::{
+    http_client, read_response_limited, request_error, ObjectStore, ProviderConfig, RemoteObject,
+    MAX_API_RESPONSE_BYTES, MAX_ENVELOPE_RESPONSE_BYTES,
+};
 
 const SIGN_TTL: Duration = Duration::from_secs(300);
 
@@ -37,6 +40,18 @@ impl S3Store {
     ) -> AppResult<Self> {
         let endpoint_url = Url::parse(&endpoint)
             .map_err(|e| AppError::Invalid(format!("invalid S3 endpoint: {e}")))?;
+        if !matches!(endpoint_url.scheme(), "http" | "https")
+            || endpoint_url.host_str().is_none()
+            || !endpoint_url.username().is_empty()
+            || endpoint_url.password().is_some()
+            || endpoint_url.query().is_some()
+            || endpoint_url.fragment().is_some()
+        {
+            return Err(AppError::Invalid(
+                "S3 endpoint must be http(s) with a host and no credentials, query, or fragment"
+                    .into(),
+            ));
+        }
         let style = if path_style {
             UrlStyle::Path
         } else {
@@ -50,7 +65,7 @@ impl S3Store {
             p => format!("{p}/"),
         };
         Ok(Self {
-            http: reqwest::Client::new(),
+            http: http_client()?,
             bucket,
             credentials: Credentials::new(access_key.clone(), secret_key.clone()),
             endpoint,
@@ -71,29 +86,52 @@ impl S3Store {
 #[async_trait]
 impl ObjectStore for S3Store {
     async fn list(&mut self) -> AppResult<Vec<RemoteObject>> {
-        let mut action = self.bucket.list_objects_v2(Some(&self.credentials));
-        action.query_mut().insert("prefix", self.prefix.clone());
-        let url = action.sign(SIGN_TTL);
-        let resp = self.http.get(url).send().await.map_err(net_err)?;
-        let status = resp.status();
-        let text = resp.text().await.map_err(net_err)?;
-        if !status.is_success() {
-            return Err(api_err("list", status, &text));
-        }
-        let parsed = ListObjectsV2::parse_response(&text)
-            .map_err(|e| AppError::Other(format!("could not parse the S3 list response: {e}")))?;
-        Ok(parsed
-            .contents
-            .into_iter()
-            .filter_map(|obj| {
+        let mut objects = Vec::new();
+        let mut continuation: Option<String> = None;
+        for _ in 0..100 {
+            let mut action = self.bucket.list_objects_v2(Some(&self.credentials));
+            action.query_mut().insert("prefix", self.prefix.clone());
+            if let Some(token) = continuation.as_ref() {
+                action
+                    .query_mut()
+                    .insert("continuation-token", token.clone());
+            }
+            let url = action.sign(SIGN_TTL);
+            let resp = self.http.get(url).send().await.map_err(net_err)?;
+            let status = resp.status();
+            let text = String::from_utf8(
+                read_response_limited(resp, MAX_API_RESPONSE_BYTES, "S3 list response").await?,
+            )
+            .map_err(|_| AppError::Other("S3 list response is not UTF-8".into()))?;
+            if !status.is_success() {
+                return Err(api_err("list", status, &text));
+            }
+            let parsed = ListObjectsV2::parse_response(&text).map_err(|e| {
+                AppError::Other(format!("could not parse the S3 list response: {e}"))
+            })?;
+            objects.extend(parsed.contents.into_iter().filter_map(|obj| {
                 let name = obj.key.strip_prefix(&self.prefix)?.to_string();
                 Some(RemoteObject {
                     id: name.clone(),
                     name,
                     size: Some(obj.size),
                 })
-            })
-            .collect())
+            }));
+            match parsed.next_continuation_token {
+                Some(next) if continuation.as_deref() != Some(next.as_str()) => {
+                    continuation = Some(next);
+                }
+                Some(_) => {
+                    return Err(AppError::Other(
+                        "S3 returned a repeated continuation token".into(),
+                    ))
+                }
+                None => return Ok(objects),
+            }
+        }
+        Err(AppError::Invalid(
+            "S3 backup listing exceeds the supported page limit".into(),
+        ))
     }
 
     async fn get(&mut self, id: &str) -> AppResult<Vec<u8>> {
@@ -105,7 +143,7 @@ impl ObjectStore for S3Store {
         if status.as_u16() == 404 {
             return Err(AppError::NotFound(format!("backup {id} not found")));
         }
-        let bytes = resp.bytes().await.map_err(net_err)?;
+        let bytes = read_response_limited(resp, MAX_ENVELOPE_RESPONSE_BYTES, "S3 backup").await?;
         if !status.is_success() {
             return Err(api_err(
                 "download",
@@ -113,7 +151,7 @@ impl ObjectStore for S3Store {
                 &String::from_utf8_lossy(&bytes),
             ));
         }
-        Ok(bytes.to_vec())
+        Ok(bytes)
     }
 
     async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
@@ -130,7 +168,10 @@ impl ObjectStore for S3Store {
             .map_err(net_err)?;
         let status = resp.status();
         if !status.is_success() {
-            let text = resp.text().await.unwrap_or_default();
+            let text = String::from_utf8_lossy(
+                &read_response_limited(resp, MAX_API_RESPONSE_BYTES, "S3 error response").await?,
+            )
+            .into_owned();
             return Err(api_err("upload", status, &text));
         }
         Ok(())
@@ -145,7 +186,10 @@ impl ObjectStore for S3Store {
         if status.is_success() || status.as_u16() == 404 {
             return Ok(());
         }
-        let text = resp.text().await.unwrap_or_default();
+        let text = String::from_utf8_lossy(
+            &read_response_limited(resp, MAX_API_RESPONSE_BYTES, "S3 error response").await?,
+        )
+        .into_owned();
         Err(api_err("delete", status, &text))
     }
 
@@ -163,7 +207,7 @@ impl ObjectStore for S3Store {
 }
 
 fn net_err(e: reqwest::Error) -> AppError {
-    AppError::Other(format!("S3 request failed: {e}"))
+    request_error("S3 request", e)
 }
 
 fn api_err(what: &str, status: reqwest::StatusCode, body: &str) -> AppError {
@@ -181,5 +225,42 @@ fn api_err(what: &str, status: reqwest::StatusCode, body: &str) -> AppError {
     match status.as_u16() {
         401 | 403 => AppError::Invalid(format!("S3 rejected the credentials: {detail}")),
         _ => AppError::Other(format!("S3 {what} failed: {detail}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn store(endpoint: &str) -> AppResult<S3Store> {
+        S3Store::new(
+            endpoint.into(),
+            "us-east-1".into(),
+            "vault".into(),
+            String::new(),
+            "access".into(),
+            "secret".into(),
+            true,
+        )
+    }
+
+    #[test]
+    fn rejects_unsafe_s3_endpoints_and_normalizes_prefixes() {
+        assert!(store("file:///tmp/s3").is_err());
+        assert!(store("https://user:secret@example.com").is_err());
+        assert!(store("https://example.com?token=secret").is_err());
+
+        let store = S3Store::new(
+            "https://example.com".into(),
+            "us-east-1".into(),
+            "vault".into(),
+            " /team/backups/ ".into(),
+            "access".into(),
+            "secret".into(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(store.prefix, "team/backups/");
+        assert_eq!(store.key("vault.json"), "team/backups/vault.json");
     }
 }

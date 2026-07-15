@@ -7,8 +7,10 @@ mod s3;
 mod settings_compat;
 mod webdav;
 
-pub use provider::{make_provider, ProviderConfig, ProviderKind, SyncVersion};
+pub use provider::{make_provider, ProviderConfig, ProviderKind, SyncProvider, SyncVersion};
 
+use std::collections::{HashMap, HashSet};
+use std::io::{Read, Write};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -16,10 +18,15 @@ use sqlx::{Executor, Sqlite, SqlitePool};
 
 use crate::crypto::{self, EncryptedEnvelope};
 use crate::domain::{now, Group, Host, Identity, PortForward, SftpBookmark, Snippet, SshKey};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["sync.", "update."];
+const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_ENVELOPE_FILE_BYTES: u64 = 100 * 1024 * 1024;
+const MAX_RECORDS_PER_KIND: usize = 100_000;
+const MAX_SYNC_ID_BYTES: usize = 256;
+const MAX_CLOCK_SKEW_HOURS: i64 = 24;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,49 +70,35 @@ impl VaultSnapshot {
                 + self.port_forwards.len()
                 + self.sftp_bookmarks.len(),
         );
-        out.extend(
-            self.groups
-                .iter()
-                .map(|g| format!("g:{}:{}", g.id, g.revision)),
-        );
-        out.extend(
-            self.hosts
-                .iter()
-                .map(|h| format!("h:{}:{}", h.id, h.revision)),
-        );
-        out.extend(
-            self.identities
-                .iter()
-                .map(|i| format!("i:{}:{}", i.id, i.revision)),
-        );
-        out.extend(
-            self.keys
-                .iter()
-                .map(|k| format!("k:{}:{}", k.id, k.revision)),
-        );
-        out.extend(
-            self.snippets
-                .iter()
-                .map(|s| format!("s:{}:{}", s.id, s.revision)),
-        );
-        out.extend(
-            self.settings
-                .iter()
-                .map(|e| format!("e:{}:{}", e.key, e.updated_at)),
-        );
+        // A revision alone is not globally unique: two devices can both
+        // produce revision N with different content. Include the complete
+        // record so the winning last-write-wins value is uploaded.
+        out.extend(self.groups.iter().map(|value| fingerprint("g", value)));
+        out.extend(self.hosts.iter().map(|value| fingerprint("h", value)));
+        out.extend(self.identities.iter().map(|value| fingerprint("i", value)));
+        out.extend(self.keys.iter().map(|value| fingerprint("k", value)));
+        out.extend(self.snippets.iter().map(|value| fingerprint("s", value)));
+        out.extend(self.settings.iter().map(|value| fingerprint("e", value)));
         out.extend(
             self.port_forwards
                 .iter()
-                .map(|f| format!("f:{}:{}", f.id, f.revision)),
+                .map(|value| fingerprint("f", value)),
         );
         out.extend(
             self.sftp_bookmarks
                 .iter()
-                .map(|b| format!("b:{}:{}", b.id, b.revision)),
+                .map(|value| fingerprint("b", value)),
         );
         out.sort_unstable();
         out
     }
+}
+
+fn fingerprint<T: Serialize>(kind: &str, value: &T) -> String {
+    format!(
+        "{kind}:{}",
+        serde_json::to_string(value).expect("vault records are JSON serializable")
+    )
 }
 
 pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
@@ -128,7 +121,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
         })
         .collect();
 
-    Ok(VaultSnapshot {
+    let snapshot = VaultSnapshot {
         exported_at: now(),
         groups,
         hosts,
@@ -138,10 +131,13 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
         settings,
         port_forwards,
         sftp_bookmarks,
-    })
+    };
+    validate_snapshot(&snapshot)?;
+    Ok(snapshot)
 }
 
 pub async fn import_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
+    validate_snapshot(snapshot)?;
     let mut tx = pool.begin().await?;
     sqlx::query("PRAGMA defer_foreign_keys = ON")
         .execute(&mut *tx)
@@ -171,22 +167,52 @@ pub async fn import_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> App
     for entry in &snapshot.settings {
         merge_setting(&mut *tx, entry).await?;
     }
+    repair_reference_cycles(&mut tx).await?;
     tx.commit().await?;
     Ok(())
 }
 
 pub async fn export_encrypted(pool: &SqlitePool, passphrase: &str) -> AppResult<EncryptedEnvelope> {
     let snapshot = export_snapshot(pool).await?;
-    let bytes = serde_json::to_vec(&snapshot)?;
-    crypto::encrypt(&bytes, passphrase)
+    encrypt_snapshot(&snapshot, passphrase).await
 }
 
-pub fn decrypt_snapshot(
+pub async fn encrypt_snapshot(
+    snapshot: &VaultSnapshot,
+    passphrase: &str,
+) -> AppResult<EncryptedEnvelope> {
+    validate_snapshot(snapshot)?;
+    let bytes = serde_json::to_vec(&snapshot)?;
+    if bytes.len() > MAX_SNAPSHOT_BYTES {
+        return Err(AppError::Invalid(format!(
+            "vault snapshot exceeds the {} MiB backup limit",
+            MAX_SNAPSHOT_BYTES / 1024 / 1024
+        )));
+    }
+    let passphrase = passphrase.to_string();
+    tokio::task::spawn_blocking(move || crypto::encrypt(&bytes, &passphrase))
+        .await
+        .map_err(|e| AppError::Other(format!("backup encryption task failed: {e}")))?
+}
+
+pub async fn decrypt_snapshot(
     envelope: &EncryptedEnvelope,
     passphrase: &str,
 ) -> AppResult<VaultSnapshot> {
-    let bytes = crypto::decrypt(envelope, passphrase)?;
-    Ok(serde_json::from_slice(&bytes)?)
+    let envelope = envelope.clone();
+    let passphrase = passphrase.to_string();
+    let bytes = tokio::task::spawn_blocking(move || crypto::decrypt(&envelope, &passphrase))
+        .await
+        .map_err(|e| AppError::Other(format!("backup decryption task failed: {e}")))??;
+    if bytes.len() > MAX_SNAPSHOT_BYTES {
+        return Err(AppError::Invalid(format!(
+            "vault snapshot exceeds the {} MiB backup limit",
+            MAX_SNAPSHOT_BYTES / 1024 / 1024
+        )));
+    }
+    let snapshot: VaultSnapshot = serde_json::from_slice(&bytes)?;
+    validate_snapshot(&snapshot)?;
+    Ok(snapshot)
 }
 
 pub async fn import_encrypted(
@@ -194,12 +220,13 @@ pub async fn import_encrypted(
     envelope: &EncryptedEnvelope,
     passphrase: &str,
 ) -> AppResult<VaultSnapshot> {
-    let snapshot = decrypt_snapshot(envelope, passphrase)?;
+    let snapshot = decrypt_snapshot(envelope, passphrase).await?;
     import_snapshot(pool, &snapshot).await?;
     Ok(snapshot)
 }
 
 pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
+    validate_snapshot(snapshot)?;
     let mut tx = pool.begin().await?;
     sqlx::query("PRAGMA defer_foreign_keys = ON")
         .execute(&mut *tx)
@@ -247,6 +274,7 @@ pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> Ap
     for entry in &snapshot.settings {
         merge_setting(&mut *tx, entry).await?;
     }
+    repair_reference_cycles(&mut tx).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -256,21 +284,284 @@ pub async fn restore_encrypted(
     envelope: &EncryptedEnvelope,
     passphrase: &str,
 ) -> AppResult<()> {
-    let snapshot = decrypt_snapshot(envelope, passphrase)?;
+    let snapshot = decrypt_snapshot(envelope, passphrase).await?;
     restore_snapshot(pool, &snapshot).await
 }
 
 pub fn write_envelope_file(path: &Path, envelope: &EncryptedEnvelope) -> AppResult<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+    let bytes = serde_json::to_vec_pretty(envelope)?;
+    if bytes.len() as u64 > MAX_ENVELOPE_FILE_BYTES {
+        return Err(AppError::Invalid(
+            "encrypted backup file is too large".into(),
+        ));
     }
-    std::fs::write(path, serde_json::to_vec_pretty(envelope)?)?;
+    let parent = path
+        .parent()
+        .filter(|value| !value.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if !parent.is_dir() {
+        return Err(AppError::Invalid(
+            "backup destination folder does not exist".into(),
+        ));
+    }
+    if path
+        .symlink_metadata()
+        .is_ok_and(|metadata| metadata.file_type().is_dir())
+    {
+        return Err(AppError::Invalid(
+            "backup destination must not be a directory".into(),
+        ));
+    }
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| AppError::Invalid("backup destination must be a file".into()))?
+        .to_string_lossy();
+    let temp = parent.join(format!(".{file_name}.{}.tmp", uuid::Uuid::new_v4()));
+
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let write_result = (|| -> AppResult<()> {
+        let mut file = options.open(&temp)?;
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+        drop(file);
+
+        if path.exists() || path.symlink_metadata().is_ok() {
+            let backup = parent.join(format!(".{file_name}.{}.bak", uuid::Uuid::new_v4()));
+            std::fs::rename(path, &backup)?;
+            if let Err(error) = std::fs::rename(&temp, path) {
+                let _ = std::fs::rename(&backup, path);
+                return Err(error.into());
+            }
+            std::fs::remove_file(&backup)?;
+        } else {
+            std::fs::rename(&temp, path)?;
+        }
+        Ok(())
+    })();
+    if write_result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    write_result?;
     Ok(())
 }
 
 pub fn read_envelope_file(path: &Path) -> AppResult<EncryptedEnvelope> {
-    let bytes = std::fs::read(path)?;
+    let file = std::fs::File::open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() || metadata.len() > MAX_ENVELOPE_FILE_BYTES {
+        return Err(AppError::Invalid(
+            "encrypted backup file is too large or invalid".into(),
+        ));
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(MAX_ENVELOPE_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_ENVELOPE_FILE_BYTES {
+        return Err(AppError::Invalid(
+            "encrypted backup file is too large".into(),
+        ));
+    }
     Ok(serde_json::from_slice(&bytes)?)
+}
+
+fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
+    validate_timestamp(&snapshot.exported_at, "snapshot export time")?;
+    for (label, len) in [
+        ("groups", snapshot.groups.len()),
+        ("hosts", snapshot.hosts.len()),
+        ("identities", snapshot.identities.len()),
+        ("keys", snapshot.keys.len()),
+        ("snippets", snapshot.snippets.len()),
+        ("settings", snapshot.settings.len()),
+        ("port forwards", snapshot.port_forwards.len()),
+        ("SFTP bookmarks", snapshot.sftp_bookmarks.len()),
+    ] {
+        if len > MAX_RECORDS_PER_KIND {
+            return Err(AppError::Invalid(format!("too many {label} in backup")));
+        }
+    }
+
+    let mut ids = HashSet::new();
+    macro_rules! records {
+        ($values:expr, $label:literal) => {
+            for value in $values {
+                validate_record(
+                    &mut ids,
+                    $label,
+                    &value.id,
+                    &value.created_at,
+                    &value.updated_at,
+                    value.deleted_at.as_deref(),
+                    value.revision,
+                )?;
+            }
+            ids.clear();
+        };
+    }
+    records!(&snapshot.groups, "group");
+    records!(&snapshot.hosts, "host");
+    records!(&snapshot.identities, "identity");
+    records!(&snapshot.keys, "key");
+    records!(&snapshot.snippets, "snippet");
+    records!(&snapshot.port_forwards, "port forward");
+    records!(&snapshot.sftp_bookmarks, "SFTP bookmark");
+    ids.clear();
+    for entry in &snapshot.settings {
+        if entry.key.is_empty()
+            || entry.key.len() > MAX_SYNC_ID_BYTES
+            || entry.key.chars().any(char::is_control)
+            || !ids.insert(entry.key.clone())
+        {
+            return Err(AppError::Invalid(
+                "invalid or duplicate setting key in backup".into(),
+            ));
+        }
+        validate_timestamp(&entry.updated_at, "setting update time")?;
+    }
+    Ok(())
+}
+
+fn validate_record(
+    ids: &mut HashSet<String>,
+    kind: &str,
+    id: &str,
+    created_at: &str,
+    updated_at: &str,
+    deleted_at: Option<&str>,
+    revision: i64,
+) -> AppResult<()> {
+    if id.is_empty()
+        || id.len() > MAX_SYNC_ID_BYTES
+        || id.chars().any(char::is_control)
+        || !ids.insert(id.to_string())
+    {
+        return Err(AppError::Invalid(format!("invalid or duplicate {kind} id")));
+    }
+    if revision < 1 {
+        return Err(AppError::Invalid(format!("invalid {kind} revision")));
+    }
+    let created = parse_timestamp(created_at, &format!("{kind} creation time"))?;
+    let updated = parse_timestamp(updated_at, &format!("{kind} update time"))?;
+    if updated < created {
+        return Err(AppError::Invalid(format!(
+            "{kind} update time precedes its creation time"
+        )));
+    }
+    if let Some(value) = deleted_at {
+        validate_timestamp(value, &format!("{kind} deletion time"))?;
+    }
+    Ok(())
+}
+
+fn validate_timestamp(value: &str, label: &str) -> AppResult<()> {
+    parse_timestamp(value, label).map(|_| ())
+}
+
+fn parse_timestamp(value: &str, label: &str) -> AppResult<chrono::DateTime<chrono::FixedOffset>> {
+    let timestamp = chrono::DateTime::parse_from_rfc3339(value)
+        .map_err(|_| AppError::Invalid(format!("invalid {label} in backup")))?;
+    if timestamp.with_timezone(&chrono::Utc)
+        > chrono::Utc::now() + chrono::Duration::hours(MAX_CLOCK_SKEW_HOURS)
+    {
+        return Err(AppError::Invalid(format!(
+            "{label} is too far in the future"
+        )));
+    }
+    Ok(timestamp)
+}
+
+async fn repair_reference_cycles(tx: &mut sqlx::Transaction<'_, Sqlite>) -> AppResult<()> {
+    repair_cycles(tx, "groups", "parent_id").await?;
+    repair_cycles(tx, "hosts", "jump_host_id").await
+}
+
+async fn repair_cycles(
+    tx: &mut sqlx::Transaction<'_, Sqlite>,
+    table: &str,
+    parent_column: &str,
+) -> AppResult<()> {
+    let sql = format!(
+        "SELECT id, updated_at, {parent_column} FROM {table} \
+         WHERE deleted_at IS NULL AND {parent_column} IS NOT NULL"
+    );
+    let pairs: Vec<(String, String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(sql))
+        .fetch_all(&mut **tx)
+        .await?;
+    let mut parents = HashMap::new();
+    let mut timestamps = HashMap::new();
+    for (id, updated_at, parent) in pairs {
+        timestamps.insert(id.clone(), updated_at);
+        parents.insert(id, parent);
+    }
+    let breakers = cycle_breakers(&parents);
+    if breakers.is_empty() {
+        return Ok(());
+    }
+    let sql = format!(
+        "UPDATE {table} SET {parent_column} = NULL, updated_at = ?, revision = revision + 1 \
+         WHERE id = ? AND deleted_at IS NULL"
+    );
+    for id in breakers {
+        let updated_at = next_sync_timestamp(
+            timestamps
+                .get(&id)
+                .expect("cycle breaker came from the queried records"),
+        )?;
+        sqlx::query(sqlx::AssertSqlSafe(sql.clone()))
+            .bind(&updated_at)
+            .bind(id)
+            .execute(&mut **tx)
+            .await?;
+    }
+    Ok(())
+}
+
+fn next_sync_timestamp(previous: &str) -> AppResult<String> {
+    let previous = chrono::DateTime::parse_from_rfc3339(previous)
+        .map_err(|_| AppError::Invalid("invalid sync conflict timestamp".into()))?
+        .with_timezone(&chrono::Utc)
+        + chrono::Duration::microseconds(1);
+    let current = chrono::Utc::now();
+    Ok(std::cmp::max(previous, current).to_rfc3339())
+}
+
+fn cycle_breakers(parents: &HashMap<String, String>) -> Vec<String> {
+    let mut starts: Vec<&String> = parents.keys().collect();
+    starts.sort_unstable();
+    let mut complete: HashSet<String> = HashSet::new();
+    let mut breakers: HashSet<String> = HashSet::new();
+    for start in starts {
+        if complete.contains(start) {
+            continue;
+        }
+        let mut path: Vec<String> = Vec::new();
+        let mut positions: HashMap<String, usize> = HashMap::new();
+        let mut current = start.clone();
+        loop {
+            if complete.contains(&current) || !parents.contains_key(&current) {
+                break;
+            }
+            if let Some(position) = positions.get(&current).copied() {
+                if let Some(breaker) = path[position..].iter().max() {
+                    breakers.insert((*breaker).clone());
+                }
+                break;
+            }
+            positions.insert(current.clone(), path.len());
+            path.push(current.clone());
+            current = parents[&current].clone();
+        }
+        complete.extend(path);
+    }
+    let mut breakers: Vec<String> = breakers.into_iter().collect();
+    breakers.sort_unstable();
+    breakers
 }
 
 async fn fetch_all<T>(pool: &SqlitePool, table: &str) -> AppResult<Vec<T>>
@@ -478,11 +769,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use sqlx::sqlite::SqlitePoolOptions;
 
     use super::*;
 
-    const BACKUP_TIMESTAMP: &str = "2099-01-01T00:00:00+00:00";
+    const BACKUP_TIMESTAMP: &str = "2026-07-15T00:00:00+00:00";
 
     async fn test_pool() -> SqlitePool {
         let pool = SqlitePoolOptions::new()
@@ -567,5 +860,128 @@ mod tests {
                 .as_deref(),
             Some("midnight:dark")
         );
+    }
+
+    #[test]
+    fn fingerprint_includes_content_not_only_revision() {
+        let mut first = empty_snapshot(Vec::new());
+        first.groups.push(Group {
+            id: "group-1".into(),
+            name: "Production".into(),
+            parent_id: None,
+            sort_order: 0,
+            created_at: BACKUP_TIMESTAMP.into(),
+            updated_at: BACKUP_TIMESTAMP.into(),
+            deleted_at: None,
+            revision: 2,
+        });
+        let mut second = first.clone();
+        second.groups[0].name = "Staging".into();
+
+        assert_ne!(
+            first.content_fingerprint(),
+            second.content_fingerprint(),
+            "two devices can produce the same revision with different content"
+        );
+        second.groups[0].name = first.groups[0].name.clone();
+        second.exported_at = "2100-02-02T00:00:00+00:00".into();
+        assert_eq!(first.content_fingerprint(), second.content_fingerprint());
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_records_before_starting_a_merge() {
+        let pool = test_pool().await;
+        let mut snapshot = empty_snapshot(Vec::new());
+        snapshot.groups.push(Group {
+            id: "group-1".into(),
+            name: "Invalid".into(),
+            parent_id: None,
+            sort_order: 0,
+            created_at: BACKUP_TIMESTAMP.into(),
+            updated_at: "not-a-time".into(),
+            deleted_at: None,
+            revision: 0,
+        });
+
+        assert!(matches!(
+            import_snapshot(&pool, &snapshot).await,
+            Err(AppError::Invalid(_))
+        ));
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM groups")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn conflict_merge_breaks_reference_cycles_deterministically() {
+        let pool = test_pool().await;
+        let mut snapshot = empty_snapshot(Vec::new());
+        snapshot.groups = vec![
+            Group {
+                id: "group-a".into(),
+                name: "A".into(),
+                parent_id: Some("group-b".into()),
+                sort_order: 0,
+                created_at: BACKUP_TIMESTAMP.into(),
+                updated_at: BACKUP_TIMESTAMP.into(),
+                deleted_at: None,
+                revision: 2,
+            },
+            Group {
+                id: "group-b".into(),
+                name: "B".into(),
+                parent_id: Some("group-a".into()),
+                sort_order: 0,
+                created_at: BACKUP_TIMESTAMP.into(),
+                updated_at: BACKUP_TIMESTAMP.into(),
+                deleted_at: None,
+                revision: 2,
+            },
+        ];
+
+        import_snapshot(&pool, &snapshot).await.unwrap();
+        let rows: Vec<(String, Option<String>, i64)> =
+            sqlx::query_as("SELECT id, parent_id, revision FROM groups ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(rows[0], ("group-a".into(), Some("group-b".into()), 2));
+        assert_eq!(rows[1], ("group-b".into(), None, 3));
+
+        let parents = HashMap::from([
+            ("a".into(), "b".into()),
+            ("b".into(), "c".into()),
+            ("c".into(), "a".into()),
+            ("x".into(), "y".into()),
+        ]);
+        assert_eq!(cycle_breakers(&parents), vec!["c"]);
+    }
+
+    #[test]
+    fn encrypted_file_write_replaces_atomically_and_uses_private_permissions() {
+        let dir = std::env::temp_dir().join(format!("sageport-sync-test-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&dir).unwrap();
+        let path = dir.join("vault.json");
+        fs::write(&path, b"old partial data").unwrap();
+        let envelope = crypto::encrypt(b"vault data", "passphrase").unwrap();
+
+        write_envelope_file(&path, &envelope).unwrap();
+        let loaded = read_envelope_file(&path).unwrap();
+        assert_eq!(
+            crypto::decrypt(&loaded, "passphrase").unwrap(),
+            b"vault data"
+        );
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 }

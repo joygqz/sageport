@@ -10,6 +10,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use url::Url;
 
+use super::provider::{http_client, read_response_limited, request_error, MAX_API_RESPONSE_BYTES};
 use crate::error::{AppError, AppResult};
 
 pub const GITHUB_CLIENT_ID: Option<&str> = option_env!("SAGEPORT_GITHUB_CLIENT_ID");
@@ -42,6 +43,7 @@ pub struct OAuthTokens {
 
 impl OAuthTokens {
     fn from_grant(access_token: String, refresh_token: String, expires_in: i64) -> Self {
+        let expires_in = expires_in.clamp(60, 86_400);
         Self {
             access_token,
             refresh_token,
@@ -94,22 +96,17 @@ fn require(id: Option<&'static str>, provider: &str, var: &str) -> AppResult<&'s
     })
 }
 
-fn http() -> reqwest::Client {
-    reqwest::Client::new()
-}
-
 async fn post_form_json(url: &str, form: &[(&str, &str)]) -> AppResult<Value> {
-    let resp = http()
+    let resp = http_client()?
         .post(url)
         .header("Accept", "application/json")
         .form(form)
         .send()
         .await
-        .map_err(|e| AppError::Other(format!("oauth request failed: {e}")))?;
+        .map_err(|e| request_error("OAuth request", e))?;
     let status = resp.status();
-    let body: Value = resp
-        .json()
-        .await
+    let bytes = read_response_limited(resp, MAX_API_RESPONSE_BYTES, "OAuth response").await?;
+    let body: Value = serde_json::from_slice(&bytes)
         .map_err(|e| AppError::Other(format!("oauth response unreadable: {e}")))?;
     if !status.is_success() {
         let detail = body["error_description"]
@@ -129,16 +126,19 @@ pub async fn github_device_flow(
 ) -> AppResult<OAuthOutcome> {
     let client_id = require(GITHUB_CLIENT_ID, "GitHub", "SAGEPORT_GITHUB_CLIENT_ID")?;
 
-    let init = post_form_json(
-        "https://github.com/login/device/code",
-        &[("client_id", client_id), ("scope", GITHUB_SCOPE)],
-    )
-    .await?;
+    let init_form = [("client_id", client_id), ("scope", GITHUB_SCOPE)];
+    let init = tokio::select! {
+        _ = &mut cancel => return Err(AppError::Cancelled),
+        result = post_form_json(
+            "https://github.com/login/device/code",
+            &init_form,
+        ) => result?,
+    };
     let device_code = json_str(&init, "device_code")?;
     let user_code = json_str(&init, "user_code")?;
-    let verification_uri = json_str(&init, "verification_uri")?;
-    let expires_in = init["expires_in"].as_i64().unwrap_or(900);
-    let mut interval = init["interval"].as_i64().unwrap_or(5).max(1) as u64;
+    let verification_uri = validate_github_verification_uri(&json_str(&init, "verification_uri")?)?;
+    let expires_in = init["expires_in"].as_i64().unwrap_or(900).clamp(60, 3600);
+    let mut interval = init["interval"].as_i64().unwrap_or(5).clamp(1, 60) as u64;
 
     on_event
         .send(OAuthEvent::DeviceCode {
@@ -159,15 +159,18 @@ pub async fn github_device_flow(
             ));
         }
 
-        let resp = post_form_json(
-            "https://github.com/login/oauth/access_token",
-            &[
-                ("client_id", client_id),
-                ("device_code", &device_code),
-                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-            ],
-        )
-        .await?;
+        let token_form = [
+            ("client_id", client_id),
+            ("device_code", device_code.as_str()),
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+        ];
+        let resp = tokio::select! {
+            _ = &mut cancel => return Err(AppError::Cancelled),
+            result = post_form_json(
+                "https://github.com/login/oauth/access_token",
+                &token_form,
+            ) => result?,
+        };
 
         match resp["error"].as_str() {
             Some("authorization_pending") => continue,
@@ -201,17 +204,23 @@ pub async fn github_device_flow(
 }
 
 async fn github_login(token: &str) -> AppResult<String> {
-    let body: Value = http()
+    let resp = http_client()?
         .get("https://api.github.com/user")
         .header("Authorization", format!("Bearer {token}"))
         .header("User-Agent", "sageport")
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
-        .map_err(|e| AppError::Other(e.to_string()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.to_string()))?;
+        .map_err(|e| request_error("GitHub account request", e))?;
+    let status = resp.status();
+    let bytes =
+        read_response_limited(resp, MAX_API_RESPONSE_BYTES, "GitHub account response").await?;
+    if !status.is_success() {
+        return Err(AppError::Invalid(
+            "GitHub authorization is invalid or expired".into(),
+        ));
+    }
+    let body: Value = serde_json::from_slice(&bytes)?;
     json_str(&body, "login")
 }
 
@@ -300,15 +309,21 @@ pub async fn google_flow(
 }
 
 async fn google_email(access_token: &str) -> AppResult<String> {
-    let body: Value = http()
+    let resp = http_client()?
         .get("https://openidconnect.googleapis.com/v1/userinfo")
         .bearer_auth(access_token)
         .send()
         .await
-        .map_err(|e| AppError::Other(e.to_string()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.to_string()))?;
+        .map_err(|e| request_error("Google account request", e))?;
+    let status = resp.status();
+    let bytes =
+        read_response_limited(resp, MAX_API_RESPONSE_BYTES, "Google account response").await?;
+    if !status.is_success() {
+        return Err(AppError::Invalid(
+            "Google authorization is invalid or expired".into(),
+        ));
+    }
+    let body: Value = serde_json::from_slice(&bytes)?;
     json_str(&body, "email")
 }
 
@@ -369,15 +384,21 @@ pub async fn microsoft_flow(
 }
 
 async fn microsoft_account(access_token: &str) -> AppResult<String> {
-    let body: Value = http()
+    let resp = http_client()?
         .get("https://graph.microsoft.com/v1.0/me")
         .bearer_auth(access_token)
         .send()
         .await
-        .map_err(|e| AppError::Other(e.to_string()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.to_string()))?;
+        .map_err(|e| request_error("Microsoft account request", e))?;
+    let status = resp.status();
+    let bytes =
+        read_response_limited(resp, MAX_API_RESPONSE_BYTES, "Microsoft account response").await?;
+    if !status.is_success() {
+        return Err(AppError::Invalid(
+            "Microsoft authorization is invalid or expired".into(),
+        ));
+    }
+    let body: Value = serde_json::from_slice(&bytes)?;
     body["mail"]
         .as_str()
         .or(body["userPrincipalName"].as_str())
@@ -474,12 +495,22 @@ async fn run_loopback(
         let (mut stream, _) = accept.map_err(|e| AppError::Other(e.to_string()))?;
 
         let mut buf = vec![0u8; 8192];
-        let n = stream.read(&mut buf).await.unwrap_or(0);
+        let n = tokio::select! {
+            _ = &mut cancel => return Err(AppError::Cancelled),
+            _ = tokio::time::sleep_until(deadline) => {
+                return Err(AppError::Invalid("timed out waiting for browser authorization".into()));
+            }
+            read = stream.read(&mut buf) => read.unwrap_or(0),
+        };
         let head = String::from_utf8_lossy(&buf[..n]);
-        let Some(target) = head.split_whitespace().nth(1) else {
+        let mut request_line = head.split_whitespace();
+        let method = request_line.next();
+        let target = request_line.next();
+        if method != Some("GET") || !target.is_some_and(|value| value.starts_with('/')) {
             respond(&mut stream, 400, "Bad request").await;
             continue;
-        };
+        }
+        let target = target.expect("checked above");
 
         let url = match Url::parse(&format!("http://localhost{target}")) {
             Ok(u) => u,
@@ -500,6 +531,10 @@ async fn run_loopback(
             }
         }
 
+        if state.as_deref() != Some(expected_state) {
+            respond(&mut stream, 400, "State mismatch").await;
+            continue;
+        }
         if let Some(err) = error {
             respond(
                 &mut stream,
@@ -515,11 +550,6 @@ async fn run_loopback(
             respond(&mut stream, 404, "Not found").await;
             continue;
         };
-        if state.as_deref() != Some(expected_state) {
-            respond(&mut stream, 400, "State mismatch").await;
-            return Err(AppError::Invalid("OAuth state mismatch — try again".into()));
-        }
-
         respond(
             &mut stream,
             200,
@@ -550,8 +580,47 @@ async fn respond(stream: &mut tokio::net::TcpStream, status: u16, message: &str)
 }
 
 fn json_str(v: &Value, key: &str) -> AppResult<String> {
-    v[key]
+    let value = v[key]
         .as_str()
-        .map(str::to_string)
-        .ok_or_else(|| AppError::Other(format!("missing `{key}` in oauth response")))
+        .ok_or_else(|| AppError::Other(format!("missing `{key}` in oauth response")))?;
+    if value.is_empty() || value.len() > 64 * 1024 || value.chars().any(char::is_control) {
+        return Err(AppError::Other(format!(
+            "invalid or oversized `{key}` in oauth response"
+        )));
+    }
+    Ok(value.to_string())
+}
+
+fn validate_github_verification_uri(value: &str) -> AppResult<String> {
+    let url = Url::parse(value)
+        .map_err(|_| AppError::Other("GitHub returned an invalid verification URL".into()))?;
+    if url.scheme() != "https"
+        || url.host_str() != Some("github.com")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err(AppError::Other(
+            "GitHub returned an untrusted verification URL".into(),
+        ));
+    }
+    Ok(url.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_oauth_expiry_and_external_verification_urls() {
+        let tokens = OAuthTokens::from_grant("access".into(), "refresh".into(), i64::MAX);
+        let expiry = chrono::DateTime::parse_from_rfc3339(&tokens.expires_at).unwrap();
+        assert!(expiry < chrono::Utc::now() + chrono::Duration::days(2));
+
+        assert!(validate_github_verification_uri("https://github.com/login/device").is_ok());
+        assert!(validate_github_verification_uri("javascript:alert(1)").is_err());
+        assert!(
+            validate_github_verification_uri("https://github.com.evil.example/login/device")
+                .is_err()
+        );
+    }
 }

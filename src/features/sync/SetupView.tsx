@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Check, Copy, ExternalLink } from "lucide-react";
 
@@ -53,8 +53,10 @@ export function SetupView({ status }: { status: SyncStatus }) {
 
   const selectProvider = (next: SyncProviderKind) => {
     if (next === kind) return;
+    void ipc.sync.oauthCancel().catch(() => undefined);
     setKind(next);
     setOAuth({ step: "idle" });
+    setPassphrase("");
     setMismatch(null);
   };
 
@@ -87,6 +89,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
     <div className="flex flex-col gap-6">
       <RadioGroup
         value={kind}
+        disabled={connect.isPending}
         onValueChange={(value) => selectProvider(value as SyncProviderKind)}
         aria-label={t("settings.sync.providerLabel")}
         className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-2"
@@ -186,8 +189,19 @@ function OAuthPanel({
   const { t } = useI18n();
   const start = useSyncOAuthStart();
   const [copied, setCopied] = useState(false);
+  const attemptRef = useRef(0);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      attemptRef.current += 1;
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      void ipc.sync.oauthCancel().catch(() => undefined);
+    };
+  }, [kind]);
 
   const begin = async () => {
+    const attempt = ++attemptRef.current;
     try {
       const { account } = await start.mutateAsync({
         provider: kind,
@@ -203,8 +217,10 @@ function OAuthPanel({
           }
         },
       });
+      if (attempt !== attemptRef.current) return;
       onPhase({ step: "authorized", account });
     } catch (err) {
+      if (attempt !== attemptRef.current) return;
       onPhase({ step: "idle" });
       if (errorCode(err) !== "cancelled") {
         toast.error(t("settings.sync.setup.oauthError"), errorMessage(err));
@@ -212,12 +228,31 @@ function OAuthPanel({
     }
   };
 
-  const cancel = () => void ipc.sync.oauthCancel();
+  const cancel = () => {
+    attemptRef.current += 1;
+    onPhase({ step: "idle" });
+    void ipc.sync.oauthCancel().catch((err) => {
+      toast.error(t("settings.sync.setup.oauthError"), errorMessage(err));
+    });
+  };
 
   const copyCode = async (code: string) => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      toast.error(t("common.copy"), errorMessage(err));
+    }
+  };
+
+  const openVerificationPage = async (url: string) => {
+    try {
+      await openUrl(url);
+    } catch (err) {
+      toast.error(t("settings.sync.setup.oauthError"), errorMessage(err));
+    }
   };
 
   if (phase.step === "device") {
@@ -245,7 +280,10 @@ function OAuthPanel({
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => void openUrl(phase.verificationUri)}>
+          <Button
+            size="sm"
+            onClick={() => void openVerificationPage(phase.verificationUri)}
+          >
             <ExternalLink className="size-3.5" />
             {t("settings.sync.setup.openPageButton")}
           </Button>
@@ -324,9 +362,14 @@ function ConnectForm({
     kind === "webdav" ? webdav : kind === "s3" ? s3 : undefined;
   const formReady =
     kind === "webdav"
-      ? !!webdav.url
+      ? !!webdav.url.trim()
       : kind === "s3"
-        ? !!(s3.endpoint && s3.bucket && s3.accessKey && s3.secretKey)
+        ? !!(
+            s3.endpoint.trim() &&
+            s3.bucket.trim() &&
+            s3.accessKey.trim() &&
+            s3.secretKey
+          )
         : true;
 
   return (
@@ -344,6 +387,7 @@ function ConnectForm({
               placeholder="https://dav.example.com/sageport"
               autoComplete="off"
               spellCheck={false}
+              maxLength={8192}
             />
           </Field>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
@@ -354,6 +398,7 @@ function ConnectForm({
                   setWebdav({ ...webdav, username: e.target.value })
                 }
                 autoComplete="off"
+                maxLength={1024}
               />
             </Field>
             <Field label={t("settings.sync.setup.passwordLabel")}>
@@ -363,6 +408,7 @@ function ConnectForm({
                   setWebdav({ ...webdav, password: e.target.value })
                 }
                 autoComplete="off"
+                maxLength={16384}
               />
             </Field>
           </div>
@@ -382,6 +428,7 @@ function ConnectForm({
               placeholder="https://s3.us-east-1.amazonaws.com"
               autoComplete="off"
               spellCheck={false}
+              maxLength={8192}
             />
           </Field>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
@@ -391,6 +438,7 @@ function ConnectForm({
                 onChange={(e) => setS3({ ...s3, bucket: e.target.value })}
                 autoComplete="off"
                 spellCheck={false}
+                maxLength={1024}
               />
             </Field>
             <Field
@@ -403,6 +451,7 @@ function ConnectForm({
                 placeholder="us-east-1"
                 autoComplete="off"
                 spellCheck={false}
+                maxLength={1024}
               />
             </Field>
           </div>
@@ -412,6 +461,7 @@ function ConnectForm({
                 value={s3.accessKey}
                 onChange={(e) => setS3({ ...s3, accessKey: e.target.value })}
                 autoComplete="off"
+                maxLength={16384}
               />
             </Field>
             <Field label={t("settings.sync.setup.s3SecretKeyLabel")} required>
@@ -419,6 +469,7 @@ function ConnectForm({
                 value={s3.secretKey}
                 onChange={(e) => setS3({ ...s3, secretKey: e.target.value })}
                 autoComplete="off"
+                maxLength={16384}
               />
             </Field>
           </div>
@@ -432,6 +483,7 @@ function ConnectForm({
               placeholder="sageport/"
               autoComplete="off"
               spellCheck={false}
+              maxLength={4096}
             />
           </Field>
           <div className="flex items-center justify-between gap-3">
@@ -461,6 +513,7 @@ function ConnectForm({
           onChange={(e) => onPassphrase(e.target.value)}
           placeholder="••••••••"
           autoComplete="off"
+          maxLength={4096}
         />
       </Field>
 

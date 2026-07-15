@@ -28,6 +28,7 @@ fn cleanup_orphaned_sessions(state: &AppState) {
     state.connection_prompts.passwords.lock().clear();
     state.ai_cancels.lock().clear();
     let mut oauth = state.sync_oauth.lock();
+    oauth.generation = oauth.generation.wrapping_add(1);
     if let Some(cancel) = oauth.cancel.take() {
         let _ = cancel.send(());
     }

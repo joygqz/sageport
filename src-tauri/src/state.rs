@@ -17,6 +17,7 @@ use crate::update::UpdateManager;
 pub struct SyncOAuthSlot {
     pub pending: Option<(ProviderKind, OAuthOutcome)>,
     pub cancel: Option<oneshot::Sender<()>>,
+    pub generation: u64,
 }
 
 pub struct AppState {
@@ -40,6 +41,10 @@ pub struct AppState {
     pub batch_cancels: Mutex<HashMap<String, Option<oneshot::Sender<()>>>>,
 
     pub sync_oauth: Mutex<SyncOAuthSlot>,
+
+    /// Serializes sync mutations so a late push/restore cannot resurrect a
+    /// disconnected provider or overwrite freshly refreshed credentials.
+    pub sync_operation: tokio::sync::Mutex<()>,
 }
 
 impl AppState {
@@ -56,6 +61,7 @@ impl AppState {
             ai_cancels: Mutex::new(HashMap::new()),
             batch_cancels: Mutex::new(HashMap::new()),
             sync_oauth: Mutex::new(SyncOAuthSlot::default()),
+            sync_operation: tokio::sync::Mutex::new(()),
         }
     }
 }

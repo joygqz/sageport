@@ -8,7 +8,10 @@ use serde_json::json;
 use crate::crypto::EncryptedEnvelope;
 use crate::error::{AppError, AppResult};
 
-use super::provider::{ProviderConfig, SyncProvider, SyncVersion, KEEP_VERSIONS};
+use super::provider::{
+    http_client, read_response_limited, request_error, ProviderConfig, SyncProvider, SyncVersion,
+    KEEP_VERSIONS, MAX_API_RESPONSE_BYTES, MAX_ENVELOPE_RESPONSE_BYTES,
+};
 
 const API: &str = "https://api.github.com";
 const FILENAME: &str = "sageport-vault.json";
@@ -25,6 +28,8 @@ pub struct GistProvider {
 #[derive(Deserialize)]
 struct GistResponse {
     id: String,
+    #[serde(default)]
+    description: String,
     #[serde(default)]
     files: HashMap<String, GistFile>,
 }
@@ -51,12 +56,12 @@ struct CommitEntry {
 }
 
 impl GistProvider {
-    pub fn new(token: String, gist_id: Option<String>) -> Self {
-        Self {
-            http: Client::new(),
+    pub fn new(token: String, gist_id: Option<String>) -> AppResult<Self> {
+        Ok(Self {
+            http: http_client()?,
             token,
             gist_id,
-        }
+        })
     }
 
     fn request(&self, method: Method, url: &str) -> reqwest::RequestBuilder {
@@ -77,7 +82,10 @@ impl GistProvider {
             let url = format!("{API}/gists?per_page=100&page={page}");
             let resp = self.send(self.request(Method::GET, &url)).await?;
             let list: Vec<GistResponse> = read_json(resp).await?;
-            if let Some(found) = list.iter().find(|g| g.files.contains_key(FILENAME)) {
+            if let Some(found) = list
+                .iter()
+                .find(|g| g.description == DESCRIPTION && g.files.contains_key(FILENAME))
+            {
                 self.gist_id = Some(found.id.clone());
                 return Ok(self.gist_id.clone());
             }
@@ -92,7 +100,7 @@ impl GistProvider {
     async fn send(&self, req: reqwest::RequestBuilder) -> AppResult<Response> {
         req.send()
             .await
-            .map_err(|e| AppError::Other(format!("gist request failed: {e}")))
+            .map_err(|e| request_error("gist request", e))
     }
 
     async fn fetch_envelope(&self, url: &str) -> AppResult<EncryptedEnvelope> {
@@ -108,11 +116,20 @@ impl GistProvider {
                 .raw_url
                 .as_deref()
                 .ok_or_else(|| AppError::Other("truncated gist without raw_url".into()))?;
-            self.send(self.request(Method::GET, raw))
-                .await?
-                .text()
-                .await
-                .map_err(|e| AppError::Other(format!("gist raw read failed: {e}")))?
+            let raw = trusted_raw_url(raw)?;
+            let response = self.send(self.http.get(raw)).await?;
+            let status = response.status();
+            let bytes =
+                read_response_limited(response, MAX_ENVELOPE_RESPONSE_BYTES, "gist backup").await?;
+            if !status.is_success() {
+                return Err(error_from(status, &bytes));
+            }
+            String::from_utf8(bytes).map_err(|_| {
+                AppError::Serde(serde_json::Error::io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "gist backup is not UTF-8",
+                )))
+            })?
         } else {
             file.content.clone()
         };
@@ -148,27 +165,13 @@ impl GistProvider {
         if status.is_success() || status.as_u16() == 404 {
             return Ok(());
         }
-        Err(error_from(status, &resp.bytes().await.unwrap_or_default()))
+        let bytes = read_response_limited(resp, MAX_API_RESPONSE_BYTES, "gist response").await?;
+        Err(error_from(status, &bytes))
     }
 }
 
 #[async_trait]
 impl SyncProvider for GistProvider {
-    async fn pull_latest(&mut self) -> AppResult<Option<EncryptedEnvelope>> {
-        let Some(id) = self.resolve_gist_id().await? else {
-            return Ok(None);
-        };
-        match self.fetch_envelope(&format!("{API}/gists/{id}")).await {
-            Ok(envelope) => Ok(Some(envelope)),
-
-            Err(AppError::NotFound(_)) => {
-                self.gist_id = None;
-                Ok(None)
-            }
-            Err(err) => Err(err),
-        }
-    }
-
     async fn push(&mut self, envelope: &EncryptedEnvelope) -> AppResult<()> {
         let gist_id = self.resolve_gist_id().await?;
         let new_id = self.upload(gist_id.as_deref(), envelope).await?;
@@ -236,12 +239,22 @@ fn error_from(status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
 
 async fn read_json<T: DeserializeOwned>(resp: Response) -> AppResult<T> {
     let status = resp.status();
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| AppError::Other(format!("failed to read gist response: {e}")))?;
+    let bytes = read_response_limited(resp, MAX_API_RESPONSE_BYTES, "gist response").await?;
     if !status.is_success() {
         return Err(error_from(status, &bytes));
     }
     Ok(serde_json::from_slice::<T>(&bytes)?)
+}
+
+fn trusted_raw_url(raw: &str) -> AppResult<url::Url> {
+    let url = url::Url::parse(raw)
+        .map_err(|e| AppError::Invalid(format!("invalid gist raw URL: {e}")))?;
+    if url.scheme() != "https"
+        || url.host_str() != Some("gist.githubusercontent.com")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err(AppError::Invalid("untrusted gist raw URL".into()));
+    }
+    Ok(url)
 }

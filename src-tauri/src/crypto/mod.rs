@@ -1,6 +1,6 @@
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
-use argon2::Argon2;
+use argon2::{Algorithm, Argon2, Params, Version};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use rand::Rng;
@@ -13,6 +13,10 @@ const CIPHER_AES256_GCM: &str = "aes-256-gcm";
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 const KEY_LEN: usize = 32;
+const ARGON2_MEMORY_KIB: u32 = 19 * 1024;
+const ARGON2_ITERATIONS: u32 = 2;
+const ARGON2_PARALLELISM: u32 = 1;
+pub(crate) const MAX_CIPHERTEXT_B64_BYTES: usize = 96 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedEnvelope {
@@ -29,8 +33,18 @@ fn default_cipher() -> String {
 }
 
 fn derive_key(passphrase: &str, salt: &[u8]) -> AppResult<[u8; KEY_LEN]> {
+    if salt.len() != SALT_LEN {
+        return Err(AppError::Crypto("invalid salt length".into()));
+    }
     let mut key = [0u8; KEY_LEN];
-    Argon2::default()
+    let params = Params::new(
+        ARGON2_MEMORY_KIB,
+        ARGON2_ITERATIONS,
+        ARGON2_PARALLELISM,
+        Some(KEY_LEN),
+    )
+    .map_err(|e| AppError::Crypto(e.to_string()))?;
+    Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
         .hash_password_into(passphrase.as_bytes(), salt, &mut key)
         .map_err(|e| AppError::Crypto(e.to_string()))?;
     Ok(key)
@@ -71,6 +85,14 @@ pub fn decrypt(envelope: &EncryptedEnvelope, passphrase: &str) -> AppResult<Vec<
             envelope.cipher
         )));
     }
+    if envelope.salt.len() > 64
+        || envelope.nonce.len() > 64
+        || envelope.ciphertext.len() > MAX_CIPHERTEXT_B64_BYTES
+    {
+        return Err(AppError::Crypto(
+            "encrypted backup exceeds supported limits".into(),
+        ));
+    }
     let salt = STANDARD
         .decode(&envelope.salt)
         .map_err(|e| AppError::Crypto(e.to_string()))?;
@@ -80,6 +102,12 @@ pub fn decrypt(envelope: &EncryptedEnvelope, passphrase: &str) -> AppResult<Vec<
     let ciphertext = STANDARD
         .decode(&envelope.ciphertext)
         .map_err(|e| AppError::Crypto(e.to_string()))?;
+    if nonce_bytes.len() != NONCE_LEN {
+        return Err(AppError::Crypto("invalid nonce length".into()));
+    }
+    if ciphertext.len() < 16 {
+        return Err(AppError::Crypto("invalid ciphertext length".into()));
+    }
 
     let key = derive_key(passphrase, &salt)?;
     let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(key));
@@ -115,5 +143,22 @@ mod tests {
         let mut envelope = encrypt(b"vault data", "passphrase").unwrap();
         envelope.cipher = "xchacha20-poly1305".into();
         assert!(decrypt(&envelope, "passphrase").is_err());
+    }
+
+    #[test]
+    fn malformed_envelope_lengths_are_rejected_before_decryption() {
+        let mut envelope = encrypt(b"vault data", "passphrase").unwrap();
+        envelope.salt = STANDARD.encode([0u8; 8]);
+        assert!(matches!(
+            decrypt(&envelope, "passphrase"),
+            Err(AppError::Crypto(message)) if message == "invalid salt length"
+        ));
+
+        let mut envelope = encrypt(b"vault data", "passphrase").unwrap();
+        envelope.nonce = STANDARD.encode([0u8; 8]);
+        assert!(matches!(
+            decrypt(&envelope, "passphrase"),
+            Err(AppError::Crypto(message)) if message == "invalid nonce length"
+        ));
     }
 }

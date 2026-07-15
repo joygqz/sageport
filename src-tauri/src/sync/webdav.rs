@@ -7,7 +7,10 @@ use url::Url;
 
 use crate::error::{AppError, AppResult};
 
-use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
+use super::provider::{
+    http_client, read_response_limited, request_error, ObjectStore, ProviderConfig, RemoteObject,
+    MAX_API_RESPONSE_BYTES, MAX_ENVELOPE_RESPONSE_BYTES,
+};
 
 pub struct WebdavStore {
     http: reqwest::Client,
@@ -31,8 +34,18 @@ impl WebdavStore {
         if !matches!(base.scheme(), "http" | "https") {
             return Err(AppError::Invalid("WebDAV URL must be http(s)".into()));
         }
+        if base.host_str().is_none()
+            || !base.username().is_empty()
+            || base.password().is_some()
+            || base.query().is_some()
+            || base.fragment().is_some()
+        {
+            return Err(AppError::Invalid(
+                "WebDAV URL must have a host and no credentials, query, or fragment".into(),
+            ));
+        }
         Ok(Self {
-            http: reqwest::Client::new(),
+            http: http_client()?,
             base,
             raw_url: url,
             username,
@@ -99,7 +112,10 @@ impl ObjectStore for WebdavStore {
             }
             _ => {}
         }
-        let text = resp.text().await.map_err(net_err)?;
+        let text = String::from_utf8(
+            read_response_limited(resp, MAX_API_RESPONSE_BYTES, "WebDAV list response").await?,
+        )
+        .map_err(|_| AppError::Other("WebDAV list response is not UTF-8".into()))?;
         let mut names = parse_hrefs(&text)?;
         names.sort_unstable();
         names.dedup();
@@ -131,7 +147,7 @@ impl ObjectStore for WebdavStore {
             }
             _ => {}
         }
-        Ok(resp.bytes().await.map_err(net_err)?.to_vec())
+        read_response_limited(resp, MAX_ENVELOPE_RESPONSE_BYTES, "WebDAV backup").await
     }
 
     async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
@@ -240,7 +256,7 @@ fn percent_decode(s: &str) -> String {
 }
 
 fn net_err(e: reqwest::Error) -> AppError {
-    AppError::Other(format!("WebDAV request failed: {e}"))
+    request_error("WebDAV request", e)
 }
 
 fn xml_err(e: impl std::fmt::Display) -> AppError {
@@ -249,4 +265,36 @@ fn xml_err(e: impl std::fmt::Display) -> AppError {
 
 fn unauthorized() -> AppError {
     AppError::Invalid("WebDAV credentials were rejected".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_urls_that_can_hide_or_leak_credentials() {
+        assert!(WebdavStore::new(
+            "https://user:secret@example.com/vault".into(),
+            String::new(),
+            String::new()
+        )
+        .is_err());
+        assert!(
+            WebdavStore::new("file:///tmp/vault".into(), String::new(), String::new()).is_err()
+        );
+        assert!(WebdavStore::new(
+            "https://example.com/vault?token=secret".into(),
+            String::new(),
+            String::new()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn decodes_webdav_hrefs_without_treating_collections_as_vaults() {
+        let xml = r#"<d:multistatus xmlns:d="DAV:"><d:response><d:href>/vault/</d:href></d:response><d:response><d:href>/vault/sageport-vault-20260101T000000000Z.json</d:href></d:response></d:multistatus>"#;
+        let names = parse_hrefs(xml).unwrap();
+        assert!(names.contains(&"vault".to_string()));
+        assert!(names.contains(&"sageport-vault-20260101T000000000Z.json".to_string()));
+    }
 }

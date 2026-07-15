@@ -5,7 +5,10 @@ use serde_json::Value;
 use crate::error::{AppError, AppResult};
 
 use super::oauth::{self, OAuthTokens};
-use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
+use super::provider::{
+    http_client, read_response_limited, request_error, ObjectStore, ProviderConfig, RemoteObject,
+    MAX_API_RESPONSE_BYTES, MAX_ENVELOPE_RESPONSE_BYTES,
+};
 
 const FILES_API: &str = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_API: &str = "https://www.googleapis.com/upload/drive/v3/files";
@@ -32,11 +35,11 @@ struct DriveFile {
 }
 
 impl GdriveStore {
-    pub fn new(tokens: OAuthTokens) -> Self {
-        Self {
-            http: reqwest::Client::new(),
+    pub fn new(tokens: OAuthTokens) -> AppResult<Self> {
+        Ok(Self {
+            http: http_client()?,
             tokens,
-        }
+        })
     }
 
     async fn token(&mut self) -> AppResult<String> {
@@ -53,7 +56,7 @@ impl ObjectStore for GdriveStore {
         let token = self.token().await?;
         let mut objects = Vec::new();
         let mut page_token: Option<String> = None;
-        loop {
+        for page_index in 0..100 {
             let mut req = self.http.get(FILES_API).bearer_auth(&token).query(&[
                 ("spaces", "appDataFolder"),
                 ("fields", "nextPageToken,files(id,name,size)"),
@@ -70,11 +73,21 @@ impl ObjectStore for GdriveStore {
                 size: f.size.and_then(|s| s.parse().ok()),
             }));
             match page.next_page_token {
-                Some(t) => page_token = Some(t),
-                None => break,
+                Some(t) if page_token.as_deref() != Some(t.as_str()) => page_token = Some(t),
+                Some(_) => {
+                    return Err(AppError::Other(
+                        "Google Drive returned a repeated page token".into(),
+                    ))
+                }
+                None => return Ok(objects),
+            }
+            if page_index == 99 {
+                return Err(AppError::Invalid(
+                    "Google Drive backup listing exceeds the supported page limit".into(),
+                ));
             }
         }
-        Ok(objects)
+        unreachable!("page loop returns on its final iteration")
     }
 
     async fn get(&mut self, id: &str) -> AppResult<Vec<u8>> {
@@ -88,11 +101,12 @@ impl ObjectStore for GdriveStore {
             .await
             .map_err(net_err)?;
         let status = resp.status();
-        let bytes = resp.bytes().await.map_err(net_err)?;
+        let bytes =
+            read_response_limited(resp, MAX_ENVELOPE_RESPONSE_BYTES, "Google Drive backup").await?;
         if !status.is_success() {
             return Err(api_err("Google Drive download", status, &bytes));
         }
-        Ok(bytes.to_vec())
+        Ok(bytes)
     }
 
     async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
@@ -133,7 +147,9 @@ impl ObjectStore for GdriveStore {
         if status.is_success() || status.as_u16() == 404 {
             return Ok(());
         }
-        let bytes = resp.bytes().await.unwrap_or_default();
+        let bytes =
+            read_response_limited(resp, MAX_API_RESPONSE_BYTES, "Google Drive error response")
+                .await?;
         Err(api_err("Google Drive delete", status, &bytes))
     }
 
@@ -145,7 +161,7 @@ impl ObjectStore for GdriveStore {
 }
 
 fn net_err(e: reqwest::Error) -> AppError {
-    AppError::Other(format!("Google Drive request failed: {e}"))
+    request_error("Google Drive request", e)
 }
 
 fn api_err(what: &str, status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
@@ -162,7 +178,8 @@ fn api_err(what: &str, status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
 async fn send_json(req: reqwest::RequestBuilder) -> AppResult<Value> {
     let resp = req.send().await.map_err(net_err)?;
     let status = resp.status();
-    let bytes = resp.bytes().await.map_err(net_err)?;
+    let bytes =
+        read_response_limited(resp, MAX_API_RESPONSE_BYTES, "Google Drive response").await?;
     if !status.is_success() {
         return Err(api_err("Google Drive request", status, &bytes));
     }

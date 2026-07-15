@@ -5,7 +5,10 @@ use serde_json::Value;
 use crate::error::{AppError, AppResult};
 
 use super::oauth::{self, OAuthTokens};
-use super::provider::{ObjectStore, ProviderConfig, RemoteObject};
+use super::provider::{
+    http_client, read_response_limited, request_error, ObjectStore, ProviderConfig, RemoteObject,
+    MAX_API_RESPONSE_BYTES, MAX_ENVELOPE_RESPONSE_BYTES,
+};
 
 const APPROOT: &str = "https://graph.microsoft.com/v1.0/me/drive/special/approot";
 
@@ -32,11 +35,11 @@ struct DriveItem {
 }
 
 impl OnedriveStore {
-    pub fn new(tokens: OAuthTokens) -> Self {
-        Self {
-            http: reqwest::Client::new(),
+    pub fn new(tokens: OAuthTokens) -> AppResult<Self> {
+        Ok(Self {
+            http: http_client()?,
             tokens,
-        }
+        })
     }
 
     async fn token(&mut self) -> AppResult<String> {
@@ -53,7 +56,7 @@ impl ObjectStore for OnedriveStore {
         let token = self.token().await?;
         let mut objects = Vec::new();
         let mut url = format!("{APPROOT}/children?$select=name,size&$top=200");
-        loop {
+        for page_index in 0..100 {
             let resp = self
                 .http
                 .get(&url)
@@ -66,7 +69,9 @@ impl ObjectStore for OnedriveStore {
             if status.as_u16() == 404 {
                 return Ok(Vec::new());
             }
-            let bytes = resp.bytes().await.map_err(net_err)?;
+            let bytes =
+                read_response_limited(resp, MAX_API_RESPONSE_BYTES, "OneDrive list response")
+                    .await?;
             if !status.is_success() {
                 return Err(api_err("OneDrive list", status, &bytes));
             }
@@ -77,11 +82,28 @@ impl ObjectStore for OnedriveStore {
                 size: item.size,
             }));
             match page.next_link {
-                Some(next) => url = next,
-                None => break,
+                Some(next) => {
+                    let parsed = reqwest::Url::parse(&next).map_err(|_| {
+                        AppError::Other("OneDrive returned an invalid pagination URL".into())
+                    })?;
+                    if parsed.scheme() != "https"
+                        || parsed.host_str() != Some("graph.microsoft.com")
+                    {
+                        return Err(AppError::Other(
+                            "OneDrive returned an untrusted pagination URL".into(),
+                        ));
+                    }
+                    url = next;
+                }
+                None => return Ok(objects),
+            }
+            if page_index == 99 {
+                return Err(AppError::Invalid(
+                    "OneDrive backup listing exceeds the supported page limit".into(),
+                ));
             }
         }
-        Ok(objects)
+        unreachable!("page loop returns on its final iteration")
     }
 
     async fn get(&mut self, id: &str) -> AppResult<Vec<u8>> {
@@ -95,11 +117,12 @@ impl ObjectStore for OnedriveStore {
             .await
             .map_err(net_err)?;
         let status = resp.status();
-        let bytes = resp.bytes().await.map_err(net_err)?;
+        let bytes =
+            read_response_limited(resp, MAX_ENVELOPE_RESPONSE_BYTES, "OneDrive backup").await?;
         if !status.is_success() {
             return Err(api_err("OneDrive download", status, &bytes));
         }
-        Ok(bytes.to_vec())
+        Ok(bytes)
     }
 
     async fn put(&mut self, name: &str, body: String) -> AppResult<()> {
@@ -120,7 +143,9 @@ impl ObjectStore for OnedriveStore {
             .map_err(net_err)?;
         let status = resp.status();
         if !status.is_success() {
-            let bytes = resp.bytes().await.unwrap_or_default();
+            let bytes =
+                read_response_limited(resp, MAX_API_RESPONSE_BYTES, "OneDrive error response")
+                    .await?;
             return Err(api_err("OneDrive upload", status, &bytes));
         }
         Ok(())
@@ -139,7 +164,8 @@ impl ObjectStore for OnedriveStore {
         if status.is_success() || status.as_u16() == 404 {
             return Ok(());
         }
-        let bytes = resp.bytes().await.unwrap_or_default();
+        let bytes =
+            read_response_limited(resp, MAX_API_RESPONSE_BYTES, "OneDrive error response").await?;
         Err(api_err("OneDrive delete", status, &bytes))
     }
 
@@ -151,7 +177,7 @@ impl ObjectStore for OnedriveStore {
 }
 
 fn net_err(e: reqwest::Error) -> AppError {
-    AppError::Other(format!("OneDrive request failed: {e}"))
+    request_error("OneDrive request", e)
 }
 
 fn api_err(what: &str, status: reqwest::StatusCode, bytes: &[u8]) -> AppError {
