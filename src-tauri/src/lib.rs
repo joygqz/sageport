@@ -23,6 +23,7 @@ fn cleanup_orphaned_sessions(state: &AppState) {
     state.pty.close_all();
     state.sftp.disconnect_all();
     state.monitor.stop_all();
+    state.forwards.stop_all();
     state.connection_prompts.host_keys.lock().clear();
     state.connection_prompts.passwords.lock().clear();
     state.ai_cancels.lock().clear();
@@ -41,6 +42,11 @@ pub fn run() {
                 if let Some(state) = webview.try_state::<AppState>() {
                     cleanup_orphaned_sessions(&state);
                 }
+            } else if payload.event() == PageLoadEvent::Finished {
+                let handle = webview.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    commands::forwards::start_auto_forwards(&handle).await;
+                });
             }
         })
         .plugin(tauri_plugin_opener::init())
@@ -63,11 +69,6 @@ pub fn run() {
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(update::run_periodic(handle));
-
-            let forward_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                commands::forwards::start_auto_forwards(&forward_handle).await;
-            });
 
             Ok(())
         })
@@ -114,6 +115,7 @@ pub fn run() {
             commands::ssh_config::ssh_config_import_apply,
             commands::forwards::forwards_list,
             commands::forwards::forwards_active,
+            commands::forwards::forwards_runtime,
             commands::forwards::forwards_create,
             commands::forwards::forwards_update,
             commands::forwards::forwards_delete,

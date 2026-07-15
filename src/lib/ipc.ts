@@ -379,6 +379,7 @@ export const ipc = {
   forwards: {
     list: () => invoke<PortForward[]>("forwards_list"),
     active: () => invoke<string[]>("forwards_active"),
+    runtime: () => invoke<ForwardStatusEvent[]>("forwards_runtime"),
     create: (input: PortForwardInput) =>
       invoke<PortForward>("forwards_create", { input }),
     update: (id: string, input: PortForwardInput) =>

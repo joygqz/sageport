@@ -180,7 +180,7 @@ const FORWARD_FIELDS = {
   },
   autoStart: {
     type: "boolean",
-    description: "Start automatically when the host connects.",
+    description: "Start automatically when the app launches.",
   },
 } as const;
 

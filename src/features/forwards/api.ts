@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
 import type { PortForwardInput } from "@/types/models";
+import { useForwardStore } from "./store";
 
 export const forwardKeys = {
   list: ["forwards"] as const,
@@ -24,7 +25,10 @@ export function useUpdateForward() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: PortForwardInput }) =>
       ipc.forwards.update(id, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: forwardKeys.list }),
+    onSuccess: (_, { id }) => {
+      useForwardStore.getState().remove(id);
+      return qc.invalidateQueries({ queryKey: forwardKeys.list });
+    },
   });
 }
 
@@ -32,6 +36,9 @@ export function useDeleteForward() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => ipc.forwards.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: forwardKeys.list }),
+    onSuccess: (_, id) => {
+      useForwardStore.getState().remove(id);
+      return qc.invalidateQueries({ queryKey: forwardKeys.list });
+    },
   });
 }

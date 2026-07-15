@@ -14,6 +14,7 @@ import { errorMessage, toast } from "@/lib/toast";
 import type { ForwardKind, PortForward } from "@/types/models";
 import { useHosts } from "@/features/hosts/api";
 import { useCreateForward, useUpdateForward } from "./api";
+import { forwardInput } from "./forwardForm";
 
 export function ForwardFormDialog({
   open,
@@ -63,24 +64,27 @@ function ForwardFormBody({
   const [autoStart, setAutoStart] = useState(Boolean(forward?.autoStart));
 
   const submit = async () => {
-    if (!label.trim() || !hostId) {
-      return toast.error(t("forwards.form.required"));
-    }
-    const input = {
+    const result = forwardInput({
       hostId,
-      label: label.trim(),
+      label,
       kind,
-      bindHost: bindHost.trim() || "127.0.0.1",
-      bindPort: Number(bindPort),
-      targetHost: kind === "local" ? targetHost.trim() : null,
-      targetPort: kind === "local" ? Number(targetPort) : null,
+      bindHost,
+      bindPort,
+      targetHost,
+      targetPort,
       autoStart,
-    };
+    });
+    if (!("input" in result)) {
+      return toast.error(t(`forwards.form.${result.error}`));
+    }
     try {
       if (forward) {
-        await updateForward.mutateAsync({ id: forward.id, input });
+        await updateForward.mutateAsync({
+          id: forward.id,
+          input: result.input,
+        });
       } else {
-        await createForward.mutateAsync(input);
+        await createForward.mutateAsync(result.input);
       }
       onClose();
     } catch (err) {

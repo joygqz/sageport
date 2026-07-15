@@ -117,6 +117,9 @@ export interface ForwardStatusEvent {
   forwardId: string;
   status: ForwardStatusKind;
   message?: string;
+  code?: string;
+  generation: number;
+  sequence: number;
 }
 
 export interface SshConfigHost {

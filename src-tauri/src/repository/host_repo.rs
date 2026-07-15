@@ -311,6 +311,19 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
             if dependents == 1 { "" } else { "s" }
         )));
     }
+    let forwards: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM port_forwards
+         WHERE host_id = ? AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
+    if forwards > 0 {
+        return Err(AppError::InUse(format!(
+            "this host is still used by {forwards} port forward{}; delete them before deleting it",
+            if forwards == 1 { "" } else { "s" }
+        )));
+    }
     let ts = now();
     let affected = sqlx::query(
         "UPDATE hosts

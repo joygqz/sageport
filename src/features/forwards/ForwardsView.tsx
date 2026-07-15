@@ -43,6 +43,7 @@ import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { useForwards, useDeleteForward } from "./api";
 import { ForwardFormDialog } from "./ForwardFormDialog";
+import { formatForwardEndpoint } from "./forwardForm";
 import { bridgeForwardEvents, useForwardStore } from "./store";
 
 export function ForwardsView() {
@@ -60,23 +61,31 @@ export function ForwardsView() {
   const searching = query.trim().length > 0;
 
   useEffect(() => {
-    bridgeForwardEvents();
-  }, []);
+    void bridgeForwardEvents().catch((err) => {
+      toast.error(t("forwards.statusError"), errorMessage(err));
+    });
+  }, [t]);
 
   const isActive = (id: string) => {
     const status = runtime[id]?.status;
     return status === "active" || status === "starting";
   };
 
-  const toggle = (forward: PortForward) => {
+  const toggle = async (forward: PortForward) => {
     if (isActive(forward.id)) {
-      void ipc.forwards.stop(forward.id).catch(() => {});
       useHostKeyStore.getState().rejectSession(forward.id);
       usePasswordPromptStore.getState().cancelSession(forward.id);
+      try {
+        await ipc.forwards.stop(forward.id);
+      } catch (err) {
+        toast.error(t("forwards.stopError"), errorMessage(err));
+      }
     } else {
-      void ipc.forwards.start(forward.id).catch((err) => {
+      try {
+        await ipc.forwards.start(forward.id);
+      } catch (err) {
         toast.error(t("forwards.startError"), errorMessage(err));
-      });
+      }
     }
   };
 
@@ -100,9 +109,9 @@ export function ForwardsView() {
 
   const describe = (forward: PortForward) => {
     if (forward.kind === "dynamic") {
-      return `SOCKS ${forward.bindHost}:${forward.bindPort}`;
+      return `SOCKS ${formatForwardEndpoint(forward.bindHost, forward.bindPort)}`;
     }
-    return `${forward.bindHost}:${forward.bindPort} → ${forward.targetHost}:${forward.targetPort}`;
+    return `${formatForwardEndpoint(forward.bindHost, forward.bindPort)} → ${formatForwardEndpoint(forward.targetHost ?? "", forward.targetPort ?? 0)}`;
   };
 
   const filteredForwards = useMemo(() => {
@@ -186,7 +195,7 @@ export function ForwardsView() {
                     onDoubleClick={(event) => {
                       if ((event.target as HTMLElement).closest("button"))
                         return;
-                      toggle(forward);
+                      void toggle(forward);
                     }}
                   >
                     <div
@@ -213,8 +222,17 @@ export function ForwardsView() {
                       <p className="truncate text-sm font-medium text-foreground">
                         {forward.label}
                       </p>
-                      <p className="truncate font-mono text-2xs text-muted-foreground">
-                        {describe(forward)}
+                      <p
+                        className={cn(
+                          "truncate text-2xs text-muted-foreground",
+                          !statusMessage && "font-mono",
+                          errored && "text-danger",
+                        )}
+                      >
+                        {statusMessage ??
+                          (runtime[forward.id]?.status === "starting"
+                            ? t("forwards.starting")
+                            : describe(forward))}
                       </p>
                     </div>
                     <Tooltip
@@ -224,7 +242,7 @@ export function ForwardsView() {
                     >
                       <button
                         type="button"
-                        onClick={() => toggle(forward)}
+                        onClick={() => void toggle(forward)}
                         className={PANEL_LIST_ACTION_CLASS}
                       >
                         {active ? (
@@ -237,7 +255,7 @@ export function ForwardsView() {
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
-                  <ContextMenuItem onSelect={() => toggle(forward)}>
+                  <ContextMenuItem onSelect={() => void toggle(forward)}>
                     {active ? <Square /> : <Play />}
                     {active ? t("forwards.stop") : t("forwards.start")}
                   </ContextMenuItem>
