@@ -506,81 +506,74 @@ function StatusOverlay({
 }) {
   const { t } = useI18n();
   const { data: hosts = [] } = useHosts();
+  const host = hosts.find((item) => item.id === pane.hostId);
+  const target = terminalConnectionTarget(pane, host);
 
   if (pane.status === "connecting") {
-    const host = hosts.find((item) => item.id === pane.hostId);
-    const target = terminalConnectionTarget(pane, host);
     return (
-      <Shell opaque>
-        <section
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          aria-labelledby={`connection-title-${pane.id}`}
-          className="w-full max-w-[24rem] px-3 py-2 text-center"
-        >
-          <div className="flex flex-col items-center">
-            <span className="flex size-9 items-center justify-center rounded-full bg-primary/15 text-link">
-              <PlugZap className="size-4" strokeWidth={1.8} />
-            </span>
-            <h2
-              id={`connection-title-${pane.id}`}
-              className="mt-2 max-w-full truncate text-base font-semibold tracking-tight text-foreground"
-            >
-              {pane.title}
-            </h2>
-            {target ? (
-              <p
-                className="mt-0.5 max-w-full truncate font-mono text-xs text-muted-foreground"
-                title={target}
-              >
-                SSH · {target}
-              </p>
-            ) : (
-              <p className="mt-0.5 text-xs text-muted-foreground">SSH</p>
-            )}
+      <ConnectionStatusFrame
+        pane={pane}
+        target={target}
+        icon={
+          <span className="flex size-9 items-center justify-center rounded-full bg-primary/15 text-link">
+            <PlugZap className="size-4" strokeWidth={1.8} />
+          </span>
+        }
+      >
+        <div className="mt-3.5">
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="size-4 shrink-0 animate-spin text-link" />
+            <p className="text-sm font-medium text-foreground">
+              {t("terminal.connecting")}
+            </p>
           </div>
-
-          <div className="mt-3.5">
-            <div className="flex items-center justify-center gap-2">
-              <Loader2 className="size-4 shrink-0 animate-spin text-link" />
-              <p className="text-sm font-medium text-foreground">
-                {t("terminal.connecting")}
-              </p>
-            </div>
-            <div
-              className="mx-auto mt-2 h-0.5 max-w-[18rem] overflow-hidden rounded-full bg-muted"
-              aria-hidden="true"
-            >
-              <span className="block h-full w-1/4 -translate-x-full rounded-full bg-link motion-safe:animate-[connection-progress_1.6s_ease-in-out_infinite] motion-reduce:translate-x-full" />
-            </div>
+          <div
+            className="mx-auto mt-2 h-0.5 max-w-[18rem] overflow-hidden rounded-full bg-muted"
+            aria-hidden="true"
+          >
+            <span className="block h-full w-1/4 -translate-x-full rounded-full bg-link motion-safe:animate-[connection-progress_1.6s_ease-in-out_infinite] motion-reduce:translate-x-full" />
           </div>
-        </section>
-      </Shell>
+        </div>
+      </ConnectionStatusFrame>
     );
   }
 
   if (pane.status === "error") {
     const cancelled = pane.errorCode === "cancelled";
     return (
-      <Shell>
-        <span className="flex size-12 items-center justify-center rounded-full bg-danger/10 text-danger">
-          <ServerCrash className="size-6" />
-        </span>
-        <p className="text-sm font-semibold text-foreground">
-          {t(
-            cancelled ? "terminal.connectCancelled" : "terminal.connectFailed",
-          )}
-        </p>
-        {pane.error && (
-          <p className="max-w-md select-text break-words text-center font-mono text-xs leading-relaxed text-danger">
-            {pane.error}
+      <ConnectionStatusFrame
+        pane={pane}
+        target={target}
+        role="alert"
+        icon={
+          <span className="flex size-9 items-center justify-center rounded-full bg-danger/10 text-danger">
+            <ServerCrash className="size-4" strokeWidth={1.8} />
+          </span>
+        }
+      >
+        <div className="mt-3.5 flex flex-col items-center">
+          <p className="text-sm font-semibold text-foreground">
+            {t(
+              cancelled
+                ? "terminal.connectCancelled"
+                : "terminal.connectFailed",
+            )}
           </p>
-        )}
-        <Button size="sm" variant="outline" onClick={onReconnect}>
-          {t("terminal.retry")}
-        </Button>
-      </Shell>
+          {pane.error && (
+            <p className="mt-2 max-w-md select-text break-words text-center font-mono text-xs leading-relaxed text-danger">
+              {pane.error}
+            </p>
+          )}
+          <Button
+            className="mt-3"
+            size="sm"
+            variant="outline"
+            onClick={onReconnect}
+          >
+            {t("terminal.retry")}
+          </Button>
+        </div>
+      </ConnectionStatusFrame>
     );
   }
 
@@ -601,6 +594,53 @@ function StatusOverlay({
   }
 
   return null;
+}
+
+function ConnectionStatusFrame({
+  pane,
+  target,
+  icon,
+  role = "status",
+  children,
+}: {
+  pane: TerminalPane;
+  target: string | null;
+  icon: React.ReactNode;
+  role?: "status" | "alert";
+  children: React.ReactNode;
+}) {
+  return (
+    <Shell opaque>
+      <section
+        role={role}
+        aria-live={role === "alert" ? "assertive" : "polite"}
+        aria-atomic="true"
+        aria-labelledby={`connection-title-${pane.id}`}
+        className="w-full max-w-[24rem] px-3 py-2 text-center"
+      >
+        <div className="flex flex-col items-center">
+          {icon}
+          <h2
+            id={`connection-title-${pane.id}`}
+            className="mt-2 max-w-full truncate text-base font-semibold tracking-tight text-foreground"
+          >
+            {pane.title}
+          </h2>
+          {target ? (
+            <p
+              className="mt-0.5 max-w-full truncate font-mono text-xs text-muted-foreground"
+              title={target}
+            >
+              SSH · {target}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-xs text-muted-foreground">SSH</p>
+          )}
+        </div>
+        {children}
+      </section>
+    </Shell>
+  );
 }
 
 function Shell({

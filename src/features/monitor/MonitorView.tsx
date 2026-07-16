@@ -214,7 +214,7 @@ function HostCard({
       type="button"
       onClick={() => setActive(primary.id)}
       className={cn(
-        "flex flex-col gap-3 rounded-lg border bg-card p-3 text-left transition-[background-color,border-color,box-shadow] hover:bg-muted",
+        "group flex flex-col gap-3 rounded-lg border bg-card p-3 text-left transition-[background-color,border-color,box-shadow] hover:bg-muted",
         CONTROL_FOCUS_CLASS,
         active
           ? "border-ring/70 bg-card ring-1 ring-ring/20"
@@ -227,7 +227,7 @@ function HostCard({
             <Gauge className="size-4" strokeWidth={1.7} />
             <span
               className={cn(
-                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card",
+                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card group-hover:ring-muted",
                 STATUS_DOT_CLASS[connected ? "connected" : primary.status],
               )}
             />
