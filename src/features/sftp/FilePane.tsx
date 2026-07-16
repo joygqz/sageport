@@ -307,7 +307,7 @@ export function FilePane({ side }: { side: PaneSide }) {
 
   return (
     <Tabs
-      value={pane.activeTabId ?? undefined}
+      value={pane.activeTabId ?? ""}
       onValueChange={(id) => setActive(side, id)}
       asChild
     >

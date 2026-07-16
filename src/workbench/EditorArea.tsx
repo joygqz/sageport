@@ -281,7 +281,7 @@ export function EditorArea() {
 
   return (
     <Tabs
-      value={activeId ?? undefined}
+      value={activeId ?? ""}
       onValueChange={(id) => {
         preserveTabFocusRef.current =
           document.activeElement?.getAttribute("role") === "tab";
