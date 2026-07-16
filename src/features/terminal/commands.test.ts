@@ -26,6 +26,7 @@ describe("stickyMarkAt", () => {
 
   it("hides while the command line itself is still visible at the top", () => {
     expect(stickyMarkAt([mark(8)], 8)).toBeNull();
+    expect(stickyMarkAt([mark(2), mark(8)], 8)).toBeNull();
   });
 
   it("skips disposed marks", () => {

@@ -16,6 +16,7 @@ export function stickyMarkAt(
   for (let i = marks.length - 1; i >= 0; i--) {
     const mark = marks[i];
     if (mark.marker.isDisposed) continue;
+    if (mark.marker.line === viewportY) return null;
     if (mark.marker.line < viewportY) return mark;
   }
   return null;
