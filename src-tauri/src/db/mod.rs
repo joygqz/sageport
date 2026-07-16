@@ -72,9 +72,45 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
+        let foreign_keys: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let journal_mode: String = sqlx::query_scalar("PRAGMA journal_mode")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let tables: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        let violations: Vec<(String, i64, String, i64)> =
+            sqlx::query_as("PRAGMA foreign_key_check")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         pool.close().await;
 
         assert_eq!(count, 0);
+        assert_eq!(foreign_keys, 1);
+        assert_eq!(journal_mode, "wal");
+        for table in [
+            "groups",
+            "keys",
+            "identities",
+            "hosts",
+            "snippets",
+            "settings",
+            "ai_sessions",
+            "sftp_transfers",
+            "port_forwards",
+            "sftp_bookmarks",
+            "command_history",
+        ] {
+            assert!(tables.iter().any(|name| name == table), "missing {table}");
+        }
+        assert!(violations.is_empty());
         assert!(path.exists());
         std::fs::remove_dir_all(dir).unwrap();
     }

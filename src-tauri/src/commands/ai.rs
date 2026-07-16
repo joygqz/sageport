@@ -4,7 +4,7 @@ use crate::ai::{self, Endpoint, Protocol};
 use crate::error::{AppError, AppResult};
 use crate::repository::ai_session_repo::{self, AiSessionRow};
 use crate::repository::settings_repo;
-use crate::state::AppState;
+use crate::state::{AppState, CancelEntry};
 
 const MAX_API_KEY_BYTES: usize = 16 * 1024;
 const MAX_BASE_URL_BYTES: usize = 8 * 1024;
@@ -31,7 +31,7 @@ const MAX_HISTORY_TOKENS_SETTING: &str = "ai.max_history_tokens";
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfig {
-    pub api_key: String,
+    pub has_api_key: bool,
     pub base_url: String,
     pub protocol: Protocol,
     pub model: String,
@@ -246,9 +246,9 @@ fn validate_tools(tools: &[ai::ToolSpec]) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
-    let api_key = settings_repo::get(&state.db, API_KEY_SETTING)
+    let has_api_key = settings_repo::get(&state.db, API_KEY_SETTING)
         .await?
-        .unwrap_or_default();
+        .is_some_and(|value| !value.trim().is_empty());
     let protocol = stored_protocol(&state).await?;
     let base_url = stored_base_url(&state).await?;
     let model = settings_repo::get(&state.db, MODEL_SETTING)
@@ -282,7 +282,7 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
         .and_then(|value| value.trim().parse::<u32>().ok())
         .filter(|value| *value > 0);
     Ok(AiConfig {
-        api_key,
+        has_api_key,
         base_url,
         protocol,
         model,
@@ -468,6 +468,7 @@ pub async fn ai_chat(
     };
 
     let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    let generation = state.next_request_generation();
     {
         let mut cancels = state.ai_cancels.lock();
         if cancels.contains_key(&request_id) {
@@ -475,21 +476,35 @@ pub async fn ai_chat(
                 "AI request id {request_id} is already active"
             )));
         }
-        cancels.insert(request_id.clone(), cancel_tx);
+        cancels.insert(
+            request_id.clone(),
+            CancelEntry {
+                generation,
+                sender: Some(cancel_tx),
+            },
+        );
     }
     let result = tokio::select! {
         r = chat => r,
         _ = cancel_rx => Err(AppError::Cancelled),
     };
-    state.ai_cancels.lock().remove(&request_id);
+    let mut cancels = state.ai_cancels.lock();
+    if cancels
+        .get(&request_id)
+        .is_some_and(|entry| entry.generation == generation)
+    {
+        cancels.remove(&request_id);
+    }
     result
 }
 
 #[tauri::command]
 pub async fn ai_chat_cancel(state: State<'_, AppState>, request_id: String) -> AppResult<()> {
     validate_id(&request_id, "request id", MAX_REQUEST_ID_BYTES)?;
-    if let Some(tx) = state.ai_cancels.lock().remove(&request_id) {
-        let _ = tx.send(());
+    if let Some(mut entry) = state.ai_cancels.lock().remove(&request_id) {
+        if let Some(sender) = entry.sender.take() {
+            let _ = sender.send(());
+        }
     }
     Ok(())
 }
@@ -593,6 +608,22 @@ mod tests {
             effective_base_url(" https://example.com/v1/// "),
             "https://example.com/v1"
         );
+    }
+
+    #[test]
+    fn public_ai_config_only_exposes_api_key_presence() {
+        let config = AiConfig {
+            has_api_key: true,
+            base_url: "https://example.com/v1".into(),
+            protocol: Protocol::Openai,
+            model: "model".into(),
+            auto_approve: false,
+            enabled_tools: None,
+            max_history_tokens: None,
+        };
+        let value = serde_json::to_value(config).unwrap();
+        assert_eq!(value["hasApiKey"], true);
+        assert!(value.get("apiKey").is_none());
     }
 
     #[test]

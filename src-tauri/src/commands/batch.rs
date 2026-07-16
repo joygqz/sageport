@@ -11,7 +11,7 @@ use crate::error::{AppError, AppResult};
 use crate::repository::{history_repo, host_repo};
 use crate::ssh::exec::exec_capture_limited;
 use crate::ssh::{establish, Hop};
-use crate::state::AppState;
+use crate::state::{AppState, CancelEntry};
 
 const BATCH_CONCURRENCY: usize = 4;
 const MAX_BATCH_HOSTS: usize = 100;
@@ -44,24 +44,35 @@ pub async fn hosts_run_command(
 ) -> AppResult<()> {
     let (host_ids, command) = validate_input(host_ids, command, &request_id)?;
     let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel();
+    let generation = state.next_request_generation();
     {
         let mut cancels = state.batch_cancels.lock();
         if cancels.contains_key(&request_id) {
             return Err(AppError::Invalid("batch request is already running".into()));
         }
-        cancels.insert(request_id.clone(), Some(cancel_tx));
+        cancels.insert(
+            request_id.clone(),
+            CancelEntry {
+                generation,
+                sender: Some(cancel_tx),
+            },
+        );
     }
 
     let mut targets: Vec<(String, AppResult<Vec<Hop>>)> = Vec::new();
     for host_id in host_ids {
+        if cancellation_requested(&mut cancel_rx) {
+            remove_cancel_if_current(&state, &request_id, generation);
+            return Err(AppError::Cancelled);
+        }
         let prepared = match host_repo::get(&state.db, &host_id).await {
             Ok(host) => super::ssh::build_hops(&state, &host).await,
             Err(error) => Err(error),
         };
         targets.push((host_id, prepared));
     }
-    if cancel_rx.try_recv().is_ok() {
-        state.batch_cancels.lock().remove(&request_id);
+    if cancellation_requested(&mut cancel_rx) {
+        remove_cancel_if_current(&state, &request_id, generation);
         return Err(AppError::Cancelled);
     }
 
@@ -142,8 +153,15 @@ pub async fn hosts_run_command(
             }
         }
     };
-    state.batch_cancels.lock().remove(&request_id);
+    remove_cancel_if_current(&state, &request_id, generation);
     result
+}
+
+fn cancellation_requested(cancel: &mut tokio::sync::oneshot::Receiver<()>) -> bool {
+    !matches!(
+        cancel.try_recv(),
+        Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+    )
 }
 
 #[tauri::command]
@@ -153,11 +171,21 @@ pub async fn hosts_cancel_run(state: State<'_, AppState>, request_id: String) ->
         .batch_cancels
         .lock()
         .get_mut(&request_id)
-        .and_then(Option::take)
+        .and_then(|entry| entry.sender.take())
     {
         let _ = cancel.send(());
     }
     Ok(())
+}
+
+fn remove_cancel_if_current(state: &AppState, request_id: &str, generation: u64) {
+    let mut cancels = state.batch_cancels.lock();
+    if cancels
+        .get(request_id)
+        .is_some_and(|entry| entry.generation == generation)
+    {
+        cancels.remove(request_id);
+    }
 }
 
 fn validate_id(id: &str, label: &str) -> AppResult<()> {
@@ -245,5 +273,13 @@ mod tests {
         assert_eq!(combine_output("out".into(), "err".into()), "out\nerr");
         assert_eq!(combine_output("out\n".into(), "err".into()), "out\nerr");
         assert_eq!(combine_output("".into(), "err".into()), "err");
+    }
+
+    #[test]
+    fn dropped_cleanup_sender_is_treated_as_cancellation() {
+        let (sender, mut receiver) = tokio::sync::oneshot::channel();
+        assert!(!cancellation_requested(&mut receiver));
+        drop(sender);
+        assert!(cancellation_requested(&mut receiver));
     }
 }

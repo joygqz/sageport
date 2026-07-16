@@ -50,6 +50,18 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<SftpBookmark>> {
 
 pub async fn create(pool: &SqlitePool, input: SftpBookmarkInput) -> AppResult<SftpBookmark> {
     let input = normalize(input)?;
+    let mut tx = pool.begin().await?;
+    if let Some(host_id) = input.host_id.as_deref() {
+        let active: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM hosts WHERE id = ? AND deleted_at IS NULL)",
+        )
+        .bind(host_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if !active {
+            return Err(AppError::NotFound(format!("host {host_id}")));
+        }
+    }
     if let Some(existing) = sqlx::query_as::<_, SftpBookmark>(
         "SELECT * FROM sftp_bookmarks
          WHERE host_id IS ? AND path = ? AND deleted_at IS NULL
@@ -57,9 +69,10 @@ pub async fn create(pool: &SqlitePool, input: SftpBookmarkInput) -> AppResult<Sf
     )
     .bind(&input.host_id)
     .bind(&input.path)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *tx)
     .await?
     {
+        tx.commit().await?;
         return Ok(existing);
     }
     let id = new_id();
@@ -75,19 +88,17 @@ pub async fn create(pool: &SqlitePool, input: SftpBookmarkInput) -> AppResult<Sf
     .bind(&input.path)
     .bind(&ts)
     .bind(&ts)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
-    get(pool, &id).await
-}
-
-pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<SftpBookmark> {
-    sqlx::query_as::<_, SftpBookmark>(
+    let bookmark = sqlx::query_as::<_, SftpBookmark>(
         "SELECT * FROM sftp_bookmarks WHERE id = ? AND deleted_at IS NULL",
     )
-    .bind(id)
-    .fetch_optional(pool)
+    .bind(&id)
+    .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(|| AppError::NotFound(format!("bookmark {id}")))
+    .ok_or_else(|| AppError::NotFound(format!("bookmark {id}")))?;
+    tx.commit().await?;
+    Ok(bookmark)
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {

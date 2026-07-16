@@ -74,23 +74,46 @@ fn normalize(mut input: HostInput) -> AppResult<HostInput> {
 }
 
 async fn validate_references(
-    pool: &SqlitePool,
+    connection: &mut SqliteConnection,
     host_id: Option<&str>,
     input: &HostInput,
 ) -> AppResult<()> {
     if let Some(group_id) = input.group_id.as_deref() {
-        crate::repository::group_repo::get(pool, group_id).await?;
+        let active: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM groups WHERE id = ? AND deleted_at IS NULL)",
+        )
+        .bind(group_id)
+        .fetch_one(&mut *connection)
+        .await?;
+        if !active {
+            return Err(AppError::NotFound(format!("group {group_id}")));
+        }
     }
     if let Some(identity_id) = input.identity_id.as_deref() {
-        crate::repository::identity_repo::get(pool, identity_id).await?;
+        let active: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM identities WHERE id = ? AND deleted_at IS NULL)",
+        )
+        .bind(identity_id)
+        .fetch_one(&mut *connection)
+        .await?;
+        if !active {
+            return Err(AppError::NotFound(format!("identity {identity_id}")));
+        }
     }
     if input.identity_id.is_none() && input.auth_type.as_deref() == Some(auth::KEY) {
         let key_id = input
             .key_id
             .as_deref()
             .ok_or_else(|| AppError::Invalid("key auth selected but no key set".into()))?;
-        let key = crate::repository::key_repo::get(pool, key_id).await?;
-        if key.private_key.as_deref().is_none_or(str::is_empty) {
+        let key: Option<(Option<String>,)> =
+            sqlx::query_as("SELECT private_key FROM keys WHERE id = ? AND deleted_at IS NULL")
+                .bind(key_id)
+                .fetch_optional(&mut *connection)
+                .await?;
+        let private_key = key
+            .ok_or_else(|| AppError::NotFound(format!("key {key_id}")))?
+            .0;
+        if private_key.as_deref().is_none_or(str::is_empty) {
             return Err(AppError::Invalid(
                 "the selected SSH key has no private key".into(),
             ));
@@ -113,8 +136,13 @@ async fn validate_references(
         if depth > JUMP_DEPTH_LIMIT {
             return Err(AppError::Invalid("the jump host chain is too deep".into()));
         }
-        let jump = get(pool, &jump_id).await?;
-        match jump.jump_host_id {
+        let jump: Option<(Option<String>,)> =
+            sqlx::query_as("SELECT jump_host_id FROM hosts WHERE id = ? AND deleted_at IS NULL")
+                .bind(&jump_id)
+                .fetch_optional(&mut *connection)
+                .await?;
+        let jump = jump.ok_or_else(|| AppError::NotFound(format!("host {jump_id}")))?;
+        match jump.0 {
             Some(next) => jump_id = next,
             None => break,
         }
@@ -141,9 +169,11 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Host> {
 
 pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
     let input = normalize(input)?;
-    validate_references(pool, None, &input).await?;
-    let mut connection = pool.acquire().await?;
-    create_normalized_in(&mut connection, input).await
+    let mut tx = pool.begin().await?;
+    validate_references(&mut tx, None, &input).await?;
+    let host = create_normalized_in(&mut tx, input).await?;
+    tx.commit().await?;
+    Ok(host)
 }
 
 pub(crate) async fn create_in(
@@ -195,9 +225,9 @@ async fn create_normalized_in(
 
 pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<Host> {
     let input = normalize(input)?;
-    validate_references(pool, Some(id), &input).await?;
-    let ts = now();
     let mut tx = pool.begin().await?;
+    validate_references(&mut tx, Some(id), &input).await?;
+    let ts = now();
     let affected = sqlx::query(
         "UPDATE hosts SET
            label = ?, address = ?, port = ?, group_id = ?, identity_id = ?, username = ?,
@@ -252,8 +282,17 @@ pub async fn move_to_group(
     let group_id = group_id
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty());
+    let mut tx = pool.begin().await?;
     if let Some(gid) = group_id.as_deref() {
-        crate::repository::group_repo::get(pool, gid).await?;
+        let active: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM groups WHERE id = ? AND deleted_at IS NULL)",
+        )
+        .bind(gid)
+        .fetch_one(&mut *tx)
+        .await?;
+        if !active {
+            return Err(AppError::NotFound(format!("group {gid}")));
+        }
     }
     let ts = now();
     let affected = sqlx::query(
@@ -263,13 +302,19 @@ pub async fn move_to_group(
     .bind(&group_id)
     .bind(&ts)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     if affected == 0 {
         return Err(AppError::NotFound(format!("host {id}")));
     }
-    get(pool, id).await
+    let host = sqlx::query_as::<_, Host>("SELECT * FROM hosts WHERE id = ? AND deleted_at IS NULL")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
+    tx.commit().await?;
+    Ok(host)
 }
 
 pub async fn set_os_hint(pool: &SqlitePool, id: &str, os_hint: String) -> AppResult<Host> {
@@ -296,14 +341,23 @@ pub async fn set_os_hint(pool: &SqlitePool, id: &str, os_hint: String) -> AppRes
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
-    get(pool, id).await?;
+    let mut tx = pool.begin().await?;
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM hosts WHERE id = ? AND deleted_at IS NULL)",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !exists {
+        return Err(AppError::NotFound(format!("host {id}")));
+    }
     let dependents: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM hosts
          WHERE jump_host_id = ? AND deleted_at IS NULL AND id != ?",
     )
     .bind(id)
     .bind(id)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
     if dependents > 0 {
         return Err(AppError::InUse(format!(
@@ -316,7 +370,7 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
          WHERE host_id = ? AND deleted_at IS NULL",
     )
     .bind(id)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
     if forwards > 0 {
         return Err(AppError::InUse(format!(
@@ -325,6 +379,16 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
         )));
     }
     let ts = now();
+    sqlx::query(
+        "UPDATE sftp_bookmarks
+         SET deleted_at = ?, updated_at = ?, revision = revision + 1
+         WHERE host_id = ? AND deleted_at IS NULL",
+    )
+    .bind(&ts)
+    .bind(&ts)
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     let affected = sqlx::query(
         "UPDATE hosts
          SET deleted_at = ?, updated_at = ?, revision = revision + 1
@@ -333,12 +397,13 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     .bind(&ts)
     .bind(&ts)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     if affected == 0 {
         return Err(AppError::NotFound(format!("host {id}")));
     }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -357,7 +422,8 @@ mod tests {
     use sqlx::sqlite::SqlitePoolOptions;
 
     use super::*;
-    use crate::domain::HostView;
+    use crate::domain::{HostView, SftpBookmarkInput};
+    use crate::repository::bookmark_repo;
 
     async fn test_pool() -> SqlitePool {
         let pool = SqlitePoolOptions::new()
@@ -465,5 +531,25 @@ mod tests {
             delete(&pool, &first.id).await,
             Err(AppError::InUse(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn deleting_a_host_soft_deletes_its_bookmarks() {
+        let pool = test_pool().await;
+        let host = create(&pool, input("bookmarked")).await.unwrap();
+        bookmark_repo::create(
+            &pool,
+            SftpBookmarkInput {
+                host_id: Some(host.id.clone()),
+                label: "Home".into(),
+                path: "/home/root".into(),
+            },
+        )
+        .await
+        .unwrap();
+
+        delete(&pool, &host.id).await.unwrap();
+
+        assert!(bookmark_repo::list(&pool).await.unwrap().is_empty());
     }
 }

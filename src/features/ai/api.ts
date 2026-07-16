@@ -41,11 +41,20 @@ export function useSetAiConfig() {
         effectiveBaseUrl(prev.baseUrl) !== effectiveBaseUrl(input.baseUrl);
       if (prev) {
         qc.setQueryData<AiConfig>(configKey, {
-          ...input,
+          ...prev,
+          baseUrl: input.baseUrl,
+          protocol: input.protocol,
+          autoApprove: input.autoApprove,
+          enabledTools: input.enabledTools,
+          maxHistoryTokens: input.maxHistoryTokens,
+          hasApiKey:
+            input.apiKey === undefined
+              ? prev.hasApiKey
+              : Boolean(input.apiKey.trim()),
           model: endpointChanged ? "" : prev.model,
         });
       }
-      if (endpointChanged || !prev || prev.apiKey !== input.apiKey) {
+      if (endpointChanged || !prev || input.apiKey !== undefined) {
         qc.removeQueries({ queryKey: modelsKey });
       }
       qc.invalidateQueries({ queryKey: configKey });

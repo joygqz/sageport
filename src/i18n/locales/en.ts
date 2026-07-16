@@ -834,6 +834,8 @@ export const en = {
       modelHint:
         "Enter a model id manually when the compatible endpoint does not expose a model list.",
       apiKeyLabel: "API key",
+      apiKeyClear: "Clear",
+      apiKeySavedPlaceholder: "Saved — enter a replacement",
       apiKeyHint:
         "Leave empty for endpoints that need no key, such as Ollama. Sent only to the AI endpoint you configure; included in end-to-end encrypted backups when sync is enabled.",
       autonomousModeLabel: "Assistant mode",

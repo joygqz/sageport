@@ -799,6 +799,8 @@ export const zhCN: Dictionary = {
       modelLabel: "模型",
       modelHint: "兼容接口未提供模型列表时，可在此手动填写模型 ID。",
       apiKeyLabel: "API 密钥",
+      apiKeyClear: "清除",
+      apiKeySavedPlaceholder: "已保存——输入新密钥可替换",
       apiKeyHint:
         "Ollama 等无需密钥的接口可留空。仅发送到你配置的 AI 服务地址；启用同步时会包含在端到端加密备份中。",
       autonomousModeLabel: "助手模式",

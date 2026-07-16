@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -20,6 +21,11 @@ pub struct SyncOAuthSlot {
     pub generation: u64,
 }
 
+pub struct CancelEntry {
+    pub generation: u64,
+    pub sender: Option<oneshot::Sender<()>>,
+}
+
 pub struct AppState {
     pub db: SqlitePool,
     pub ssh: Arc<SessionManager>,
@@ -36,9 +42,11 @@ pub struct AppState {
 
     pub update: UpdateManager,
 
-    pub ai_cancels: Mutex<HashMap<String, oneshot::Sender<()>>>,
+    pub ai_cancels: Mutex<HashMap<String, CancelEntry>>,
 
-    pub batch_cancels: Mutex<HashMap<String, Option<oneshot::Sender<()>>>>,
+    pub batch_cancels: Mutex<HashMap<String, CancelEntry>>,
+
+    request_generation: AtomicU64,
 
     pub sync_oauth: Mutex<SyncOAuthSlot>,
 
@@ -60,8 +68,13 @@ impl AppState {
             update: UpdateManager::new(),
             ai_cancels: Mutex::new(HashMap::new()),
             batch_cancels: Mutex::new(HashMap::new()),
+            request_generation: AtomicU64::new(0),
             sync_oauth: Mutex::new(SyncOAuthSlot::default()),
             sync_operation: tokio::sync::Mutex::new(()),
         }
+    }
+
+    pub fn next_request_generation(&self) -> u64 {
+        self.request_generation.fetch_add(1, Ordering::Relaxed) + 1
     }
 }

@@ -262,13 +262,12 @@ impl SftpManager {
     }
 
     pub fn disconnect_all(&self) {
-        for flag in self.cancel_flags.lock().values() {
+        for (_, flag) in self.cancel_flags.lock().drain() {
             flag.cancel();
         }
-        for cancel in self.connect_cancels.lock().values() {
+        for (_, cancel) in self.connect_cancels.lock().drain() {
             cancel.cancel();
         }
-        self.connect_cancels.lock().clear();
         self.conns.lock().clear();
     }
 
@@ -407,6 +406,17 @@ mod tests {
             .await
             .expect("cancellation should wake immediately")
             .expect("wait task should finish");
+    }
+
+    #[test]
+    fn disconnect_all_cancels_and_releases_registered_transfers() {
+        let manager = SftpManager::new();
+        let cancel = manager.register_transfer("transfer-1");
+
+        manager.disconnect_all();
+
+        assert!(cancel.is_cancelled());
+        assert!(manager.cancel_flags.lock().is_empty());
     }
 
     #[tokio::test]

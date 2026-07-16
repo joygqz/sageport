@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::domain::{new_id, now, Group, GroupInput};
 use crate::error::{AppError, AppResult};
@@ -19,7 +19,7 @@ fn normalize(mut input: GroupInput) -> AppResult<GroupInput> {
 }
 
 async fn validate_parent(
-    pool: &SqlitePool,
+    connection: &mut SqliteConnection,
     group_id: Option<&str>,
     parent_id: Option<&str>,
 ) -> AppResult<()> {
@@ -36,8 +36,13 @@ async fn validate_parent(
                 "the group parent chain has a loop".into(),
             ));
         }
-        let current = get(pool, &current_id).await?;
-        match current.parent_id {
+        let current: Option<(Option<String>,)> =
+            sqlx::query_as("SELECT parent_id FROM groups WHERE id = ? AND deleted_at IS NULL")
+                .bind(&current_id)
+                .fetch_optional(&mut *connection)
+                .await?;
+        let current = current.ok_or_else(|| AppError::NotFound(format!("group {current_id}")))?;
+        match current.0 {
             Some(parent) => current_id = parent,
             None => return Ok(()),
         }
@@ -53,6 +58,7 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Group>> {
     Ok(rows)
 }
 
+#[cfg(test)]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Group> {
     sqlx::query_as::<_, Group>("SELECT * FROM groups WHERE id = ? AND deleted_at IS NULL")
         .bind(id)
@@ -63,7 +69,8 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Group> {
 
 pub async fn create(pool: &SqlitePool, input: GroupInput) -> AppResult<Group> {
     let input = normalize(input)?;
-    validate_parent(pool, None, input.parent_id.as_deref()).await?;
+    let mut tx = pool.begin().await?;
+    validate_parent(&mut tx, None, input.parent_id.as_deref()).await?;
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -76,15 +83,31 @@ pub async fn create(pool: &SqlitePool, input: GroupInput) -> AppResult<Group> {
     .bind(input.sort_order)
     .bind(&ts)
     .bind(&ts)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
-    get(pool, &id).await
+    let group =
+        sqlx::query_as::<_, Group>("SELECT * FROM groups WHERE id = ? AND deleted_at IS NULL")
+            .bind(&id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("group {id}")))?;
+    tx.commit().await?;
+    Ok(group)
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: GroupInput) -> AppResult<Group> {
     let input = normalize(input)?;
-    get(pool, id).await?;
-    validate_parent(pool, Some(id), input.parent_id.as_deref()).await?;
+    let mut tx = pool.begin().await?;
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM groups WHERE id = ? AND deleted_at IS NULL)",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !exists {
+        return Err(AppError::NotFound(format!("group {id}")));
+    }
+    validate_parent(&mut tx, Some(id), input.parent_id.as_deref()).await?;
     let ts = now();
     let affected = sqlx::query(
         "UPDATE groups
@@ -96,17 +119,30 @@ pub async fn update(pool: &SqlitePool, id: &str, input: GroupInput) -> AppResult
     .bind(input.sort_order)
     .bind(&ts)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     if affected == 0 {
         return Err(AppError::NotFound(format!("group {id}")));
     }
-    get(pool, id).await
+    let group =
+        sqlx::query_as::<_, Group>("SELECT * FROM groups WHERE id = ? AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("group {id}")))?;
+    tx.commit().await?;
+    Ok(group)
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResult<()> {
-    let group = get(pool, id).await?;
+    let mut tx = pool.begin().await?;
+    let group =
+        sqlx::query_as::<_, Group>("SELECT * FROM groups WHERE id = ? AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("group {id}")))?;
     let ts = now();
     if delete_hosts {
         let external_jump_users: i64 = sqlx::query_scalar(
@@ -120,7 +156,7 @@ pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResul
         )
         .bind(id)
         .bind(id)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await?;
         if external_jump_users > 0 {
             return Err(AppError::InUse(format!(
@@ -128,10 +164,36 @@ pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResul
                 if external_jump_users == 1 { "" } else { "s" }
             )));
         }
-    }
-
-    let mut tx = pool.begin().await?;
-    if delete_hosts {
+        let forwards: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)
+             FROM port_forwards AS forward
+             JOIN hosts AS host ON host.id = forward.host_id
+             WHERE host.group_id = ?
+               AND host.deleted_at IS NULL
+               AND forward.deleted_at IS NULL",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if forwards > 0 {
+            return Err(AppError::InUse(format!(
+                "hosts in this group are still used by {forwards} port forward{}; delete them before deleting the group",
+                if forwards == 1 { "" } else { "s" }
+            )));
+        }
+        sqlx::query(
+            "UPDATE sftp_bookmarks
+             SET deleted_at = ?, updated_at = ?, revision = revision + 1
+             WHERE deleted_at IS NULL
+               AND host_id IN (
+                 SELECT id FROM hosts WHERE group_id = ? AND deleted_at IS NULL
+               )",
+        )
+        .bind(&ts)
+        .bind(&ts)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
         sqlx::query(
             "UPDATE hosts SET deleted_at = ?, updated_at = ?, revision = revision + 1
              WHERE group_id = ? AND deleted_at IS NULL",
@@ -184,8 +246,8 @@ mod tests {
     use sqlx::sqlite::SqlitePoolOptions;
 
     use super::*;
-    use crate::domain::{auth, HostInput};
-    use crate::repository::host_repo;
+    use crate::domain::{auth, forward_kind, HostInput, PortForwardInput};
+    use crate::repository::{forward_repo, host_repo};
 
     async fn test_pool() -> SqlitePool {
         let pool = SqlitePoolOptions::new()
@@ -265,6 +327,36 @@ mod tests {
         let mut dependent_input = host_input("dependent", None);
         dependent_input.jump_host_id = Some(jump.id);
         host_repo::create(&pool, dependent_input).await.unwrap();
+
+        assert!(matches!(
+            delete(&pool, &group.id, true).await,
+            Err(AppError::InUse(_))
+        ));
+        assert!(get(&pool, &group.id).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn blocks_group_host_deletion_when_a_forward_uses_a_host() {
+        let pool = test_pool().await;
+        let group = create(&pool, group_input("forwarded", None)).await.unwrap();
+        let host = host_repo::create(&pool, host_input("web", Some(group.id.clone())))
+            .await
+            .unwrap();
+        forward_repo::create(
+            &pool,
+            PortForwardInput {
+                host_id: host.id,
+                label: "Web".into(),
+                kind: forward_kind::LOCAL.into(),
+                bind_host: "127.0.0.1".into(),
+                bind_port: 18080,
+                target_host: Some("127.0.0.1".into()),
+                target_port: Some(8080),
+                auto_start: false,
+            },
+        )
+        .await
+        .unwrap();
 
         assert!(matches!(
             delete(&pool, &group.id, true).await,

@@ -103,14 +103,18 @@ fn fingerprint<T: Serialize>(kind: &str, value: &T) -> String {
 }
 
 pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
-    let groups = fetch_all::<Group>(pool, "groups").await?;
-    let hosts = fetch_all::<Host>(pool, "hosts").await?;
-    let identities = fetch_all::<Identity>(pool, "identities").await?;
-    let keys = fetch_all::<SshKey>(pool, "keys").await?;
-    let snippets = fetch_all::<Snippet>(pool, "snippets").await?;
-    let port_forwards = fetch_all::<PortForward>(pool, "port_forwards").await?;
-    let sftp_bookmarks = fetch_all::<SftpBookmark>(pool, "sftp_bookmarks").await?;
-    let settings = settings_repo::all_excluding_prefixes(pool, EXCLUDED_SETTINGS_PREFIXES)
+    // Keep every table in one SQLite read transaction. Reading through the
+    // pool independently can mix revisions from before and after a concurrent
+    // mutation, producing an encrypted backup that never existed locally.
+    let mut tx = pool.begin().await?;
+    let groups = fetch_all::<Group, _>(&mut *tx, "groups").await?;
+    let hosts = fetch_all::<Host, _>(&mut *tx, "hosts").await?;
+    let identities = fetch_all::<Identity, _>(&mut *tx, "identities").await?;
+    let keys = fetch_all::<SshKey, _>(&mut *tx, "keys").await?;
+    let snippets = fetch_all::<Snippet, _>(&mut *tx, "snippets").await?;
+    let port_forwards = fetch_all::<PortForward, _>(&mut *tx, "port_forwards").await?;
+    let sftp_bookmarks = fetch_all::<SftpBookmark, _>(&mut *tx, "sftp_bookmarks").await?;
+    let settings = settings_repo::all_excluding_prefixes(&mut *tx, EXCLUDED_SETTINGS_PREFIXES)
         .await?
         .into_iter()
         .filter_map(|(key, value, updated_at)| {
@@ -121,6 +125,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
             })
         })
         .collect();
+    tx.commit().await?;
 
     let snapshot = VaultSnapshot {
         exported_at: now(),
@@ -565,13 +570,14 @@ fn cycle_breakers(parents: &HashMap<String, String>) -> Vec<String> {
     breakers
 }
 
-async fn fetch_all<T>(pool: &SqlitePool, table: &str) -> AppResult<Vec<T>>
+async fn fetch_all<'e, T, E>(executor: E, table: &str) -> AppResult<Vec<T>>
 where
     T: for<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> + Send + Unpin,
+    E: Executor<'e, Database = Sqlite>,
 {
     let sql = format!("SELECT * FROM {table}");
     Ok(sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(sql))
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?)
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Check,
   ChevronRight,
@@ -529,7 +529,6 @@ function AiForm({ config }: { config: AiConfig }) {
   const setModelMutation = useSetAiModel();
   const [protocol, setProtocol] = useState<AiProtocol>(config.protocol);
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
-  const [apiKey, setApiKey] = useState(config.apiKey);
   const [model, setModel] = useState(config.model);
   const [autoApprove, setAutoApprove] = useState(config.autoApprove);
   const [enabledTools, setEnabledTools] = useState(() =>
@@ -544,40 +543,50 @@ function AiForm({ config }: { config: AiConfig }) {
   const mutate = setConfig.mutate;
   const mutateModel = setModelMutation.mutate;
   const lastSavedModel = useRef(config.model);
-  const values = useRef({
+  type ConfigInput = {
+    baseUrl: string;
+    protocol: AiProtocol;
+    apiKey?: string;
+    autoApprove: boolean;
+    enabledTools: string[];
+    maxHistoryTokens: number | null;
+  };
+  const values = useRef<ConfigInput>({
     baseUrl: config.baseUrl,
     protocol: config.protocol,
-    apiKey: config.apiKey,
     autoApprove: config.autoApprove,
     enabledTools: resolveEnabledToolNames(config.enabledTools),
     maxHistoryTokens: config.maxHistoryTokens,
   });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const saveConfig = (patch: Partial<typeof values.current>) => {
+  const flushConfig = useCallback(() => {
+    saveTimer.current = null;
+    const input = values.current;
+    const { apiKey: _apiKey, ...retained } = input;
+    // Do not retain a submitted secret in long-lived React refs or resend it
+    // with unrelated settings changes.
+    values.current = retained;
+    mutate(input, {
+      onError: (err) =>
+        toast.error(t("settings.ai.saveError"), errorMessage(err)),
+    });
+  }, [mutate, t]);
+
+  const saveConfig = (patch: Partial<ConfigInput>) => {
     values.current = { ...values.current, ...patch };
     if (saveTimer.current !== null) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      saveTimer.current = null;
-      mutate(values.current, {
-        onError: (err) =>
-          toast.error(t("settings.ai.saveError"), errorMessage(err)),
-      });
-    }, 500);
+    saveTimer.current = setTimeout(flushConfig, 500);
   };
 
   useEffect(
     () => () => {
       if (saveTimer.current !== null) {
         clearTimeout(saveTimer.current);
-        saveTimer.current = null;
-        mutate(values.current, {
-          onError: (err) =>
-            toast.error(t("settings.ai.saveError"), errorMessage(err)),
-        });
+        flushConfig();
       }
     },
-    [mutate, t],
+    [flushConfig],
   );
 
   const commitModel = (next: string) => {
@@ -598,7 +607,6 @@ function AiForm({ config }: { config: AiConfig }) {
   };
 
   const commitApiKey = (next: string) => {
-    setApiKey(next);
     saveConfig({ apiKey: next });
   };
 
@@ -702,15 +710,28 @@ function AiForm({ config }: { config: AiConfig }) {
           label={t("settings.ai.apiKeyLabel")}
           hint={t("settings.ai.apiKeyHint")}
         >
-          <DraftInput
-            password
-            value={apiKey}
-            onCommit={commitApiKey}
-            maxLength={16384}
-            placeholder="sk-…"
-            autoComplete="off"
-            spellCheck={false}
-          />
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <DraftInput
+                password
+                value=""
+                onCommit={commitApiKey}
+                maxLength={16384}
+                placeholder={
+                  config.hasApiKey
+                    ? t("settings.ai.apiKeySavedPlaceholder")
+                    : "sk-…"
+                }
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            {config.hasApiKey && (
+              <Button variant="outline" onClick={() => commitApiKey("")}>
+                {t("settings.ai.apiKeyClear")}
+              </Button>
+            )}
+          </div>
         </Field>
 
         <Field

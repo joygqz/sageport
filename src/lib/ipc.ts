@@ -309,7 +309,7 @@ export const ipc = {
     setConfig: (input: {
       baseUrl: string;
       protocol: AiProtocol;
-      apiKey: string;
+      apiKey?: string;
       autoApprove: boolean;
       enabledTools: string[];
       maxHistoryTokens: number | null;

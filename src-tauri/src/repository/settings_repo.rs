@@ -1,4 +1,4 @@
-use sqlx::SqlitePool;
+use sqlx::{Executor, Sqlite, SqlitePool};
 
 use crate::domain::now;
 use crate::error::AppResult;
@@ -43,10 +43,13 @@ pub async fn set_many(pool: &SqlitePool, entries: &[(String, String)]) -> AppRes
     Ok(())
 }
 
-pub async fn all_excluding_prefixes(
-    pool: &SqlitePool,
+pub async fn all_excluding_prefixes<'e, E>(
+    executor: E,
     prefixes: &[&str],
-) -> AppResult<Vec<(String, String, String)>> {
+) -> AppResult<Vec<(String, String, String)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     let clause = prefixes
         .iter()
         .map(|_| "key NOT LIKE ?")
@@ -57,6 +60,6 @@ pub async fn all_excluding_prefixes(
     for prefix in prefixes {
         query = query.bind(format!("{prefix}%"));
     }
-    let rows: Vec<(String, String, String)> = query.fetch_all(pool).await?;
+    let rows: Vec<(String, String, String)> = query.fetch_all(executor).await?;
     Ok(rows)
 }

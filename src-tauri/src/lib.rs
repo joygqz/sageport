@@ -17,6 +17,8 @@ use tauri::webview::PageLoadEvent;
 use tauri::Manager;
 
 use state::AppState;
+#[cfg(test)]
+use state::CancelEntry;
 
 fn cleanup_orphaned_sessions(state: &AppState) {
     state.ssh.close_all();
@@ -38,7 +40,7 @@ fn cleanup_orphaned_sessions(state: &AppState) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Started {
                 if let Some(state) = webview.try_state::<AppState>() {
@@ -181,8 +183,16 @@ pub fn run() {
             commands::ai::ai_session_save,
             commands::ai::ai_session_delete,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|handle, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            if let Some(state) = handle.try_state::<AppState>() {
+                cleanup_orphaned_sessions(&state);
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -199,10 +209,13 @@ mod tests {
         let state = AppState::new(pool);
 
         let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
-        state
-            .batch_cancels
-            .lock()
-            .insert("request-1".into(), Some(cancel_tx));
+        state.batch_cancels.lock().insert(
+            "request-1".into(),
+            CancelEntry {
+                generation: 1,
+                sender: Some(cancel_tx),
+            },
+        );
 
         cleanup_orphaned_sessions(&state);
 

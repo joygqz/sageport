@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -60,12 +60,19 @@ struct ActiveForward {
 
 struct StartGuard {
     id: String,
-    preparing: Arc<Mutex<HashSet<String>>>,
+    lifecycle: u64,
+    preparing: Arc<Mutex<HashMap<String, u64>>>,
 }
 
 impl Drop for StartGuard {
     fn drop(&mut self) {
-        self.preparing.lock().remove(&self.id);
+        let mut preparing = self.preparing.lock();
+        if preparing
+            .get(&self.id)
+            .is_some_and(|lifecycle| *lifecycle == self.lifecycle)
+        {
+            preparing.remove(&self.id);
+        }
     }
 }
 
@@ -73,10 +80,11 @@ impl Drop for StartGuard {
 pub struct ForwardManager {
     active: Arc<Mutex<HashMap<String, ActiveForward>>>,
     retiring: Arc<Mutex<HashMap<String, oneshot::Receiver<()>>>>,
-    preparing: Arc<Mutex<HashSet<String>>>,
+    preparing: Arc<Mutex<HashMap<String, u64>>>,
     runtime: Arc<Mutex<HashMap<String, StatusEvent>>>,
     next_generation: Arc<AtomicU64>,
     next_sequence: Arc<AtomicU64>,
+    lifecycle: Arc<Mutex<u64>>,
 }
 
 impl ForwardManager {
@@ -103,6 +111,12 @@ impl ForwardManager {
     }
 
     pub fn stop_all(&self) {
+        // Serialize cleanup with the point where a pending start becomes
+        // active. Otherwise a start waiting on an older retired task can
+        // insert itself after a page-reload cleanup has already drained the
+        // active map.
+        let mut lifecycle = self.lifecycle.lock();
+        *lifecycle = lifecycle.wrapping_add(1);
         let entries = self.active.lock().drain().collect::<Vec<_>>();
         let mut retiring = self.retiring.lock();
         for (id, entry) in entries {
@@ -147,17 +161,23 @@ impl ForwardManager {
         prompts: ConnectionPrompts,
         spec: ForwardSpec,
     ) -> AppResult<()> {
+        let lifecycle = *self.lifecycle.lock();
         if self.active.lock().contains_key(&spec.id) {
             return Ok(());
         }
         {
             let mut preparing = self.preparing.lock();
-            if !preparing.insert(spec.id.clone()) {
+            if preparing
+                .get(&spec.id)
+                .is_some_and(|pending| *pending == lifecycle)
+            {
                 return Ok(());
             }
+            preparing.insert(spec.id.clone(), lifecycle);
         }
         let _start_guard = StartGuard {
             id: spec.id.clone(),
+            lifecycle,
             preparing: self.preparing.clone(),
         };
         let retiring = self.retiring.lock().remove(&spec.id);
@@ -174,6 +194,10 @@ impl ForwardManager {
         let (finished_tx, finished_rx) = oneshot::channel();
 
         {
+            let current_lifecycle = self.lifecycle.lock();
+            if *current_lifecycle != lifecycle {
+                return Err(AppError::Cancelled);
+            }
             let mut active = self.active.lock();
             if active.contains_key(&spec.id) {
                 return Ok(());
@@ -655,5 +679,30 @@ mod tests {
         assert_eq!(active.lock().get("forward").unwrap().generation, 2);
         remove_finished(&active, "forward", 2);
         assert!(!active.lock().contains_key("forward"));
+    }
+
+    #[test]
+    fn stop_all_invalidates_pending_start_lifecycle() {
+        let manager = ForwardManager::new();
+        let pending_lifecycle = *manager.lifecycle.lock();
+
+        manager.stop_all();
+
+        assert_ne!(*manager.lifecycle.lock(), pending_lifecycle);
+    }
+
+    #[test]
+    fn stale_start_guard_does_not_clear_a_new_lifecycle_reservation() {
+        let preparing = Arc::new(Mutex::new(HashMap::from([("forward".into(), 1)])));
+        let guard = StartGuard {
+            id: "forward".into(),
+            lifecycle: 1,
+            preparing: preparing.clone(),
+        };
+        preparing.lock().insert("forward".into(), 2);
+
+        drop(guard);
+
+        assert_eq!(preparing.lock().get("forward"), Some(&2));
     }
 }

@@ -95,7 +95,8 @@ pub async fn list_auto_start(pool: &SqlitePool) -> AppResult<Vec<PortForward>> {
 
 pub async fn create(pool: &SqlitePool, input: PortForwardInput) -> AppResult<PortForward> {
     let input = normalize(input)?;
-    crate::repository::host_repo::get(pool, &input.host_id).await?;
+    let mut tx = pool.begin().await?;
+    require_active_host(&mut tx, &input.host_id).await?;
     let id = new_id();
     let ts = now();
     sqlx::query(
@@ -115,9 +116,11 @@ pub async fn create(pool: &SqlitePool, input: PortForwardInput) -> AppResult<Por
     .bind(input.auto_start as i64)
     .bind(&ts)
     .bind(&ts)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
-    get(pool, &id).await
+    let forward = get_in(&mut tx, &id).await?;
+    tx.commit().await?;
+    Ok(forward)
 }
 
 pub async fn update(
@@ -126,7 +129,8 @@ pub async fn update(
     input: PortForwardInput,
 ) -> AppResult<PortForward> {
     let input = normalize(input)?;
-    crate::repository::host_repo::get(pool, &input.host_id).await?;
+    let mut tx = pool.begin().await?;
+    require_active_host(&mut tx, &input.host_id).await?;
     let ts = now();
     let affected = sqlx::query(
         "UPDATE port_forwards SET
@@ -144,13 +148,41 @@ pub async fn update(
     .bind(input.auto_start as i64)
     .bind(&ts)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     if affected == 0 {
         return Err(AppError::NotFound(format!("port forward {id}")));
     }
-    get(pool, id).await
+    let forward = get_in(&mut tx, id).await?;
+    tx.commit().await?;
+    Ok(forward)
+}
+
+async fn require_active_host(
+    connection: &mut sqlx::SqliteConnection,
+    host_id: &str,
+) -> AppResult<()> {
+    let active: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM hosts WHERE id = ? AND deleted_at IS NULL)",
+    )
+    .bind(host_id)
+    .fetch_one(&mut *connection)
+    .await?;
+    if !active {
+        return Err(AppError::NotFound(format!("host {host_id}")));
+    }
+    Ok(())
+}
+
+async fn get_in(connection: &mut sqlx::SqliteConnection, id: &str) -> AppResult<PortForward> {
+    sqlx::query_as::<_, PortForward>(
+        "SELECT * FROM port_forwards WHERE id = ? AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .fetch_optional(connection)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("port forward {id}")))
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
