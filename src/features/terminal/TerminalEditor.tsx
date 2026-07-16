@@ -517,31 +517,31 @@ function StatusOverlay({
           aria-live="polite"
           aria-atomic="true"
           aria-labelledby={`connection-title-${pane.id}`}
-          className="w-full max-w-[28rem] px-4 py-3 text-center"
+          className="w-full max-w-[24rem] px-3 py-2 text-center"
         >
           <div className="flex flex-col items-center">
-            <span className="flex size-11 items-center justify-center rounded-full bg-primary/15 text-link">
-              <PlugZap className="size-5" strokeWidth={1.8} />
+            <span className="flex size-9 items-center justify-center rounded-full bg-primary/15 text-link">
+              <PlugZap className="size-4" strokeWidth={1.8} />
             </span>
             <h2
               id={`connection-title-${pane.id}`}
-              className="mt-3 max-w-full truncate text-lg font-semibold tracking-tight text-foreground"
+              className="mt-2 max-w-full truncate text-base font-semibold tracking-tight text-foreground"
             >
               {pane.title}
             </h2>
             {target ? (
               <p
-                className="mt-1 max-w-full truncate font-mono text-xs text-muted-foreground"
+                className="mt-0.5 max-w-full truncate font-mono text-xs text-muted-foreground"
                 title={target}
               >
                 SSH · {target}
               </p>
             ) : (
-              <p className="mt-1 text-xs text-muted-foreground">SSH</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">SSH</p>
             )}
           </div>
 
-          <div className="mt-5">
+          <div className="mt-3.5">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="size-4 shrink-0 animate-spin text-link" />
               <p className="text-sm font-medium text-foreground">
@@ -549,7 +549,7 @@ function StatusOverlay({
               </p>
             </div>
             <div
-              className="mx-auto mt-3 h-0.5 max-w-[22rem] overflow-hidden rounded-full bg-muted"
+              className="mx-auto mt-2 h-0.5 max-w-[18rem] overflow-hidden rounded-full bg-muted"
               aria-hidden="true"
             >
               <span className="block h-full w-1/4 -translate-x-full rounded-full bg-link motion-safe:animate-[connection-progress_1.6s_ease-in-out_infinite] motion-reduce:translate-x-full" />
