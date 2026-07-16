@@ -518,50 +518,44 @@ function StatusOverlay({
           aria-live="polite"
           aria-atomic="true"
           aria-labelledby={`connection-title-${pane.id}`}
-          className="w-full max-w-[29rem] rounded-xl border border-border/80 bg-card/95 p-4 text-card-foreground"
+          className="w-full max-w-[28rem] px-4 py-3 text-center"
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-link ring-1 ring-primary/20">
-              <PlugZap className="size-[18px]" strokeWidth={1.8} />
-              <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-card bg-warning motion-safe:animate-pulse" />
+          <div className="flex flex-col items-center">
+            <span className="flex size-11 items-center justify-center rounded-full bg-primary/15 text-link">
+              <PlugZap className="size-5" strokeWidth={1.8} />
             </span>
-            <div className="min-w-0 flex-1">
-              <h2
-                id={`connection-title-${pane.id}`}
-                className="truncate text-base font-semibold tracking-tight text-foreground"
+            <h2
+              id={`connection-title-${pane.id}`}
+              className="mt-3 max-w-full truncate text-lg font-semibold tracking-tight text-foreground"
+            >
+              {pane.title}
+            </h2>
+            {target ? (
+              <p
+                className="mt-1 max-w-full truncate font-mono text-xs text-muted-foreground"
+                title={target}
               >
-                {pane.title}
-              </h2>
-              {target ? (
-                <p
-                  className="mt-0.5 truncate font-mono text-xs text-muted-foreground"
-                  title={target}
-                >
-                  SSH · {target}
-                </p>
-              ) : (
-                <p className="mt-0.5 text-xs text-muted-foreground">SSH</p>
-              )}
-            </div>
-            <span className="hidden rounded-full border border-border/70 bg-muted/70 px-2 py-0.5 text-2xs font-medium text-muted-foreground sm:block">
-              {t("terminal.status.connecting")}
-            </span>
+                SSH · {target}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">SSH</p>
+            )}
           </div>
 
-          <div className="mt-3.5">
-            <div className="flex items-center gap-2">
+          <div className="mt-5">
+            <div className="flex items-center justify-center gap-2">
               <Loader2 className="size-4 shrink-0 animate-spin text-link" />
               <p className="text-sm font-medium text-foreground">
                 {t("terminal.connecting")}
               </p>
             </div>
             <div
-              className="mt-2.5 h-1 overflow-hidden rounded-full bg-muted"
+              className="mx-auto mt-3 h-0.5 max-w-[22rem] overflow-hidden rounded-full bg-muted"
               aria-hidden="true"
             >
               <span className="block h-full w-1/4 -translate-x-full rounded-full bg-link motion-safe:animate-[connection-progress_1.6s_ease-in-out_infinite] motion-reduce:translate-x-full" />
             </div>
-            <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-2.5 text-2xs leading-relaxed text-muted-foreground">
               {t("terminal.timeout", {
                 seconds: CONNECT_TIMEOUT_MS / 1_000,
               })}
