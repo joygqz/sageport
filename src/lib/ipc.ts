@@ -216,6 +216,9 @@ export const ipc = {
     onExit: (handler: (e: PtyExitEvent) => void): Promise<UnlistenFn> =>
       listen<PtyExitEvent>("pty://exit", (event) => handler(event.payload)),
   },
+  clipboard: {
+    saveImage: () => invoke<string | null>("clipboard_save_image"),
+  },
   sftp: {
     connect: (connectionId: string, hostId: string) =>
       invoke<void>("fs_connect", { connectionId, hostId }),

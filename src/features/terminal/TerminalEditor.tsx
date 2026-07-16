@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { ISearchOptions } from "@xterm/addon-search";
 import {
   ArrowDown,
@@ -53,6 +53,7 @@ import {
   type TerminalTab,
 } from "@/workbench/tabs";
 import { terminalFontSize, useZoomStore } from "@/workbench/zoom";
+import { pasteIntoTerminal } from "./paste";
 import { useTerminalSearch } from "./search";
 import { focusTerminal, getSession } from "./sessions";
 import { TerminalView } from "./TerminalView";
@@ -63,11 +64,10 @@ async function copyPaneSelection(paneId: string) {
   await writeText(term.getSelection());
 }
 
-async function pastePaneClipboard(paneId: string) {
+async function pastePaneClipboard(paneId: string, images: boolean) {
   const session = getSession(paneId);
   if (!session) return;
-  const text = await readText().catch(() => "");
-  if (text) session.term.paste(text);
+  await pasteIntoTerminal(session.term, { images });
 }
 
 function selectPaneAll(paneId: string) {
@@ -249,7 +249,9 @@ function PaneView({
           <Copy /> {t("common.copy")}
         </ContextMenuItem>
         <ContextMenuItem
-          onSelect={runAndRefocus(() => void pastePaneClipboard(pane.id))}
+          onSelect={runAndRefocus(
+            () => void pastePaneClipboard(pane.id, pane.target === "local"),
+          )}
         >
           <ClipboardPaste /> {t("terminal.menu.paste")}
         </ContextMenuItem>

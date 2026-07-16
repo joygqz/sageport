@@ -6,6 +6,7 @@ import { errorCode, errorMessage } from "@/lib/toast";
 import type { TerminalStatus } from "@/workbench/tabs";
 import { CommandTracker } from "./commands";
 import { hasHostKeyPrompt, useHostKeyStore } from "./host-key";
+import { attachImagePaste } from "./paste";
 import { hasPasswordPrompt, usePasswordPromptStore } from "./password-prompt";
 import type { TerminalStatusUpdate, TerminalTransport } from "./transport";
 import { attachWebglRenderer, createTerminal } from "./xterm";
@@ -27,6 +28,7 @@ export interface TerminalSessionOptions {
   fontSize: number;
   theme: ITheme;
   watchHostKey: boolean;
+  imagePaste: boolean;
   onStatus: (event: SessionStatusEvent) => void;
   onUserInput?: (data: string) => void;
   onDispose?: () => void;
@@ -126,6 +128,9 @@ export class TerminalSession {
       const container = this.container;
       this.term.open(container);
       attachWebglRenderer(this.term);
+      if (this.opts.imagePaste) {
+        this.disposables.push(attachImagePaste(this.term));
+      }
       try {
         this.fit.fit();
       } catch {}

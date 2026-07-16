@@ -98,6 +98,7 @@ export function TerminalView({
       fontSize: terminalFontSize(),
       theme: terminalTheme(themeRef.current),
       watchHostKey: isSshLike,
+      imagePaste: isLocal,
       onStatus: (e) => {
         if (isSshLike) {
           if (e.status === "connected") {

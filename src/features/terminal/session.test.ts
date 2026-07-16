@@ -71,6 +71,7 @@ describe("TerminalSession lifecycle", () => {
       fontSize: 13,
       theme: {},
       watchHostKey: false,
+      imagePaste: false,
       onStatus: (event) => events.push(event),
     });
 
@@ -96,6 +97,7 @@ describe("TerminalSession lifecycle", () => {
       fontSize: 13,
       theme: {},
       watchHostKey: false,
+      imagePaste: false,
       onStatus: vi.fn(),
     });
 

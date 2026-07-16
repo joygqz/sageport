@@ -42,6 +42,7 @@ aes-gcm = "0.11"
 argon2 = "0.5"
 rand = "0.10"
 base64 = "0.22"
+png = "0.17"
 
 russh = "0.62.2"
 russh-sftp = "2.3.0"

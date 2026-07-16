@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod batch;
 pub mod bookmarks;
+pub mod clipboard;
 pub mod forwards;
 pub mod groups;
 pub mod history;

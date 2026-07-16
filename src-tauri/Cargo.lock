@@ -5104,6 +5104,7 @@ dependencies = [
  "objc2-app-kit",
  "objc2-foundation",
  "parking_lot",
+ "png 0.17.16",
  "portable-pty",
  "quick-xml 0.41.0",
  "rand 0.10.2",

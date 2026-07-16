@@ -131,6 +131,7 @@ pub fn run() {
             commands::pty::pty_write,
             commands::pty::pty_resize,
             commands::pty::pty_close,
+            commands::clipboard::clipboard_save_image,
             commands::batch::hosts_run_command,
             commands::batch::hosts_cancel_run,
             commands::history::history_add,
