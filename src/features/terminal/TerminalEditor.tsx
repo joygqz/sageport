@@ -518,7 +518,7 @@ function StatusOverlay({
           aria-live="polite"
           aria-atomic="true"
           aria-labelledby={`connection-title-${pane.id}`}
-          className="w-full max-w-[29rem] rounded-xl border border-border/80 bg-card/95 p-4 text-card-foreground shadow-md"
+          className="w-full max-w-[29rem] rounded-xl border border-border/80 bg-card/95 p-4 text-card-foreground"
         >
           <div className="flex min-w-0 items-center gap-3">
             <span className="relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-link ring-1 ring-primary/20">
