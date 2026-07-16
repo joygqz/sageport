@@ -232,7 +232,6 @@ export const en = {
 
   terminal: {
     connecting: "Securing",
-    timeout: "Timeout {seconds}s",
     connectFailed: "Connection failed",
     connectCancelled: "Connection cancelled",
     retry: "Try again",

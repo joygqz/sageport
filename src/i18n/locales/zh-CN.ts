@@ -228,7 +228,6 @@ export const zhCN: Dictionary = {
 
   terminal: {
     connecting: "安全连接中",
-    timeout: "{seconds}秒超时",
     connectFailed: "连接失败",
     connectCancelled: "连接已取消",
     retry: "重试",

@@ -109,7 +109,7 @@ describe("TerminalSession lifecycle", () => {
     expect(current.disconnect).toHaveBeenCalledTimes(1);
   });
 
-  it("fails and releases the transport after the advertised timeout", async () => {
+  it("fails and releases the transport after the configured timeout", async () => {
     vi.useFakeTimers();
     const current = transport();
     const events: Array<{ status: string; code?: string | null }> = [];

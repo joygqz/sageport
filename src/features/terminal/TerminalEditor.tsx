@@ -56,7 +56,6 @@ import {
 import { terminalFontSize, useZoomStore } from "@/workbench/zoom";
 import { pasteIntoTerminal } from "./paste";
 import { useTerminalSearch } from "./search";
-import { CONNECT_TIMEOUT_MS } from "./session";
 import { focusTerminal, getSession } from "./sessions";
 import { TerminalView } from "./TerminalView";
 import { terminalConnectionTarget } from "./connection-display";
@@ -555,11 +554,6 @@ function StatusOverlay({
             >
               <span className="block h-full w-1/4 -translate-x-full rounded-full bg-link motion-safe:animate-[connection-progress_1.6s_ease-in-out_infinite] motion-reduce:translate-x-full" />
             </div>
-            <p className="mt-2.5 text-2xs leading-relaxed text-muted-foreground">
-              {t("terminal.timeout", {
-                seconds: CONNECT_TIMEOUT_MS / 1_000,
-              })}
-            </p>
           </div>
         </section>
       </Shell>
