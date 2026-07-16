@@ -11,6 +11,7 @@ export {
   noTerminalSessionError,
   resolveTerminalPane,
   sessionNotConnectedError,
+  terminalTargetDisplay,
   terminalReadLineLimit,
 } from "./terminal";
 export { reusableHostSession } from "./hosts";

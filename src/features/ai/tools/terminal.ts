@@ -5,10 +5,12 @@ import { getSession, readTerminalContext } from "@/features/terminal/sessions";
 import { ipc } from "@/lib/ipc";
 import { layoutPaneIds } from "@/workbench/pane-layout";
 import {
+  paneTab,
   targetPaneId,
   terminalPanes,
   terminalTabs,
   useTabsStore,
+  type EditorTab,
   type TerminalPane,
 } from "@/workbench/tabs";
 import {
@@ -37,6 +39,29 @@ export function resolveTerminalPane(requested?: string): TerminalPane | null {
   }
   const id = targetPaneId(state);
   return sessions.find((s) => s.id === id) ?? null;
+}
+
+export interface TerminalTargetDisplay {
+  title: string;
+  paneIndex?: number;
+  paneCount?: number;
+}
+
+export function terminalTargetDisplay(
+  tabs: readonly EditorTab[],
+  sessionId: string,
+): TerminalTargetDisplay | undefined {
+  const tab = paneTab(tabs, sessionId);
+  const pane = tab?.panes.find((item) => item.id === sessionId);
+  if (!tab || !pane) return undefined;
+
+  const ordered = layoutPaneIds(tab.layout);
+  const index = ordered.indexOf(sessionId);
+  return {
+    title: pane.title,
+    paneIndex: ordered.length > 1 && index >= 0 ? index + 1 : undefined,
+    paneCount: ordered.length > 1 ? ordered.length : undefined,
+  };
 }
 
 export function noTerminalSessionError(requested?: string): string {

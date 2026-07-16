@@ -199,6 +199,21 @@ describe("splitPane", () => {
     }
     expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(6);
   });
+
+  it("reuses a vacant local terminal suffix without duplicating titles", () => {
+    const first = useTabsStore.getState().openLocalTerminal()!;
+    const baseTitle = terminalPanes(useTabsStore.getState().tabs)[0]!.title;
+    const second = useTabsStore.getState().splitPane(first, "right")!;
+    const third = useTabsStore.getState().splitPane(second, "right")!;
+    useTabsStore.getState().closePane(second);
+
+    const replacement = useTabsStore.getState().splitPane(third, "down")!;
+    const panes = terminalPanes(useTabsStore.getState().tabs);
+    expect(panes.find((pane) => pane.id === replacement)?.title).toBe(
+      `${baseTitle} 2`,
+    );
+    expect(new Set(panes.map((pane) => pane.title)).size).toBe(panes.length);
+  });
 });
 
 describe("closePane", () => {

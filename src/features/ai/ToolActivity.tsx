@@ -19,12 +19,13 @@ import {
   askUserOptions,
   askUserQuestion,
   selectionResult,
+  terminalTargetDisplay,
   TOOL_CONFIRM_KEYS,
   TOOL_ICONS,
   TOOL_LABEL_KEYS,
   TOOLS_REQUIRING_APPROVAL,
 } from "./tools";
-import { findPane, useTabsStore } from "@/workbench/tabs";
+import { useTabsStore } from "@/workbench/tabs";
 
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
 
@@ -111,9 +112,15 @@ export function ToolActivity({
     : undefined;
   const targetSessionId =
     typeof item.args.sessionId === "string" ? item.args.sessionId : undefined;
-  const targetTitle = useTabsStore((state) =>
-    targetSessionId ? findPane(state.tabs, targetSessionId)?.title : undefined,
+  const target = useTabsStore((state) =>
+    targetSessionId
+      ? terminalTargetDisplay(state.tabs, targetSessionId)
+      : undefined,
   );
+  const targetName =
+    target?.paneIndex && target.paneCount
+      ? `${target.title} · ${target.paneIndex}/${target.paneCount}`
+      : (target?.title ?? targetSessionId ?? "");
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card text-xs">
@@ -143,7 +150,7 @@ export function ToolActivity({
                   <Server className="size-3.5 shrink-0" />
                   <span>
                     {t("ai.commandTarget", {
-                      name: targetTitle ?? targetSessionId,
+                      name: targetName,
                     })}
                   </span>
                 </div>

@@ -22,6 +22,7 @@ import {
   executeTool,
   newOutput,
   reusableHostSession,
+  terminalTargetDisplay,
   terminalReadLineLimit,
 } from "./tools";
 
@@ -168,6 +169,43 @@ describe("reusableHostSession", () => {
 });
 
 describe("terminal output helpers", () => {
+  it("lists split panes separately and marks the focused pane", async () => {
+    const left = terminal("left", "Production");
+    const right = terminal("right", "Production");
+    const split: TerminalTab = {
+      kind: "terminal",
+      id: "tab",
+      panes: [left, right],
+      layout: {
+        type: "split",
+        id: "split",
+        direction: "row",
+        children: [
+          { type: "leaf", paneId: left.id },
+          { type: "leaf", paneId: right.id },
+        ],
+        sizes: [0.5, 0.5],
+      },
+      activePaneId: right.id,
+    };
+    useTabsStore.setState({
+      tabs: [split],
+      activeId: split.id,
+      lastPaneId: right.id,
+    });
+
+    const result = await executeTool("list_terminal_sessions", {});
+    expect(JSON.parse(result.content)).toEqual([
+      expect.objectContaining({ id: left.id, current: false, pane: "1/2" }),
+      expect.objectContaining({ id: right.id, current: true, pane: "2/2" }),
+    ]);
+    expect(terminalTargetDisplay([split], right.id)).toEqual({
+      title: "Production",
+      paneIndex: 2,
+      paneCount: 2,
+    });
+  });
+
   it("returns structured failures instead of inferring status from text", async () => {
     await expect(executeTool("read_terminal_output", {})).resolves.toEqual({
       content: expect.stringContaining("Error: no active terminal session"),

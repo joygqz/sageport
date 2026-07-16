@@ -209,12 +209,15 @@ export function targetPaneId(state: {
 }
 
 function localPaneTitle(tabs: EditorTab[]): string {
-  const count = terminalPanes(tabs).filter(
-    (pane) => pane.target === "local",
-  ).length;
-  return count === 0
-    ? t("terminal.local.title")
-    : `${t("terminal.local.title")} ${count + 1}`;
+  const base = t("terminal.local.title");
+  const titles = terminalPanes(tabs)
+    .filter((pane) => pane.target === "local")
+    .map((pane) => pane.title);
+  let title = base;
+  for (let suffix = 2; titles.includes(title); suffix += 1) {
+    title = `${base} ${suffix}`;
+  }
+  return title;
 }
 
 export const useTabsStore = create<TabsState>((set, get) => {

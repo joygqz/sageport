@@ -325,6 +325,77 @@ describe("runAgentLoop", () => {
     );
   });
 
+  it("keeps an approved command pinned to the pane focused before approval", async () => {
+    useTabsStore.setState({
+      tabs: [
+        {
+          kind: "terminal",
+          id: "split-tab",
+          panes: [
+            {
+              id: "pane-left",
+              target: "ssh",
+              hostId: "host-1",
+              title: "Production",
+              status: "connected",
+              attempt: 0,
+            },
+            {
+              id: "pane-right",
+              target: "ssh",
+              hostId: "host-1",
+              title: "Production",
+              status: "connected",
+              attempt: 0,
+            },
+          ],
+          layout: {
+            type: "split",
+            id: "split",
+            direction: "row",
+            children: [
+              { type: "leaf", paneId: "pane-left" },
+              { type: "leaf", paneId: "pane-right" },
+            ],
+            sizes: [0.5, 0.5],
+          },
+          activePaneId: "pane-left",
+        },
+      ],
+      activeId: "split-tab",
+      lastPaneId: "pane-left",
+    });
+    chat
+      .mockResolvedValueOnce({
+        toolCalls: [
+          {
+            id: "call-1",
+            name: "run_terminal_command",
+            arguments: { command: "uptime" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "Done." });
+    executeTool.mockResolvedValue({ content: "ok", isError: false });
+    const run = harness();
+    run.host.requestApproval = vi.fn(async () => {
+      useTabsStore.getState().focusPane("pane-right");
+      return true;
+    });
+
+    await runAgentLoop(run.host, "session", "model");
+
+    expect(executeTool).toHaveBeenCalledWith(
+      "run_terminal_command",
+      { command: "uptime", sessionId: "pane-left" },
+      expect.any(Object),
+    );
+    const activeTab = useTabsStore.getState().tabs[0];
+    expect(activeTab?.kind === "terminal" && activeTab.activePaneId).toBe(
+      "pane-right",
+    );
+  });
+
   it("rejects an answer that was not offered by ask_user", async () => {
     chat
       .mockResolvedValueOnce({
