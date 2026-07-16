@@ -4,7 +4,7 @@ import { useI18n, type TKey } from "@/i18n";
 import { useBroadcastStore } from "@/features/terminal/broadcast";
 import { THEMES } from "@/themes";
 import { useTheme } from "@/themes/useTheme";
-import { useLayoutStore } from "./layout";
+import { useLayoutStore, type Activity } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
 
@@ -23,6 +23,13 @@ function splitActivePane(direction: "right" | "down") {
   const active = state.tabs.find((tab) => tab.id === state.activeId);
   if (active?.kind === "terminal") {
     state.splitPane(active.activePaneId, direction);
+  }
+}
+
+function showActivity(activity: Activity) {
+  const layout = useLayoutStore.getState();
+  if (layout.activity !== activity || !layout.sidebarVisible) {
+    layout.selectActivity(activity);
   }
 }
 
@@ -105,6 +112,14 @@ export function useCommands(): WorkbenchCommand[] {
         shortcut: ["mod", "L"],
         run: () => layout().toggleAux(),
       },
+      ...(
+        ["hosts", "credentials", "snippets", "forwards", "monitor"] as const
+      ).map((activity) => ({
+        id: `view.${activity}`,
+        categoryKey: "commands.category.view" as TKey,
+        label: t(`activityBar.${activity}`),
+        run: () => showActivity(activity),
+      })),
       {
         id: "tab.close",
         categoryKey: "commands.category.view",
@@ -122,6 +137,12 @@ export function useCommands(): WorkbenchCommand[] {
         shortcut: ["mod", ","],
         run: () => overlays().openSettings(),
       },
+      ...(["appearance", "ai", "sync", "about"] as const).map((section) => ({
+        id: `settings.${section}`,
+        categoryKey: "commands.category.preferences" as TKey,
+        label: t(`settings.nav.${section}`),
+        run: () => overlays().openSettings(section),
+      })),
       ...THEMES.map((theme) => ({
         id: `theme.${theme.id}`,
         categoryKey: "commands.category.theme" as TKey,

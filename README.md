@@ -77,6 +77,8 @@ Sageport brings every tool of routine server work — terminal, file transfer, k
 
 **Interface** — Three theme families (Midnight, Graphite, Dracula), each with light and dark variants and a matching terminal palette, switching automatically with the system if you like; English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘</kbd> <kbd>P</kbd> / <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd>), and automatic updates.
 
+Use <kbd>⌘</kbd> <kbd>1</kbd> through <kbd>⌘</kbd> <kbd>8</kbd> to jump to a session tab, or <kbd>⌘</kbd> <kbd>9</kbd> for the last tab. All major sidebars and settings pages are also available from the command palette.
+
 ## Installation
 
 Download from the [latest release](https://github.com/joygqz/sageport/releases/latest):

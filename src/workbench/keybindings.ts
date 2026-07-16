@@ -25,6 +25,8 @@ export function useKeybindings() {
 
       if (key === "p") {
         run(() => overlays.openPalette(e.shiftKey ? "commands" : "quick"));
+      } else if (/^[1-9]$/.test(key) && !e.shiftKey) {
+        run(() => tabs.activateAt(Number(key) - 1));
       } else if (key === "n" && !e.shiftKey) {
         run(() => overlays.openHostForm());
       } else if (key === ",") {

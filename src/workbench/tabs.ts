@@ -127,6 +127,7 @@ interface TabsState {
   close: (id: string, opts?: { force?: boolean }) => void;
   moveTab: (id: string, toIndex: number) => void;
   setActive: (id: string) => void;
+  activateAt: (index: number) => void;
   activateNext: (direction: 1 | -1) => void;
 
   setTerminalStatus: (
@@ -580,6 +581,13 @@ export const useTabsStore = create<TabsState>((set, get) => {
           lastPaneId: id,
         };
       }),
+
+    activateAt: (index) => {
+      const { tabs, setActive } = get();
+      if (tabs.length === 0 || !Number.isInteger(index) || index < 0) return;
+      const target = index === 8 ? tabs.at(-1) : tabs[index];
+      if (target) setActive(target.id);
+    },
 
     activateNext: (direction) => {
       const { tabs, activeId, setActive } = get();

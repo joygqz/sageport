@@ -308,6 +308,8 @@ export const zhCN: Dictionary = {
     ungrouped: "未分组",
     connect: "连接",
     openSftp: "浏览文件",
+    copySshCommand: "复制 SSH 命令",
+    copySshCommandError: "复制 SSH 命令失败",
     health: {
       check: "检查连接",
       checkAll: "检查所有连接",

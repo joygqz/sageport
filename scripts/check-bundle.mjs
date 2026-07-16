@@ -22,6 +22,7 @@ const INITIAL_JS_BUDGET = 701 * 1024;
 const lazyOnlyPrefixes = [
   "AssistantPanel-",
   "FileEditor-",
+  "HostsView-",
   "SettingsPage-",
   "TerminalEditor-",
   "markdown-",

@@ -15,6 +15,7 @@ export function isWorkbenchShortcut(
   if (!primaryModifier || secondaryModifier || event.altKey) return false;
 
   const key = workbenchShortcutKey(event);
+  if (/^[1-9]$/.test(key)) return !event.shiftKey;
   if (key === "p" || key === "b") return true;
   if (key === "n") return !event.shiftKey;
   if (key === ",") return !event.shiftKey;

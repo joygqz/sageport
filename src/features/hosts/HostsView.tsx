@@ -6,6 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
+  Copy,
   FileInput,
   FolderPlus,
   FolderSync,
@@ -62,6 +63,7 @@ import {
   useSetHostOsHint,
 } from "./api";
 import { HostSystemIcon } from "./HostSystemIcon";
+import { formatSshCommand } from "./ssh-command";
 import { SshConfigImportDialog } from "./SshConfigImportDialog";
 
 const UNGROUPED = "__ungrouped__";
@@ -662,6 +664,15 @@ function HostRow({
     addRemoteTab("right", host);
   };
 
+  const copySshCommand = async () => {
+    try {
+      await navigator.clipboard.writeText(formatSshCommand(host));
+      toast.success(t("common.copied"));
+    } catch (err) {
+      toast.error(t("hosts.copySshCommandError"), errorMessage(err));
+    }
+  };
+
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
     dragRef.current = {
@@ -803,6 +814,9 @@ function HostRow({
           <RefreshCw /> {t("hosts.health.check")}
         </ContextMenuItem>
         <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => void copySshCommand()}>
+          <Copy /> {t("hosts.copySshCommand")}
+        </ContextMenuItem>
         <ContextMenuItem onSelect={onEdit}>
           <Pencil /> {t("common.edit")}
         </ContextMenuItem>

@@ -444,6 +444,29 @@ describe("activateNext", () => {
   });
 });
 
+describe("activateAt", () => {
+  it("activates a tab by position and uses position nine for the last tab", () => {
+    const a = openHost("a");
+    openHost("b");
+    const c = openHost("c");
+
+    useTabsStore.getState().activateAt(0);
+    expect(useTabsStore.getState().activeId).toBe(tabIdOf(a));
+
+    useTabsStore.getState().activateAt(8);
+    expect(useTabsStore.getState().activeId).toBe(tabIdOf(c));
+  });
+
+  it("ignores positions without a corresponding tab", () => {
+    const a = openHost("a");
+    const activeId = tabIdOf(a);
+
+    useTabsStore.getState().activateAt(3);
+    useTabsStore.getState().activateAt(-1);
+    expect(useTabsStore.getState().activeId).toBe(activeId);
+  });
+});
+
 describe("moveTab", () => {
   it("reorders tabs without changing the active tab", () => {
     const a = openHost("a");

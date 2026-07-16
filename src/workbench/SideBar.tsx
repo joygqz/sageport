@@ -1,8 +1,13 @@
 import { lazy, Suspense } from "react";
 
 import { Spinner } from "@/components/ui";
-import { HostsView } from "@/features/hosts/HostsView";
 import { useLayoutStore } from "./layout";
+
+const HostsView = lazy(() =>
+  import("@/features/hosts/HostsView").then((module) => ({
+    default: module.HostsView,
+  })),
+);
 
 const CredentialsView = lazy(() =>
   import("@/features/credentials/CredentialsView").then((module) => ({

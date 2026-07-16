@@ -34,6 +34,8 @@ describe("isWorkbenchShortcut", () => {
       true,
     );
     expect(shortcut(key("+", { shiftKey: true }))).toBe(true);
+    expect(shortcut(key("1"))).toBe(true);
+    expect(shortcut(key("9"))).toBe(true);
   });
 
   it("uses Command on macOS without swallowing terminal Control keys", () => {
@@ -55,6 +57,7 @@ describe("isWorkbenchShortcut", () => {
   it("allows terminal control keys and unsupported modifier variants", () => {
     expect(shortcut(key("c"))).toBe(false);
     expect(shortcut(key("n", { shiftKey: true }))).toBe(false);
+    expect(shortcut(key("1", { shiftKey: true }))).toBe(false);
     expect(shortcut(key("b", { altKey: true }))).toBe(false);
     expect(shortcut(key("b", { ctrlKey: false }))).toBe(false);
   });

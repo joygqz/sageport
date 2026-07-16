@@ -318,6 +318,8 @@ export const en = {
     ungrouped: "Ungrouped",
     connect: "Connect",
     openSftp: "Browse files",
+    copySshCommand: "Copy SSH command",
+    copySshCommandError: "Failed to copy SSH command",
     health: {
       check: "Check connection",
       checkAll: "Check all connections",
