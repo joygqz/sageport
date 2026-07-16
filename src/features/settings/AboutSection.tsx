@@ -21,6 +21,7 @@ import {
   useCanSelfUpdate,
   useUpdateStatus,
 } from "@/features/updates/api";
+import { updateDownloadProgress } from "@/features/updates/progress";
 
 const AUTHOR_NAME = "Quincy Zhang";
 const AUTHOR_URL = "https://github.com/joygqz";
@@ -94,10 +95,7 @@ function UpdateStatusCard({
   canSelfUpdate: boolean | null;
 }) {
   const { t } = useI18n();
-  const progress =
-    state.status === "downloading" && state.total
-      ? Math.min(100, Math.round((state.downloaded / state.total) * 100))
-      : null;
+  const progress = updateDownloadProgress(state);
 
   let title = t("settings.about.update.title");
   let description = t("settings.about.update.idle");
