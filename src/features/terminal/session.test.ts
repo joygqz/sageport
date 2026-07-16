@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TerminalTransport } from "./transport";
 
@@ -28,7 +28,7 @@ vi.mock("./xterm", () => ({
   attachWebglRenderer: vi.fn(),
 }));
 
-import { TerminalSession } from "./session";
+import { CONNECT_TIMEOUT_MS, TerminalSession } from "./session";
 
 function transport(
   overrides: Partial<TerminalTransport> = {},
@@ -57,6 +57,8 @@ beforeEach(() => {
     },
   );
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe("TerminalSession lifecycle", () => {
   it("reports a transport connect failure", async () => {
@@ -105,5 +107,32 @@ describe("TerminalSession lifecycle", () => {
     session.dispose();
 
     expect(current.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails and releases the transport after the advertised timeout", async () => {
+    vi.useFakeTimers();
+    const current = transport();
+    const events: Array<{ status: string; code?: string | null }> = [];
+    const session = new TerminalSession({
+      id: "session-1",
+      connectionKey: "attempt-1",
+      transport: current,
+      fontFamily: "monospace",
+      fontSize: 13,
+      theme: {},
+      watchHostKey: false,
+      imagePaste: false,
+      onStatus: (event) => events.push(event),
+    });
+
+    session.attach({} as HTMLElement);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(events.map((event) => event.status)).toEqual(["connecting"]);
+
+    await vi.advanceTimersByTimeAsync(CONNECT_TIMEOUT_MS);
+
+    expect(events.at(-1)).toEqual({ status: "error", code: "timeout" });
+    expect(current.disconnect).toHaveBeenCalledTimes(1);
+    session.dispose();
   });
 });

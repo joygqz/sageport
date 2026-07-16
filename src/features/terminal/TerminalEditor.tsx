@@ -42,8 +42,9 @@ import {
   FindToggleButton,
   ResizeHandle,
 } from "@/components/ui";
+import { useHosts } from "@/features/hosts/api";
 import { useI18n } from "@/i18n";
-import { isValidRegex } from "@/lib/utils";
+import { cn, isValidRegex } from "@/lib/utils";
 import { useTheme } from "@/themes";
 import { monoFontFamily, useFontStore } from "@/workbench/font";
 import type { PaneLayout } from "@/workbench/pane-layout";
@@ -55,8 +56,10 @@ import {
 import { terminalFontSize, useZoomStore } from "@/workbench/zoom";
 import { pasteIntoTerminal } from "./paste";
 import { useTerminalSearch } from "./search";
+import { CONNECT_TIMEOUT_MS } from "./session";
 import { focusTerminal, getSession } from "./sessions";
 import { TerminalView } from "./TerminalView";
+import { terminalConnectionTarget } from "./connection-display";
 
 async function copyPaneSelection(paneId: string) {
   const term = getSession(paneId)?.term;
@@ -503,14 +506,68 @@ function StatusOverlay({
   onReconnect: () => void;
 }) {
   const { t } = useI18n();
+  const { data: hosts = [] } = useHosts();
 
   if (pane.status === "connecting") {
+    const host = hosts.find((item) => item.id === pane.hostId);
+    const target = terminalConnectionTarget(pane, host);
     return (
-      <Shell>
-        <Loader2 className="size-7 animate-spin text-link" />
-        <p className="text-sm font-medium text-foreground">
-          {t("terminal.connecting", { host: pane.title })}
-        </p>
+      <Shell opaque>
+        <section
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-labelledby={`connection-title-${pane.id}`}
+          className="w-full max-w-[29rem] rounded-xl border border-border/80 bg-card/95 p-4 text-card-foreground shadow-md"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-link ring-1 ring-primary/20">
+              <PlugZap className="size-[18px]" strokeWidth={1.8} />
+              <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-card bg-warning motion-safe:animate-pulse" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2
+                id={`connection-title-${pane.id}`}
+                className="truncate text-base font-semibold tracking-tight text-foreground"
+              >
+                {pane.title}
+              </h2>
+              {target ? (
+                <p
+                  className="mt-0.5 truncate font-mono text-xs text-muted-foreground"
+                  title={target}
+                >
+                  SSH · {target}
+                </p>
+              ) : (
+                <p className="mt-0.5 text-xs text-muted-foreground">SSH</p>
+              )}
+            </div>
+            <span className="hidden rounded-full border border-border/70 bg-muted/70 px-2 py-0.5 text-2xs font-medium text-muted-foreground sm:block">
+              {t("terminal.status.connecting")}
+            </span>
+          </div>
+
+          <div className="mt-3.5">
+            <div className="flex items-center gap-2">
+              <Loader2 className="size-4 shrink-0 animate-spin text-link" />
+              <p className="text-sm font-medium text-foreground">
+                {t("terminal.connecting")}
+              </p>
+            </div>
+            <div
+              className="mt-2.5 h-1 overflow-hidden rounded-full bg-muted"
+              aria-hidden="true"
+            >
+              <span className="block h-full w-1/4 -translate-x-full rounded-full bg-link motion-safe:animate-[connection-progress_1.6s_ease-in-out_infinite] motion-reduce:translate-x-full" />
+            </div>
+            <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+              {t("terminal.timeout", {
+                seconds: CONNECT_TIMEOUT_MS / 1_000,
+              })}
+            </p>
+          </div>
+        </section>
       </Shell>
     );
   }
@@ -558,10 +615,21 @@ function StatusOverlay({
   return null;
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({
+  children,
+  opaque = false,
+}: {
+  children: React.ReactNode;
+  opaque?: boolean;
+}) {
   return (
-    <div className="absolute inset-0 z-10 flex overflow-hidden bg-background/85 backdrop-blur-sm">
-      <div className="m-auto flex flex-col items-center gap-3 p-3">
+    <div
+      className={cn(
+        "absolute inset-0 z-10 overflow-auto",
+        opaque ? "bg-terminal-background" : "bg-background/85 backdrop-blur-sm",
+      )}
+    >
+      <div className="flex min-h-full w-full flex-col items-center justify-center gap-3 p-3">
         {children}
       </div>
     </div>

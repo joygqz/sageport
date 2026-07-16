@@ -248,6 +248,18 @@
   }
 }
 
+@keyframes connection-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  55% {
+    transform: translateX(190%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}
+
 @layer components {
   .ui-checkbox {
     appearance: none;

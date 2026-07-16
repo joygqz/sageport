@@ -11,7 +11,7 @@ import { hasPasswordPrompt, usePasswordPromptStore } from "./password-prompt";
 import type { TerminalStatusUpdate, TerminalTransport } from "./transport";
 import { attachWebglRenderer, createTerminal } from "./xterm";
 
-const CONNECT_TIMEOUT_MS = 45_000;
+export const CONNECT_TIMEOUT_MS = 45_000;
 const COLUMN_RESIZE_DEBOUNCE_MS = 100;
 
 export interface SessionStatusEvent {
