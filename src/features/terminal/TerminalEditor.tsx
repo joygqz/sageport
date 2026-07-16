@@ -579,17 +579,29 @@ function StatusOverlay({
 
   if (pane.status === "closed") {
     return (
-      <Shell>
-        <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <PlugZap className="size-6" />
-        </span>
-        <p className="text-sm font-medium text-foreground">
-          {t("terminal.closed")}
-        </p>
-        <Button size="sm" variant="outline" onClick={onReconnect}>
-          {t("terminal.reconnect")}
-        </Button>
-      </Shell>
+      <ConnectionStatusFrame
+        pane={pane}
+        target={target}
+        icon={
+          <span className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <PlugZap className="size-4" strokeWidth={1.8} />
+          </span>
+        }
+      >
+        <div className="mt-3.5 flex flex-col items-center">
+          <p className="text-sm font-medium text-foreground">
+            {t("terminal.closed")}
+          </p>
+          <Button
+            className="mt-3"
+            size="sm"
+            variant="outline"
+            onClick={onReconnect}
+          >
+            {t("terminal.reconnect")}
+          </Button>
+        </div>
+      </ConnectionStatusFrame>
     );
   }
 
@@ -626,7 +638,7 @@ function ConnectionStatusFrame({
           >
             {pane.title}
           </h2>
-          {target ? (
+          {pane.target === "local" ? null : target ? (
             <p
               className="mt-0.5 max-w-full truncate font-mono text-xs text-muted-foreground"
               title={target}

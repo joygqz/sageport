@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   ArrowRight,
   AudioLines,
+  CircleAlert,
   Database,
   File,
   FileArchive,
@@ -23,7 +24,6 @@ import {
   Folder,
   FolderOpen,
   FolderSymlink,
-  Loader2,
   Lock,
   Package,
   SquarePen,
@@ -41,6 +41,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   EmptyState,
+  LoadingState,
   ScrollArea,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
@@ -303,34 +304,29 @@ export function FileList({
   };
 
   if (tab.loading) {
-    return (
-      <div
-        role="status"
-        className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground"
-      >
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        <span className="text-xs">{t("sftp.loading")}</span>
-      </div>
-    );
+    return <LoadingState label={t("sftp.loading")} fill />;
   }
 
   if (tab.error) {
+    const canReconnect = tab.kind === "remote" && tab.status === "error";
     return (
-      <div className="flex flex-1 items-center justify-center p-4">
-        <div className="flex max-w-sm flex-col items-center gap-3 text-center">
-          {tab.kind === "remote" && <WifiOff className="size-6 text-danger" />}
-          <p className="text-xs text-danger">{tab.error}</p>
-          {tab.kind === "remote" && tab.status === "error" && (
+      <EmptyState
+        fill
+        icon={tab.kind === "remote" ? WifiOff : CircleAlert}
+        iconClassName="border-danger/15 bg-danger/10 text-danger"
+        title={tab.error}
+        action={
+          canReconnect ? (
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               onClick={() => reconnectTab(side, tab.id)}
             >
               {t("terminal.reconnect")}
             </Button>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
     );
   }
 
