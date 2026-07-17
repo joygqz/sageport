@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -112,10 +112,13 @@ export function ToolActivity({
     : undefined;
   const targetSessionId =
     typeof item.args.sessionId === "string" ? item.args.sessionId : undefined;
-  const target = useTabsStore((state) =>
-    targetSessionId
-      ? terminalTargetDisplay(state.tabs, targetSessionId)
-      : undefined,
+  const tabs = useTabsStore((state) => state.tabs);
+  const target = useMemo(
+    () =>
+      targetSessionId
+        ? terminalTargetDisplay(tabs, targetSessionId)
+        : undefined,
+    [tabs, targetSessionId],
   );
   const targetName =
     target?.paneIndex && target.paneCount
