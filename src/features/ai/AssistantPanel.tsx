@@ -413,7 +413,7 @@ export function AssistantPanel({ width }: { width: number }) {
               />
               <div className="flex items-center gap-1.5 border-t border-input px-1.5 py-1.5">
                 <Select
-                  value={model || undefined}
+                  value={model}
                   onValueChange={changeModel}
                   options={models.map((item) => ({
                     value: item,
