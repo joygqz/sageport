@@ -6,6 +6,7 @@ mod domain;
 mod error;
 mod pty;
 mod repository;
+mod secrets;
 mod sftp;
 mod ssh;
 mod sshkey;
@@ -15,7 +16,9 @@ mod update;
 
 use tauri::webview::PageLoadEvent;
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
+use error::{AppError, AppResult};
 use state::AppState;
 #[cfg(test)]
 use state::CancelEntry;
@@ -38,6 +41,37 @@ fn cleanup_orphaned_sessions(state: &AppState) {
     oauth.pending = None;
 }
 
+fn initialize_app(app: &mut tauri::App) -> AppResult<()> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| AppError::Other(format!("cannot locate application data: {error}")))?;
+    let db_path = data_dir.join("sageport.db");
+    let requires_existing_key =
+        tauri::async_runtime::block_on(secrets::database_requires_existing_key(&db_path))?;
+    secrets::initialize(&data_dir, !requires_existing_key)?;
+    let pool = tauri::async_runtime::block_on(db::init(&db_path))?;
+    tauri::async_runtime::block_on(secrets::migrate_plaintext(&pool))?;
+    tauri::async_runtime::block_on(repository::transfer_repo::mark_interrupted(&pool))?;
+    app.manage(AppState::new(pool));
+    Ok(())
+}
+
+fn report_startup_failure(app: &mut tauri::App, error: AppError) {
+    eprintln!("Sageport startup failed: {error}");
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+    let handle = app.handle().clone();
+    app.dialog()
+        .message(format!(
+            "Sageport 无法安全读取本地数据，未对现有数据做任何修改。\n\n如果刚才拒绝了钥匙串访问，请重新打开 Sageport 并选择“允许”或“始终允许”。\n\nSageport could not safely read its local data. No existing data was modified.\n\nIf Keychain access was denied, reopen Sageport and choose Allow or Always Allow.\n\n详细信息 / Details:\n{error}"
+        ))
+        .title("Sageport 启动失败 / Startup failed")
+        .kind(MessageDialogKind::Error)
+        .show(move |_| handle.exit(1));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -48,9 +82,11 @@ pub fn run() {
                 }
             } else if payload.event() == PageLoadEvent::Finished {
                 let handle = webview.app_handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    commands::forwards::start_auto_forwards(&handle).await;
-                });
+                if handle.try_state::<AppState>().is_some() {
+                    tauri::async_runtime::spawn(async move {
+                        commands::forwards::start_auto_forwards(&handle).await;
+                    });
+                }
             }
         })
         .plugin(tauri_plugin_opener::init())
@@ -61,11 +97,10 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let data_dir = app.path().app_data_dir()?;
-            let db_path = data_dir.join("sageport.db");
-            let pool = tauri::async_runtime::block_on(db::init(&db_path))?;
-            tauri::async_runtime::block_on(repository::transfer_repo::mark_interrupted(&pool))?;
-            app.manage(AppState::new(pool));
+            if let Err(error) = initialize_app(app) {
+                report_startup_failure(app, error);
+                return Ok(());
+            }
 
             if let Some(window) = app.get_webview_window("main") {
                 commands::window::preset_traffic_light_inset(&window);
@@ -73,6 +108,7 @@ pub fn run() {
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(update::run_periodic(handle));
+            commands::sync::run_periodic(app.handle().clone());
 
             Ok(())
         })
@@ -83,6 +119,7 @@ pub fn run() {
             commands::groups::groups_delete,
             commands::hosts::hosts_list,
             commands::hosts::hosts_get,
+            commands::hosts::hosts_reveal_password,
             commands::hosts::hosts_create,
             commands::hosts::hosts_update,
             commands::hosts::hosts_set_os_hint,
@@ -90,6 +127,7 @@ pub fn run() {
             commands::hosts::hosts_delete,
             commands::hosts::hosts_check_health,
             commands::identities::identities_list,
+            commands::identities::identities_reveal_password,
             commands::identities::identities_create,
             commands::identities::identities_update,
             commands::identities::identities_delete,

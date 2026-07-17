@@ -15,6 +15,7 @@ import {
   Plus,
   RefreshCw,
   Server,
+  ShieldUser,
   TextCursorInput,
   Trash2,
 } from "lucide-react";
@@ -175,13 +176,18 @@ export function HostsView() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return hosts;
+    const groupNames = new Map(
+      groups.map((group) => [group.id, group.name.toLowerCase()]),
+    );
     return hosts.filter(
       (h) =>
         h.label.toLowerCase().includes(q) ||
         h.address.toLowerCase().includes(q) ||
-        (h.username ?? "").toLowerCase().includes(q),
+        (h.username ?? "").toLowerCase().includes(q) ||
+        (h.notes ?? "").toLowerCase().includes(q) ||
+        (h.groupId ? groupNames.get(h.groupId)?.includes(q) : false),
     );
-  }, [hosts, query]);
+  }, [groups, hosts, query]);
 
   const sections = useMemo(() => {
     const byGroup = new Map<string, Host[]>();
@@ -764,9 +770,21 @@ function HostRow({
             </div>
           </Tooltip>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
-              {host.label}
-            </p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="truncate text-sm font-medium text-foreground">
+                {host.label}
+              </p>
+              {host.requiresApproval && (
+                <Tooltip content={t("hosts.approvalRequired")}>
+                  <span
+                    role="img"
+                    className="flex size-5 shrink-0 items-center justify-center rounded-md bg-warning/15 text-warning"
+                  >
+                    <ShieldUser className="size-3.5" />
+                  </span>
+                </Tooltip>
+              )}
+            </div>
             <p className="truncate font-mono text-2xs text-muted-foreground">
               {host.username ? `${host.username}@` : ""}
               {host.address}

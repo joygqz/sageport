@@ -3,6 +3,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 use crate::domain::{new_id, now, SshKey, SshKeyInput};
 use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
+use crate::secrets;
 use crate::sshkey;
 
 const MAX_NAME_LEN: usize = 255;
@@ -49,15 +50,16 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<SshKey>> {
     )
     .fetch_all(pool)
     .await?;
-    Ok(rows)
+    rows.into_iter().map(secrets::open_key).collect()
 }
 
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<SshKey> {
-    sqlx::query_as::<_, SshKey>("SELECT * FROM keys WHERE id = ? AND deleted_at IS NULL")
+    let key = sqlx::query_as::<_, SshKey>("SELECT * FROM keys WHERE id = ? AND deleted_at IS NULL")
         .bind(id)
         .fetch_optional(pool)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("key {id}")))
+        .ok_or_else(|| AppError::NotFound(format!("key {id}")))?;
+    secrets::open_key(key)
 }
 
 fn with_validated_private_key(
@@ -106,6 +108,14 @@ pub(crate) async fn create_in(
     let input = with_validated_private_key(normalize(input)?, true)?;
     let id = new_id();
     let ts = now();
+    let private_key = secrets::seal_optional(
+        &format!("keys:{id}:private_key"),
+        none_if_empty(input.private_key.as_deref()),
+    )?;
+    let passphrase = secrets::seal_optional(
+        &format!("keys:{id}:passphrase"),
+        none_if_empty(input.passphrase.as_deref()),
+    )?;
     sqlx::query(
         "INSERT INTO keys (id, name, public_key, private_key, passphrase, created_at, updated_at, revision)
          VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
@@ -113,18 +123,19 @@ pub(crate) async fn create_in(
     .bind(&id)
     .bind(&input.name)
     .bind(&input.public_key)
-    .bind(none_if_empty(input.private_key.as_deref()))
-    .bind(none_if_empty(input.passphrase.as_deref()))
+    .bind(private_key)
+    .bind(passphrase)
     .bind(&ts)
     .bind(&ts)
     .execute(&mut *connection)
     .await?;
 
-    sqlx::query_as::<_, SshKey>("SELECT * FROM keys WHERE id = ? AND deleted_at IS NULL")
+    let key = sqlx::query_as::<_, SshKey>("SELECT * FROM keys WHERE id = ? AND deleted_at IS NULL")
         .bind(&id)
         .fetch_optional(&mut *connection)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("key {id}")))
+        .ok_or_else(|| AppError::NotFound(format!("key {id}")))?;
+    secrets::open_key(key)
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResult<SshKey> {
@@ -153,15 +164,23 @@ pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResul
             .await?;
     }
     if input.private_key.is_some() {
+        let private_key = secrets::seal_optional(
+            &format!("keys:{id}:private_key"),
+            none_if_empty(input.private_key.as_deref()),
+        )?;
         sqlx::query("UPDATE keys SET private_key = ? WHERE id = ?")
-            .bind(none_if_empty(input.private_key.as_deref()))
+            .bind(private_key)
             .bind(id)
             .execute(&mut *tx)
             .await?;
     }
     if input.passphrase.is_some() {
+        let passphrase = secrets::seal_optional(
+            &format!("keys:{id}:passphrase"),
+            none_if_empty(input.passphrase.as_deref()),
+        )?;
         sqlx::query("UPDATE keys SET passphrase = ? WHERE id = ?")
-            .bind(none_if_empty(input.passphrase.as_deref()))
+            .bind(passphrase)
             .bind(id)
             .execute(&mut *tx)
             .await?;
@@ -172,7 +191,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: SshKeyInput) -> AppResul
         .await?
         .ok_or_else(|| AppError::NotFound(format!("key {id}")))?;
     tx.commit().await?;
-    Ok(key)
+    secrets::open_key(key)
 }
 
 async fn hosts_using(connection: &mut SqliteConnection, id: &str) -> AppResult<i64> {

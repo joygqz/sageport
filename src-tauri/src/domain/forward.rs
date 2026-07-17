@@ -42,5 +42,6 @@ fn default_bind_host() -> String {
 
 pub mod forward_kind {
     pub const LOCAL: &str = "local";
+    pub const REMOTE: &str = "remote";
     pub const DYNAMIC: &str = "dynamic";
 }

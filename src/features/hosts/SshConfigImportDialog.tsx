@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import {
   Button,
+  CONTROL_CONTAINER_CLASS,
   FormBody,
   FormDialog,
   FormLoading,
@@ -157,7 +158,7 @@ function ImportBody({ onClose }: { onClose: () => void }) {
       <p className="text-sm text-muted-foreground">
         {t("hosts.import.description")}
       </p>
-      <div className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className={cn(CONTROL_CONTAINER_CLASS, "overflow-hidden")}>
         {entries.map((entry, index) => {
           const on = selected.has(entry.alias);
           const disabled = entry.existing || entry.warnings.length > 0;

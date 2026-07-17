@@ -5,6 +5,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 use crate::domain::{auth, new_id, now, Host, HostInput};
 use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
+use crate::secrets;
 use crate::ssh::JUMP_DEPTH_LIMIT;
 
 const MIN_PORT: i64 = 1;
@@ -26,7 +27,6 @@ fn normalize(mut input: HostInput) -> AppResult<HostInput> {
     clean_optional(&mut input.auth_type);
     clean_optional(&mut input.key_id);
     clean_optional(&mut input.os_hint);
-    clean_optional(&mut input.color);
     clean_optional(&mut input.notes);
     clean_optional(&mut input.jump_host_id);
     clean_optional(&mut input.startup_command);
@@ -113,6 +113,8 @@ async fn validate_references(
         let private_key = key
             .ok_or_else(|| AppError::NotFound(format!("key {key_id}")))?
             .0;
+        let private_key =
+            secrets::open_optional(&format!("keys:{key_id}:private_key"), private_key)?;
         if private_key.as_deref().is_none_or(str::is_empty) {
             return Err(AppError::Invalid(
                 "the selected SSH key has no private key".into(),
@@ -156,15 +158,16 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Host>> {
     )
     .fetch_all(pool)
     .await?;
-    Ok(rows)
+    rows.into_iter().map(secrets::open_host).collect()
 }
 
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Host> {
-    sqlx::query_as::<_, Host>("SELECT * FROM hosts WHERE id = ? AND deleted_at IS NULL")
+    let host = sqlx::query_as::<_, Host>("SELECT * FROM hosts WHERE id = ? AND deleted_at IS NULL")
         .bind(id)
         .fetch_optional(pool)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("host {id}")))
+        .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
+    secrets::open_host(host)
 }
 
 pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
@@ -190,11 +193,16 @@ async fn create_normalized_in(
 ) -> AppResult<Host> {
     let id = new_id();
     let ts = now();
+    let password = secrets::seal_optional(
+        &format!("hosts:{id}:password"),
+        none_if_empty(input.password.as_deref()),
+    )?;
     sqlx::query(
         "INSERT INTO hosts
            (id, label, address, port, group_id, identity_id, username, auth_type, key_id,
-            os_hint, color, notes, jump_host_id, startup_command, password, created_at, updated_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+            os_hint, requires_approval, color, notes, jump_host_id, startup_command, password,
+            created_at, updated_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 1)",
     )
     .bind(&id)
     .bind(&input.label)
@@ -206,21 +214,22 @@ async fn create_normalized_in(
     .bind(&input.auth_type)
     .bind(&input.key_id)
     .bind(&input.os_hint)
-    .bind(&input.color)
+    .bind(input.requires_approval)
     .bind(&input.notes)
     .bind(&input.jump_host_id)
     .bind(&input.startup_command)
-    .bind(none_if_empty(input.password.as_deref()))
+    .bind(password)
     .bind(&ts)
     .bind(&ts)
     .execute(&mut *connection)
     .await?;
 
-    sqlx::query_as::<_, Host>("SELECT * FROM hosts WHERE id = ? AND deleted_at IS NULL")
+    let host = sqlx::query_as::<_, Host>("SELECT * FROM hosts WHERE id = ? AND deleted_at IS NULL")
         .bind(&id)
         .fetch_optional(&mut *connection)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("host {id}")))
+        .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
+    secrets::open_host(host)
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<Host> {
@@ -231,7 +240,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
     let affected = sqlx::query(
         "UPDATE hosts SET
            label = ?, address = ?, port = ?, group_id = ?, identity_id = ?, username = ?,
-           auth_type = ?, key_id = ?, os_hint = ?, color = ?, notes = ?,
+           auth_type = ?, key_id = ?, os_hint = ?, requires_approval = ?, color = NULL, notes = ?,
            jump_host_id = ?, startup_command = ?,
            updated_at = ?, revision = revision + 1
          WHERE id = ? AND deleted_at IS NULL",
@@ -245,7 +254,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
     .bind(&input.auth_type)
     .bind(&input.key_id)
     .bind(&input.os_hint)
-    .bind(&input.color)
+    .bind(input.requires_approval)
     .bind(&input.notes)
     .bind(&input.jump_host_id)
     .bind(&input.startup_command)
@@ -259,8 +268,12 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
     }
 
     if input.password.is_some() {
+        let password = secrets::seal_optional(
+            &format!("hosts:{id}:password"),
+            none_if_empty(input.password.as_deref()),
+        )?;
         sqlx::query("UPDATE hosts SET password = ? WHERE id = ?")
-            .bind(none_if_empty(input.password.as_deref()))
+            .bind(password)
             .bind(id)
             .execute(&mut *tx)
             .await?;
@@ -271,7 +284,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
         .await?
         .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
     tx.commit().await?;
-    Ok(host)
+    secrets::open_host(host)
 }
 
 pub async fn move_to_group(
@@ -314,7 +327,7 @@ pub async fn move_to_group(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
     tx.commit().await?;
-    Ok(host)
+    secrets::open_host(host)
 }
 
 pub async fn set_os_hint(pool: &SqlitePool, id: &str, os_hint: String) -> AppResult<Host> {
@@ -446,7 +459,7 @@ mod tests {
             auth_type: Some(auth::AGENT.to_string()),
             key_id: None,
             os_hint: None,
-            color: None,
+            requires_approval: false,
             notes: None,
             jump_host_id: None,
             startup_command: None,
@@ -465,7 +478,7 @@ mod tests {
             auth_type: host.auth_type.clone(),
             key_id: host.key_id.clone(),
             os_hint: host.os_hint.clone(),
-            color: host.color.clone(),
+            requires_approval: host.requires_approval,
             notes: host.notes.clone(),
             jump_host_id: host.jump_host_id.clone(),
             startup_command: host.startup_command.clone(),
@@ -480,6 +493,13 @@ mod tests {
         create_input.auth_type = Some(auth::PASSWORD.to_string());
         create_input.password = Some("secret".to_string());
         let host = create(&pool, create_input).await.unwrap();
+        let stored: String = sqlx::query_scalar("SELECT password FROM hosts WHERE id = ?")
+            .bind(&host.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert!(secrets::is_sealed(&stored));
+        assert_ne!(stored, "secret");
 
         let kept = update(&pool, &host.id, update_input(&host, None))
             .await
@@ -493,6 +513,20 @@ mod tests {
             .await
             .unwrap();
         assert!(cleared.password.is_none());
+    }
+
+    #[tokio::test]
+    async fn approval_requirement_round_trips_through_create_and_update() {
+        let pool = test_pool().await;
+        let mut create_input = input("protected");
+        create_input.requires_approval = true;
+        let host = create(&pool, create_input).await.unwrap();
+        assert!(host.requires_approval);
+
+        let mut update = update_input(&host, None);
+        update.requires_approval = false;
+        let host = super::update(&pool, &host.id, update).await.unwrap();
+        assert!(!host.requires_approval);
     }
 
     #[tokio::test]

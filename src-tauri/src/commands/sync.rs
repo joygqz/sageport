@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Manager, State};
 use tokio::sync::oneshot;
 
 use crate::domain::now;
@@ -72,6 +72,8 @@ pub struct SyncStatus {
 
     pub detail: Option<String>,
     pub last_synced_at: Option<String>,
+    pub auto_sync_in_progress: bool,
+    pub auto_sync_error: Option<String>,
 
     pub oauth_ready: OAuthReady,
 }
@@ -137,11 +139,14 @@ struct S3Settings {
 #[tauri::command]
 pub async fn sync_get_status(state: State<'_, AppState>) -> AppResult<SyncStatus> {
     let conn = load_connection(&state).await?;
+    let runtime = state.sync_runtime.lock();
     Ok(SyncStatus {
         provider: conn.as_ref().map(|c| c.config.kind()),
         detail: conn.as_ref().and_then(|c| c.config.detail()),
         account: conn.as_ref().map(|c| c.account.clone()),
         last_synced_at: conn.and_then(|c| c.last_synced_at),
+        auto_sync_in_progress: runtime.active_operations > 0,
+        auto_sync_error: runtime.last_error.clone(),
         oauth_ready: OAuthReady {
             gist: oauth::GITHUB_CLIENT_ID.is_some_and(|v| !v.is_empty()),
             gdrive: oauth::GOOGLE_CLIENT_ID.is_some_and(|v| !v.is_empty())
@@ -385,14 +390,32 @@ pub async fn sync_disconnect(state: State<'_, AppState>) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn sync_push(state: State<'_, AppState>) -> AppResult<PushOutcome> {
+    run_sync(&state).await
+}
+
+async fn run_sync(state: &AppState) -> AppResult<PushOutcome> {
+    {
+        let mut runtime = state.sync_runtime.lock();
+        runtime.active_operations = runtime.active_operations.saturating_add(1);
+    }
+    let result = sync_push_inner(state).await;
+    {
+        let mut runtime = state.sync_runtime.lock();
+        runtime.active_operations = runtime.active_operations.saturating_sub(1);
+        runtime.last_error = result.as_ref().err().map(ToString::to_string);
+    }
+    result
+}
+
+async fn sync_push_inner(state: &AppState) -> AppResult<PushOutcome> {
     let _operation = state.sync_operation.lock().await;
-    let mut conn = require_connection(&state).await?;
+    let mut conn = require_connection(state).await?;
     let mut backend = sync::make_provider(conn.config.clone())?;
 
     let versions = match backend.list_versions().await {
         Ok(value) => value,
         Err(error) => {
-            save_refreshed_config(&state, &mut conn, backend.config()).await;
+            save_refreshed_config(state, &mut conn, backend.config()).await;
             return Err(error);
         }
     };
@@ -401,14 +424,14 @@ pub async fn sync_push(state: State<'_, AppState>) -> AppResult<PushOutcome> {
         let envelope = match backend.pull_version(&latest.id).await {
             Ok(value) => value,
             Err(error) => {
-                save_refreshed_config(&state, &mut conn, backend.config()).await;
+                save_refreshed_config(state, &mut conn, backend.config()).await;
                 return Err(error);
             }
         };
         let snapshot = match sync::decrypt_snapshot(&envelope, &conn.passphrase).await {
             Ok(value) => value,
             Err(error) => {
-                save_refreshed_config(&state, &mut conn, backend.config()).await;
+                save_refreshed_config(state, &mut conn, backend.config()).await;
                 return Err(error);
             }
         };
@@ -426,7 +449,7 @@ pub async fn sync_push(state: State<'_, AppState>) -> AppResult<PushOutcome> {
             let envelope = match backend.pull_version(&version.id).await {
                 Ok(value) => value,
                 Err(error) => {
-                    save_refreshed_config(&state, &mut conn, backend.config()).await;
+                    save_refreshed_config(state, &mut conn, backend.config()).await;
                     return Err(error);
                 }
             };
@@ -434,7 +457,7 @@ pub async fn sync_push(state: State<'_, AppState>) -> AppResult<PushOutcome> {
                 Ok(snapshot) => sync::import_snapshot(&state.db, &snapshot).await?,
                 Err(error) if is_ignorable_historical_error(&error) => continue,
                 Err(error) => {
-                    save_refreshed_config(&state, &mut conn, backend.config()).await;
+                    save_refreshed_config(state, &mut conn, backend.config()).await;
                     return Err(error);
                 }
             }
@@ -448,7 +471,7 @@ pub async fn sync_push(state: State<'_, AppState>) -> AppResult<PushOutcome> {
     if !unchanged {
         let sealed = sync::encrypt_snapshot(&local, &conn.passphrase).await?;
         if let Err(error) = backend.push(&sealed).await {
-            save_refreshed_config(&state, &mut conn, backend.config()).await;
+            save_refreshed_config(state, &mut conn, backend.config()).await;
             return Err(error);
         }
     }
@@ -458,13 +481,37 @@ pub async fn sync_push(state: State<'_, AppState>) -> AppResult<PushOutcome> {
     conn.seen_version_ids = versions.into_iter().map(|version| version.id).collect();
     conn.seen_versions_initialized = true;
     conn.last_synced_at = Some(now());
-    save_connection(&state, &conn).await?;
+    save_connection(state, &conn).await?;
 
     Ok(if unchanged {
         PushOutcome::Unchanged
     } else {
         PushOutcome::Pushed
     })
+}
+
+pub fn run_periodic(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut retry = std::time::Duration::from_secs(30);
+        tokio::time::sleep(retry).await;
+        loop {
+            let Some(state) = app.try_state::<AppState>() else {
+                return;
+            };
+            let connected = load_connection(&state).await.ok().flatten().is_some();
+            if connected {
+                match run_sync(&state).await {
+                    Ok(_) => retry = std::time::Duration::from_secs(120),
+                    Err(_) => {
+                        retry = (retry * 2).min(std::time::Duration::from_secs(900));
+                    }
+                }
+            } else {
+                retry = std::time::Duration::from_secs(120);
+            }
+            tokio::time::sleep(retry).await;
+        }
+    });
 }
 
 #[tauri::command]

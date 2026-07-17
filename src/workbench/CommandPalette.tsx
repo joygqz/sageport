@@ -3,7 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronRight, Plug, Server } from "lucide-react";
 
 import { DialogOverlay, Input, Kbd } from "@/components/ui";
-import { useHosts } from "@/features/hosts/api";
+import { useGroups, useHosts } from "@/features/hosts/api";
 import {
   formatQuickConnectTarget,
   parseQuickConnect,
@@ -69,6 +69,7 @@ function PaletteBody({
   const listId = useId();
 
   const { data: hosts = [] } = useHosts();
+  const { data: groups = [] } = useGroups();
   const commands = useCommands();
   const openTerminal = useTabsStore((s) => s.openTerminal);
   const openAdhocTerminal = useTabsStore((s) => s.openAdhocTerminal);
@@ -89,12 +90,18 @@ function PaletteBody({
     const sorted = [...hosts].sort((a, b) =>
       (b.lastUsedAt ?? "").localeCompare(a.lastUsedAt ?? ""),
     );
+    const groupNames = new Map(groups.map((group) => [group.id, group.name]));
     const matches: PaletteItem[] = sorted
       .filter(
         (h) =>
           fuzzyPaletteMatch(query, h.label) ||
           fuzzyPaletteMatch(query, h.address) ||
-          fuzzyPaletteMatch(query, h.username ?? ""),
+          fuzzyPaletteMatch(query, h.username ?? "") ||
+          fuzzyPaletteMatch(query, h.notes ?? "") ||
+          fuzzyPaletteMatch(
+            query,
+            h.groupId ? (groupNames.get(h.groupId) ?? "") : "",
+          ),
       )
       .map((host) => ({ type: "host", host }));
     const adhoc = parseQuickConnect(query);
@@ -106,7 +113,7 @@ function PaletteBody({
         matches.push({ type: "command", command });
     }
     return matches;
-  }, [commandMode, query, commands, hosts, t]);
+  }, [commandMode, query, commands, groups, hosts, t]);
   const safeIndex = clampPaletteIndex(index, items.length);
 
   useLayoutEffect(() => {

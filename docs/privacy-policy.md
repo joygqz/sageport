@@ -7,7 +7,7 @@ Sageport is a local-first desktop SSH workbench. This policy explains what data 
 ## 1. Overview
 
 - Sageport does not require an account, and the developer does not operate any backend server.
-- Everything the application produces — hosts, credentials, keys, snippets, AI conversation history, interface settings — is stored in a SQLite database on your own device.
+- Application data — hosts, credentials, keys, snippets, AI conversation history, interface settings, and workspace metadata — is stored locally on your device in SQLite and application-local browser storage.
 - The developer does not collect, receive, or store any usage data. The application contains no analytics, telemetry, or crash-reporting components.
 - Data leaves your device only when you deliberately enable an optional feature such as Sync or the AI assistant, as described below.
 
@@ -16,15 +16,15 @@ Sageport is a local-first desktop SSH workbench. This policy explains what data 
 The following is kept only in the local database and is never sent to the developer:
 
 - Host addresses, groups, and notes
-- Credentials and keys (including private keys and passwords), stored encrypted in the database
-- Terminal scrollback content and session state
+- Credentials and keys (including private keys, passwords, passphrases, AI API keys, and sync-provider credentials), encrypted in the database with AES-256-GCM. The per-installation master key is stored separately by the operating-system credential store (macOS Keychain, Windows Credential Manager, or Linux Secret Service).
+- Terminal workspace metadata used to restore tabs and split layouts. Live SSH connections and terminal scrollback are not restored automatically.
 - SFTP transfer history and path bookmarks
 - Command snippets and port-forwarding rules
 - Command history used for terminal autocomplete
 - AI assistant conversation history
 - Interface preferences (locale, theme, zoom level, etc.)
 
-Uninstalling the application or deleting the local database file removes all of the above.
+The application provides deletion controls for stored records. Operating systems and package managers differ in whether uninstalling also removes application data and the credential-store master key, so users who need complete removal should delete both the application-data directory and Sageport credential-store entry.
 
 ## 3. Servers you connect to directly
 
@@ -48,6 +48,7 @@ The AI assistant requires you to supply your own API key for a third-party servi
 - Your API key, conversation content, and the terminal context necessary to answer your questions are sent directly from your device to the AI provider you configured — not through the developer.
 - How that data is stored, used, or potentially used for model training is governed entirely by your chosen AI provider's own privacy policy, not by this one.
 - AI assistant operations require your explicit confirmation by default. If you explicitly enable Autonomous mode, Sageport automatically approves AI-generated operations; use it only for hosts and tasks you trust.
+- Operations targeting a host marked as requiring approval still require explicit confirmation in Autonomous mode.
 - Conversation history is stored only in the local database; deleting a conversation removes it.
 
 ## 6. Automatic updates

@@ -16,7 +16,7 @@ fn valid_port(port: i64) -> AppResult<u16> {
 async fn build_spec(state: &State<'_, AppState>, forward: &PortForward) -> AppResult<ForwardSpec> {
     if !matches!(
         forward.kind.as_str(),
-        forward_kind::LOCAL | forward_kind::DYNAMIC
+        forward_kind::LOCAL | forward_kind::REMOTE | forward_kind::DYNAMIC
     ) {
         return Err(AppError::Invalid(format!(
             "unknown forward kind: {}",
@@ -25,17 +25,21 @@ async fn build_spec(state: &State<'_, AppState>, forward: &PortForward) -> AppRe
     }
     let host = host_repo::get(&state.db, &forward.host_id).await?;
     let hops = super::ssh::build_hops(state, &host).await?;
-    let (target_host, target_port) = if forward.kind == forward_kind::LOCAL {
+    let (target_host, target_port) = if matches!(
+        forward.kind.as_str(),
+        forward_kind::LOCAL | forward_kind::REMOTE
+    ) {
         let target_host = forward
             .target_host
             .as_deref()
             .map(str::trim)
             .filter(|host| !host.is_empty())
-            .ok_or_else(|| AppError::Invalid("local forward target host is required".into()))?;
-        let target_port =
-            valid_port(forward.target_port.ok_or_else(|| {
-                AppError::Invalid("local forward target port is required".into())
-            })?)?;
+            .ok_or_else(|| AppError::Invalid("forward target host is required".into()))?;
+        let target_port = valid_port(
+            forward
+                .target_port
+                .ok_or_else(|| AppError::Invalid("forward target port is required".into()))?,
+        )?;
         (Some(target_host.to_string()), Some(target_port))
     } else {
         (None, None)

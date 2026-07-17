@@ -18,7 +18,7 @@ import {
   RadioGroup,
   RadioGroupItem,
   Spinner,
-  Switch,
+  SwitchField,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
@@ -486,20 +486,12 @@ function ConnectForm({
               maxLength={4096}
             />
           </Field>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm text-foreground">
-                {t("settings.sync.setup.s3PathStyleLabel")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("settings.sync.setup.s3PathStyleHint")}
-              </p>
-            </div>
-            <Switch
-              checked={s3.pathStyle}
-              onCheckedChange={(v) => setS3({ ...s3, pathStyle: v })}
-            />
-          </div>
+          <SwitchField
+            label={t("settings.sync.setup.s3PathStyleLabel")}
+            description={t("settings.sync.setup.s3PathStyleHint")}
+            checked={s3.pathStyle}
+            onCheckedChange={(v) => setS3({ ...s3, pathStyle: v })}
+          />
         </>
       )}
 

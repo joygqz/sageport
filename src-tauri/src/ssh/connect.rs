@@ -7,7 +7,7 @@ use russh::keys::{decode_secret_key, PrivateKeyWithHashAlg};
 use russh::MethodKind;
 use tauri::{AppHandle, Emitter};
 use tokio::net::TcpStream;
-use tokio::sync::{oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 
 use super::agent;
 use super::agent::AgentAuth;
@@ -66,6 +66,16 @@ pub async fn establish(
     session_id: &str,
     hops: &[Hop],
 ) -> AppResult<SshConnection> {
+    establish_with_forwarded_tcpip(app, prompts, session_id, hops, None).await
+}
+
+pub async fn establish_with_forwarded_tcpip(
+    app: &AppHandle,
+    prompts: &ConnectionPrompts,
+    session_id: &str,
+    hops: &[Hop],
+    forwarded_tcpip: Option<mpsc::Sender<russh::Channel<client::Msg>>>,
+) -> AppResult<SshConnection> {
     if hops.is_empty() {
         return Err(AppError::Invalid("no host to connect to".into()));
     }
@@ -77,7 +87,7 @@ pub async fn establish(
     let mut jumps: Vec<Handle<ClientHandler>> = Vec::new();
     let mut current: Option<Handle<ClientHandler>> = None;
 
-    for hop in hops {
+    for (index, hop) in hops.iter().enumerate() {
         let (host_key_activity, activity_rx) = watch::channel(false);
         let handler = ClientHandler {
             app: app.clone(),
@@ -86,6 +96,9 @@ pub async fn establish(
             host: hop.host.clone(),
             port: hop.port,
             host_key_activity,
+            forwarded_tcpip: (index + 1 == hops.len())
+                .then(|| forwarded_tcpip.clone())
+                .flatten(),
         };
 
         let mut next = match current.take() {

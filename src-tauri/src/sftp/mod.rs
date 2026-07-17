@@ -18,7 +18,7 @@ use crate::error::{AppError, AppResult};
 use crate::ssh::{establish, exec_capture, ConnectionPrompts, Hop, SshConnection};
 
 pub use path::base_name;
-pub use transfer::{transfer, Endpoint};
+pub use transfer::{transfer, Endpoint, TransferRequest};
 
 pub const EVENT_STATUS: &str = "sftp://status";
 pub const EVENT_TRANSFER: &str = "sftp://transfer";

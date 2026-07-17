@@ -18,6 +18,7 @@ import {
   type PaneLayout,
   type SplitDirection,
 } from "./pane-layout";
+import { readWorkspace, writeWorkspace } from "./workspace-state";
 
 function t(
   key: Parameters<typeof translate>[1],
@@ -58,6 +59,7 @@ export interface TerminalPane {
   errorCode?: string | null;
 
   attempt: number;
+  restorePending?: boolean;
 }
 
 export interface TerminalTab {
@@ -221,6 +223,12 @@ function localPaneTitle(tabs: EditorTab[]): string {
   return title;
 }
 
+const restoredWorkspace =
+  typeof localStorage !== "undefined" &&
+  typeof localStorage.getItem === "function"
+    ? readWorkspace(localStorage)
+    : { tabs: [], activeId: null, lastPaneId: null };
+
 export const useTabsStore = create<TabsState>((set, get) => {
   const canOpenSession = () => {
     if (terminalPanes(get().tabs).length < MAX_TERMINAL_SESSIONS) return true;
@@ -305,9 +313,9 @@ export const useTabsStore = create<TabsState>((set, get) => {
   };
 
   return {
-    tabs: [],
-    activeId: null,
-    lastPaneId: null,
+    tabs: restoredWorkspace.tabs,
+    activeId: restoredWorkspace.activeId,
+    lastPaneId: restoredWorkspace.lastPaneId,
     pendingCloseId: null,
     pendingWindowClose: false,
 
@@ -611,6 +619,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
         error: undefined,
         errorCode: undefined,
         attempt: pane.attempt + 1,
+        restorePending: false,
       });
     },
 
@@ -629,3 +638,36 @@ export const useTabsStore = create<TabsState>((set, get) => {
     },
   };
 });
+
+if (
+  typeof localStorage !== "undefined" &&
+  typeof localStorage.setItem === "function"
+) {
+  let previous = "";
+  useTabsStore.subscribe((state) => {
+    const signature = JSON.stringify({
+      tabs: terminalTabs(state.tabs).map((tab) => ({
+        ...tab,
+        panes: tab.panes.map(
+          ({
+            status: _status,
+            error: _error,
+            errorCode: _errorCode,
+            attempt: _attempt,
+            restorePending: _restorePending,
+            ...pane
+          }) => pane,
+        ),
+      })),
+      activeId: state.activeId,
+      lastPaneId: state.lastPaneId,
+    });
+    if (signature === previous) return;
+    try {
+      writeWorkspace(localStorage, state);
+      previous = signature;
+    } catch {
+      // Storage can be disabled or temporarily full; terminal state remains live.
+    }
+  });
+}

@@ -43,6 +43,8 @@ argon2 = "0.5"
 rand = "0.10"
 base64 = "0.22"
 png = "0.17"
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+zeroize = "1"
 
 russh = "0.62.2"
 russh-sftp = "2.3.0"

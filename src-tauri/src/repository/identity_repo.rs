@@ -3,6 +3,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 use crate::domain::{auth, new_id, now, Identity, IdentityInput, SshKey};
 use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
+use crate::secrets;
 
 const MAX_NAME_LEN: usize = 255;
 const MAX_USERNAME_LEN: usize = 255;
@@ -82,6 +83,7 @@ async fn validate_key_reference(
         .fetch_optional(&mut *connection)
         .await?
         .ok_or_else(|| AppError::Invalid("the selected SSH key does not exist".into()))?;
+    let key = secrets::open_key(key)?;
     let private_key = key
         .private_key
         .as_deref()
@@ -102,15 +104,18 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Identity>> {
     )
     .fetch_all(pool)
     .await?;
-    Ok(rows)
+    rows.into_iter().map(secrets::open_identity).collect()
 }
 
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Identity> {
-    sqlx::query_as::<_, Identity>("SELECT * FROM identities WHERE id = ? AND deleted_at IS NULL")
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("identity {id}")))
+    let identity = sqlx::query_as::<_, Identity>(
+        "SELECT * FROM identities WHERE id = ? AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("identity {id}")))?;
+    secrets::open_identity(identity)
 }
 
 pub async fn create(pool: &SqlitePool, input: IdentityInput) -> AppResult<Identity> {
@@ -119,6 +124,10 @@ pub async fn create(pool: &SqlitePool, input: IdentityInput) -> AppResult<Identi
     validate_key_reference(&mut tx, &input).await?;
     let id = new_id();
     let ts = now();
+    let password = secrets::seal_optional(
+        &format!("identities:{id}:password"),
+        none_if_empty(input.password.as_deref()),
+    )?;
     sqlx::query(
         "INSERT INTO identities
            (id, name, username, auth_type, key_id, password, created_at, updated_at, revision)
@@ -129,7 +138,7 @@ pub async fn create(pool: &SqlitePool, input: IdentityInput) -> AppResult<Identi
     .bind(&input.username)
     .bind(&input.auth_type)
     .bind(&input.key_id)
-    .bind(none_if_empty(input.password.as_deref()))
+    .bind(password)
     .bind(&ts)
     .bind(&ts)
     .execute(&mut *tx)
@@ -142,7 +151,7 @@ pub async fn create(pool: &SqlitePool, input: IdentityInput) -> AppResult<Identi
     .await?
     .ok_or_else(|| AppError::NotFound(format!("identity {id}")))?;
     tx.commit().await?;
-    Ok(identity)
+    secrets::open_identity(identity)
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: IdentityInput) -> AppResult<Identity> {
@@ -170,8 +179,12 @@ pub async fn update(pool: &SqlitePool, id: &str, input: IdentityInput) -> AppRes
     }
 
     if input.password.is_some() {
+        let password = secrets::seal_optional(
+            &format!("identities:{id}:password"),
+            none_if_empty(input.password.as_deref()),
+        )?;
         sqlx::query("UPDATE identities SET password = ? WHERE id = ?")
-            .bind(none_if_empty(input.password.as_deref()))
+            .bind(password)
             .bind(id)
             .execute(&mut *tx)
             .await?;
@@ -184,7 +197,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: IdentityInput) -> AppRes
     .await?
     .ok_or_else(|| AppError::NotFound(format!("identity {id}")))?;
     tx.commit().await?;
-    Ok(identity)
+    secrets::open_identity(identity)
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
@@ -341,7 +354,7 @@ mod tests {
                 auth_type: None,
                 key_id: None,
                 os_hint: None,
-                color: None,
+                requires_approval: false,
                 notes: None,
                 jump_host_id: None,
                 startup_command: None,

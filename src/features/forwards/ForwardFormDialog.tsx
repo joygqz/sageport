@@ -7,7 +7,7 @@ import {
   Input,
   SegmentedControl,
   Select,
-  Switch,
+  SwitchField,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
@@ -104,6 +104,7 @@ function ForwardFormBody({
         onChange={setKind}
         options={[
           { value: "local", label: t("forwards.kind.local") },
+          { value: "remote", label: t("forwards.kind.remote") },
           { value: "dynamic", label: t("forwards.kind.dynamic") },
         ]}
       />
@@ -151,7 +152,7 @@ function ForwardFormBody({
         </Field>
       </div>
 
-      {kind === "local" && (
+      {kind !== "dynamic" && (
         <div className="grid grid-cols-[1fr_7rem] gap-3">
           <Field label={t("forwards.targetHost")} required>
             <Input
@@ -172,10 +173,11 @@ function ForwardFormBody({
         </div>
       )}
 
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span>{t("forwards.autoStart")}</span>
-        <Switch checked={autoStart} onCheckedChange={setAutoStart} />
-      </label>
+      <SwitchField
+        label={t("forwards.autoStart")}
+        checked={autoStart}
+        onCheckedChange={setAutoStart}
+      />
     </FormBody>
   );
 }

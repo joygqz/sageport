@@ -26,6 +26,12 @@ pub struct CancelEntry {
     pub sender: Option<oneshot::Sender<()>>,
 }
 
+#[derive(Default)]
+pub struct SyncRuntime {
+    pub active_operations: usize,
+    pub last_error: Option<String>,
+}
+
 pub struct AppState {
     pub db: SqlitePool,
     pub ssh: Arc<SessionManager>,
@@ -53,6 +59,7 @@ pub struct AppState {
     /// Serializes sync mutations so a late push/restore cannot resurrect a
     /// disconnected provider or overwrite freshly refreshed credentials.
     pub sync_operation: tokio::sync::Mutex<()>,
+    pub sync_runtime: Mutex<SyncRuntime>,
 }
 
 impl AppState {
@@ -71,6 +78,7 @@ impl AppState {
             request_generation: AtomicU64::new(0),
             sync_oauth: Mutex::new(SyncOAuthSlot::default()),
             sync_operation: tokio::sync::Mutex::new(()),
+            sync_runtime: Mutex::new(SyncRuntime::default()),
         }
     }
 

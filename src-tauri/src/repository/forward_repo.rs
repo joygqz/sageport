@@ -40,12 +40,12 @@ fn normalize(mut input: PortForwardInput) -> AppResult<PortForwardInput> {
         ));
     }
     match input.kind.as_str() {
-        forward_kind::LOCAL => {
+        forward_kind::LOCAL | forward_kind::REMOTE => {
             if input.target_host.is_none()
                 || !input.target_port.is_some_and(|p| (1..=65535).contains(&p))
             {
                 return Err(AppError::Invalid(
-                    "local forwards need a target host and port".into(),
+                    "local and remote forwards need a target host and port".into(),
                 ));
             }
             if input
@@ -235,7 +235,7 @@ mod tests {
                 auth_type: Some(auth::AGENT.into()),
                 key_id: None,
                 os_hint: None,
-                color: None,
+                requires_approval: false,
                 notes: None,
                 jump_host_id: None,
                 startup_command: None,
@@ -276,6 +276,10 @@ mod tests {
         let dynamic = normalize(dynamic).unwrap();
         assert!(dynamic.target_host.is_none());
         assert!(dynamic.target_port.is_none());
+
+        let remote = normalize(input("host".into(), forward_kind::REMOTE)).unwrap();
+        assert_eq!(remote.target_host.as_deref(), Some("db.internal"));
+        assert_eq!(remote.target_port, Some(5432));
     }
 
     #[tokio::test]

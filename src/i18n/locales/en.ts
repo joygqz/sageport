@@ -110,14 +110,15 @@ export const en = {
     labelPlaceholder: "Database tunnel",
     host: "Host",
     selectHost: "Select a host",
-    bindHost: "Local address",
-    bindPort: "Local port",
+    bindHost: "Listen address",
+    bindPort: "Listen port",
     targetHost: "Target host",
     targetHostPlaceholder: "localhost",
     targetPort: "Target port",
     autoStart: "Start automatically on launch",
     kind: {
       local: "Local (-L)",
+      remote: "Remote (-R)",
       dynamic: "Dynamic SOCKS (-D)",
     },
     empty: {
@@ -133,7 +134,7 @@ export const en = {
       editTitle: "Edit port forward",
       required: "A name and host are required",
       invalidBindPort: "Local port must be between 1 and 65535",
-      targetRequired: "A target host is required for local forwarding",
+      targetRequired: "A target host is required for this forwarding mode",
       invalidTargetPort: "Target port must be between 1 and 65535",
       saveError: "Failed to save port forward",
     },
@@ -223,6 +224,8 @@ export const en = {
     syncOn: "Sync on",
     syncOff: "Sync off",
     lastSynced: "Last synced {time}",
+    syncPending: "Syncing…",
+    syncError: "Sync needs attention: {error}",
     updateAvailable: "Update available",
     updateReady: "Restart to update",
     broadcast: "Broadcasting input",
@@ -236,6 +239,7 @@ export const en = {
     connectCancelled: "Connection cancelled",
     retry: "Try again",
     closed: "Session ended",
+    restored: "Session restored — reconnect when ready",
     reconnect: "Reconnect",
     local: {
       title: "Local",
@@ -280,6 +284,8 @@ export const en = {
     newHost: "New host",
     newGroup: "New group",
     noMatches: "No matching hosts",
+    approvalRequired:
+      "Sensitive AI operations on this host require manual approval",
     import: {
       action: "Import from SSH config",
       title: "Import from SSH config",
@@ -379,6 +385,7 @@ export const en = {
     passwordKeepHint: "Leave blank to keep the current password.",
     passwordClear: "Clear saved password",
     passwordClearUndo: "Undo password removal",
+    passwordRevealError: "Failed to reveal the saved password",
     passwordWillClear:
       "The saved password will be removed. You can enter it when connecting.",
     sshKey: "SSH key",
@@ -393,6 +400,10 @@ export const en = {
     startupCommandHint: "Runs automatically each time the session opens.",
     notes: "Notes",
     notesPlaceholder: "Optional notes about this host",
+    approval: "Approval protection",
+    approvalHint:
+      "When enabled, sensitive AI operations on this host always require manual approval.",
+    approvalToggle: "Require manual approval",
     create: "Create host",
     saveError: "Failed to save host",
   },
@@ -494,6 +505,7 @@ export const en = {
       passwordKeepHint: "Leave blank to keep the current password.",
       passwordClear: "Clear saved password",
       passwordClearUndo: "Undo password removal",
+      passwordRevealError: "Failed to reveal the saved password",
       passwordWillClear:
         "The saved password will be removed. You can enter it when connecting.",
       sshKey: "SSH key",
@@ -607,6 +619,14 @@ export const en = {
     deleteError: "Failed to delete",
     transferError: "Failed to start transfer",
     transferFailed: "Transfer failed",
+    conflict: {
+      title: "A file already exists",
+      description: "{name} already exists at the destination.",
+      skip: "Skip",
+      keepBoth: "Keep both",
+      overwrite: "Replace",
+      applyToRemaining: "Apply to the remaining {count} conflicts",
+    },
     connectionLost:
       "The remote connection was interrupted. Check your network and reconnect.",
     notConnected: "Connect before transferring files",
@@ -646,6 +666,8 @@ export const en = {
         "This will clear all transfer history. This action cannot be undone.",
       clearError: "Failed to clear transfer history",
       loadError: "Failed to load transfer history",
+      retry: "Retry transfer",
+      retryError: "Failed to retry transfer",
       status: {
         active: "In progress",
         done: "Done",

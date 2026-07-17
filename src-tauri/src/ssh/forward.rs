@@ -8,11 +8,11 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio::time::{Instant, MissedTickBehavior};
 
-use super::connect::{establish, SshConnection};
+use super::connect::{establish, establish_with_forwarded_tcpip, SshConnection};
 use super::{ConnectionPrompts, Hop};
 use crate::error::{AppError, AppResult};
 
@@ -26,6 +26,7 @@ const MAX_FORWARD_CONNECTIONS: usize = 256;
 
 pub mod kind {
     pub const DYNAMIC: &str = "dynamic";
+    pub const REMOTE: &str = "remote";
 }
 
 #[derive(Clone)]
@@ -287,6 +288,21 @@ async fn run_forward(
     runtime: Arc<Mutex<HashMap<String, StatusEvent>>>,
     next_sequence: Arc<AtomicU64>,
 ) {
+    if spec.kind == kind::REMOTE {
+        run_remote_forward(
+            app,
+            prompts,
+            spec,
+            generation,
+            shutdown,
+            ready,
+            runtime,
+            next_sequence,
+        )
+        .await;
+        return;
+    }
+
     let bind = tokio::select! {
         result = tokio::time::timeout(
             BIND_TIMEOUT,
@@ -302,10 +318,7 @@ async fn run_forward(
         _ = shutdown.changed() => Err(AppError::Cancelled),
     };
     let listener = match bind {
-        Ok(listener) => {
-            let _ = ready.send(Ok(()));
-            listener
-        }
+        Ok(listener) => listener,
         Err(error) => {
             let status = if matches!(error, AppError::Cancelled) {
                 "stopped"
@@ -339,6 +352,7 @@ async fn run_forward(
                     "error",
                     Some(&error),
                 );
+                let _ = ready.send(Err(error));
                 return;
             }
         },
@@ -352,10 +366,12 @@ async fn run_forward(
                 "stopped",
                 None,
             );
+            let _ = ready.send(Err(AppError::Cancelled));
             return;
         }
     };
 
+    let _ = ready.send(Ok(()));
     emit(
         &app,
         &runtime,
@@ -401,6 +417,191 @@ async fn run_forward(
         }
     };
 
+    connections.shutdown().await;
+    match terminal_error {
+        Some(error) => emit(
+            &app,
+            &runtime,
+            &next_sequence,
+            &spec.id,
+            generation,
+            "error",
+            Some(&error),
+        ),
+        None => emit(
+            &app,
+            &runtime,
+            &next_sequence,
+            &spec.id,
+            generation,
+            "stopped",
+            None,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_remote_forward(
+    app: AppHandle,
+    prompts: ConnectionPrompts,
+    spec: ForwardSpec,
+    generation: u64,
+    mut shutdown: watch::Receiver<bool>,
+    ready: oneshot::Sender<AppResult<()>>,
+    runtime: Arc<Mutex<HashMap<String, StatusEvent>>>,
+    next_sequence: Arc<AtomicU64>,
+) {
+    let (forwarded_tx, mut forwarded_rx) = mpsc::channel(MAX_FORWARD_CONNECTIONS);
+    let conn = tokio::select! {
+        result = establish_with_forwarded_tcpip(
+            &app,
+            &prompts,
+            &spec.id,
+            &spec.hops,
+            Some(forwarded_tx),
+        ) => match result {
+            Ok(conn) => Arc::new(conn),
+            Err(error) => {
+                emit(&app, &runtime, &next_sequence, &spec.id, generation, "error", Some(&error));
+                let _ = ready.send(Err(error));
+                return;
+            }
+        },
+        _ = shutdown.changed() => {
+            emit(&app, &runtime, &next_sequence, &spec.id, generation, "stopped", None);
+            let _ = ready.send(Err(AppError::Cancelled));
+            return;
+        }
+    };
+
+    let registered = tokio::select! {
+        result = tokio::time::timeout(
+            CHANNEL_OPEN_TIMEOUT,
+            conn.handle.tcpip_forward(spec.bind_host.clone(), spec.bind_port as u32),
+        ) => match result {
+            Ok(Ok(_)) => Ok(()),
+            Ok(Err(error)) => Err(AppError::Ssh(error)),
+            Err(_) => Err(AppError::Timeout(format!(
+                "requesting remote bind {}:{} timed out",
+                spec.bind_host, spec.bind_port
+            ))),
+        },
+        _ = shutdown.changed() => Err(AppError::Cancelled),
+    };
+    if let Err(error) = registered {
+        let status = if matches!(error, AppError::Cancelled) {
+            "stopped"
+        } else {
+            "error"
+        };
+        emit(
+            &app,
+            &runtime,
+            &next_sequence,
+            &spec.id,
+            generation,
+            status,
+            (status == "error").then_some(&error),
+        );
+        let _ = ready.send(Err(error));
+        return;
+    }
+
+    let _ = ready.send(Ok(()));
+    emit(
+        &app,
+        &runtime,
+        &next_sequence,
+        &spec.id,
+        generation,
+        "active",
+        None,
+    );
+
+    let target_host = match spec.target_host.clone() {
+        Some(host) => host,
+        None => {
+            let error = AppError::Invalid("missing remote forward target host".into());
+            emit(
+                &app,
+                &runtime,
+                &next_sequence,
+                &spec.id,
+                generation,
+                "error",
+                Some(&error),
+            );
+            return;
+        }
+    };
+    let target_port = match spec.target_port {
+        Some(port) => port,
+        None => {
+            let error = AppError::Invalid("missing remote forward target port".into());
+            emit(
+                &app,
+                &runtime,
+                &next_sequence,
+                &spec.id,
+                generation,
+                "error",
+                Some(&error),
+            );
+            return;
+        }
+    };
+
+    let mut connections = JoinSet::new();
+    let mut connection_check = tokio::time::interval_at(
+        Instant::now() + CONNECTION_CHECK_INTERVAL,
+        CONNECTION_CHECK_INTERVAL,
+    );
+    connection_check.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    let terminal_error = loop {
+        tokio::select! {
+            channel = forwarded_rx.recv(), if connections.len() < MAX_FORWARD_CONNECTIONS => {
+                let Some(channel) = channel else {
+                    break Some(AppError::Network("remote forwarding channel was closed".into()));
+                };
+                let host = target_host.clone();
+                let mut child = shutdown.clone();
+                connections.spawn(async move {
+                    let mut local = tokio::select! {
+                        result = tokio::time::timeout(CHANNEL_OPEN_TIMEOUT, TcpStream::connect((host.as_str(), target_port))) => {
+                            result.map_err(|_| AppError::Timeout("connecting remote forward target timed out".into()))??
+                        }
+                        _ = child.changed() => return Ok::<(), AppError>(()),
+                    };
+                    let mut remote = channel.into_stream();
+                    tokio::select! {
+                        result = tokio::io::copy_bidirectional(&mut local, &mut remote) => {
+                            result?;
+                            Ok::<(), AppError>(())
+                        }
+                        _ = child.changed() => Ok(()),
+                    }
+                });
+            }
+            _ = shutdown.changed() => break None,
+            _ = connection_check.tick() => {
+                if conn.handle.is_closed() {
+                    break Some(AppError::Network("SSH connection for remote port forward was closed".into()));
+                }
+            }
+            result = connections.join_next(), if !connections.is_empty() => {
+                if let Some(Err(error)) = result {
+                    break Some(AppError::Other(format!("remote forward connection task failed: {error}")));
+                }
+            }
+        }
+    };
+
+    let _ = tokio::time::timeout(
+        CHANNEL_OPEN_TIMEOUT,
+        conn.handle
+            .cancel_tcpip_forward(spec.bind_host.clone(), spec.bind_port as u32),
+    )
+    .await;
     connections.shutdown().await;
     match terminal_error {
         Some(error) => emit(

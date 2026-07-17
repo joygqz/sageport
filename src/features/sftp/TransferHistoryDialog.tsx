@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { History, HardDrive, Server, Trash2 } from "lucide-react";
+import { History, HardDrive, RotateCcw, Server, Trash2 } from "lucide-react";
 
 import {
   Badge,
@@ -21,6 +21,7 @@ import type { TransferStatus } from "@/types/models";
 import {
   useClearTransferHistory,
   useDeleteTransferHistory,
+  useRetryTransfer,
   useTransferHistory,
 } from "./api";
 
@@ -45,6 +46,7 @@ export function TransferHistoryDialog({
   const { data: entries, isLoading, isError } = useTransferHistory(open);
   const deleteOne = useDeleteTransferHistory();
   const clearAll = useClearTransferHistory();
+  const retryTransfer = useRetryTransfer();
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const onClear = async () => {
@@ -60,6 +62,14 @@ export function TransferHistoryDialog({
       await deleteOne.mutateAsync(id);
     } catch (err) {
       toast.error(t("sftp.history.clearError"), errorMessage(err));
+    }
+  };
+
+  const onRetry = async (entry: NonNullable<typeof entries>[number]) => {
+    try {
+      await retryTransfer.mutateAsync(entry);
+    } catch (err) {
+      toast.error(t("sftp.history.retryError"), errorMessage(err));
     }
   };
 
@@ -169,6 +179,22 @@ export function TransferHistoryDialog({
                         {e.message && ` · ${e.message}`}
                       </span>
                     </div>
+                    {(e.status === "error" || e.status === "cancelled") && (
+                      <Tooltip content={t("sftp.history.retry")}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 shrink-0"
+                          loading={
+                            retryTransfer.isPending &&
+                            retryTransfer.variables?.id === e.id
+                          }
+                          onClick={() => void onRetry(e)}
+                        >
+                          <RotateCcw className="size-3.5" />
+                        </Button>
+                      </Tooltip>
+                    )}
                     <Tooltip content={t("common.delete")}>
                       <Button
                         size="icon"

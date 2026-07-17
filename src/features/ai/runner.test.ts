@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { chat, modelLimits, executeTool } = vi.hoisted(() => ({
+const { chat, modelLimits, executeTool, listHosts } = vi.hoisted(() => ({
   chat: vi.fn(),
   modelLimits: vi.fn(),
   executeTool: vi.fn(),
+  listHosts: vi.fn(),
 }));
 
 vi.mock("@/lib/ipc", () => ({
   ipc: {
     ai: { chat, modelLimits },
     groups: { list: vi.fn() },
-    hosts: { get: vi.fn(), list: vi.fn() },
+    hosts: { get: vi.fn(), list: listHosts },
   },
 }));
 
@@ -66,6 +67,8 @@ beforeEach(() => {
   chat.mockReset();
   modelLimits.mockReset();
   executeTool.mockReset();
+  listHosts.mockReset();
+  listHosts.mockResolvedValue([]);
   modelLimits.mockResolvedValue({
     contextWindow: 128_000,
     maxOutputTokens: 16_000,
@@ -322,6 +325,98 @@ describe("runAgentLoop", () => {
         toolCallId: "call-1",
         status: "done",
       }),
+    );
+  });
+
+  it("still requests approval for protected hosts in autonomous mode", async () => {
+    useTabsStore.setState({
+      tabs: [
+        {
+          kind: "terminal",
+          id: "terminal-1",
+          panes: [
+            {
+              id: "terminal-1",
+              target: "ssh",
+              hostId: "host-1",
+              title: "Protected host",
+              status: "connected",
+              attempt: 0,
+            },
+          ],
+          layout: { type: "leaf", paneId: "terminal-1" },
+          activePaneId: "terminal-1",
+        },
+      ],
+      activeId: "terminal-1",
+      lastPaneId: "terminal-1",
+    });
+    listHosts.mockResolvedValue([{ id: "host-1", requiresApproval: true }]);
+    chat
+      .mockResolvedValueOnce({
+        toolCalls: [
+          {
+            id: "call-protected",
+            name: "run_terminal_command",
+            arguments: { command: "uptime" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "Approval was required." });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model", true);
+
+    expect(run.host.requestApproval).toHaveBeenCalledTimes(1);
+    expect(executeTool).not.toHaveBeenCalled();
+  });
+
+  it("does not apply host approval protection to unrelated operations", async () => {
+    useTabsStore.setState({
+      tabs: [
+        {
+          kind: "terminal",
+          id: "terminal-1",
+          panes: [
+            {
+              id: "terminal-1",
+              target: "ssh",
+              hostId: "host-1",
+              title: "Protected host",
+              status: "connected",
+              attempt: 0,
+            },
+          ],
+          layout: { type: "leaf", paneId: "terminal-1" },
+          activePaneId: "terminal-1",
+        },
+      ],
+      activeId: "terminal-1",
+      lastPaneId: "terminal-1",
+    });
+    listHosts.mockResolvedValue([{ id: "host-1", requiresApproval: true }]);
+    chat
+      .mockResolvedValueOnce({
+        toolCalls: [
+          {
+            id: "call-delete-snippet",
+            name: "delete_snippet",
+            arguments: { id: "snippet-1" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "Done." });
+    executeTool.mockResolvedValue({ content: "Deleted.", isError: false });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model", true, ["delete_snippet"]);
+
+    expect(run.host.requestApproval).not.toHaveBeenCalled();
+    expect(listHosts).not.toHaveBeenCalled();
+    expect(executeTool).toHaveBeenCalledWith(
+      "delete_snippet",
+      { id: "snippet-1" },
+      expect.any(Object),
     );
   });
 

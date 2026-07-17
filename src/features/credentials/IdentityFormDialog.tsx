@@ -10,6 +10,7 @@ import {
   Select,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import type { AuthType, Identity } from "@/types/models";
 import { useCreateIdentity, useSshKeys, useUpdateIdentity } from "./api";
@@ -35,7 +36,11 @@ export function IdentityFormDialog({
           : t("credentials.identities.newTitle")
       }
     >
-      <IdentityFormBody identity={identity} onClose={onClose} />
+      <IdentityFormBody
+        key={identity?.id ?? "new"}
+        identity={identity}
+        onClose={onClose}
+      />
     </FormDialog>
   );
 }
@@ -58,10 +63,27 @@ function IdentityFormBody({
     identity?.authType ?? "password",
   );
   const [password, setPassword] = useState("");
+  const [passwordEdited, setPasswordEdited] = useState(false);
   const [clearSavedPassword, setClearSavedPassword] = useState(false);
   const [keyId, setKeyId] = useState(identity?.keyId ?? "");
 
   const editing = Boolean(identity);
+
+  const revealSavedPassword = async () => {
+    if (password) return true;
+    if (!identity?.hasPassword) return true;
+    try {
+      setPassword(await ipc.identities.revealPassword(identity.id));
+      setPasswordEdited(false);
+      return true;
+    } catch (error) {
+      toast.error(
+        t("credentials.identities.passwordRevealError"),
+        errorMessage(error),
+      );
+      return false;
+    }
+  };
 
   const submit = async () => {
     if (!name.trim() || !username.trim()) {
@@ -78,7 +100,7 @@ function IdentityFormBody({
 
       password: identityPasswordSubmissionValue({
         authType,
-        value: password,
+        value: identity && !passwordEdited ? "" : password,
         clearSavedPassword,
       }),
     };
@@ -147,11 +169,15 @@ function IdentityFormBody({
               value={password}
               onChange={(event) => {
                 setPassword(event.target.value);
+                setPasswordEdited(true);
                 if (event.target.value) setClearSavedPassword(false);
               }}
               placeholder="••••••••"
               disabled={clearSavedPassword}
               autoComplete="new-password"
+              onBeforeReveal={
+                identity?.hasPassword ? revealSavedPassword : undefined
+              }
             />
           </Field>
           {identity?.hasPassword && (
@@ -160,7 +186,11 @@ function IdentityFormBody({
               size="sm"
               variant="ghost"
               className="h-auto px-0 py-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={() => setClearSavedPassword((value) => !value)}
+              onClick={() => {
+                if (!clearSavedPassword) setPassword("");
+                setPasswordEdited(false);
+                setClearSavedPassword((value) => !value);
+              }}
             >
               {clearSavedPassword
                 ? t("credentials.identities.passwordClearUndo")

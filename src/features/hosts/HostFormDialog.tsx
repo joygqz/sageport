@@ -12,6 +12,7 @@ import {
   Input,
   PasswordInput,
   Select,
+  SwitchField,
   Textarea,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
@@ -41,6 +42,7 @@ interface FormValues {
   jumpHostId: string;
   startupCommand: string;
   notes: string;
+  requiresApproval: boolean;
 }
 
 const emptyValues: FormValues = {
@@ -56,6 +58,7 @@ const emptyValues: FormValues = {
   jumpHostId: "",
   startupCommand: "",
   notes: "",
+  requiresApproval: false,
 };
 
 export function HostFormDialog({
@@ -75,7 +78,7 @@ export function HostFormDialog({
       width="w-[560px]"
       title={hostId ? t("hostForm.editTitle") : t("hostForm.newTitle")}
     >
-      <HostFormBody hostId={hostId} onClose={onClose} />
+      <HostFormBody key={hostId ?? "new"} hostId={hostId} onClose={onClose} />
     </FormDialog>
   );
 }
@@ -114,9 +117,12 @@ function HostFormBody({
     handleSubmit,
     reset,
     resetField,
+    getValues,
+    setValue,
     watch,
     formState: { errors },
   } = useForm<FormValues>({ defaultValues: emptyValues });
+  const [passwordEdited, setPasswordEdited] = useState(false);
 
   useEffect(() => {
     if (!hostId) return;
@@ -135,14 +141,30 @@ function HostFormBody({
         jumpHostId: host.jumpHostId ?? "",
         startupCommand: host.startupCommand ?? "",
         notes: host.notes ?? "",
+        requiresApproval: host.requiresApproval,
       });
       setClearSavedPassword(false);
+      setPasswordEdited(false);
     }
   }, [host, hostId, identitiesLoading, keysLoading, reset]);
 
   const authType = watch("authType");
   const identityId = watch("identityId");
   const useIdentity = Boolean(identityId);
+
+  const revealSavedPassword = async () => {
+    if (getValues("password")) return true;
+    if (!hostId || !host?.hasPassword) return true;
+    try {
+      const password = await ipc.hosts.revealPassword(hostId);
+      setValue("password", password, { shouldDirty: false });
+      setPasswordEdited(false);
+      return true;
+    } catch (error) {
+      toast.error(t("hostForm.passwordRevealError"), errorMessage(error));
+      return false;
+    }
+  };
 
   const onSubmit = handleSubmit(async (values) => {
     const base = {
@@ -154,6 +176,7 @@ function HostFormBody({
       osHint: host?.osHint ?? null,
       startupCommand: values.startupCommand.trim() || null,
       notes: values.notes.trim() || null,
+      requiresApproval: values.requiresApproval,
     };
 
     const input: HostInput = values.identityId
@@ -173,7 +196,7 @@ function HostFormBody({
 
           password: passwordSubmissionValue({
             authType: values.authType,
-            value: values.password,
+            value: hostId && !passwordEdited ? "" : values.password,
             clearSavedPassword,
           }),
         };
@@ -360,9 +383,13 @@ function HostFormBody({
               placeholder="••••••••"
               autoComplete="new-password"
               disabled={clearSavedPassword}
+              onBeforeReveal={
+                host?.hasPassword ? revealSavedPassword : undefined
+              }
               {...register("password", {
                 onChange: (event) => {
                   if (event.target.value) setClearSavedPassword(false);
+                  setPasswordEdited(true);
                 },
               })}
             />
@@ -373,7 +400,11 @@ function HostFormBody({
               size="sm"
               variant="ghost"
               className="h-auto px-0 py-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={() => setClearSavedPassword((value) => !value)}
+              onClick={() => {
+                if (!clearSavedPassword) resetField("password");
+                setPasswordEdited(false);
+                setClearSavedPassword((value) => !value);
+              }}
             >
               {clearSavedPassword
                 ? t("hostForm.passwordClearUndo")
@@ -454,6 +485,20 @@ function HostFormBody({
           {...register("notes")}
         />
       </Field>
+
+      <Controller
+        control={control}
+        name="requiresApproval"
+        render={({ field }) => (
+          <SwitchField
+            fieldLabel={t("hostForm.approval")}
+            label={t("hostForm.approvalToggle")}
+            description={t("hostForm.approvalHint")}
+            checked={field.value}
+            onCheckedChange={field.onChange}
+          />
+        )}
+      />
     </FormBody>
   );
 }

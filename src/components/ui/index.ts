@@ -15,6 +15,7 @@ export * from "./context-menu";
 export * from "./tooltip";
 export * from "./scroll-area";
 export * from "./switch";
+export * from "./switch-field";
 export * from "./separator";
 export * from "./badge";
 export * from "./spinner";

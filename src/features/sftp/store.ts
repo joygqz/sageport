@@ -81,9 +81,16 @@ interface SftpState {
   transfers: Record<string, ActiveTransfer>;
 
   showHidden: boolean;
+  pendingConflict: {
+    name: string;
+    remaining: number;
+    applyToRemaining: boolean;
+  } | null;
 
   setRatio: (r: number) => void;
   toggleHidden: () => void;
+  setConflictApplyToRemaining: (value: boolean) => void;
+  resolveConflict: (decision: ConflictAction) => void;
 
   ensureLocalTab: (side: PaneSide) => Promise<void>;
   addLocalTab: (side: PaneSide) => Promise<void>;
@@ -119,6 +126,23 @@ interface SftpState {
 
 const otherSide = (side: PaneSide): PaneSide =>
   side === "left" ? "right" : "left";
+
+type ConflictAction = "skip" | "rename" | "overwrite";
+type ConflictDecision = { action: ConflictAction; applyToRemaining: boolean };
+
+let conflictResolver: ((decision: ConflictDecision) => void) | null = null;
+
+function uniqueCopyName(name: string, occupied: Set<string>): string {
+  const dot = name.lastIndexOf(".");
+  const hasExtension = dot > 0;
+  const stem = hasExtension ? name.slice(0, dot) : name;
+  const extension = hasExtension ? name.slice(dot) : "";
+  for (let index = 2; index < 10_000; index += 1) {
+    const candidate = `${stem} (${index})${extension}`;
+    if (!occupied.has(candidate)) return candidate;
+  }
+  return `${stem} (${crypto.randomUUID()})${extension}`;
+}
 
 export function parentPath(path: string): string {
   const root =
@@ -280,11 +304,25 @@ export const useSftpStore = create<SftpState>((set, get) => {
     ratio: 0.5,
     panes: { left: emptyPane(), right: emptyPane() },
     transfers: {},
+    pendingConflict: null,
     showHidden: false,
 
     setRatio: (r) => set({ ratio: Math.max(0, Math.min(r, 1)) }),
 
     toggleHidden: () => set((s) => ({ showHidden: !s.showHidden })),
+    setConflictApplyToRemaining: (applyToRemaining) =>
+      set((state) => ({
+        pendingConflict: state.pendingConflict
+          ? { ...state.pendingConflict, applyToRemaining }
+          : null,
+      })),
+    resolveConflict: (decision) => {
+      const resolve = conflictResolver;
+      const applyToRemaining = get().pendingConflict?.applyToRemaining ?? false;
+      conflictResolver = null;
+      set({ pendingConflict: null });
+      resolve?.({ action: decision, applyToRemaining });
+    },
 
     ensureLocalTab: async (side) => {
       if (get().panes[side].tabs.length > 0 || !canAddTab(false)) return;
@@ -606,7 +644,38 @@ export const useSftpStore = create<SftpState>((set, get) => {
         srcTab.entries.filter((e) => srcTab.selected.includes(e.path));
       if (items.length === 0) return;
 
-      for (const item of items) {
+      const occupied = new Set(dstTab.entries.map((entry) => entry.name));
+      let batchDecision: ConflictAction | null = null;
+
+      for (const [index, item] of items.entries()) {
+        let targetName = item.name;
+        let overwrite = false;
+        if (occupied.has(targetName)) {
+          const decision: ConflictDecision = batchDecision
+            ? { action: batchDecision, applyToRemaining: true }
+            : await new Promise<ConflictDecision>((resolve) => {
+                conflictResolver?.({
+                  action: "skip",
+                  applyToRemaining: false,
+                });
+                conflictResolver = resolve;
+                set({
+                  pendingConflict: {
+                    name: item.name,
+                    remaining: items.length - index - 1,
+                    applyToRemaining: false,
+                  },
+                });
+              });
+          if (decision.applyToRemaining) batchDecision = decision.action;
+          if (decision.action === "skip") continue;
+          if (decision.action === "rename") {
+            targetName = uniqueCopyName(item.name, occupied);
+          } else {
+            overwrite = true;
+          }
+        }
+        occupied.add(targetName);
         const transferId = crypto.randomUUID();
         set((s) => ({
           transfers: {
@@ -634,6 +703,8 @@ export const useSftpStore = create<SftpState>((set, get) => {
             transferId,
             { connectionId: srcTab.connectionId, path: item.path },
             { connectionId: dstTab.connectionId, path: dstTab.cwd },
+            targetName,
+            overwrite,
           )
           .catch((err) => {
             set((s) => {

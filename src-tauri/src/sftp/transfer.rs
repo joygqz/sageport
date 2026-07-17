@@ -27,6 +27,15 @@ pub struct Endpoint {
     pub path: String,
 }
 
+#[derive(Clone, Copy)]
+pub struct TransferRequest<'a> {
+    pub transfer_id: &'a str,
+    pub source: &'a Endpoint,
+    pub dest_dir: &'a Endpoint,
+    pub target_name: &'a str,
+    pub overwrite: bool,
+}
+
 pub struct TransferOutcome {
     pub transferred: u64,
     pub total: u64,
@@ -91,12 +100,18 @@ fn should_emit_progress(p: &ProgressCtx, done: u64) -> bool {
 pub async fn transfer(
     app: &AppHandle,
     mgr: &SftpManager,
-    transfer_id: &str,
-    source: &Endpoint,
-    dest_dir: &Endpoint,
+    request: TransferRequest<'_>,
     cancel: Arc<TransferCancel>,
 ) -> TransferOutcome {
-    let name = base_name(&source.path);
+    let TransferRequest {
+        transfer_id,
+        source,
+        dest_dir,
+        target_name,
+        overwrite,
+    } = request;
+    let source_name = base_name(&source.path);
+    let name = target_name.to_string();
     emit_transfer_event(
         app,
         transfer_id,
@@ -111,7 +126,7 @@ pub async fn transfer(
     let validation = tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(AppError::Cancelled),
-        result = validate_transfer_target(mgr, source, dest_dir, &name) => result,
+        result = validate_transfer_target(mgr, source, dest_dir, &name, overwrite) => result,
     };
     if let Err(e) = validation {
         let is_cancelled = matches!(&e, AppError::Cancelled);
@@ -148,7 +163,7 @@ pub async fn transfer(
         false
     };
     if compress {
-        return transfer_compressed(app, mgr, transfer_id, source, dest_dir, cancel).await;
+        return transfer_compressed(app, mgr, request, &source_name, cancel).await;
     }
 
     let total = tokio::select! {
@@ -176,7 +191,7 @@ pub async fn transfer(
     };
     let result = match copy_result {
         Ok(()) if progress.cancel.is_cancelled() => Err(AppError::Cancelled),
-        Ok(()) => commit_staged(mgr, dest_dir, &staged_name, &name).await,
+        Ok(()) => commit_staged(mgr, dest_dir, &staged_name, &name, overwrite).await,
         Err(error) => Err(error),
     };
     if result.is_err() {
@@ -453,8 +468,9 @@ async fn validate_transfer_target(
     source: &Endpoint,
     dest_dir: &Endpoint,
     name: &str,
+    overwrite: bool,
 ) -> AppResult<()> {
-    if target_exists(mgr, dest_dir, name).await? {
+    if target_exists(mgr, dest_dir, name).await? && !overwrite {
         return Err(AppError::Conflict(format!(
             "destination already contains {name}"
         )));
@@ -548,8 +564,10 @@ async fn commit_staged(
     dest_dir: &Endpoint,
     staged_name: &str,
     final_name: &str,
+    overwrite: bool,
 ) -> AppResult<()> {
-    if target_exists(mgr, dest_dir, final_name).await? {
+    let exists = target_exists(mgr, dest_dir, final_name).await?;
+    if exists && !overwrite {
         return Err(AppError::Conflict(format!(
             "destination already contains {final_name}"
         )));
@@ -564,10 +582,41 @@ async fn commit_staged(
         &dest_dir.path,
         final_name,
     );
-    match &dest_dir.connection_id {
-        None => Ok(fs::rename(from, to).await?),
-        Some(id) => mgr.rename(id, &from, &to).await,
+    if !exists {
+        return match &dest_dir.connection_id {
+            None => Ok(fs::rename(from, to).await?),
+            Some(id) => mgr.rename(id, &from, &to).await,
+        };
     }
+
+    let backup_name = format!(".sageport-backup-{}", uuid::Uuid::new_v4());
+    let backup = dest_join(
+        dest_dir.connection_id.as_deref(),
+        &dest_dir.path,
+        &backup_name,
+    );
+    let target_endpoint = Endpoint {
+        connection_id: dest_dir.connection_id.clone(),
+        path: to.clone(),
+    };
+    let target_is_dir = is_dir(mgr, &target_endpoint).await?;
+    match &dest_dir.connection_id {
+        None => fs::rename(&to, &backup).await?,
+        Some(id) => mgr.rename(id, &to, &backup).await?,
+    }
+    let replace = match &dest_dir.connection_id {
+        None => fs::rename(&from, &to).await.map_err(AppError::from),
+        Some(id) => mgr.rename(id, &from, &to).await,
+    };
+    if let Err(error) = replace {
+        let _ = match &dest_dir.connection_id {
+            None => fs::rename(&backup, &to).await.map_err(AppError::from),
+            Some(id) => mgr.rename(id, &backup, &to).await,
+        };
+        return Err(error);
+    }
+    cleanup_staged(mgr, dest_dir, &backup_name, target_is_dir).await;
+    Ok(())
 }
 
 async fn cleanup_staged(mgr: &SftpManager, dest_dir: &Endpoint, staged_name: &str, is_dir: bool) {
@@ -668,12 +717,18 @@ async fn make_dir(mgr: &SftpManager, dest_dir: &Endpoint, name: &str) -> AppResu
 async fn transfer_compressed(
     app: &AppHandle,
     mgr: &SftpManager,
-    transfer_id: &str,
-    source: &Endpoint,
-    dest_dir: &Endpoint,
+    request: TransferRequest<'_>,
+    source_name: &str,
     cancel: Arc<TransferCancel>,
 ) -> TransferOutcome {
-    let name = base_name(&source.path);
+    let TransferRequest {
+        transfer_id,
+        source,
+        dest_dir,
+        target_name,
+        overwrite,
+    } = request;
+    let name = target_name.to_string();
     let notify =
         |transferred: u64, total: u64, status: &str, phase: Option<&str>, msg: Option<String>| {
             emit_transfer_event(
@@ -701,10 +756,12 @@ async fn transfer_compressed(
                 app,
                 mgr,
                 transfer_id,
+                source_name,
                 &name,
                 &source.path,
                 dst,
                 &dest_dir.path,
+                overwrite,
                 cancel,
             )
             .await
@@ -714,10 +771,12 @@ async fn transfer_compressed(
                 app,
                 mgr,
                 transfer_id,
+                source_name,
                 &name,
                 src,
                 &source.path,
                 &dest_dir.path,
+                overwrite,
                 cancel,
             )
             .await
@@ -727,11 +786,13 @@ async fn transfer_compressed(
                 app,
                 mgr,
                 transfer_id,
+                source_name,
                 &name,
                 src,
                 &source.path,
                 dst,
                 &dest_dir.path,
+                overwrite,
                 cancel,
             )
             .await
@@ -839,10 +900,12 @@ async fn compressed_local_to_remote(
     app: &AppHandle,
     mgr: &SftpManager,
     transfer_id: &str,
-    name: &str,
+    source_name: &str,
+    target_name: &str,
     src_path: &str,
     dst_id: &str,
     dst_dir: &str,
+    overwrite: bool,
     cancel: Arc<TransferCancel>,
 ) -> AppResult<u64> {
     let tmp = local_temp_archive();
@@ -863,7 +926,7 @@ async fn compressed_local_to_remote(
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let ctx = xfer_ctx(transfer_id, name, size, false, cancel.clone());
+        let ctx = xfer_ctx(transfer_id, target_name, size, false, cancel.clone());
         upload_archive(app, mgr, dst_id, &tmp, &remote_archive, &ctx).await?;
 
         if cancel.is_cancelled() {
@@ -874,7 +937,7 @@ async fn compressed_local_to_remote(
             transfer_id,
             size,
             size,
-            name,
+            target_name,
             "active",
             Some(PHASE_EXTRACT.into()),
             None,
@@ -893,7 +956,16 @@ async fn compressed_local_to_remote(
             &cancel,
         )
         .await?;
-        commit_remote_stage(mgr, dst_id, &stage, name, dst_dir).await?;
+        commit_remote_stage(
+            mgr,
+            dst_id,
+            &stage,
+            source_name,
+            target_name,
+            dst_dir,
+            overwrite,
+        )
+        .await?;
         Ok(())
     }
     .await;
@@ -909,10 +981,12 @@ async fn compressed_remote_to_local(
     app: &AppHandle,
     mgr: &SftpManager,
     transfer_id: &str,
-    name: &str,
+    source_name: &str,
+    target_name: &str,
     src_id: &str,
     src_path: &str,
     dst_dir: &str,
+    overwrite: bool,
     cancel: Arc<TransferCancel>,
 ) -> AppResult<u64> {
     let parent = parent_remote(src_path);
@@ -924,7 +998,7 @@ async fn compressed_remote_to_local(
             "umask 077 && tar -czf {} -C {} {}",
             sh_quote(&remote_archive),
             sh_quote(&parent),
-            sh_quote(name)
+            sh_quote(source_name)
         ),
         &cancel,
     )
@@ -943,7 +1017,7 @@ async fn compressed_remote_to_local(
             _ = cancel.cancelled() => return Err(AppError::Cancelled),
             result = ops::remote_file_size(src_conn.session(), &remote_archive) => result?,
         };
-        let ctx = xfer_ctx(transfer_id, name, size, false, cancel.clone());
+        let ctx = xfer_ctx(transfer_id, target_name, size, false, cancel.clone());
         download_archive(app, mgr, src_id, &remote_archive, &tmp, &ctx).await?;
 
         if cancel.is_cancelled() {
@@ -954,7 +1028,7 @@ async fn compressed_remote_to_local(
             transfer_id,
             size,
             size,
-            name,
+            target_name,
             "active",
             Some(PHASE_EXTRACT.into()),
             None,
@@ -968,7 +1042,7 @@ async fn compressed_remote_to_local(
         })
         .await
         .map_err(|e| AppError::Other(format!("task join error: {e}")))??;
-        commit_local_stage(&stage, name, &dst).await?;
+        commit_local_stage(&stage, source_name, target_name, &dst, overwrite).await?;
         Ok(size)
     }
     .await;
@@ -984,11 +1058,13 @@ async fn compressed_remote_to_remote(
     app: &AppHandle,
     mgr: &SftpManager,
     transfer_id: &str,
-    name: &str,
+    source_name: &str,
+    target_name: &str,
     src_id: &str,
     src_path: &str,
     dst_id: &str,
     dst_dir: &str,
+    overwrite: bool,
     cancel: Arc<TransferCancel>,
 ) -> AppResult<u64> {
     let parent = parent_remote(src_path);
@@ -1000,7 +1076,7 @@ async fn compressed_remote_to_remote(
             "umask 077 && tar -czf {} -C {} {}",
             sh_quote(&src_archive),
             sh_quote(&parent),
-            sh_quote(name)
+            sh_quote(source_name)
         ),
         &cancel,
     )
@@ -1028,7 +1104,7 @@ async fn compressed_remote_to_remote(
             src_id,
             &src_archive,
             &tmp,
-            &xfer_ctx(transfer_id, name, size, false, cancel.clone()),
+            &xfer_ctx(transfer_id, target_name, size, false, cancel.clone()),
         )
         .await?;
         upload_archive(
@@ -1037,7 +1113,7 @@ async fn compressed_remote_to_remote(
             dst_id,
             &tmp,
             &dst_archive,
-            &xfer_ctx(transfer_id, name, size, true, cancel.clone()),
+            &xfer_ctx(transfer_id, target_name, size, true, cancel.clone()),
         )
         .await?;
 
@@ -1049,7 +1125,7 @@ async fn compressed_remote_to_remote(
             transfer_id,
             size,
             size,
-            name,
+            target_name,
             "active",
             Some(PHASE_EXTRACT.into()),
             None,
@@ -1068,7 +1144,16 @@ async fn compressed_remote_to_remote(
             &cancel,
         )
         .await?;
-        commit_remote_stage(mgr, dst_id, &stage, name, dst_dir).await?;
+        commit_remote_stage(
+            mgr,
+            dst_id,
+            &stage,
+            source_name,
+            target_name,
+            dst_dir,
+            overwrite,
+        )
+        .await?;
         Ok(size)
     }
     .await;
@@ -1082,15 +1167,37 @@ async fn compressed_remote_to_remote(
     res
 }
 
-async fn commit_local_stage(stage: &Path, name: &str, dest_dir: &Path) -> AppResult<()> {
-    let source = stage.join(name);
-    let target = dest_dir.join(name);
-    if fs::try_exists(&target).await? {
+async fn commit_local_stage(
+    stage: &Path,
+    source_name: &str,
+    target_name: &str,
+    dest_dir: &Path,
+    overwrite: bool,
+) -> AppResult<()> {
+    let source = stage.join(source_name);
+    let target = dest_dir.join(target_name);
+    let exists = fs::try_exists(&target).await?;
+    if exists && !overwrite {
         return Err(AppError::Conflict(format!(
-            "destination already contains {name}"
+            "destination already contains {target_name}"
         )));
     }
-    fs::rename(source, target).await?;
+    if !exists {
+        fs::rename(source, target).await?;
+        return Ok(());
+    }
+    let backup = dest_dir.join(format!(".sageport-backup-{}", uuid::Uuid::new_v4()));
+    let target_is_dir = fs::symlink_metadata(&target).await?.is_dir();
+    fs::rename(&target, &backup).await?;
+    if let Err(error) = fs::rename(&source, &target).await {
+        let _ = fs::rename(&backup, &target).await;
+        return Err(error.into());
+    }
+    if target_is_dir {
+        let _ = fs::remove_dir_all(backup).await;
+    } else {
+        let _ = fs::remove_file(backup).await;
+    }
     Ok(())
 }
 
@@ -1098,22 +1205,46 @@ async fn commit_remote_stage(
     mgr: &SftpManager,
     connection_id: &str,
     stage: &str,
-    name: &str,
+    source_name: &str,
+    target_name: &str,
     dest_dir: &str,
+    overwrite: bool,
 ) -> AppResult<()> {
-    let source = join_remote(stage, name);
-    let target = join_remote(dest_dir, name);
-    if mgr
+    let source = join_remote(stage, source_name);
+    let target = join_remote(dest_dir, target_name);
+    let exists = mgr
         .list(connection_id, dest_dir)
         .await?
         .iter()
-        .any(|entry| entry.name == name)
-    {
+        .any(|entry| entry.name == target_name);
+    if exists && !overwrite {
         return Err(AppError::Conflict(format!(
-            "destination already contains {name}"
+            "destination already contains {target_name}"
         )));
     }
-    mgr.rename(connection_id, &source, &target).await
+    if !exists {
+        return mgr.rename(connection_id, &source, &target).await;
+    }
+    let backup = join_remote(
+        dest_dir,
+        &format!(".sageport-backup-{}", uuid::Uuid::new_v4()),
+    );
+    let target_endpoint = Endpoint {
+        connection_id: Some(connection_id.to_string()),
+        path: target.clone(),
+    };
+    let target_is_dir = is_dir(mgr, &target_endpoint).await?;
+    mgr.rename(connection_id, &target, &backup).await?;
+    if let Err(error) = mgr.rename(connection_id, &source, &target).await {
+        let _ = mgr.rename(connection_id, &backup, &target).await;
+        return Err(error);
+    }
+    if target_is_dir {
+        cleanup_remote_tree(mgr, connection_id, &backup).await;
+    } else {
+        cleanup_remote(mgr, connection_id, &backup).await;
+    }
+    Ok(())
 }
 
 async fn exec_with_cancel(

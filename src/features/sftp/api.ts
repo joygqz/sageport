@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
-import type { SftpBookmarkInput } from "@/types/models";
+import type { SftpBookmarkInput, TransferHistoryEntry } from "@/types/models";
 
 const historyKey = ["sftp", "transferHistory"] as const;
 export const bookmarkKey = ["sftp", "bookmarks"] as const;
@@ -47,6 +47,22 @@ export function useClearTransferHistory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => ipc.sftp.historyClear(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: historyKey }),
+  });
+}
+
+export function useRetryTransfer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entry: TransferHistoryEntry) =>
+      ipc.sftp.transfer(
+        crypto.randomUUID(),
+        {
+          connectionId: entry.sourceConnectionId,
+          path: entry.sourcePath,
+        },
+        { connectionId: entry.destConnectionId, path: entry.destPath },
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: historyKey }),
   });
 }

@@ -11,7 +11,12 @@ const statusKey = ["sync", "status"] as const;
 const versionsKey = ["sync", "versions"] as const;
 
 export function useSyncStatus() {
-  return useQuery({ queryKey: statusKey, queryFn: ipc.sync.status });
+  return useQuery({
+    queryKey: statusKey,
+    queryFn: ipc.sync.status,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
 }
 
 export function useSyncOAuthStart() {

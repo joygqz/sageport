@@ -41,11 +41,12 @@ export function forwardInput(
   if (bindPort === null) return { error: "invalidBindPort" };
 
   const targetHost = values.targetHost.trim();
-  if (values.kind === "local" && !targetHost) {
+  const hasFixedTarget = values.kind !== "dynamic";
+  if (hasFixedTarget && !targetHost) {
     return { error: "targetRequired" };
   }
-  const targetPort = values.kind === "local" ? port(values.targetPort) : null;
-  if (values.kind === "local" && targetPort === null) {
+  const targetPort = hasFixedTarget ? port(values.targetPort) : null;
+  if (hasFixedTarget && targetPort === null) {
     return { error: "invalidTargetPort" };
   }
 
@@ -56,7 +57,7 @@ export function forwardInput(
       kind: values.kind,
       bindHost: values.bindHost.trim() || "127.0.0.1",
       bindPort,
-      targetHost: values.kind === "local" ? targetHost : null,
+      targetHost: hasFixedTarget ? targetHost : null,
       targetPort,
       autoStart: values.autoStart,
     },

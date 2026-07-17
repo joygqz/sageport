@@ -48,7 +48,7 @@ async function listForwards(): Promise<ToolExecutionResult> {
         kind: f.kind,
         bind: `${f.bindHost}:${f.bindPort}`,
         target:
-          f.kind === "local" && f.targetHost
+          f.kind !== "dynamic" && f.targetHost
             ? `${f.targetHost}:${f.targetPort}`
             : undefined,
         active: activeSet.has(f.id),
@@ -92,11 +92,11 @@ async function createForward(
   }
   const kind = optionalStr(args, "kind") ?? "local";
   if (
-    kind === "local" &&
+    kind !== "dynamic" &&
     (!optionalStr(args, "targetHost") || !num(args, "targetPort"))
   ) {
     return toolFailure(
-      "Error: a local forward needs targetHost and targetPort.",
+      "Error: local and remote forwards need targetHost and targetPort.",
     );
   }
   const forward = await ipc.forwards.create(inputFromArgs(args));
@@ -161,22 +161,23 @@ const FORWARD_FIELDS = {
   label: { type: "string", description: "Display name." },
   kind: {
     type: "string",
-    enum: ["local", "dynamic"],
-    description: "'local' (fixed target) or 'dynamic' (SOCKS proxy).",
+    enum: ["local", "remote", "dynamic"],
+    description: "'local' (-L), 'remote' (-R), or 'dynamic' (SOCKS proxy).",
   },
   bindHost: {
     type: "string",
-    description: "Local bind address (default 127.0.0.1).",
+    description: "Listening address (default 127.0.0.1).",
   },
-  bindPort: { type: "integer", description: "Local port to listen on." },
+  bindPort: { type: "integer", description: "Port to listen on." },
   targetHost: {
     type: ["string", "null"],
     description:
-      "Remote host to reach (local forwards only). Set null to clear it.",
+      "Destination host (local and remote forwards). Set null to clear it.",
   },
   targetPort: {
     type: ["integer", "null"],
-    description: "Remote port (local forwards only). Set null to clear it.",
+    description:
+      "Destination port (local and remote forwards). Set null to clear it.",
   },
   autoStart: {
     type: "boolean",
@@ -211,7 +212,7 @@ export const forwardTools: AiTool[] = [
     spec: {
       name: "create_forward",
       description:
-        "Create a port forward. Local forwards need targetHost and targetPort; dynamic forwards act as a SOCKS proxy on bindPort.",
+        "Create a port forward. Local (-L) and remote (-R) forwards need targetHost and targetPort; dynamic forwards act as a SOCKS proxy.",
       parameters: {
         type: "object",
         properties: FORWARD_FIELDS,

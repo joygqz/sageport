@@ -61,6 +61,15 @@ pub async fn hosts_get(state: State<'_, AppState>, id: String) -> AppResult<Host
 }
 
 #[tauri::command]
+pub async fn hosts_reveal_password(state: State<'_, AppState>, id: String) -> AppResult<String> {
+    host_repo::get(&state.db, &id)
+        .await?
+        .password
+        .filter(|password| !password.is_empty())
+        .ok_or_else(|| AppError::NotFound(format!("password for host {id}")))
+}
+
+#[tauri::command]
 pub async fn hosts_create(state: State<'_, AppState>, input: HostInput) -> AppResult<HostView> {
     Ok(host_repo::create(&state.db, input).await?.into())
 }
@@ -255,6 +264,7 @@ mod tests {
             auth_type: Some("agent".to_string()),
             key_id: None,
             os_hint: None,
+            requires_approval: false,
             color: None,
             notes: None,
             password: None,

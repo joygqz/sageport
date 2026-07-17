@@ -1,9 +1,10 @@
 use std::time::Duration;
 
-use russh::client;
+use russh::client::{self, ChannelOpenHandle, Msg};
 use russh::keys::ssh_key::PublicKey;
+use russh::Channel;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::{oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 
 use super::known_hosts::{self, KnownHostStatus};
 use super::{
@@ -40,6 +41,7 @@ pub struct ClientHandler {
     pub host: String,
     pub port: u16,
     pub host_key_activity: watch::Sender<bool>,
+    pub forwarded_tcpip: Option<mpsc::Sender<Channel<Msg>>>,
 }
 
 impl client::Handler for ClientHandler {
@@ -93,5 +95,28 @@ impl client::Handler for ClientHandler {
                 Ok(true)
             }
         }
+    }
+
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        channel: Channel<Msg>,
+        _connected_address: &str,
+        _connected_port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        let Some(sender) = self.forwarded_tcpip.clone() else {
+            return Ok(());
+        };
+        let Ok(permit) = sender.try_reserve_owned() else {
+            // Dropping the reply rejects excess connections without blocking
+            // the SSH handler (and therefore keepalives) under load.
+            return Ok(());
+        };
+        reply.accept().await;
+        permit.send(channel);
+        Ok(())
     }
 }

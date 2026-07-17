@@ -59,4 +59,17 @@ describe("forwardInput", () => {
       input: { kind: "dynamic", targetHost: null, targetPort: null },
     });
   });
+
+  it("keeps and validates the local destination for remote forwards", () => {
+    expect(forwardInput({ ...values, kind: "remote" })).toMatchObject({
+      input: {
+        kind: "remote",
+        targetHost: "db.internal",
+        targetPort: 5432,
+      },
+    });
+    expect(
+      forwardInput({ ...values, kind: "remote", targetHost: " " }),
+    ).toEqual({ error: "targetRequired" });
+  });
 });

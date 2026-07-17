@@ -103,7 +103,8 @@ export function ForwardsView() {
     if (forward.kind === "dynamic") {
       return `SOCKS ${formatForwardEndpoint(forward.bindHost, forward.bindPort)}`;
     }
-    return `${formatForwardEndpoint(forward.bindHost, forward.bindPort)} → ${formatForwardEndpoint(forward.targetHost ?? "", forward.targetPort ?? 0)}`;
+    const prefix = forward.kind === "remote" ? "R" : "L";
+    return `${prefix} ${formatForwardEndpoint(forward.bindHost, forward.bindPort)} → ${formatForwardEndpoint(forward.targetHost ?? "", forward.targetPort ?? 0)}`;
   };
 
   const filteredForwards = useMemo(() => {

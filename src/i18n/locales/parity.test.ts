@@ -81,6 +81,7 @@ describe("locale parity", () => {
       "P-384",
       "P-521",
       "PEM",
+      "R",
       "R2",
       "S3",
       "S3-compatible",

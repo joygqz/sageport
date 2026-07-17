@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, History, Loader2, X } from "lucide-react";
 
-import { Button, ResizeHandle, Tooltip } from "@/components/ui";
+import {
+  Button,
+  ConfirmDialog,
+  ResizeHandle,
+  Tooltip,
+  type ConfirmState,
+} from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 import { useLayoutStore } from "@/workbench/layout";
@@ -26,6 +32,11 @@ export function SftpPanel({ height }: { height: number }) {
   const toggleHidden = useSftpStore((s) => s.toggleHidden);
   const setPanelVisible = useLayoutStore((s) => s.setPanelVisible);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const pendingConflict = useSftpStore((s) => s.pendingConflict);
+  const resolveConflict = useSftpStore((s) => s.resolveConflict);
+  const setConflictApplyToRemaining = useSftpStore(
+    (s) => s.setConflictApplyToRemaining,
+  );
 
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -119,6 +130,52 @@ export function SftpPanel({ height }: { height: number }) {
       <TransferStrip />
 
       <TransferHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
+      <ConfirmDialog
+        state={
+          pendingConflict
+            ? ({
+                title: t("sftp.conflict.title"),
+                description: (
+                  <span className="flex flex-col gap-3">
+                    <span>
+                      {t("sftp.conflict.description", {
+                        name: pendingConflict.name,
+                      })}
+                    </span>
+                    {pendingConflict.remaining > 0 && (
+                      <label className="flex items-center gap-2 text-xs text-muted">
+                        <input
+                          type="checkbox"
+                          checked={pendingConflict.applyToRemaining}
+                          onChange={(event) =>
+                            setConflictApplyToRemaining(event.target.checked)
+                          }
+                        />
+                        {t("sftp.conflict.applyToRemaining", {
+                          count: pendingConflict.remaining,
+                        })}
+                      </label>
+                    )}
+                  </span>
+                ),
+                cancelLabel: t("sftp.conflict.skip"),
+                actions: [
+                  {
+                    label: t("sftp.conflict.keepBoth"),
+                    variant: "primary",
+                    onSelect: () => resolveConflict("rename"),
+                  },
+                  {
+                    label: t("sftp.conflict.overwrite"),
+                    variant: "destructive",
+                    onSelect: () => resolveConflict("overwrite"),
+                  },
+                ],
+              } satisfies ConfirmState)
+            : null
+        }
+        onClose={() => resolveConflict("skip")}
+      />
     </div>
   );
 }

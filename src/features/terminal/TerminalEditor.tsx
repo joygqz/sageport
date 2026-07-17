@@ -230,14 +230,16 @@ function PaneView({
             if (tab.activePaneId !== pane.id) focusPane(pane.id);
           }}
         >
-          <TerminalView
-            sessionId={pane.id}
-            target={pane.target}
-            hostId={pane.hostId}
-            adhoc={pane.adhoc}
-            attempt={pane.attempt}
-            active={paneActive}
-          />
+          {!pane.restorePending && (
+            <TerminalView
+              sessionId={pane.id}
+              target={pane.target}
+              hostId={pane.hostId}
+              adhoc={pane.adhoc}
+              attempt={pane.attempt}
+              active={paneActive}
+            />
+          )}
           <StickyCommand key={pane.attempt} sessionId={pane.id} />
           {searchOpen && active && <SearchBar sessionId={pane.id} />}
           <StatusOverlay pane={pane} onReconnect={() => reconnect(pane.id)} />
@@ -590,7 +592,7 @@ function StatusOverlay({
       >
         <div className="mt-3.5 flex flex-col items-center">
           <p className="text-sm font-medium text-foreground">
-            {t("terminal.closed")}
+            {t(pane.restorePending ? "terminal.restored" : "terminal.closed")}
           </p>
           <Button
             className="mt-3"

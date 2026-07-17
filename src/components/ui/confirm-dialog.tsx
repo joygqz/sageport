@@ -21,7 +21,7 @@ export interface ConfirmAction {
 
 export interface ConfirmState {
   title: string;
-  description?: string;
+  description?: ReactNode;
   cancelLabel: string;
 
   actions: ConfirmAction[];
@@ -81,3 +81,4 @@ export function ConfirmDialog({
     </AlertDialog>
   );
 }
+import type { ReactNode } from "react";

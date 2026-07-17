@@ -1,6 +1,13 @@
 import { useState } from "react";
 
-import { Field, FormBody, FormDialog, Input, Switch } from "@/components/ui";
+import {
+  CONTROL_CONTAINER_CLASS,
+  Field,
+  FormBody,
+  FormDialog,
+  Input,
+  Switch,
+} from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
@@ -97,7 +104,7 @@ function PermissionsBody({
       pending={saving}
       submitDisabled={parsedOctal === null}
     >
-      <div className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className={`${CONTROL_CONTAINER_CLASS} overflow-hidden`}>
         <div className="grid grid-cols-[1fr_repeat(3,3.5rem)] items-center border-b border-border bg-surface px-3 py-1.5 text-2xs font-medium text-muted-foreground">
           <span />
           {BITS.map((bit) => (

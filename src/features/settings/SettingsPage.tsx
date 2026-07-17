@@ -36,7 +36,7 @@ import {
   SegmentedControl,
   Separator,
   Select,
-  Switch,
+  SwitchField,
   Tooltip,
 } from "@/components/ui";
 import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
@@ -734,26 +734,15 @@ function AiForm({ config }: { config: AiConfig }) {
           </div>
         </Field>
 
-        <Field
-          label={t("settings.ai.autonomousModeLabel")}
+        <SwitchField
+          fieldLabel={t("settings.ai.autonomousModeLabel")}
+          label={t("settings.ai.autonomousMode")}
           hint={t("settings.ai.autonomousModeHint")}
-        >
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-3 py-2.5">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">
-                {t("settings.ai.autonomousMode")}
-              </p>
-              <p className="mt-0.5 text-xs text-danger">
-                {t("settings.ai.autonomousModeWarning")}
-              </p>
-            </div>
-            <Switch
-              checked={autoApprove}
-              onCheckedChange={changeAutoApprove}
-              aria-label={t("settings.ai.autonomousMode")}
-            />
-          </div>
-        </Field>
+          description={t("settings.ai.autonomousModeWarning")}
+          descriptionClassName="text-danger"
+          checked={autoApprove}
+          onCheckedChange={changeAutoApprove}
+        />
 
         <Field
           label={t("settings.ai.maxHistoryTokensLabel")}

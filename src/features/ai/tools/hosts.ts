@@ -288,7 +288,7 @@ function inputFromArgs(args: Record<string, unknown>, base?: Host): HostInput {
     authType: base?.authType ?? null,
     keyId: base?.keyId ?? null,
     osHint: base?.osHint ?? null,
-    color: base?.color ?? null,
+    requiresApproval: base?.requiresApproval ?? false,
     notes: notes === undefined ? (base?.notes ?? null) : notes,
     jumpHostId: base?.jumpHostId ?? null,
     startupCommand: base?.startupCommand ?? null,

@@ -9,6 +9,7 @@ import {
 
 import {
   Button,
+  CONTROL_CONTAINER_CLASS,
   ErrorState,
   Field,
   FormDialog,
@@ -155,7 +156,7 @@ function BatchBody({
       </Field>
 
       <Field label={t("snippets.batch.hosts")}>
-        <ScrollArea className="max-h-40 rounded-lg border border-border bg-surface">
+        <ScrollArea className={cn(CONTROL_CONTAINER_CLASS, "max-h-40")}>
           {hostsLoading ? (
             <LoadingState label={t("common.loading")} />
           ) : hostsError ? (

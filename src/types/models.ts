@@ -22,7 +22,7 @@ export interface Host {
   authType: AuthType | null;
   keyId: string | null;
   osHint: string | null;
-  color: string | null;
+  requiresApproval: boolean;
   notes: string | null;
   jumpHostId: string | null;
   startupCommand: string | null;
@@ -82,7 +82,7 @@ export interface SftpBookmarkInput {
   path: string;
 }
 
-export type ForwardKind = "local" | "dynamic";
+export type ForwardKind = "local" | "remote" | "dynamic";
 
 export interface PortForward {
   id: string;
@@ -207,7 +207,7 @@ export interface HostInput {
   authType?: AuthType | null;
   keyId?: string | null;
   osHint?: string | null;
-  color?: string | null;
+  requiresApproval?: boolean;
   notes?: string | null;
   jumpHostId?: string | null;
   startupCommand?: string | null;
@@ -332,6 +332,8 @@ export interface SyncStatus {
   detail: string | null;
 
   lastSyncedAt: string | null;
+  autoSyncInProgress: boolean;
+  autoSyncError: string | null;
 
   oauthReady: { gist: boolean; gdrive: boolean; onedrive: boolean };
 }

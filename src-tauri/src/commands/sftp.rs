@@ -301,6 +301,8 @@ pub async fn fs_transfer(
     transfer_id: String,
     source: EndpointInput,
     dest: EndpointInput,
+    target_name: Option<String>,
+    overwrite: Option<bool>,
 ) -> AppResult<()> {
     validate_transfer_id(&transfer_id)?;
     validate_endpoint(&source)?;
@@ -310,6 +312,15 @@ pub async fn fs_transfer(
         return Err(AppError::Invalid(
             "source path has no transferable name".into(),
         ));
+    }
+    let target_name = target_name.unwrap_or_else(|| source_name.clone());
+    if target_name.is_empty()
+        || target_name == "."
+        || target_name == ".."
+        || target_name.contains(['/', '\\', '\0'])
+        || target_name.len() > 1024
+    {
+        return Err(AppError::Invalid("invalid transfer target name".into()));
     }
     let mgr = state.sftp.clone();
     let pool = state.db.clone();
@@ -333,7 +344,19 @@ pub async fn fs_transfer(
             _ = cancel.cancelled() => None,
             permit = mgr.acquire_transfer_slot() => Some(permit),
         };
-        let outcome = sftp::transfer(&app, &mgr, &transfer_id, &source, &dest, cancel).await;
+        let outcome = sftp::transfer(
+            &app,
+            &mgr,
+            sftp::TransferRequest {
+                transfer_id: &transfer_id,
+                source: &source,
+                dest_dir: &dest,
+                target_name: &target_name,
+                overwrite: overwrite.unwrap_or(false),
+            },
+            cancel,
+        )
+        .await;
         drop(permit);
         mgr.unregister_transfer(&transfer_id);
         let _ = transfer_repo::finish(

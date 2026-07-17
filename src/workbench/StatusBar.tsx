@@ -179,17 +179,30 @@ function SyncItem() {
     <StatusBarItem
       onClick={() => openSettings("sync")}
       title={
-        connected && status?.lastSyncedAt
-          ? t("statusBar.lastSynced", {
-              time: new Date(status.lastSyncedAt).toLocaleString(),
-            })
-          : undefined
+        status?.autoSyncError
+          ? t("statusBar.syncError", { error: status.autoSyncError })
+          : connected && status?.lastSyncedAt
+            ? t("statusBar.lastSynced", {
+                time: new Date(status.lastSyncedAt).toLocaleString(),
+              })
+            : undefined
       }
     >
       {connected ? (
         <>
-          <Cloud className="size-3" />
-          <span>{t("statusBar.syncOn")}</span>
+          <Cloud
+            className={cn(
+              "size-3",
+              status?.autoSyncInProgress && "animate-pulse",
+            )}
+          />
+          <span>
+            {t(
+              status?.autoSyncInProgress
+                ? "statusBar.syncPending"
+                : "statusBar.syncOn",
+            )}
+          </span>
         </>
       ) : (
         <>

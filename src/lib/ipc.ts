@@ -70,6 +70,8 @@ export const ipc = {
   hosts: {
     list: () => invoke<Host[]>("hosts_list"),
     get: (id: string) => invoke<Host>("hosts_get", { id }),
+    revealPassword: (id: string) =>
+      invoke<string>("hosts_reveal_password", { id }),
     create: (input: HostInput) => invoke<Host>("hosts_create", { input }),
     update: (id: string, input: HostInput) =>
       invoke<Host>("hosts_update", { id, input }),
@@ -112,6 +114,8 @@ export const ipc = {
   },
   identities: {
     list: () => invoke<Identity[]>("identities_list"),
+    revealPassword: (id: string) =>
+      invoke<string>("identities_reveal_password", { id }),
     create: (input: IdentityInput) =>
       invoke<Identity>("identities_create", { input }),
     update: (id: string, input: IdentityInput) =>
@@ -250,8 +254,20 @@ export const ipc = {
       }),
     chmod: (connectionId: string | null, path: string, mode: number) =>
       invoke<void>("fs_chmod", { connectionId, path, mode }),
-    transfer: (transferId: string, source: FsEndpoint, dest: FsEndpoint) =>
-      invoke<void>("fs_transfer", { transferId, source, dest }),
+    transfer: (
+      transferId: string,
+      source: FsEndpoint,
+      dest: FsEndpoint,
+      targetName?: string,
+      overwrite?: boolean,
+    ) =>
+      invoke<void>("fs_transfer", {
+        transferId,
+        source,
+        dest,
+        targetName,
+        overwrite,
+      }),
     cancelTransfer: (transferId: string) =>
       invoke<void>("fs_transfer_cancel", { transferId }),
     historyList: (limit?: number) =>

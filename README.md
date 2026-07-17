@@ -26,7 +26,7 @@ Sageport brings every tool of routine server work — terminal, file transfer, k
 - **A terminal that keeps up** — GPU-accelerated xterm.js (WebGL) on a pure-Rust SSH stack (russh), with inline history autocomplete, scrollback search, and broadcast-to-all-sessions.
 - **An AI assistant that operates the workbench** — beyond chat, it lists hosts, opens connections, reads terminal output, and proposes or runs commands through guarded tools — in supervised or autonomous mode.
 - **End-to-end encrypted multi-device sync** — five providers (GitHub Gist, Google Drive, OneDrive, WebDAV, S3), keys derived with Argon2id and payloads sealed with AES-256-GCM. Only ciphertext ever leaves the device.
-- **Local-first, no account required** — all data stays in a local SQLite database; the cloud is strictly opt-in.
+- **Local-first, no account required** — application data stays on the device; sensitive fields in SQLite are encrypted with a key held by the operating-system credential store. The cloud is strictly opt-in.
 - **Cross-platform & self-updating** — a lightweight native app for macOS, Windows, and Linux, built on Tauri 2.
 
 ## Features
@@ -34,6 +34,7 @@ Sageport brings every tool of routine server work — terminal, file transfer, k
 **Terminal** — GPU-accelerated rendering via xterm.js with WebGL, on a pure-Rust SSH stack (russh).
 
 - Tabbed concurrent sessions that persist in the background without reflow
+- Restores the previous terminal workspace after relaunch without reconnecting to servers until you choose to
 - Keepalives with one-click reconnect
 - Scrollback search (<kbd>⌘</kbd> <kbd>F</kbd>), clickable links, and full Unicode support
 - Inline autocomplete suggests commands from your history as you type
@@ -46,6 +47,7 @@ Sageport brings every tool of routine server work — terminal, file transfer, k
 - One-click import from your existing `~/.ssh/config`
 - Host-key verification on first use and system SSH-agent support
 - Credentials decoupled from hosts, so one identity can be reused across servers
+- Nested groups with drag-and-drop host organization
 - Built-in key manager generates and imports Ed25519, RSA, and ECDSA keys in OpenSSH format, with optional passphrase protection
 
 **File transfer & editing** — Dual-pane browser where each pane can show the local filesystem or an SFTP connection.
@@ -54,18 +56,19 @@ Sageport brings every tool of routine server work — terminal, file transfer, k
 - In-transit archiving for directories with many small files
 - Back/forward navigation history, path bookmarks, and inline file and folder creation
 - Permissions editor and a complete transfer history
+- Safe conflict handling (replace, skip, or keep both), batch decisions, cancellation, and one-click retry
 - Open text files in an editor tab with syntax highlighting and save straight back over SFTP
 
 **Monitoring** — A dedicated sidebar shows live CPU, memory, disk, and network statistics for connected hosts, with a compact summary for the active host in the status bar.
 
-**Port forwarding** — Local (`-L`) and dynamic SOCKS (`-D`) tunnels with start/stop control, live status, and optional auto-start on launch — routed over jump-host chains when configured.
+**Port forwarding** — Local (`-L`), remote (`-R`), and dynamic SOCKS (`-D`) tunnels with start/stop control, live status, and optional auto-start on launch — routed over jump-host chains when configured.
 
 **Snippets** — Frequently used commands with `{{variable}}` placeholders, sent to the active terminal or run across many hosts at once with per-host results.
 
 **AI assistant** — Bring your own API key; supports Anthropic and any OpenAI-compatible endpoint with configurable base URL and model, plus prompt caching to cut token costs.
 
 - Works through your workbench: lists saved hosts, opens connections, inspects terminal output, and proposes commands
-- Supervised mode requires confirmation for operations; explicitly enabled Autonomous mode approves them automatically while still asking when scope is ambiguous
+- Supervised mode requires confirmation for operations; explicitly enabled Autonomous mode approves them automatically while still asking when scope is ambiguous. Hosts marked as requiring approval remain manually gated.
 - Conversations are stored locally
 
 **Sync & backup** — Cross-device sync through one of five providers — GitHub Gist, Google Drive, and Microsoft OneDrive via OAuth, or WebDAV and S3 with your own credentials.
@@ -73,6 +76,7 @@ Sageport brings every tool of routine server work — terminal, file transfer, k
 - End-to-end encrypted with a passphrase-derived key; only ciphertext ever leaves the device
 - Syncs hosts, credentials, snippets, port forwards, bookmarks, and interface preferences (locale, theme, zoom)
 - Automatic last-write-wins conflict resolution and revision history with restore
+- Periodic background synchronization with bounded exponential retry while a provider is connected
 - Encrypted export/import for offline backups
 
 **Interface** — Three theme families (Midnight, Graphite, Dracula), each with light and dark variants and a matching terminal palette, switching automatically with the system if you like; English and Simplified Chinese localization, whole-UI zoom, command palette (<kbd>⌘</kbd> <kbd>P</kbd> / <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd>), and automatic updates.
@@ -103,7 +107,7 @@ On Windows and Linux, substitute <kbd>Ctrl</kbd> for <kbd>⌘</kbd>.
 
 ## Security
 
-- All data resides in a local SQLite database; no cloud service is required.
+- Application data remains on the device; no cloud service is required. Passwords, private keys, passphrases, AI API keys, and sync credentials are encrypted at rest with **AES-256-GCM**. The random database master key is stored separately in the operating-system credential store (macOS Keychain, Windows Credential Manager, or Linux Secret Service).
 - Sync and backups derive the encryption key from your passphrase with **Argon2id** and seal payloads with **AES-256-GCM**. Only ciphertext leaves the device; the passphrase never does. **A lost passphrase makes synced data unrecoverable.**
 - AI assistant operations require approval by default. Autonomous mode is an explicit opt-in that automatically approves them, so enable it only for trusted hosts and tasks.
 
@@ -117,6 +121,8 @@ pnpm install        # install dependencies
 pnpm tauri dev      # run in development mode
 pnpm tauri build    # build installers
 ```
+
+Unsigned macOS development builds keep their master key in the private application-data directory (`0700` directory, `0600` key file), avoiding Keychain prompts caused by the ad-hoc code signature changing after every rebuild. An existing encrypted development database is migrated after one successful Keychain authorization. Release builds continue to use the operating-system credential store and can safely import that development key if needed.
 
 Additional scripts: `pnpm lint`, `pnpm typecheck`, `pnpm format`, `pnpm test`.
 
