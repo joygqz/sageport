@@ -76,7 +76,8 @@ export function CommandHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={false}
-        className="flex h-[min(70vh,620px)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:p-0"
+        scrollMode="content"
+        className="flex h-[min(70vh,620px)] max-w-2xl flex-col gap-0 p-0 sm:p-0"
         onInteractOutside={(event) => {
           if (confirmState) event.preventDefault();
         }}

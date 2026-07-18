@@ -118,7 +118,8 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showClose={false}
-        className="flex h-[min(44rem,calc(100dvh-2rem))] w-[min(58rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden bg-background p-0 text-foreground sm:h-[min(44rem,calc(100dvh-4rem))] sm:w-[min(58rem,calc(100vw-4rem))] sm:p-0"
+        scrollMode="content"
+        className="flex h-[min(44rem,calc(100dvh-2rem))] w-[min(58rem,calc(100vw-2rem))] max-w-none flex-col gap-0 bg-background p-0 text-foreground sm:h-[min(44rem,calc(100dvh-4rem))] sm:w-[min(58rem,calc(100vw-4rem))] sm:p-0"
       >
         <DialogToolbar className="bg-background">
           {t("settings.title")}

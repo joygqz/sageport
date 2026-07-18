@@ -56,10 +56,12 @@ function DialogContent({
   className,
   children,
   showClose = true,
+  scrollMode = "dialog",
   ref,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showClose?: boolean;
+  scrollMode?: "dialog" | "content";
   ref?: React.Ref<React.ComponentRef<typeof DialogPrimitive.Content>>;
 }) {
   const { t } = useI18n();
@@ -130,7 +132,11 @@ function DialogContent({
         style={{
           translate: `calc(-50% + ${offset.x}px) calc(-50% + ${offset.y}px)`,
         }}
-        className={cn(DIALOG_CONTENT_CLASS, "overflow-y-auto", className)}
+        className={cn(
+          DIALOG_CONTENT_CLASS,
+          scrollMode === "dialog" ? "overflow-y-auto" : "overflow-hidden",
+          className,
+        )}
         {...props}
       >
         {children}
