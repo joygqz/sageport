@@ -1,68 +1,68 @@
-# Privacy Policy
+# 隐私政策
 
-Effective date: 2026-07-08
+生效日期：2026-07-08
 
-Sageport is a local-first desktop SSH workbench. This policy explains what data the application handles while running, where that data lives, and where it goes if you turn on optional features that transmit data off your device.
+Sageport 是一款本地优先的桌面 SSH 工作台。本政策说明应用运行时会处理哪些数据、数据存储在哪里，以及当您启用会将数据传出设备的可选功能时，数据将被发送到何处。
 
-## 1. Overview
+## 1. 概述
 
-- Sageport does not require an account, and the developer does not operate any backend server.
-- Application data — hosts, credentials, keys, snippets, AI conversation history, interface settings, and workspace metadata — is stored locally on your device in SQLite and application-local browser storage.
-- The developer does not collect, receive, or store any usage data. The application contains no analytics, telemetry, or crash-reporting components.
-- Data leaves your device only when you deliberately enable an optional feature such as Sync or the AI assistant, as described below.
+- Sageport 无需注册账号，开发者也不运营任何后端服务器。
+- 主机、凭据、密钥、命令片段、AI 对话记录、界面设置和工作区元数据等应用数据，均存储在您设备本地的 SQLite 数据库及应用本地浏览器存储中。
+- 开发者不会收集、接收或存储任何使用数据。应用不包含分析、遥测或崩溃报告组件。
+- 只有当您主动启用同步或 AI 助手等可选功能时，数据才会按照下文说明离开您的设备。
 
-## 2. Data stored locally
+## 2. 本地存储的数据
 
-The following is kept only in the local database and is never sent to the developer:
+以下数据仅保存在本地数据库中，绝不会发送给开发者：
 
-- Host addresses, groups, and notes
-- Credentials and keys (including private keys, passwords, passphrases, AI API keys, and sync-provider credentials), encrypted in the database with AES-256-GCM. The per-installation master key is stored separately by the operating-system credential store (macOS Keychain, Windows Credential Manager, or Linux Secret Service).
-- Terminal workspace metadata used to restore tabs and split layouts. Live SSH connections and terminal scrollback are not restored automatically.
-- SFTP transfer history and path bookmarks
-- Command snippets and port-forwarding rules
-- Command history used for terminal autocomplete
-- AI assistant conversation history
-- Interface preferences (locale, theme, zoom level, etc.)
+- 主机地址、分组和备注；
+- 凭据和密钥，包括私钥、密码、口令、AI API 密钥及同步服务商凭据。这些数据在数据库中使用 AES-256-GCM 加密；每次安装生成的主密钥由操作系统凭据存储单独保管，例如 macOS 钥匙串、Windows 凭据管理器或 Linux Secret Service；
+- 用于恢复标签页和拆分布局的终端工作区元数据；实时 SSH 连接和终端回滚内容不会自动恢复；
+- SFTP 传输记录和路径书签；
+- 命令片段和端口转发规则；
+- 用于终端自动补全的命令历史；
+- AI 助手对话记录；
+- 语言、主题、缩放比例等界面偏好设置。
 
-The application provides deletion controls for stored records. Operating systems and package managers differ in whether uninstalling also removes application data and the credential-store master key, so users who need complete removal should delete both the application-data directory and Sageport credential-store entry.
+应用提供删除已存储记录的操作。不同操作系统和软件包管理器在卸载应用时，是否同时删除应用数据和凭据存储中的主密钥存在差异。如需彻底移除数据，用户应同时删除 Sageport 的应用数据目录以及操作系统凭据存储中的 Sageport 条目。
 
-## 3. Servers you connect to directly
+## 3. 您直接连接的服务器
 
-Sageport's core function is connecting, via SSH/SFTP, to servers you configure yourself. These connections are established directly between your device and the target server — they never pass through any server operated by the developer, and the developer cannot see or receive any session content.
+Sageport 的核心功能是通过 SSH/SFTP 连接您自行配置的服务器。连接直接建立在您的设备与目标服务器之间，不经过开发者运营的任何服务器；开发者无法查看或接收任何会话内容。
 
-## 4. Sync & backup (optional, off by default)
+## 4. 同步与备份（可选，默认关闭）
 
-Sync is disabled by default and must be turned on explicitly in Settings. Once enabled:
+同步功能默认关闭，必须由您在设置中主动启用。启用后：
 
-- You choose one sync provider: GitHub Gist, Google Drive, or Microsoft OneDrive (via OAuth authorization), or WebDAV / S3 (using credentials you supply).
-- Before anything is uploaded, it is encrypted on your device: a key is derived from your passphrase using Argon2id, and the payload is sealed with AES-256-GCM. Only the resulting ciphertext is sent to the chosen provider — your passphrase itself is never transmitted or stored anywhere.
-- Only you hold the passphrase; the developer cannot access it and cannot recover it for you. **If you lose the passphrase, previously synced data cannot be decrypted or recovered.**
-- Synced data includes hosts, credentials, keys, snippets, port-forwarding rules, SFTP bookmarks, and interface preferences (locale, theme, zoom). It does not include AI conversation history, command history, transfer history, or device-local sync/update settings.
-- When you connect via OAuth to GitHub, Google, or Microsoft, the authorization flow is handled by that platform, and how it processes your account information is governed by that platform's own privacy policy.
-- You can disconnect sync or switch providers at any time. Disconnecting does not automatically delete encrypted data already stored with the provider — remove it directly through that provider's own service if needed.
+- 您可以选择一个同步服务商：通过 OAuth 授权使用 GitHub Gist、Google Drive 或 Microsoft OneDrive，或者使用您自行提供凭据的 WebDAV/S3；
+- 上传前，数据会先在您的设备上加密：应用使用 Argon2id 从同步口令派生密钥，再使用 AES-256-GCM 加密数据。发送给所选服务商的只有密文；同步口令本身不会被传输或存储到任何位置；
+- 只有您持有同步口令。开发者无法访问或帮助找回该口令。**如果丢失同步口令，之前同步的数据将无法解密或恢复；**
+- 同步数据包括主机、凭据、密钥、命令片段、端口转发规则、SFTP 书签及语言、主题、缩放比例等界面偏好设置；不包括 AI 对话记录、命令历史、传输记录，以及仅限当前设备的同步和更新设置；
+- 当您通过 OAuth 连接 GitHub、Google 或 Microsoft 时，授权流程由相应平台处理；平台如何处理您的账号信息，以其各自的隐私政策为准；
+- 您可以随时断开同步或更换服务商。断开同步不会自动删除已存储在服务商处的加密数据；如需删除，请通过相应服务商自行操作。
 
-## 5. AI assistant (optional)
+## 5. AI 助手（可选）
 
-The AI assistant requires you to supply your own API key for a third-party service (Anthropic, or any OpenAI-compatible endpoint):
+AI 助手要求您自行提供第三方服务的 API 密钥，可使用 Anthropic 或任意兼容 OpenAI API 的端点：
 
-- Your API key, conversation content, and the terminal context necessary to answer your questions are sent directly from your device to the AI provider you configured — not through the developer.
-- How that data is stored, used, or potentially used for model training is governed entirely by your chosen AI provider's own privacy policy, not by this one.
-- AI assistant operations require your explicit confirmation by default. If you explicitly enable Autonomous mode, Sageport automatically approves AI-generated operations; use it only for hosts and tasks you trust.
-- Operations targeting a host marked as requiring approval still require explicit confirmation in Autonomous mode.
-- Conversation history is stored only in the local database; deleting a conversation removes it.
+- 您的 API 密钥、对话内容以及回答问题所需的终端上下文，会从您的设备直接发送到您配置的 AI 服务商，不经过开发者；
+- 服务商如何存储、使用这些数据，或是否将其用于模型训练，完全受您所选 AI 服务商自身隐私政策约束，不受本政策约束；
+- 默认情况下，AI 助手执行操作前需要您明确确认。如果您主动启用自主模式，Sageport 会自动批准 AI 生成的操作；请仅对可信的主机和任务使用该模式；
+- 即使启用了自主模式，针对标记为“需要批准”的主机执行操作时，仍需要明确确认；
+- 对话记录仅存储在本地数据库中；删除对话会移除相应记录。
 
-## 6. Automatic updates
+## 6. 自动更新
 
-The application periodically checks GitHub Releases for new version information. This is a standard HTTP request that does not carry any of your application data; network metadata generated during this request (such as IP address) is subject to GitHub's own privacy policy.
+应用会定期访问 GitHub Releases，检查是否存在新版本。该标准 HTTP 请求不携带您的任何应用数据；请求产生的网络元数据（例如 IP 地址）受 GitHub 自身隐私政策约束。
 
-## 7. Children's privacy
+## 7. 儿童隐私
 
-Sageport is a tool aimed at technical users with server-administration needs. It is not directed at children, and the developer does not knowingly collect personal information from children.
+Sageport 面向有服务器管理需求的技术用户，并非面向儿童设计。开发者不会在知情的情况下收集儿童的个人信息。
 
-## 8. Changes to this policy
+## 8. 政策变更
 
-Updates to this policy will appear as changes to this file in the source repository, and the full history of changes is visible through Git commit history. Continued use of Sageport after an update constitutes acceptance of the revised policy.
+本政策的更新会以源代码仓库中的文件变更形式发布，完整变更记录可通过 Git 提交历史查看。在本政策更新后继续使用 Sageport，即表示您接受修订后的政策。
 
-## 9. Contact
+## 9. 联系方式
 
-If you have questions about this policy, reach the developer via [GitHub Issues](https://github.com/joygqz/sageport/issues).
+如对本政策有任何疑问，请通过 [GitHub Issues](https://github.com/joygqz/sageport/issues) 联系开发者。

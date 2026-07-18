@@ -111,48 +111,6 @@ On Windows and Linux, substitute <kbd>Ctrl</kbd> for <kbd>⌘</kbd>.
 - Sync and backups derive the encryption key from your passphrase with **Argon2id** and seal payloads with **AES-256-GCM**. Only ciphertext leaves the device; the passphrase never does. **A lost passphrase makes synced data unrecoverable.**
 - AI assistant operations require approval by default. Autonomous mode is an explicit opt-in that automatically approves them, so enable it only for trusted hosts and tasks.
 
-## Development
-
-**Stack:** Tauri 2 + Rust · React 19 + TypeScript · Tailwind CSS 4 · Zustand + TanStack Query
-
-```bash
-# Prerequisites: https://tauri.app/start/prerequisites/ plus Node.js and pnpm
-pnpm install        # install dependencies
-pnpm tauri dev      # run in development mode
-pnpm tauri build    # build installers
-```
-
-Unsigned macOS development builds keep their master key in the private application-data directory (`0700` directory, `0600` key file), avoiding Keychain prompts caused by the ad-hoc code signature changing after every rebuild. An existing encrypted development database is migrated after one successful Keychain authorization. Release builds continue to use the operating-system credential store and can safely import that development key if needed.
-
-Additional scripts: `pnpm lint`, `pnpm typecheck`, `pnpm format`, `pnpm test`.
-
-The OAuth-based sync providers (GitHub Gist, Google Drive, OneDrive) require client IDs injected at build time via `SAGEPORT_*` environment variables — see [docs/sync-oauth-setup.md](docs/sync-oauth-setup.md). Without them the app builds and runs normally; those sign-in buttons are simply disabled.
-
-### Project layout
-
-```
-src/
-  workbench/    Shell: activity bar, side bar, editor tabs, panel,
-                status bar, command palette, keybindings
-  features/     One folder per domain: hosts, terminal, sftp, snippets,
-                credentials, forwards, monitor, ai, sync, settings, updates
-  themes/       Theme definitions applied as CSS variables and shared with xterm
-  components/   Reusable UI primitives
-  lib/ipc.ts    Typed facade over all Tauri commands and events
-  i18n/         Typed dictionaries: en, zh-CN
-
-src-tauri/src/
-  commands/     Thin Tauri command handlers
-  repository/   SQLite persistence per entity
-  ssh/ sftp/    russh session, SFTP, forwarding, and monitoring engines
-  pty/          Local shell sessions via portable-pty
-  sync/ crypto/ Vault snapshot, provider clients (Gist, Drive, OneDrive,
-                WebDAV, S3), OAuth, Argon2id + AES-256-GCM
-  ai/           Anthropic and OpenAI-compatible chat clients
-```
-
-Issues and pull requests are welcome.
-
 ## License
 
-[GPL-3.0-only](LICENSE) · [Privacy policy](docs/privacy-policy.md) · [Terms of service](docs/terms-of-service.md)
+[GPL-3.0-only](LICENSE)

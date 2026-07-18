@@ -105,6 +105,63 @@ jobs:
         with:
           rust-targets: ${{ matrix.rust-targets }}
 
+      - name: Import Apple Developer certificate
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in \
+            APPLE_CERTIFICATE \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_ID \
+            APPLE_PASSWORD \
+            APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required Actions secret: $name"
+              exit 1
+            fi
+          done
+
+          CERTIFICATE_PATH="$RUNNER_TEMP/apple-certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/apple-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          SIGNING_IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+              | awk -F'"' '/Developer ID Application/ { print $2; exit }'
+          )"
+          if [[ -z "$SIGNING_IDENTITY" ]]; then
+            echo "::error::The certificate does not contain a Developer ID Application identity"
+            exit 1
+          fi
+
+          {
+            printf 'APPLE_SIGNING_IDENTITY=%s\n' "$SIGNING_IDENTITY"
+            printf 'APPLE_ID=%s\n' "$APPLE_ID"
+            printf 'APPLE_PASSWORD=%s\n' "$APPLE_PASSWORD"
+            printf 'APPLE_TEAM_ID=%s\n' "$APPLE_TEAM_ID"
+          } >> "$GITHUB_ENV"
+
       - name: Build and publish
         uses: tauri-apps/tauri-action@v1
         env:

@@ -1,51 +1,51 @@
-# Terms of Service
+# 服务条款
 
-Effective date: 2026-07-04
+生效日期：2026-07-04
 
-Please read these terms carefully before using Sageport. By installing, running, or otherwise using Sageport (the "Application"), you agree to be bound by them.
+使用 Sageport 前，请仔细阅读本条款。安装、运行或以其他方式使用 Sageport（以下简称“本应用”），即表示您同意受本条款约束。
 
-## 1. About the Application
+## 1. 关于本应用
 
-Sageport is an open-source desktop SSH workbench that integrates a terminal, SFTP file transfer, host and credential management, command snippets, port forwarding, and an optional AI assistant. The Application is open source under [GPL-3.0-only](https://github.com/joygqz/sageport/blob/main/LICENSE); its source code is available for inspection and modification in the [GitHub repository](https://github.com/joygqz/sageport).
+Sageport 是一款开源桌面 SSH 工作台，集成终端、SFTP 文件传输、主机与凭据管理、命令片段、端口转发及可选的 AI 助手。本应用依据 [GPL-3.0-only](https://github.com/joygqz/sageport/blob/main/LICENSE) 许可证开源；您可以在 [GitHub 仓库](https://github.com/joygqz/sageport)中查看和修改源代码。
 
-## 2. License to use
+## 2. 使用许可
 
-Subject to the terms of the GPL-3.0-only license, you may freely download, install, use, copy, modify, and distribute the Application. The specific terms of GPL-3.0-only govern, as set out in the [LICENSE](https://github.com/joygqz/sageport/blob/main/LICENSE) file; in the event of any conflict between this document and the LICENSE file, the LICENSE file controls.
+在遵守 GPL-3.0-only 许可证条款的前提下，您可以自由下载、安装、使用、复制、修改和分发本应用。具体授权条件以 [LICENSE](https://github.com/joygqz/sageport/blob/main/LICENSE) 文件中的 GPL-3.0-only 条款为准；如本文档与 LICENSE 文件存在冲突，应以 LICENSE 文件为准。
 
-## 3. Your responsibilities
+## 3. 您的责任
 
-By using the Application, you agree to:
+使用本应用即表示您同意：
 
-- Connect only to servers and systems you are authorized to access, and comply with the policies of those systems' owners and all applicable laws.
-- Safeguard the passwords, private keys, passphrases, and third-party credentials (API keys, sync provider authorizations, etc.) you store in the Application; you are responsible for any loss resulting from their compromise.
-- Review AI-proposed operations before approving them in the default supervised mode. If you enable Autonomous mode, AI-generated operations may execute without individual prompts; AI output can contain errors or inappropriate actions, and you remain solely responsible for its consequences.
-- Remember the passphrase you set when enabling Sync — losing it makes previously synced data permanently unrecoverable, and neither the Application nor the developer can recover it for you.
-- Comply with the terms of service of any third-party service you connect to or authorize through the Application (GitHub, Google Drive, Microsoft OneDrive, WebDAV/S3 providers, AI providers, etc.).
+- 仅连接您已获授权访问的服务器和系统，并遵守系统所有者的政策及所有适用法律；
+- 妥善保管存储在本应用中的密码、私钥、口令和第三方凭据，包括 API 密钥及同步服务商授权等；因上述信息泄露造成的损失由您自行承担；
+- 在默认的监督模式下，批准 AI 建议的操作前应进行审查。启用自主模式后，AI 生成的操作可能在不逐项提示的情况下执行；AI 输出可能存在错误或包含不适当的操作，其后果仍由您自行承担；
+- 妥善记住启用同步时设置的同步口令。丢失该口令将导致之前同步的数据永久无法恢复，本应用和开发者均无法帮助找回；
+- 遵守您通过本应用连接或授权的所有第三方服务的服务条款，包括 GitHub、Google Drive、Microsoft OneDrive、WebDAV/S3 服务商及 AI 服务商等。
 
-## 4. Third-party services
+## 4. 第三方服务
 
-Some features of the Application rely on third-party services that you choose, configure, or authorize yourself, including but not limited to:
+本应用的部分功能依赖由您自行选择、配置或授权的第三方服务，包括但不限于：
 
-- GitHub Gist, Google Drive, Microsoft OneDrive, WebDAV, and S3-compatible storage used for Sync & backup;
-- Anthropic or any OpenAI-compatible endpoint used by the AI assistant;
-- GitHub Releases, used to check for updates.
+- 用于同步与备份的 GitHub Gist、Google Drive、Microsoft OneDrive、WebDAV 和兼容 S3 的存储服务；
+- AI 助手使用的 Anthropic 或任意兼容 OpenAI API 的端点；
+- 用于检查更新的 GitHub Releases。
 
-These third-party services are operated independently by their respective providers, and their availability, behavior, and data handling are governed entirely by that provider's own terms and policies. The developer has no involvement in and bears no responsibility for the availability, accuracy, or consequences of any third-party service.
+上述第三方服务均由各自服务商独立运营，其可用性、行为和数据处理方式完全受相应服务商自身条款及政策约束。开发者不参与第三方服务的运营，也不对任何第三方服务的可用性、准确性或使用后果承担责任。
 
-## 5. Disclaimer of warranties
+## 5. 免责声明与责任限制
 
-The Application is provided "AS IS," without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, and non-infringement. The developer does not warrant that the Application will be error-free, uninterrupted, or fault-free in any environment.
+本应用按“现状”提供，不附带任何明示或默示的保证，包括但不限于适销性、特定用途适用性和不侵权保证。开发者不保证本应用在任何环境中均无错误、不会中断或不存在故障。
 
-To the maximum extent permitted by applicable law, the developer shall not be liable for any direct, indirect, incidental, special, or consequential damages arising from the use of, or inability to use, the Application, including but not limited to data loss, server misconfiguration, credential compromise, or data rendered unrecoverable due to a lost sync passphrase.
+在适用法律允许的最大范围内，对于因使用或无法使用本应用而产生的任何直接、间接、附带、特殊或后果性损害，开发者不承担责任，包括但不限于数据丢失、服务器配置错误、凭据泄露，或因同步口令丢失而导致数据无法恢复。
 
-## 6. Free and open source
+## 6. 免费与开源
 
-The Application is provided free of charge, with no advertising, in-app purchases, or sale of user data. You are free to review the source code to independently verify the privacy and security commitments described above.
+本应用免费提供，不包含广告、应用内购买，也不会出售用户数据。您可以自由审查源代码，独立验证上述隐私和安全承诺。
 
-## 7. Changes to these terms
+## 7. 条款变更
 
-The developer may update these terms from time to time. Updates will appear as changes to this file in the source repository, and the full history of changes is visible through Git commit history. Continued use of the Application after a change constitutes acceptance of the revised terms.
+开发者可能不时更新本条款。更新会以源代码仓库中的文件变更形式发布，完整变更记录可通过 Git 提交历史查看。在条款变更后继续使用本应用，即表示您接受修订后的条款。
 
-## 8. Contact
+## 8. 联系方式
 
-If you have questions about these terms, reach the developer via [GitHub Issues](https://github.com/joygqz/sageport/issues).
+如对本条款有任何疑问，请通过 [GitHub Issues](https://github.com/joygqz/sageport/issues) 联系开发者。
