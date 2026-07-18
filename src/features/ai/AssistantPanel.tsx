@@ -420,7 +420,6 @@ export function AssistantPanel({ width }: { width: number }) {
                   disabled={models.length === 0}
                   showChevron={false}
                   className="h-7 w-auto min-w-0 max-w-[70%] border-0 bg-transparent px-2 text-xs hover:bg-accent focus-visible:ring-0"
-                  contentClassName="max-w-[calc(100vw-1.5rem)]"
                 />
                 <div className="ml-auto flex items-center gap-1.5">
                   <ContextMeter

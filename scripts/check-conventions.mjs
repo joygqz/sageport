@@ -69,7 +69,10 @@ for (const file of localeFiles) {
 
 for (const file of sourceFiles.filter((file) => file.endsWith(".tsx"))) {
   const text = readFileSync(root + file, "utf8");
-  if (/<(?:select|option)\b/.test(text)) {
+  if (
+    file !== "src/components/ui/select.tsx" &&
+    /<(?:select|option)\b/.test(text)
+  ) {
     problems.push(
       `${file}: use the shared Select component instead of native select/option elements`,
     );
