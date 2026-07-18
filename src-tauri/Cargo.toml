@@ -42,8 +42,8 @@ aes-gcm = "0.11"
 argon2 = "0.5"
 rand = "0.10"
 base64 = "0.22"
-png = "0.17"
-keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+png = "0.18"
+keyring = "4.1.5"
 zeroize = "1"
 
 russh = "0.62.2"
