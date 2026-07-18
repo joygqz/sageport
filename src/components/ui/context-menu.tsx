@@ -28,6 +28,7 @@ function ContextMenuGroup(
 
 function ContextMenuContent({
   className,
+  collisionPadding = 8,
   ref,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Content> & {
@@ -38,6 +39,7 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         ref={ref}
         data-slot="context-menu-content"
+        collisionPadding={collisionPadding}
         className={cn(POPOVER_CONTENT_CLASS, className)}
         {...props}
       />

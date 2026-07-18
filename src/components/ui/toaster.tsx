@@ -103,7 +103,7 @@ export function Toaster() {
       })}
       <ToastPrimitive.Viewport
         label={translate("common.notifications")}
-        className="pointer-events-none fixed bottom-[calc(var(--statusbar-height)+0.75rem)] left-3 right-3 z-[100] flex w-auto flex-col gap-2 outline-none sm:bottom-[calc(var(--statusbar-height)+1rem)] sm:left-auto sm:right-4 sm:w-80"
+        className="pointer-events-none fixed bottom-[calc(var(--statusbar-height)+0.75rem)] left-3 right-3 z-[100] flex max-h-[calc(100dvh-var(--statusbar-height)-1.5rem)] w-auto flex-col gap-2 overflow-y-auto outline-none sm:bottom-[calc(var(--statusbar-height)+1rem)] sm:left-auto sm:right-4 sm:w-80"
       />
     </ToastPrimitive.Provider>
   );

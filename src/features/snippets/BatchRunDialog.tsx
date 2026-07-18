@@ -13,6 +13,7 @@ import {
   ErrorState,
   Field,
   FormDialog,
+  INTERACTIVE_FOCUS_CLASS,
   LoadingState,
   ScrollArea,
   Switch,
@@ -219,8 +220,13 @@ function ResultRow({ name, result }: { name: string; result: Result }) {
     <div className="overflow-hidden rounded-lg border border-border bg-surface">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-list-hover"
+        onClick={() => body && setOpen((o) => !o)}
+        aria-expanded={body ? open : undefined}
+        className={cn(
+          INTERACTIVE_FOCUS_CLASS,
+          "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors",
+          body ? "hover:bg-list-hover" : "cursor-default",
+        )}
       >
         {result.status === "queued" ? (
           <Clock3 className="size-3.5 shrink-0 text-muted-foreground" />

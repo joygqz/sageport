@@ -124,6 +124,7 @@ function PermissionsBody({
                 <Switch
                   checked={hasBit(mode, cls, bit)}
                   onCheckedChange={() => setBoth(toggleBit(mode, cls, bit))}
+                  aria-label={`${t(`sftp.permissions.${cls}`)} ${t(`sftp.permissions.${bit}`)}`}
                 />
               </div>
             ))}

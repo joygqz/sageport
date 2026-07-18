@@ -11,7 +11,10 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { CONTROL_INTERACTION_CLASS } from "@/components/ui/styles";
+import {
+  CONTROL_INTERACTION_CLASS,
+  INTERACTIVE_FOCUS_CLASS,
+} from "@/components/ui/styles";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { AgentLogItem, ToolStatus } from "./transcript";
@@ -130,7 +133,11 @@ export function ToolActivity({
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-accent"
+        aria-expanded={expanded}
+        className={cn(
+          INTERACTIVE_FOCUS_CLASS,
+          "flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-accent",
+        )}
       >
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-muted-foreground">

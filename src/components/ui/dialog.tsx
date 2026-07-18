@@ -9,7 +9,7 @@ export const DIALOG_OVERLAY_CLASS =
   "fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] dark:bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 
 export const DIALOG_CONTENT_CLASS =
-  "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-4 rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-md sm:p-6 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
+  "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-4 overscroll-contain rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-md sm:p-6 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
 
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -136,7 +136,7 @@ function DialogContent({
         {children}
         {showClose && (
           <DialogPrimitive.Close className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-lg text-muted-foreground opacity-70 transition-[background-color,opacity] hover:bg-accent hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/35">
-            <X className="size-4" />
+            <X aria-hidden="true" className="size-4" />
             <span className="sr-only">{t("common.close")}</span>
           </DialogPrimitive.Close>
         )}
@@ -174,7 +174,7 @@ function DialogToolbar({
       <DialogTitle className="min-w-0 flex-1 truncate">{children}</DialogTitle>
       {actions}
       <DialogPrimitive.Close className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-70 transition-[background-color,opacity] hover:bg-accent hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/35">
-        <X className="size-4" />
+        <X aria-hidden="true" className="size-4" />
         <span className="sr-only">{t("common.close")}</span>
       </DialogPrimitive.Close>
     </div>

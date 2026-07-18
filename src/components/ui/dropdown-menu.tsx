@@ -58,6 +58,7 @@ function DropdownMenuRadioGroup(
 function DropdownMenuContent({
   className,
   sideOffset = 4,
+  collisionPadding = 8,
   ref,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content> & {
@@ -69,6 +70,7 @@ function DropdownMenuContent({
         ref={ref}
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         className={cn(POPOVER_CONTENT_CLASS, className)}
         {...props}
       />

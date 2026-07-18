@@ -25,6 +25,7 @@ function TooltipTrigger(
 function TooltipContent({
   className,
   sideOffset = 6,
+  collisionPadding = 8,
   ref,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content> & {
@@ -36,8 +37,9 @@ function TooltipContent({
         ref={ref}
         data-slot="tooltip-content"
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         className={cn(
-          "z-50 overflow-hidden rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background shadow-sm",
+          "pointer-events-none z-50 max-w-72 select-none overflow-hidden rounded-md bg-foreground px-2.5 py-1.5 text-center text-xs font-medium leading-snug text-background shadow-sm",
           "data-[state=delayed-open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=delayed-open]:fade-in-0",
           className,
         )}

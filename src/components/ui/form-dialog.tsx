@@ -79,9 +79,10 @@ export function FormBody({
 }
 
 export function FormLoading() {
+  const { t } = useI18n();
   return (
     <div className="flex min-h-48 flex-1 items-center justify-center">
-      <Spinner />
+      <Spinner label={t("common.loading")} />
     </div>
   );
 }

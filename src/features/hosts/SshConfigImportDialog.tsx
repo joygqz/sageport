@@ -177,6 +177,7 @@ function ImportBody({ onClose }: { onClose: () => void }) {
                 checked={on}
                 disabled={disabled}
                 onCheckedChange={() => toggle(entry)}
+                aria-label={entry.alias}
               />
               <button
                 type="button"

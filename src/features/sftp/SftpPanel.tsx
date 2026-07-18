@@ -143,9 +143,10 @@ export function SftpPanel({ height }: { height: number }) {
                       })}
                     </span>
                     {pendingConflict.remaining > 0 && (
-                      <label className="flex items-center gap-2 text-xs text-muted">
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         <input
                           type="checkbox"
+                          className="ui-checkbox"
                           checked={pendingConflict.applyToRemaining}
                           onChange={(event) =>
                             setConflictApplyToRemaining(event.target.checked)
