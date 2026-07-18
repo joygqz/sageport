@@ -35,7 +35,13 @@ export function ForwardFormDialog({
         forward ? t("forwards.form.editTitle") : t("forwards.form.newTitle")
       }
     >
-      <ForwardFormBody forward={forward} onClose={onClose} />
+      {open && (
+        <ForwardFormBody
+          key={forward?.id ?? "new"}
+          forward={forward}
+          onClose={onClose}
+        />
+      )}
     </FormDialog>
   );
 }

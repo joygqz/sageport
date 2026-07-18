@@ -36,11 +36,13 @@ export function IdentityFormDialog({
           : t("credentials.identities.newTitle")
       }
     >
-      <IdentityFormBody
-        key={identity?.id ?? "new"}
-        identity={identity}
-        onClose={onClose}
-      />
+      {open && (
+        <IdentityFormBody
+          key={identity?.id ?? "new"}
+          identity={identity}
+          onClose={onClose}
+        />
+      )}
     </FormDialog>
   );
 }

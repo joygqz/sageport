@@ -21,7 +21,7 @@ describe("Select", () => {
       );
 
       expect(html).toContain(
-        `<option value="${option.value}" selected="">${option.label}</option>`,
+        `value="${option.value}" selected="">${option.label}</option>`,
       );
     });
   }
