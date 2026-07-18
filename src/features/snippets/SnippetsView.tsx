@@ -111,7 +111,7 @@ export function SnippetsView() {
       cancelLabel: t("common.cancel"),
       actions: [
         {
-          label: t("common.delete"),
+          label: t("snippets.delete.action"),
           variant: "destructive",
           onSelect: () =>
             void deleteSnippet.mutateAsync(snippet.id).catch((err) => {

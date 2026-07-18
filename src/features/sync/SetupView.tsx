@@ -159,7 +159,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setMismatch(null)}>
-              {t("settings.sync.setup.mismatchCancelButton")}
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"

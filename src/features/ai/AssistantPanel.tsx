@@ -279,11 +279,7 @@ export function AssistantPanel({ width }: { width: number }) {
                           )}
                           <button
                             type="button"
-                            aria-label={t(
-                              deleteTargetId === s.id
-                                ? "common.confirm"
-                                : "common.delete",
-                            )}
+                            aria-label={t("ai.deleteChat")}
                             className={cn(
                               "rounded text-muted-foreground hover:bg-accent hover:text-danger",
                               deleteTargetId === s.id
@@ -301,7 +297,7 @@ export function AssistantPanel({ width }: { width: number }) {
                             }}
                           >
                             {deleteTargetId === s.id ? (
-                              t("common.confirm")
+                              t("common.delete")
                             ) : (
                               <Trash2 className="size-3.5" />
                             )}

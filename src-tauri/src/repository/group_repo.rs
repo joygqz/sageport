@@ -135,7 +135,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: GroupInput) -> AppResult
     Ok(group)
 }
 
-pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResult<()> {
+pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let mut tx = pool.begin().await?;
     let group =
         sqlx::query_as::<_, Group>("SELECT * FROM groups WHERE id = ? AND deleted_at IS NULL")
@@ -144,75 +144,15 @@ pub async fn delete(pool: &SqlitePool, id: &str, delete_hosts: bool) -> AppResul
             .await?
             .ok_or_else(|| AppError::NotFound(format!("group {id}")))?;
     let ts = now();
-    if delete_hosts {
-        let external_jump_users: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*)
-             FROM hosts AS dependent
-             JOIN hosts AS jump ON dependent.jump_host_id = jump.id
-             WHERE jump.group_id = ?
-               AND jump.deleted_at IS NULL
-               AND dependent.deleted_at IS NULL
-               AND (dependent.group_id IS NULL OR dependent.group_id != ?)",
-        )
-        .bind(id)
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
-        if external_jump_users > 0 {
-            return Err(AppError::InUse(format!(
-                "hosts in this group are still used as jump hosts by {external_jump_users} host{} outside the group; reassign them before deleting the group",
-                if external_jump_users == 1 { "" } else { "s" }
-            )));
-        }
-        let forwards: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*)
-             FROM port_forwards AS forward
-             JOIN hosts AS host ON host.id = forward.host_id
-             WHERE host.group_id = ?
-               AND host.deleted_at IS NULL
-               AND forward.deleted_at IS NULL",
-        )
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
-        if forwards > 0 {
-            return Err(AppError::InUse(format!(
-                "hosts in this group are still used by {forwards} port forward{}; delete them before deleting the group",
-                if forwards == 1 { "" } else { "s" }
-            )));
-        }
-        sqlx::query(
-            "UPDATE sftp_bookmarks
-             SET deleted_at = ?, updated_at = ?, revision = revision + 1
-             WHERE deleted_at IS NULL
-               AND host_id IN (
-                 SELECT id FROM hosts WHERE group_id = ? AND deleted_at IS NULL
-               )",
-        )
-        .bind(&ts)
-        .bind(&ts)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query(
-            "UPDATE hosts SET deleted_at = ?, updated_at = ?, revision = revision + 1
-             WHERE group_id = ? AND deleted_at IS NULL",
-        )
-        .bind(&ts)
-        .bind(&ts)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    } else {
-        sqlx::query(
-            "UPDATE hosts SET group_id = NULL, updated_at = ?, revision = revision + 1
-             WHERE group_id = ? AND deleted_at IS NULL",
-        )
-        .bind(&ts)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    }
+    sqlx::query(
+        "UPDATE hosts SET group_id = ?, updated_at = ?, revision = revision + 1
+         WHERE group_id = ? AND deleted_at IS NULL",
+    )
+    .bind(&group.parent_id)
+    .bind(&ts)
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query(
         "UPDATE groups
          SET parent_id = ?, updated_at = ?, revision = revision + 1
@@ -246,8 +186,8 @@ mod tests {
     use sqlx::sqlite::SqlitePoolOptions;
 
     use super::*;
-    use crate::domain::{auth, forward_kind, HostInput, PortForwardInput};
-    use crate::repository::{forward_repo, host_repo};
+    use crate::domain::{auth, HostInput};
+    use crate::repository::host_repo;
 
     async fn test_pool() -> SqlitePool {
         let pool = SqlitePoolOptions::new()
@@ -307,7 +247,7 @@ mod tests {
             Err(AppError::Invalid(_))
         ));
 
-        delete(&pool, &parent.id, false).await.unwrap();
+        delete(&pool, &parent.id).await.unwrap();
         assert!(get(&pool, &parent.id).await.is_err());
         assert!(get(&pool, &child.id).await.unwrap().parent_id.is_none());
         assert!(host_repo::get(&pool, &host.id)
@@ -318,50 +258,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn blocks_group_host_deletion_when_jump_hosts_are_used_outside() {
+    async fn moves_hosts_and_children_to_the_deleted_groups_parent() {
         let pool = test_pool().await;
-        let group = create(&pool, group_input("jump", None)).await.unwrap();
-        let jump = host_repo::create(&pool, host_input("jump", Some(group.id.clone())))
+        let parent = create(&pool, group_input("parent", None)).await.unwrap();
+        let group = create(&pool, group_input("nested", Some(parent.id.clone())))
             .await
             .unwrap();
-        let mut dependent_input = host_input("dependent", None);
-        dependent_input.jump_host_id = Some(jump.id);
-        host_repo::create(&pool, dependent_input).await.unwrap();
-
-        assert!(matches!(
-            delete(&pool, &group.id, true).await,
-            Err(AppError::InUse(_))
-        ));
-        assert!(get(&pool, &group.id).await.is_ok());
-    }
-
-    #[tokio::test]
-    async fn blocks_group_host_deletion_when_a_forward_uses_a_host() {
-        let pool = test_pool().await;
-        let group = create(&pool, group_input("forwarded", None)).await.unwrap();
+        let child = create(&pool, group_input("child", Some(group.id.clone())))
+            .await
+            .unwrap();
         let host = host_repo::create(&pool, host_input("web", Some(group.id.clone())))
             .await
             .unwrap();
-        forward_repo::create(
-            &pool,
-            PortForwardInput {
-                host_id: host.id,
-                label: "Web".into(),
-                kind: forward_kind::LOCAL.into(),
-                bind_host: "127.0.0.1".into(),
-                bind_port: 18080,
-                target_host: Some("127.0.0.1".into()),
-                target_port: Some(8080),
-                auto_start: false,
-            },
-        )
-        .await
-        .unwrap();
 
-        assert!(matches!(
-            delete(&pool, &group.id, true).await,
-            Err(AppError::InUse(_))
-        ));
-        assert!(get(&pool, &group.id).await.is_ok());
+        delete(&pool, &group.id).await.unwrap();
+
+        assert_eq!(
+            host_repo::get(&pool, &host.id).await.unwrap().group_id,
+            Some(parent.id.clone())
+        );
+        assert_eq!(
+            get(&pool, &child.id).await.unwrap().parent_id,
+            Some(parent.id)
+        );
     }
 }

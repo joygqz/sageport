@@ -290,7 +290,10 @@ export function FilePane({ side }: { side: PaneSide }) {
     const [entry] = entries;
     if (!entry) return;
     setConfirmState({
-      title: t("common.delete"),
+      title:
+        entries.length === 1
+          ? t("sftp.deleteOneTitle")
+          : t("sftp.deleteManyTitle", { count: entries.length }),
       description:
         entries.length === 1
           ? t("common.deleteConfirm", { name: entry.name })
@@ -298,7 +301,10 @@ export function FilePane({ side }: { side: PaneSide }) {
       cancelLabel: t("common.cancel"),
       actions: [
         {
-          label: t("common.delete"),
+          label:
+            entries.length === 1
+              ? t("sftp.deleteOneAction")
+              : t("sftp.deleteManyAction"),
           variant: "destructive",
           onSelect: () => void onDelete(tab, entries),
         },

@@ -50,7 +50,7 @@ export function CommandHistoryDialog({
 
   const confirmClear = () => {
     setConfirmState({
-      title: t("snippets.history.title"),
+      title: t("snippets.history.clearTitle"),
       description: t("snippets.history.clearConfirm"),
       cancelLabel: t("common.cancel"),
       actions: [

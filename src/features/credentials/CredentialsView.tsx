@@ -274,7 +274,7 @@ function KeyList({
       cancelLabel: t("common.cancel"),
       actions: [
         {
-          label: t("common.delete"),
+          label: t("credentials.keys.delete.action"),
           variant: "destructive",
           onSelect: () =>
             void deleteKey.mutateAsync(key.id).catch((err) => {
@@ -432,7 +432,7 @@ function IdentityList({
       cancelLabel: t("common.cancel"),
       actions: [
         {
-          label: t("common.delete"),
+          label: t("credentials.identities.delete.action"),
           variant: "destructive",
           onSelect: () =>
             void deleteIdentity.mutateAsync(identity.id).catch((err) => {

@@ -566,7 +566,7 @@ function TabItem({
 
         {dirty && (
           <span
-            aria-label={t("editor.unsavedTitle")}
+            aria-label={t("editor.unsavedIndicator")}
             className="size-1.5 shrink-0 rounded-full bg-foreground/70"
           />
         )}

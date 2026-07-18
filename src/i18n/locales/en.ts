@@ -5,7 +5,6 @@ export const en = {
     close: "Close",
     copy: "Copy",
     copied: "Copied",
-    confirm: "Confirm",
     create: "Create",
     delete: "Delete",
     edit: "Edit",
@@ -14,14 +13,14 @@ export const en = {
     save: "Save",
     saveChanges: "Save changes",
     loading: "Loading…",
-    loadError: "Unable to load this content",
-    unexpectedError: "An unexpected error occurred",
+    loadError: "Failed to load content",
+    unexpectedError: "Something went wrong",
     notification: "Notification",
     notifications: "Notifications ({hotkey})",
     showPassword: "Show password",
     hidePassword: "Hide password",
     deleteConfirm:
-      "This will permanently delete {name}. This action cannot be undone.",
+      "This will permanently delete “{name}”. This action cannot be undone.",
     auth: {
       password: "Password",
       key: "SSH key",
@@ -41,7 +40,7 @@ export const en = {
     connectionInterrupted:
       "The connection was interrupted. Check your network, then reconnect to continue.",
     hostKeyRejected:
-      "The connection was cancelled because the host key was not trusted.",
+      "The connection was canceled because the host key was not trusted.",
     passwordPrompt: {
       title: "Authentication required",
       description: "{username}@{host}",
@@ -88,7 +87,7 @@ export const en = {
     uptimeHm: "{h}h {m}m",
     uptimeM: "{m}m",
     collecting: "Collecting statistics…",
-    unsupported: "Statistics are not available on this system.",
+    unsupported: "Statistics aren't available on this system.",
     empty: {
       title: "No active sessions",
       description: "Connect to a host to see live CPU, memory, and disk usage.",
@@ -126,16 +125,17 @@ export const en = {
       description: "Forward a local port to a remote service over SSH.",
     },
     delete: {
-      title: "Delete port forward",
+      title: "Delete port forward?",
+      action: "Delete port forward",
       error: "Failed to delete port forward",
     },
     form: {
       newTitle: "New port forward",
       editTitle: "Edit port forward",
-      required: "A name and host are required",
-      invalidBindPort: "Local port must be between 1 and 65535",
-      targetRequired: "A target host is required for this forwarding mode",
-      invalidTargetPort: "Target port must be between 1 and 65535",
+      required: "Enter a name and select a host",
+      invalidBindPort: "Enter a listen port from 1 to 65535",
+      targetRequired: "Enter a target host",
+      invalidTargetPort: "Enter a target port from 1 to 65535",
       saveError: "Failed to save port forward",
     },
   },
@@ -189,13 +189,14 @@ export const en = {
     closeTab: "Close tab",
     tabLimitReached: "You can open up to {count} terminal sessions",
     fileTabLimitReached: "You can open up to {count} files",
-    unsavedTitle: "Unsaved changes",
+    unsavedTitle: "Save changes?",
+    unsavedIndicator: "Unsaved changes",
     unsavedDescription:
-      "{name} has unsaved changes. Your changes will be lost if you don't save them.",
+      "Changes to “{name}” will be lost if you close it without saving.",
     unsavedWindowDescription:
-      "{count} open files have unsaved changes. Save them before closing Sageport?",
+      "Changes to {count} open files will be lost if you close Sageport without saving.",
     discard: "Don't save",
-    discardAll: "Don't save any",
+    discardAll: "Don't save",
     saveAll: "Save all",
     find: {
       dialogLabel: "Find and replace",
@@ -225,21 +226,21 @@ export const en = {
     syncOff: "Sync off",
     lastSynced: "Last synced {time}",
     syncPending: "Syncing…",
-    syncError: "Sync needs attention: {error}",
+    syncError: "Sync issue: {error}",
     updateAvailable: "Update available",
     updateReady: "Restart to update",
     broadcast: "Broadcasting input",
-    broadcastHint: "Typing is sent to every connected terminal. Click to stop.",
+    broadcastHint: "Send input to every connected terminal. Select to stop.",
     monitorHint: "CPU load, memory, and disk usage on the active host",
   },
 
   terminal: {
-    connecting: "Securing",
+    connecting: "Connecting securely",
     connectFailed: "Connection failed",
-    connectCancelled: "Connection cancelled",
+    connectCancelled: "Connection canceled",
     retry: "Try again",
     closed: "Session ended",
-    restored: "Session restored — reconnect when ready",
+    restored: "Session restored. Reconnect when ready",
     reconnect: "Reconnect",
     local: {
       title: "Local",
@@ -300,7 +301,7 @@ export const en = {
         user: "User",
       },
       viaJump: "via {jump}",
-      submit: "Import {count}",
+      submit: "Import {count} hosts",
       success: "Imported {count} hosts",
       error: "Failed to import from SSH config",
       warning: {
@@ -344,18 +345,29 @@ export const en = {
       },
     },
     deleteHost: {
-      title: "Delete host",
+      title: "Delete host?",
+      action: "Delete host",
       error: "Failed to delete host",
     },
     move: {
+      toUngrouped: "Move to ungrouped",
       error: "Failed to move host",
     },
+    moveGroup: {
+      toTopLevel: "Move to top level",
+      error: "Failed to move group",
+    },
     deleteGroup: {
-      title: "Delete group",
-      withHostsDescription:
-        "{name} contains {count} hosts. Choose what happens to them.",
-      keepHosts: "Delete group only",
-      withHosts: "Delete group and hosts",
+      title: "Delete group?",
+      action: "Delete group",
+      nestedBoth:
+        "{hostCount} hosts and {childCount} subgroups will move to {parent}.",
+      nestedHosts: "{count} hosts will move to {parent}.",
+      nestedGroups: "{count} subgroups will move to {parent}.",
+      rootBoth:
+        "{hostCount} hosts will become ungrouped. {childCount} subgroups will move to the top level.",
+      rootHosts: "{count} hosts will become ungrouped.",
+      rootGroups: "{count} subgroups will move to the top level.",
       error: "Failed to delete group",
     },
   },
@@ -364,21 +376,21 @@ export const en = {
     newTitle: "New host",
     editTitle: "Edit host",
     label: "Name",
-    labelRequired: "Name is required",
+    labelRequired: "Enter a name",
     labelPlaceholder: "Production web",
     group: "Group",
     noGroup: "No group",
     address: "Address",
-    addressRequired: "Address is required",
+    addressRequired: "Enter an address",
     addressPlaceholder: "10.0.0.4 or host.example.com",
     port: "Port",
-    portInvalid: "Port must be between 1 and 65535",
+    portInvalid: "Enter a port from 1 to 65535",
     credentials: "Credentials",
     customCredentials: "Custom credentials",
     usingIdentityHint:
       "Username and authentication come from the selected identity.",
     username: "Username",
-    usernameRequired: "Username is required.",
+    usernameRequired: "Enter a username",
     usernamePlaceholder: "root",
     authentication: "Authentication",
     password: "Password",
@@ -390,8 +402,8 @@ export const en = {
       "The saved password will be removed. You can enter it when connecting.",
     sshKey: "SSH key",
     selectKey: "Select a key",
-    keyRequired: "Select an SSH key.",
-    noKeysHint: "No keys yet. Add one on the credentials page.",
+    keyRequired: "Select an SSH key",
+    noKeysHint: "Add an SSH key before using key authentication.",
     jumpHost: "Jump host",
     noJumpHost: "Connect directly",
     jumpHostHint: "Route this connection through a bastion host.",
@@ -400,7 +412,7 @@ export const en = {
     startupCommandHint: "Runs automatically each time the session opens.",
     notes: "Notes",
     notesPlaceholder: "Optional notes about this host",
-    approval: "Approval protection",
+    approval: "AI operation approval",
     approvalHint:
       "When enabled, sensitive AI operations on this host always require manual approval.",
     approvalToggle: "Require manual approval",
@@ -427,7 +439,7 @@ export const en = {
     editTitle: "Edit group",
     name: "Name",
     namePlaceholder: "Production",
-    nameRequired: "Name is required",
+    nameRequired: "Enter a name",
     parent: "Parent group",
     noParent: "Top level",
     parentHint: "Optionally nest this group inside another group.",
@@ -452,7 +464,7 @@ export const en = {
       modeImport: "Import",
       name: "Name",
       namePlaceholder: "prod-deploy-key",
-      nameRequired: "Name is required",
+      nameRequired: "Enter a name",
       algorithmLabel: "Algorithm",
       algorithm: {
         ed25519: "Ed25519 (recommended)",
@@ -472,7 +484,7 @@ export const en = {
       privateKeyReplaceHint:
         "Leave blank to keep the current key, or paste/choose a replacement.",
       privateKeyKeepPlaceholder: "Leave blank to keep the current private key",
-      privateKeyRequired: "Private key is required",
+      privateKeyRequired: "Enter a private key",
       publicKey: "Public key",
       chooseFile: "Choose file",
       import: {
@@ -486,7 +498,8 @@ export const en = {
       empty: "No keys yet. Generate one or import an existing key.",
       addError: "Failed to save key",
       delete: {
-        title: "Delete key",
+        title: "Delete SSH key?",
+        action: "Delete SSH key",
         error: "Failed to delete key",
         inUse:
           "This key is still used by hosts or identities. Reassign them before deleting it.",
@@ -509,14 +522,15 @@ export const en = {
       passwordWillClear:
         "The saved password will be removed. You can enter it when connecting.",
       sshKey: "SSH key",
-      keyRequired: "Select an SSH key.",
+      keyRequired: "Select an SSH key",
       noKeysHint: "Add an SSH key first to use key authentication.",
       empty:
         "No identities yet. An identity bundles a username with an authentication method so many hosts can share one login.",
-      nameUsernameRequired: "Name and username are required",
+      nameUsernameRequired: "Enter a name and username",
       saveError: "Failed to save identity",
       delete: {
-        title: "Delete identity",
+        title: "Delete identity?",
+        action: "Delete identity",
         error: "Failed to delete identity",
         inUse:
           "This identity is still used by hosts. Reassign them before deleting it.",
@@ -530,14 +544,14 @@ export const en = {
     noMatches: "No matching snippets",
     new: "New snippet",
     batch: {
-      action: "Run on hosts…",
+      action: "Run on hosts",
       title: "Run on multiple hosts",
       command: "Command",
       hosts: "Hosts",
       noHosts: "No hosts available",
       hostLimit: "Select up to {count} hosts per run",
       run: "Run on {count}",
-      error: "Batch run failed",
+      error: "Failed to run command on hosts",
     },
     history: {
       title: "Command history",
@@ -547,10 +561,11 @@ export const en = {
       local: "Local terminal",
       empty: "No matching command history",
       loadError: "Failed to load command history",
-      useCount: "used {count} times",
-      clear: "Clear history",
+      useCount: "Used {count} times",
+      clear: "Clear command history",
+      clearTitle: "Clear command history?",
       clearConfirm:
-        "This will permanently clear command history for every host and local terminal.",
+        "Command history for every host and local terminal will be permanently cleared. This action cannot be undone.",
       clearError: "Failed to clear command history",
     },
     newTitle: "New snippet",
@@ -565,13 +580,13 @@ export const en = {
     descriptionPlaceholder: "Optional",
     empty: {
       title: "No snippets yet",
-      description:
-        "Save commands you run often and send them to a terminal with one click.",
+      description: "Save frequently used commands and run them in a terminal.",
     },
-    nameCommandRequired: "Name and command are required",
+    nameCommandRequired: "Enter a name and command",
     saveError: "Failed to save snippet",
     delete: {
-      title: "Delete snippet",
+      title: "Delete snippet?",
+      action: "Delete snippet",
       error: "Failed to delete snippet",
     },
     run: "Run in terminal",
@@ -610,8 +625,12 @@ export const en = {
     },
     emptyDir: "This folder is empty",
     fileList: "Files",
+    deleteOneTitle: "Delete item?",
+    deleteManyTitle: "Delete {count} items?",
+    deleteOneAction: "Delete item",
+    deleteManyAction: "Delete items",
     deleteManyConfirm:
-      "This will permanently delete {count} selected items. This action cannot be undone.",
+      "The {count} selected items will be permanently deleted. This action cannot be undone.",
     noTabTitle: "No location open",
     mkdirError: "Failed to create folder",
     createFileError: "Failed to create file",
@@ -634,6 +653,7 @@ export const en = {
     bookmarks: {
       title: "Bookmarks",
       add: "Bookmark this folder",
+      delete: "Delete bookmark",
       error: "Failed to save bookmark",
       deleteError: "Failed to delete bookmark",
     },
@@ -655,24 +675,26 @@ export const en = {
       saveError: "Failed to save file",
     },
     cancelTransfer: "Cancel transfer",
-    cancelling: "Cancelling…",
+    cancelling: "Canceling…",
     cancelError: "Failed to cancel transfer",
     remaining: "{time} left",
     history: {
       title: "Transfer history",
       empty: "No transfers yet",
-      clear: "Clear history",
+      clear: "Clear transfer history",
+      clearTitle: "Clear transfer history?",
       clearConfirm:
-        "This will clear all transfer history. This action cannot be undone.",
+        "All transfer history will be permanently cleared. This action cannot be undone.",
       clearError: "Failed to clear transfer history",
       loadError: "Failed to load transfer history",
       retry: "Retry transfer",
       retryError: "Failed to retry transfer",
+      delete: "Delete transfer record",
       status: {
         active: "In progress",
         done: "Done",
         error: "Failed",
-        cancelled: "Cancelled",
+        cancelled: "Canceled",
       },
     },
   },
@@ -683,7 +705,7 @@ export const en = {
     setup: {
       title: "Set up the assistant",
       description:
-        "Set the base URL of an OpenAI-compatible or Anthropic-compatible endpoint to start chatting.",
+        "Add an OpenAI-compatible or Anthropic-compatible endpoint to start chatting.",
       action: "Open settings",
     },
     empty: {
@@ -691,7 +713,7 @@ export const en = {
       description:
         "It can inspect terminals, run commands, and use enabled tools. Changes require your approval.",
       descriptionAutonomous:
-        "Autonomous mode is on. Operations run without individual approval; stop them at any time.",
+        "Autonomous mode is on. Operations run without individual approval. You can stop them at any time.",
     },
     suggestion: {
       core: {
@@ -736,6 +758,7 @@ export const en = {
     history: "Chat history",
     noSessions: "No chats yet",
     untitledChat: "New chat",
+    deleteChat: "Delete chat",
     thinking: "Thinking",
     stop: "Stop generating",
     stepLimitReached: "Paused at the step limit for this run.",
@@ -745,9 +768,9 @@ export const en = {
     commandLabel: "Command",
     commandTarget: "Target: {name}",
     error: "Assistant error",
-    confirmRun: "Wants to run this command in your terminal",
-    confirmAction: "Wants to perform this action",
-    confirmTransfer: "Wants to transfer this file or directory",
+    confirmRun: "Run this command?",
+    confirmAction: "Allow this action?",
+    confirmTransfer: "Transfer this item?",
     approve: "Allow",
     deny: "Deny",
     modelLabel: "Model",
@@ -756,7 +779,7 @@ export const en = {
     contextUsage: "Context {percent}% · {used} / {total} tokens",
     autonomousMode: "Autonomous",
     autonomousModeHint:
-      "Operation approvals are being granted automatically. Open AI settings to turn this off.",
+      "Operations are approved automatically. Turn off autonomous mode in AI settings.",
     tool: {
       askUser: "Ask for your choice",
       listHosts: "List hosts",
@@ -833,13 +856,12 @@ export const en = {
       darkThemes: "Dark themes",
       lightThemes: "Light themes",
       language: "Language",
-      languageHint: "Sets the display language of the app.",
+      languageHint: "Choose the display language.",
       fontFamily: "Font family",
       fontFamilyHint:
-        "Applies to the terminal and file editor. Separate multiple fonts with commas; leave empty for the default font.",
+        "Applies to the terminal and file editor. Separate multiple fonts with commas. Leave blank to use the default font.",
       zoom: "Zoom",
-      zoomHint:
-        "Scales the whole interface, including the terminal. Shortcuts:",
+      zoomHint: "Scale the interface and terminal with these shortcuts",
       zoomIn: "Zoom in",
       zoomOut: "Zoom out",
       zoomReset: "Reset zoom",
@@ -856,25 +878,25 @@ export const en = {
       baseUrlHint: "OpenAI-compatible endpoints usually end with /v1.",
       modelLabel: "Model",
       modelHint:
-        "Enter a model id manually when the compatible endpoint does not expose a model list.",
+        "Enter a model ID if the endpoint doesn't provide a model list.",
       apiKeyLabel: "API key",
       apiKeyClear: "Clear",
-      apiKeySavedPlaceholder: "Saved — enter a replacement",
+      apiKeySavedPlaceholder: "Enter a new key to replace the saved key",
       apiKeyHint:
-        "Leave empty for endpoints that need no key, such as Ollama. Sent only to the AI endpoint you configure; included in end-to-end encrypted backups when sync is enabled.",
+        "Leave blank for endpoints that don't need a key, such as Ollama. The key is sent only to your configured AI endpoint and is included in encrypted backups when sync is on.",
       autonomousModeLabel: "Assistant mode",
-      autonomousMode: "Autonomous operation",
+      autonomousMode: "Autonomous mode",
       autonomousModeHint:
         "When enabled, the assistant automatically approves operations such as commands, file edits, and configuration changes. It will still ask when your intent or target is ambiguous.",
       autonomousModeWarning:
         "This can make irreversible changes to your systems. Enable it only for hosts and tasks you trust.",
       maxHistoryTokensLabel: "Max history tokens",
       maxHistoryTokensHint:
-        "Upper bound on conversation tokens sent to the model each turn. Leave empty for the default (200,000). Raise it on large-context models to keep more history, or lower it to reduce cost.",
+        "Limits the conversation history sent with each request. Leave blank for 200,000. Increase it to keep more history or decrease it to reduce cost.",
       tools: {
         title: "Assistant tools",
         description:
-          "Core tools are always available. Enable only the additional tools you need to keep prompts shorter and stop the assistant from picking irrelevant tools.",
+          "Core tools are always on. Enable only the additional tools you need.",
         required: "Required",
         group: {
           core: "Core",
@@ -892,7 +914,7 @@ export const en = {
         "Back up hosts, keys, snippets, and settings to a storage of your choice. Everything is end-to-end encrypted with your passphrase before it leaves this device. Disconnect first to switch storage.",
       providerLabel: "Storage provider",
       corruptRemoteBackup:
-        "The backup retrieved from the connected storage looks corrupted or from an incompatible app version.",
+        "The backup may be corrupt or from an incompatible version of Sageport.",
       provider: {
         gistTagline: "A secret gist on your GitHub account",
         gdriveTagline: "A hidden app folder in your Google Drive",
@@ -903,21 +925,20 @@ export const en = {
       setup: {
         oauthSignIn: "Sign in with {name}",
         oauthUnavailable:
-          "This build has no OAuth client ID for {name}, so sign-in is unavailable.",
+          "{name} sign-in isn't available because this build has no OAuth client ID.",
         oauthError: "Authorization failed",
-        deviceCodeHint:
-          "Enter this code on the GitHub page to authorize Sageport.",
+        deviceCodeHint: "Enter this code on GitHub to authorize Sageport.",
         openPageButton: "Open GitHub",
         browserWaiting: "Waiting for you to finish authorizing in the browser…",
         authorizedAs: "Signed in as {account}",
         reauthorizeButton: "Sign in again",
         webdavUrlLabel: "Server URL",
-        webdavUrlHint:
-          "A folder URL on the server; backups are stored inside it.",
+        webdavUrlHint: "Backups are stored in this folder URL.",
         usernameLabel: "Username",
         passwordLabel: "Password",
         s3EndpointLabel: "Endpoint",
-        s3EndpointHint: "The service URL, e.g. https://s3.amazonaws.com.",
+        s3EndpointHint:
+          "The service URL, for example https://s3.amazonaws.com.",
         s3RegionLabel: "Region",
         s3RegionHint: "Defaults to us-east-1.",
         s3BucketLabel: "Bucket",
@@ -929,14 +950,13 @@ export const en = {
         s3PathStyleHint: "Required by MinIO and most self-hosted services.",
         passphraseLabel: "Encryption passphrase",
         passphraseHint:
-          "Encrypts every backup end to end. Use the same passphrase on every device; it never leaves this device.",
+          "Encrypts every backup end to end. Use the same passphrase on every device. It never leaves this device.",
         connectButton: "Connect",
         connectedTitle: "Sync connected",
         connectError: "Failed to connect",
-        mismatchTitle: "Passphrase does not match",
+        mismatchTitle: "Clear remote backups?",
         mismatchDescription:
-          "This passphrase cannot decrypt the existing backup. Enter the original passphrase, or clear the remote backup history and back up manually when ready.",
-        mismatchCancelButton: "Try again",
+          "This passphrase can't decrypt the existing backup. Cancel to enter the original passphrase. Clearing the remote backup history permanently deletes every remote backup and can't be undone.",
         mismatchForceButton: "Clear remote backups",
       },
       connected: {
@@ -950,13 +970,13 @@ export const en = {
           "Current data matches the latest backup, so nothing was uploaded.",
         pushFailed: "Backup failed",
         pushWrongPassphrase:
-          "The connected backup can no longer be decrypted with this device's passphrase — it may have been re-encrypted from another device. Disconnect and reconnect with the correct passphrase to resolve.",
-        disconnectButton: "Disconnect",
-        disconnectError: "Failed to disconnect",
-        disconnectConfirmTitle: "Disconnect sync",
+          "This device's passphrase can't decrypt the connected backup. Disconnect and reconnect with the correct passphrase.",
+        disconnectButton: "Disconnect sync",
+        disconnectError: "Failed to disconnect sync",
+        disconnectConfirmTitle: "Disconnect sync?",
         disconnectConfirmDescription:
-          "This device stops backing up to the connected storage. Remote backups themselves are kept.",
-        disconnectConfirmButton: "Disconnect",
+          "Sync will stop on this device. Remote backups will remain available.",
+        disconnectConfirmButton: "Disconnect sync",
       },
       versions: {
         title: "Backup history",
@@ -968,13 +988,13 @@ export const en = {
         latestBadge: "Latest",
         refreshButton: "Refresh",
         restoreButton: "Restore",
-        restoreConfirmTitle: "Restore backup",
+        restoreConfirmTitle: "Restore backup?",
         restoreConfirmDescription:
           "All local data will be replaced by the selected backup. Changes made since then are lost and cannot be recovered.",
-        restoreConfirmButton: "Restore and overwrite",
+        restoreConfirmButton: "Restore backup",
         restoredTitle: "Backup restored",
         restoredPendingDescription:
-          "No backup was uploaded. When this is the version you want to keep, click Back up now.",
+          "No backup was uploaded. Back up now when you're ready to keep this version.",
         restoreFailed: "Restore failed",
         restoreWrongPassphrase:
           "This backup was encrypted with a different passphrase than the one configured for sync. Disconnect and reconnect with the correct passphrase, then try restoring again.",
@@ -983,8 +1003,8 @@ export const en = {
         title: "File backup",
         description:
           "Export or restore a single encrypted backup file independently of connected storage. You enter the passphrase each time, and it is never saved.",
-        exportButton: "Export to file…",
-        importButton: "Restore from file…",
+        exportButton: "Export to file",
+        importButton: "Restore from file",
         exportDialogTitle: "Export encrypted backup",
         importDialogTitle: "Restore encrypted backup",
         vaultFilterName: "Sageport backup",
@@ -997,13 +1017,14 @@ export const en = {
         importInvalidFile:
           "This isn't a valid Sageport backup file. Check that you selected the correct file.",
         passphraseDialogTitle: "Enter backup passphrase",
-        passphraseDialogConfirm: "Continue",
+        exportPassphraseConfirm: "Choose export location",
+        importPassphraseConfirm: "Choose backup file",
       },
     },
     about: {
       version: "Version {version}",
-      author: "Author: ",
-      license: "License:",
+      author: "Author",
+      license: "License",
       openLinkError: "Failed to open link",
       update: {
         title: "Software update",
@@ -1011,20 +1032,20 @@ export const en = {
         check: "Check for updates",
         checking: "Checking for updates…",
         currentVersion: "Current version {version}",
-        upToDate: "Sageport is up to date.",
-        available: "Version {version} is available.",
+        upToDate: "Sageport is up to date",
+        available: "Version {version} is available",
         install: "Download and install",
         viewRelease: "View release page",
         details: "View details",
         downloading: "Downloading…",
         downloadingVersion: "Downloading version {version}",
         downloadingProgress: "Downloading {percent}%",
-        ready: "Version {version} is ready to install.",
+        ready: "Version {version} is ready to install",
         restartHint: "Restart Sageport to finish the update.",
         restart: "Restart to update",
-        checkError: "Unable to check for updates",
-        installError: "Unable to install update",
-        restartError: "Unable to restart Sageport",
+        checkError: "Failed to check for updates",
+        installError: "Failed to install update",
+        restartError: "Failed to restart Sageport",
       },
     },
   },

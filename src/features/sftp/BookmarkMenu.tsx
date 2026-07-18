@@ -71,7 +71,7 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
             <span className="min-w-0 flex-1 truncate">{bookmark.label}</span>
             <button
               type="button"
-              aria-label={t("common.delete")}
+              aria-label={t("sftp.bookmarks.delete")}
               onClick={(e) => {
                 e.stopPropagation();
                 void deleteBookmark.mutateAsync(bookmark.id).catch((err) => {

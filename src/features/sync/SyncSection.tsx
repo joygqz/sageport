@@ -425,6 +425,7 @@ function FileBackupCard() {
       </div>
 
       <FilePassphraseDialog
+        action={action}
         open={action !== null}
         onOpenChange={(next) => !next && setAction(null)}
         onConfirm={handleConfirm}
@@ -434,10 +435,12 @@ function FileBackupCard() {
 }
 
 function FilePassphraseDialog({
+  action,
   open,
   onOpenChange,
   onConfirm,
 }: {
+  action: "export" | "import" | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (passphrase: string) => void;
@@ -446,6 +449,7 @@ function FilePassphraseDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <FilePassphraseForm
+          action={action}
           onCancel={() => onOpenChange(false)}
           onConfirm={onConfirm}
         />
@@ -455,9 +459,11 @@ function FilePassphraseDialog({
 }
 
 function FilePassphraseForm({
+  action,
   onCancel,
   onConfirm,
 }: {
+  action: "export" | "import" | null;
   onCancel: () => void;
   onConfirm: (passphrase: string) => void;
 }) {
@@ -484,7 +490,11 @@ function FilePassphraseForm({
           {t("common.cancel")}
         </Button>
         <Button onClick={() => onConfirm(passphrase)} disabled={!passphrase}>
-          {t("settings.sync.file.passphraseDialogConfirm")}
+          {t(
+            action === "import"
+              ? "settings.sync.file.importPassphraseConfirm"
+              : "settings.sync.file.exportPassphraseConfirm",
+          )}
         </Button>
       </DialogFooter>
     </>

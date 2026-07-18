@@ -4,7 +4,6 @@ import { ipc } from "@/lib/ipc";
 import type { Group, GroupInput } from "@/types/models";
 import { invalidateGroups, invalidateHosts } from "./cache";
 import {
-  bool,
   nullableStr,
   optionalStr,
   str,
@@ -57,18 +56,15 @@ async function deleteGroup(
 ): Promise<ToolExecutionResult> {
   const id = str(args, "id");
   if (!id) return toolFailure("Error: no group id given.");
-  const deleteHosts = bool(args, "deleteHosts");
   try {
-    await ipc.groups.remove(id, deleteHosts);
+    await ipc.groups.remove(id);
   } catch {
     return toolFailure(`Error: could not delete group "${id}".`);
   }
   invalidateGroups();
   invalidateHosts();
   return toolSuccess(
-    deleteHosts
-      ? `Deleted group ${id} and its hosts.`
-      : `Deleted group ${id}. Its hosts are now ungrouped.`,
+    `Deleted group ${id}. Its hosts and child groups were moved to its parent.`,
   );
 }
 
@@ -123,15 +119,11 @@ export const groupTools: AiTool[] = [
     spec: {
       name: "delete_group",
       description:
-        "Delete a host group. By default its hosts become ungrouped; set deleteHosts to also delete them.",
+        "Delete a host group without deleting hosts. Its hosts and direct child groups move to its parent.",
       parameters: {
         type: "object",
         properties: {
           id: { type: "string", description: "Group id." },
-          deleteHosts: {
-            type: "boolean",
-            description: "Also delete the hosts in the group.",
-          },
         },
         required: ["id"],
         additionalProperties: false,

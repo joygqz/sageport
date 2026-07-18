@@ -12,6 +12,7 @@ import {
   Input,
   PasswordInput,
   Select,
+  TreeSelect,
   SwitchField,
   Textarea,
 } from "@/components/ui";
@@ -64,10 +65,12 @@ const emptyValues: FormValues = {
 export function HostFormDialog({
   open,
   hostId,
+  initialGroupId,
   onClose,
 }: {
   open: boolean;
   hostId: string | null;
+  initialGroupId: string | null;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -78,16 +81,23 @@ export function HostFormDialog({
       width="w-[560px]"
       title={hostId ? t("hostForm.editTitle") : t("hostForm.newTitle")}
     >
-      <HostFormBody key={hostId ?? "new"} hostId={hostId} onClose={onClose} />
+      <HostFormBody
+        key={hostId ?? `new:${initialGroupId ?? "ungrouped"}`}
+        hostId={hostId}
+        initialGroupId={initialGroupId}
+        onClose={onClose}
+      />
     </FormDialog>
   );
 }
 
 function HostFormBody({
   hostId,
+  initialGroupId,
   onClose,
 }: {
   hostId: string | null;
+  initialGroupId: string | null;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -121,7 +131,9 @@ function HostFormBody({
     setValue,
     watch,
     formState: { errors },
-  } = useForm<FormValues>({ defaultValues: emptyValues });
+  } = useForm<FormValues>({
+    defaultValues: { ...emptyValues, groupId: initialGroupId ?? "" },
+  });
   const [passwordEdited, setPasswordEdited] = useState(false);
 
   useEffect(() => {
@@ -248,17 +260,16 @@ function HostFormBody({
             control={control}
             name="groupId"
             render={({ field }) => (
-              <Select
+              <TreeSelect
                 value={field.value}
                 onValueChange={field.onChange}
                 onBlur={field.onBlur}
-                options={[
-                  { value: "", label: t("hostForm.noGroup") },
-                  ...groups.map((group) => ({
-                    value: group.id,
-                    label: group.name,
-                  })),
-                ]}
+                rootOption={{ value: "", label: t("hostForm.noGroup") }}
+                nodes={groups.map((group) => ({
+                  value: group.id,
+                  label: group.name,
+                  parentValue: group.parentId,
+                }))}
               />
             )}
           />

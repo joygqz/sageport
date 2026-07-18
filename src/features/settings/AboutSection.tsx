@@ -60,7 +60,7 @@ export function AboutSection() {
             {t("settings.about.version", { version: __APP_VERSION__ })}
           </p>
           <p className="text-sm text-muted-foreground">
-            {t("settings.about.author")}
+            {t("settings.about.author")}{" "}
             <button
               type="button"
               className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/35"

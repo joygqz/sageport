@@ -88,7 +88,7 @@ export function ForwardsView() {
       cancelLabel: t("common.cancel"),
       actions: [
         {
-          label: t("common.delete"),
+          label: t("forwards.delete.action"),
           variant: "destructive",
           onSelect: () =>
             void deleteForward.mutateAsync(forward.id).catch((err) => {

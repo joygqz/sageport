@@ -10,6 +10,7 @@ import {
 import {
   Copy,
   FileInput,
+  Folder,
   FolderPlus,
   FolderSync,
   Pencil,
@@ -18,7 +19,6 @@ import {
   RefreshCw,
   Server,
   ShieldUser,
-  TextCursorInput,
   Trash2,
 } from "lucide-react";
 
@@ -41,7 +41,7 @@ import { useI18n } from "@/i18n";
 import { useDragCursor } from "@/lib/pointerDrag";
 import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
-import type { Host, HostHealthCheck } from "@/types/models";
+import type { Group, Host, HostHealthCheck } from "@/types/models";
 import { useLayoutStore } from "@/workbench/layout";
 import { useOverlayStore } from "@/workbench/overlays";
 import {
@@ -63,10 +63,12 @@ import {
   useDeleteHost,
   useGroups,
   useHosts,
+  useMoveGroup,
   useMoveHost,
   useSetHostOsHint,
 } from "./api";
 import { HostSystemIcon } from "./HostSystemIcon";
+import { descendantGroupIds } from "./groupTree";
 import { formatSshCommand } from "./ssh-command";
 
 const ConfirmDialog = lazy(() =>
@@ -82,6 +84,7 @@ const SshConfigImportDialog = lazy(() =>
 );
 
 const UNGROUPED = "__ungrouped__";
+const GROUP_ROOT = "__group_root__";
 interface HostDragPointer {
   clientX: number;
   clientY: number;
@@ -90,6 +93,10 @@ interface HostDragPointer {
 
 interface HostDragState extends HostDragPointer {
   host: Host;
+}
+
+interface GroupDragState extends HostDragPointer {
+  group: Group;
 }
 
 const HEALTH_REASON_KEYS = {
@@ -118,6 +125,7 @@ export function HostsView() {
   const deleteHost = useDeleteHost();
   const deleteGroup = useDeleteGroup();
   const moveHost = useMoveHost();
+  const moveGroup = useMoveGroup();
   const checkHealth = useCheckHostHealth();
   const openHostForm = useOverlayStore((s) => s.openHostForm);
   const openGroupForm = useOverlayStore((s) => s.openGroupForm);
@@ -138,12 +146,22 @@ export function HostsView() {
   const dropTargetRef = useRef<string | null>(null);
   const [dragState, setDragState] = useState<HostDragState | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const dragGroupRef = useRef<{
+    group: Group;
+    from: string;
+    unavailable: Set<string>;
+  } | null>(null);
+  const groupDropTargetRef = useRef<string | null>(null);
+  const [groupDragState, setGroupDragState] = useState<GroupDragState | null>(
+    null,
+  );
+  const [groupDropTarget, setGroupDropTarget] = useState<string | null>(null);
 
   const searching = query.trim().length > 0;
   const isLoading = hostsLoading || groupsLoading;
   const isError = hostsError || groupsError;
 
-  useDragCursor(dragState !== null);
+  useDragCursor(dragState !== null || groupDragState !== null);
 
   const beginHostDrag = (host: Host, pointer: HostDragPointer) => {
     dragHostRef.current = { id: host.id, from: host.groupId ?? UNGROUPED };
@@ -162,11 +180,15 @@ export function HostsView() {
   };
 
   const updateHostDrag = (clientX: number, clientY: number) => {
-    const section = document
-      .elementFromPoint(clientX, clientY)
-      ?.closest<HTMLElement>("[data-host-group-id]");
+    const element = document.elementFromPoint(clientX, clientY);
+    const section = element?.closest<HTMLElement>("[data-host-group-id]");
     const sectionId = section?.dataset.hostGroupId;
-    const nextTarget = sectionId && canDropOn(sectionId) ? sectionId : null;
+    const candidate =
+      sectionId ??
+      (element?.closest("[data-group-root-drop-target]")
+        ? UNGROUPED
+        : undefined);
+    const nextTarget = candidate && canDropOn(candidate) ? candidate : null;
     dropTargetRef.current = nextTarget;
     setDropTarget(nextTarget);
     setDragState((current) =>
@@ -183,6 +205,66 @@ export function HostsView() {
       { id: drag.id, groupId: sectionId === UNGROUPED ? null : sectionId },
       {
         onError: (err) => toast.error(t("hosts.move.error"), errorMessage(err)),
+      },
+    );
+  };
+
+  const beginGroupDrag = (group: Group, pointer: HostDragPointer) => {
+    dragGroupRef.current = {
+      group,
+      from: group.parentId ?? GROUP_ROOT,
+      unavailable: descendantGroupIds(groups, group.id),
+    };
+    setGroupDragState({ group, ...pointer });
+  };
+
+  const clearGroupDrag = () => {
+    dragGroupRef.current = null;
+    groupDropTargetRef.current = null;
+    setGroupDragState(null);
+    setGroupDropTarget(null);
+  };
+
+  const updateGroupDrag = (clientX: number, clientY: number) => {
+    const element = document.elementFromPoint(clientX, clientY);
+    const section = element?.closest<HTMLElement>("[data-host-group-id]");
+    const sectionId = section?.dataset.hostGroupId;
+    const candidate = sectionId
+      ? sectionId === UNGROUPED
+        ? GROUP_ROOT
+        : sectionId
+      : element?.closest("[data-group-root-drop-target]")
+        ? GROUP_ROOT
+        : null;
+    const drag = dragGroupRef.current;
+    const nextTarget =
+      drag &&
+      candidate &&
+      candidate !== drag.from &&
+      !drag.unavailable.has(candidate)
+        ? candidate
+        : null;
+    groupDropTargetRef.current = nextTarget;
+    setGroupDropTarget(nextTarget);
+    setGroupDragState((current) =>
+      current ? { ...current, clientX, clientY } : current,
+    );
+  };
+
+  const endGroupDrag = (didDrag: boolean) => {
+    const drag = dragGroupRef.current;
+    const target = groupDropTargetRef.current;
+    clearGroupDrag();
+    if (!didDrag || !drag || !target || target === drag.from) return;
+    const parentId = target === GROUP_ROOT ? null : target;
+    if (parentId) {
+      setCollapsed((current) => ({ ...current, [parentId]: false }));
+    }
+    moveGroup.mutate(
+      { group: drag.group, parentId },
+      {
+        onError: (error) =>
+          toast.error(t("hosts.moveGroup.error"), errorMessage(error)),
       },
     );
   };
@@ -239,6 +321,7 @@ export function HostsView() {
     const ordered: Array<{
       id: string;
       name: string;
+      group: Group | null;
       hosts: Host[];
       depth: number;
       ancestors: string[];
@@ -255,6 +338,7 @@ export function HostsView() {
         ordered.push({
           id: group.id,
           name: group.name,
+          group,
           hosts: byGroup.get(group.id) ?? [],
           depth,
           ancestors,
@@ -268,6 +352,7 @@ export function HostsView() {
         ordered.push({
           id: group.id,
           name: group.name,
+          group,
           hosts: byGroup.get(group.id) ?? [],
           depth: 0,
           ancestors: [],
@@ -279,6 +364,7 @@ export function HostsView() {
       ordered.push({
         id: UNGROUPED,
         name: t("hosts.ungrouped"),
+        group: null,
         hosts: ungrouped,
         depth: 0,
         ancestors: [],
@@ -303,7 +389,7 @@ export function HostsView() {
       cancelLabel: t("common.cancel"),
       actions: [
         {
-          label: t("common.delete"),
+          label: t("hosts.deleteHost.action"),
           variant: "destructive",
           onSelect: () =>
             void deleteHost.mutateAsync(host.id).catch((err) => {
@@ -319,43 +405,60 @@ export function HostsView() {
     name: string;
     hosts: Host[];
   }) => {
-    const doDelete = (deleteHosts: boolean) =>
-      void deleteGroup
-        .mutateAsync({ id: section.id, deleteHosts })
-        .catch((err) => {
-          toast.error(t("hosts.deleteGroup.error"), errorMessage(err));
-        });
-
-    const hasHosts = section.hosts.length > 0;
+    const group = groups.find((candidate) => candidate.id === section.id);
+    if (!group) return;
+    const childCount = groups.filter(
+      (candidate) => candidate.parentId === group.id,
+    ).length;
+    const parent = group.parentId
+      ? groups.find((candidate) => candidate.id === group.parentId)
+      : undefined;
+    const hostCount = section.hosts.length;
+    const relocationDescription = parent
+      ? hostCount > 0 && childCount > 0
+        ? t("hosts.deleteGroup.nestedBoth", {
+            hostCount,
+            childCount,
+            parent: parent.name,
+          })
+        : hostCount > 0
+          ? t("hosts.deleteGroup.nestedHosts", {
+              count: hostCount,
+              parent: parent.name,
+            })
+          : childCount > 0
+            ? t("hosts.deleteGroup.nestedGroups", {
+                count: childCount,
+                parent: parent.name,
+              })
+            : undefined
+      : hostCount > 0 && childCount > 0
+        ? t("hosts.deleteGroup.rootBoth", { hostCount, childCount })
+        : hostCount > 0
+          ? t("hosts.deleteGroup.rootHosts", { count: hostCount })
+          : childCount > 0
+            ? t("hosts.deleteGroup.rootGroups", { count: childCount })
+            : undefined;
+    const description = [
+      t("common.deleteConfirm", { name: section.name }),
+      relocationDescription,
+    ]
+      .filter(Boolean)
+      .join(" ");
     setConfirmState({
       title: t("hosts.deleteGroup.title"),
-      description: hasHosts
-        ? t("hosts.deleteGroup.withHostsDescription", {
-            name: section.name,
-            count: section.hosts.length,
-          })
-        : t("common.deleteConfirm", { name: section.name }),
+      description,
       cancelLabel: t("common.cancel"),
-      actions: hasHosts
-        ? [
-            {
-              label: t("hosts.deleteGroup.keepHosts"),
-              variant: "outline",
-              onSelect: () => doDelete(false),
-            },
-            {
-              label: t("hosts.deleteGroup.withHosts"),
-              variant: "destructive",
-              onSelect: () => doDelete(true),
-            },
-          ]
-        : [
-            {
-              label: t("common.delete"),
-              variant: "destructive",
-              onSelect: () => doDelete(false),
-            },
-          ],
+      actions: [
+        {
+          label: t("hosts.deleteGroup.action"),
+          variant: "destructive",
+          onSelect: () =>
+            void deleteGroup.mutateAsync(section.id).catch((error) => {
+              toast.error(t("hosts.deleteGroup.error"), errorMessage(error));
+            }),
+        },
+      ],
     });
   };
 
@@ -475,7 +578,21 @@ export function HostsView() {
         />
       }
     >
-      <PanelContent className="space-y-[var(--panel-gutter)]">
+      <PanelContent
+        data-group-root-drop-target
+        className={cn(
+          "relative space-y-[var(--panel-gutter)] transition-shadow",
+          (groupDropTarget === GROUP_ROOT || dropTarget === UNGROUPED) &&
+            "ring-1 ring-inset ring-ring/50",
+        )}
+      >
+        {(groupDropTarget === GROUP_ROOT || dropTarget === UNGROUPED) && (
+          <div className="pointer-events-none absolute right-2 top-2 z-10 !m-0 rounded-md bg-popover px-2 py-1 text-2xs text-popover-foreground shadow-sm">
+            {groupDropTarget === GROUP_ROOT
+              ? t("hosts.moveGroup.toTopLevel")
+              : t("hosts.move.toUngrouped")}
+          </div>
+        )}
         {isLoading ? (
           <LoadingState label={t("common.loading")} fill />
         ) : isError ? (
@@ -507,6 +624,7 @@ export function HostsView() {
               key={section.id}
               id={section.id}
               isGroup={section.id !== UNGROUPED}
+              group={section.group}
               name={section.name}
               count={section.hosts.length}
               depth={section.depth}
@@ -514,9 +632,16 @@ export function HostsView() {
               onToggle={() =>
                 setCollapsed((c) => ({ ...c, [section.id]: !c[section.id] }))
               }
+              onAddHost={() => openHostForm(undefined, section.id)}
+              onAddChild={() => openGroupForm(undefined, section.id)}
               onEdit={() => openGroupForm(section.id)}
               onDelete={() => requestDeleteGroup(section)}
-              isDropTarget={dropTarget === section.id}
+              isHostDropTarget={dropTarget === section.id}
+              isGroupDropTarget={groupDropTarget === section.id}
+              dragging={groupDragState?.group.id === section.id}
+              onGroupDragStart={beginGroupDrag}
+              onGroupDragMove={updateGroupDrag}
+              onGroupDragEnd={endGroupDrag}
             >
               <div className={PANEL_LIST_CLASS}>
                 {section.hosts.map((host) => (
@@ -554,6 +679,7 @@ export function HostsView() {
         </Suspense>
       )}
       {dragState && <HostDragGhost dragState={dragState} />}
+      {groupDragState && <GroupDragGhost dragState={groupDragState} />}
     </SideBarView>
   );
 }
@@ -561,35 +687,114 @@ export function HostsView() {
 function GroupSection({
   id,
   isGroup,
+  group,
   name,
   count,
   depth,
   collapsed,
-  isDropTarget,
+  isHostDropTarget,
+  isGroupDropTarget,
+  dragging,
   onToggle,
+  onAddHost,
+  onAddChild,
   onEdit,
   onDelete,
+  onGroupDragStart,
+  onGroupDragMove,
+  onGroupDragEnd,
   children,
 }: {
   id: string;
   isGroup: boolean;
+  group: Group | null;
   name: string;
   count: number;
   depth: number;
   collapsed: boolean;
-  isDropTarget: boolean;
+  isHostDropTarget: boolean;
+  isGroupDropTarget: boolean;
+  dragging: boolean;
   onToggle: () => void;
+  onAddHost: () => void;
+  onAddChild: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onGroupDragStart: (group: Group, pointer: HostDragPointer) => void;
+  onGroupDragMove: (clientX: number, clientY: number) => void;
+  onGroupDragEnd: (didDrag: boolean) => void;
   children: React.ReactNode;
 }) {
   const { t } = useI18n();
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    active: boolean;
+  } | null>(null);
+  const suppressToggleRef = useRef(false);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!group || event.button !== 0) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    };
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const pointer = dragRef.current;
+    if (!group || !pointer || pointer.pointerId !== event.pointerId) return;
+    if (!pointer.active) {
+      const distance = Math.hypot(
+        event.clientX - pointer.startX,
+        event.clientY - pointer.startY,
+      );
+      if (distance < 5) return;
+      pointer.active = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      onGroupDragStart(group, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        rect: event.currentTarget.getBoundingClientRect(),
+      });
+    }
+    event.preventDefault();
+    onGroupDragMove(event.clientX, event.clientY);
+  };
+
+  const finishPointerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const pointer = dragRef.current;
+    if (!pointer || pointer.pointerId !== event.pointerId) return;
+    const didDrag = event.type !== "pointercancel" && pointer.active;
+    if (pointer.active) {
+      event.preventDefault();
+      suppressToggleRef.current = true;
+      window.setTimeout(() => {
+        suppressToggleRef.current = false;
+      }, 0);
+    }
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    onGroupDragEnd(didDrag);
+  };
 
   const header = (
     <PanelSectionHeader
       title={name}
       collapsed={collapsed}
-      onToggle={onToggle}
+      onToggle={() => {
+        if (!suppressToggleRef.current) onToggle();
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishPointerDrag}
+      onPointerCancel={finishPointerDrag}
+      className={cn(isGroup && "touch-none select-none cursor-grab")}
       trailing={
         <span className="min-w-6 rounded-full bg-muted px-1.5 py-0.5 text-center text-2xs font-normal tabular-nums text-muted-foreground">
           {count}
@@ -606,15 +811,24 @@ function GroupSection({
       }
       className={cn(
         "rounded-lg transition-[background-color,box-shadow]",
-        isDropTarget && "bg-list-hover ring-1 ring-inset ring-ring/50",
+        (isHostDropTarget || isGroupDropTarget) &&
+          "bg-list-hover ring-1 ring-inset ring-ring/50",
+        dragging && "opacity-50",
       )}
     >
       {isGroup ? (
         <ContextMenu>
           <ContextMenuTrigger asChild>{header}</ContextMenuTrigger>
           <ContextMenuContent>
+            <ContextMenuItem onSelect={onAddHost}>
+              <Plus /> {t("hosts.newHost")}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onAddChild}>
+              <FolderPlus /> {t("hosts.newGroup")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem onSelect={onEdit}>
-              <TextCursorInput /> {t("common.rename")}
+              <Pencil /> {t("common.edit")}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem destructive onSelect={onDelete}>
@@ -887,6 +1101,24 @@ function HostDragGhost({ dragState }: { dragState: HostDragState }) {
           {host.address}
         </p>
       </div>
+    </div>
+  );
+}
+
+function GroupDragGhost({ dragState }: { dragState: GroupDragState }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-lg border border-border bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95 shadow-md"
+      style={{
+        left: dragState.clientX,
+        top: dragState.clientY,
+        width: dragState.rect.width,
+        height: dragState.rect.height,
+      }}
+    >
+      <Folder className="size-4 shrink-0 text-link" />
+      <p className="truncate">{dragState.group.name}</p>
     </div>
   );
 }

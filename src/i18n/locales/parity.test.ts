@@ -39,9 +39,7 @@ describe("locale parity", () => {
     ["en", en],
     ["zh-CN", zhCN],
   ])("%s strings have consistent spacing and ellipses", (_locale, dict) => {
-    const invalid = leafEntries(dict).filter(([key, value]) => {
-      // The English author prefix includes the separator before a linked name.
-      if (key === "settings.about.author") return false;
+    const invalid = leafEntries(dict).filter(([, value]) => {
       return (
         value !== value.trim() || value.includes("...") || / {2,}/.test(value)
       );

@@ -27,5 +27,6 @@ export * from "./radio-group";
 export * from "./collapsible";
 export * from "./tabs";
 export * from "./select";
+export * from "./tree-select";
 export * from "./resize-handle";
 export * from "./styles";

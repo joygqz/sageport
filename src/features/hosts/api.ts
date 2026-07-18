@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
 import type {
+  Group,
   GroupInput,
   Host,
   HostHealthCheck,
@@ -127,11 +128,47 @@ export function useUpdateGroup() {
   });
 }
 
+export function useMoveGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      group,
+      parentId,
+    }: {
+      group: Group;
+      parentId: string | null;
+    }) =>
+      ipc.groups.update(group.id, {
+        name: group.name,
+        parentId,
+        sortOrder: group.sortOrder,
+      }),
+    onMutate: async ({ group, parentId }) => {
+      await qc.cancelQueries({ queryKey: hostKeys.groups });
+      const previous = qc.getQueryData<Group[]>(hostKeys.groups);
+      qc.setQueryData<Group[]>(hostKeys.groups, (current) =>
+        current?.map((item) =>
+          item.id === group.id ? { ...item, parentId } : item,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) qc.setQueryData(hostKeys.groups, context.previous);
+    },
+    onSuccess: (group) => {
+      qc.setQueryData<Group[]>(hostKeys.groups, (current) =>
+        current?.map((item) => (item.id === group.id ? group : item)),
+      );
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: hostKeys.groups }),
+  });
+}
+
 export function useDeleteGroup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, deleteHosts }: { id: string; deleteHosts: boolean }) =>
-      ipc.groups.remove(id, deleteHosts),
+    mutationFn: (id: string) => ipc.groups.remove(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: hostKeys.groups });
       qc.invalidateQueries({ queryKey: hostKeys.hosts });

@@ -33,6 +33,23 @@ describe("settings overlay", () => {
     expect(useOverlayStore.getState().overlay).toEqual({
       type: "host-form",
       hostId: "host-1",
+      groupId: null,
+    });
+  });
+
+  it("presets the parent group for nested create flows", () => {
+    useOverlayStore.getState().openHostForm(undefined, "group-1");
+    expect(useOverlayStore.getState().overlay).toEqual({
+      type: "host-form",
+      hostId: null,
+      groupId: "group-1",
+    });
+
+    useOverlayStore.getState().openGroupForm(undefined, "group-1");
+    expect(useOverlayStore.getState().overlay).toEqual({
+      type: "group-form",
+      groupId: null,
+      parentId: "group-1",
     });
   });
 });

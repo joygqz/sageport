@@ -47,6 +47,26 @@ for (const file of ipcFiles) {
   }
 }
 
+const localeFiles = ["src/i18n/locales/en.ts", "src/i18n/locales/zh-CN.ts"];
+const genericConfirmation =
+  /^(?:Confirm(?: action| deletion| clearing)?|确认(?:操作|删除|清空))$/i;
+for (const file of localeFiles) {
+  const text = readFileSync(root + file, "utf8");
+  const stringLiterals = text.match(/"(?:\\.|[^"\\])*"/g) ?? [];
+  for (const literal of stringLiterals) {
+    const value = JSON.parse(literal);
+    if (/[;；]/.test(value)) {
+      problems.push(`${file}: replace semicolons in UI copy with sentences`);
+    }
+    if (/\be\.g\./i.test(value)) {
+      problems.push(`${file}: use “for example” instead of “e.g.”`);
+    }
+    if (genericConfirmation.test(value)) {
+      problems.push(`${file}: confirmation copy must name the specific action`);
+    }
+  }
+}
+
 for (const file of sourceFiles.filter((file) => file.endsWith(".tsx"))) {
   const text = readFileSync(root + file, "utf8");
   if (/<(?:select|option)\b/.test(text)) {

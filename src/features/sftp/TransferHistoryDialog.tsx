@@ -75,7 +75,7 @@ export function TransferHistoryDialog({
 
   const confirmClear = () => {
     setConfirmState({
-      title: t("sftp.history.title"),
+      title: t("sftp.history.clearTitle"),
       description: t("sftp.history.clearConfirm"),
       cancelLabel: t("common.cancel"),
       actions: [
@@ -196,7 +196,7 @@ export function TransferHistoryDialog({
                         </Button>
                       </Tooltip>
                     )}
-                    <Tooltip content={t("common.delete")}>
+                    <Tooltip content={t("sftp.history.delete")}>
                       <Button
                         size="icon"
                         variant="ghost"

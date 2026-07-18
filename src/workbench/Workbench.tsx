@@ -311,7 +311,12 @@ export function Workbench() {
 
       {overlay?.type === "host-form" && (
         <Suspense fallback={null}>
-          <HostFormDialog open hostId={overlay.hostId} onClose={closeOverlay} />
+          <HostFormDialog
+            open
+            hostId={overlay.hostId}
+            initialGroupId={overlay.groupId}
+            onClose={closeOverlay}
+          />
         </Suspense>
       )}
       {overlay?.type === "group-form" && (
@@ -319,6 +324,7 @@ export function Workbench() {
           <GroupFormDialog
             open
             groupId={overlay.groupId}
+            initialParentId={overlay.parentId}
             onClose={closeOverlay}
           />
         </Suspense>
