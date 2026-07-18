@@ -25,7 +25,10 @@ export function FormDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         showClose={false}
-        className={cn("flex max-w-[92vw] flex-col gap-0 p-0 sm:p-0", width)}
+        className={cn(
+          "flex max-w-[92vw] flex-col gap-0 overflow-hidden p-0 sm:p-0",
+          width,
+        )}
       >
         <DialogToolbar>{title}</DialogToolbar>
         {open && children}

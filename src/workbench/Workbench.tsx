@@ -1,21 +1,23 @@
 import { lazy, Suspense, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { ResizeHandle, Spinner } from "@/components/ui";
+import { ResizeHandle } from "@/components/ui/resize-handle";
+import { Spinner } from "@/components/ui/spinner";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorMessage, toast, useToastStore } from "@/lib/toast";
 import { useSettingSync } from "@/lib/settingSync";
 import { IS_MACOS } from "@/lib/platform";
-import { Toaster } from "@/components/ui/toaster";
-import { GroupFormDialog } from "@/features/hosts/GroupFormDialog";
-import { HostFormDialog } from "@/features/hosts/HostFormDialog";
 import { bridgeSftpEvents } from "@/features/sftp/store";
-import { HostKeyDialog } from "@/features/terminal/HostKeyDialog";
-import { PasswordPromptDialog } from "@/features/terminal/PasswordPromptDialog";
-import { useUpdateNotifier } from "@/features/updates/notifier";
+import {
+  listenHostKeyEvents,
+  useHostKeyStore,
+} from "@/features/terminal/host-key";
+import {
+  listenPasswordPrompts,
+  usePasswordPromptStore,
+} from "@/features/terminal/password-prompt";
 import { ActivityBar } from "./ActivityBar";
-import { CommandPalette } from "./CommandPalette";
 import { EditorArea } from "./EditorArea";
 import { FONT_SYNC_KEY, useFontStore } from "./font";
 import { useKeybindings } from "./keybindings";
@@ -51,16 +53,73 @@ const SettingsDialog = lazy(() =>
   })),
 );
 
+const CommandPalette = lazy(() =>
+  import("./CommandPalette").then((module) => ({
+    default: module.CommandPalette,
+  })),
+);
+
+const HostFormDialog = lazy(() =>
+  import("@/features/hosts/HostFormDialog").then((module) => ({
+    default: module.HostFormDialog,
+  })),
+);
+
+const GroupFormDialog = lazy(() =>
+  import("@/features/hosts/GroupFormDialog").then((module) => ({
+    default: module.GroupFormDialog,
+  })),
+);
+
+const HostKeyDialog = lazy(() =>
+  import("@/features/terminal/HostKeyDialog").then((module) => ({
+    default: module.HostKeyDialog,
+  })),
+);
+
+const PasswordPromptDialog = lazy(() =>
+  import("@/features/terminal/PasswordPromptDialog").then((module) => ({
+    default: module.PasswordPromptDialog,
+  })),
+);
+
+const Toaster = lazy(() =>
+  import("@/components/ui/toaster").then((module) => ({
+    default: module.Toaster,
+  })),
+);
+
+const UpdateNotifier = lazy(() =>
+  import("@/features/updates/notifier").then((module) => ({
+    default: module.UpdateNotifier,
+  })),
+);
+
 export function Workbench() {
   const { t } = useI18n();
   useKeybindings();
-  useUpdateNotifier();
 
   useEffect(() => {
     void bridgeSftpEvents().catch((error) =>
       toast.error(t("sftp.listenerError"), errorMessage(error)),
     );
   }, [t]);
+
+  useEffect(
+    () =>
+      installWindowListener(listenHostKeyEvents, (error) =>
+        toast.error(t("windowControls.listenerError"), errorMessage(error)),
+      ),
+    [t],
+  );
+
+  useEffect(
+    () =>
+      installWindowListener(listenPasswordPrompts, (error) =>
+        toast.error(t("windowControls.listenerError"), errorMessage(error)),
+      ),
+    [t],
+  );
 
   useEffect(() => {
     const unlisten = installWindowListener(
@@ -154,10 +213,20 @@ export function Workbench() {
     );
   }, [t]);
 
-  const layout = useLayoutStore();
+  const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
+  const sidebarWidth = useLayoutStore((s) => s.sidebarWidth);
+  const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth);
+  const panelVisible = useLayoutStore((s) => s.panelVisible);
+  const panelHeight = useLayoutStore((s) => s.panelHeight);
+  const setPanelHeight = useLayoutStore((s) => s.setPanelHeight);
+  const auxVisible = useLayoutStore((s) => s.auxVisible);
+  const auxWidth = useLayoutStore((s) => s.auxWidth);
+  const setAuxWidth = useLayoutStore((s) => s.setAuxWidth);
   const overlay = useOverlayStore((s) => s.overlay);
   const closeOverlay = useOverlayStore((s) => s.close);
   const setSettingsSection = useOverlayStore((s) => s.setSettingsSection);
+  const hasHostKeyPrompt = useHostKeyStore((s) => s.queue.length > 0);
+  const hasPasswordPrompt = usePasswordPromptStore((s) => s.queue.length > 0);
 
   return (
     <div className="flex h-full flex-col bg-surface text-surface-foreground">
@@ -166,12 +235,12 @@ export function Workbench() {
       <div className="flex min-h-0 flex-1">
         <ActivityBar />
 
-        {layout.sidebarVisible && <SideBar width={layout.sidebarWidth} />}
+        {sidebarVisible && <SideBar width={sidebarWidth} />}
         <ResizeHandle
           axis="x"
           sashId="sidebar"
-          size={layout.sidebarVisible ? layout.sidebarWidth : 0}
-          onResize={layout.setSidebarWidth}
+          size={sidebarVisible ? sidebarWidth : 0}
+          onResize={setSidebarWidth}
           limits={sidebarLimits}
           showLine={false}
           highlightOffset={0.5}
@@ -180,61 +249,59 @@ export function Workbench() {
         <div
           className={cn(
             "flex min-h-0 min-w-0 flex-1 flex-col border-border",
-            layout.sidebarVisible && "border-l",
-            layout.auxVisible && "border-r",
+            sidebarVisible && "border-l",
+            auxVisible && "border-r",
           )}
         >
           <EditorArea />
-          {layout.panelVisible && (
+          {panelVisible && (
             <>
               <ResizeHandle
                 axis="y"
                 reverse
                 sashId="panel"
-                size={layout.panelHeight}
-                onResize={layout.setPanelHeight}
+                size={panelHeight}
+                onResize={setPanelHeight}
                 limits={panelLimits}
                 startCorner={{
                   targetId: "sidebar",
-                  size: layout.sidebarVisible ? layout.sidebarWidth : 0,
-                  onResize: layout.setSidebarWidth,
+                  size: sidebarVisible ? sidebarWidth : 0,
+                  onResize: setSidebarWidth,
                 }}
                 endCorner={
-                  layout.auxVisible
+                  auxVisible
                     ? {
                         targetId: "aux",
-                        size: layout.auxWidth,
+                        size: auxWidth,
                         reverse: true,
-                        onResize: layout.setAuxWidth,
+                        onResize: setAuxWidth,
                       }
                     : undefined
                 }
                 showLine={false}
                 highlightOffset={0.5}
               />
-              <Suspense
-                fallback={<FeatureLoading height={layout.panelHeight} />}
-              >
-                <SftpPanel height={layout.panelHeight} />
+              <Suspense fallback={<FeatureLoading height={panelHeight} />}>
+                <SftpPanel height={panelHeight} />
               </Suspense>
             </>
           )}
         </div>
 
-        {layout.auxVisible && (
+        {auxVisible && (
           <>
             <ResizeHandle
               axis="x"
               reverse
               sashId="aux"
-              size={layout.auxWidth}
-              onResize={layout.setAuxWidth}
+              size={auxWidth}
+              onResize={setAuxWidth}
               limits={auxLimits}
               showLine={false}
               highlightOffset={-0.5}
             />
-            <Suspense fallback={<FeatureLoading width={layout.auxWidth} />}>
-              <AssistantPanel width={layout.auxWidth} />
+            <Suspense fallback={<FeatureLoading width={auxWidth} />}>
+              <AssistantPanel width={auxWidth} />
             </Suspense>
           </>
         )}
@@ -242,21 +309,29 @@ export function Workbench() {
 
       <StatusBar />
 
-      <HostFormDialog
-        open={overlay?.type === "host-form"}
-        hostId={overlay?.type === "host-form" ? overlay.hostId : null}
-        onClose={closeOverlay}
-      />
-      <GroupFormDialog
-        open={overlay?.type === "group-form"}
-        groupId={overlay?.type === "group-form" ? overlay.groupId : null}
-        onClose={closeOverlay}
-      />
-      <CommandPalette
-        open={overlay?.type === "palette"}
-        initialMode={overlay?.type === "palette" ? overlay.mode : "quick"}
-        onClose={closeOverlay}
-      />
+      {overlay?.type === "host-form" && (
+        <Suspense fallback={null}>
+          <HostFormDialog open hostId={overlay.hostId} onClose={closeOverlay} />
+        </Suspense>
+      )}
+      {overlay?.type === "group-form" && (
+        <Suspense fallback={null}>
+          <GroupFormDialog
+            open
+            groupId={overlay.groupId}
+            onClose={closeOverlay}
+          />
+        </Suspense>
+      )}
+      {overlay?.type === "palette" && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            open
+            initialMode={overlay.mode}
+            onClose={closeOverlay}
+          />
+        </Suspense>
+      )}
       {overlay?.type === "settings" && (
         <Suspense fallback={null}>
           <SettingsDialog
@@ -267,10 +342,31 @@ export function Workbench() {
           />
         </Suspense>
       )}
-      <HostKeyDialog />
-      <PasswordPromptDialog />
-      <Toaster />
+      {hasHostKeyPrompt && (
+        <Suspense fallback={null}>
+          <HostKeyDialog />
+        </Suspense>
+      )}
+      {hasPasswordPrompt && (
+        <Suspense fallback={null}>
+          <PasswordPromptDialog />
+        </Suspense>
+      )}
+      <Suspense fallback={null}>
+        <UpdateNotifier />
+      </Suspense>
+      <LazyToaster />
     </div>
+  );
+}
+
+function LazyToaster() {
+  const hasToasts = useToastStore((state) => state.toasts.length > 0);
+  if (!hasToasts) return null;
+  return (
+    <Suspense fallback={null}>
+      <Toaster />
+    </Suspense>
   );
 }
 

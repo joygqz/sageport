@@ -51,11 +51,6 @@ export default defineConfig(async () => ({
               priority: 50,
             },
             {
-              name: "radix-ui",
-              test: /node_modules[\\/]@radix-ui[\\/]/,
-              priority: 40,
-            },
-            {
               name: "xterm",
               test: /node_modules[\\/]@xterm[\\/]/,
               priority: 30,

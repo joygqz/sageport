@@ -15,17 +15,28 @@ const initialAssets = [
   ),
 ];
 
-// The workbench shell includes accessible dialog, tabs, and toast primitives.
-// Keep roughly the same headroom as the previous 650 kB budget after adding them.
-// Bumped slightly for the terminal split-pane focus-follow bookkeeping.
-const INITIAL_JS_BUDGET = 701 * 1024;
+// Keep enough headroom for routine shell changes without allowing optional
+// dialogs, notifications, or feature code to drift back into startup.
+const INITIAL_JS_BUDGET = 525 * 1024;
 const lazyOnlyPrefixes = [
   "AssistantPanel-",
+  "CommandPalette-",
   "FileEditor-",
+  "GroupFormDialog-",
+  "HostBrandIcon-",
+  "HostFormDialog-",
+  "HostKeyDialog-",
   "HostsView-",
+  "PasswordPromptDialog-",
   "SettingsPage-",
+  "SshConfigImportDialog-",
   "TerminalEditor-",
+  "notifier-",
+  "confirm-dialog-",
+  "dialog-",
+  "index.esm-",
   "markdown-",
+  "toaster-",
   "xterm-",
 ];
 

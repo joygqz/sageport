@@ -1,6 +1,7 @@
 import {
   Fragment,
   lazy,
+  memo,
   Suspense,
   useEffect,
   useRef,
@@ -11,17 +12,11 @@ import { createPortal } from "react-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FileText, Plus, TerminalSquare, X } from "lucide-react";
 
-import {
-  ConfirmDialog,
-  Kbd,
-  Spinner,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  Tooltip,
-  type ConfirmState,
-} from "@/components/ui";
+import { type ConfirmState } from "@/components/ui/confirm-dialog";
+import { Kbd } from "@/components/ui/kbd";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { useDragCursor } from "@/lib/pointerDrag";
 import { errorMessage, toast } from "@/lib/toast";
@@ -35,6 +30,7 @@ import {
   WORKBENCH_TAB_ACTIVE_CLASS,
   WORKBENCH_TAB_CLASS,
   WORKBENCH_TAB_CLOSE_CLASS,
+  WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
   WORKBENCH_TAB_DROP_INDICATOR_CLASS,
   WORKBENCH_TAB_INACTIVE_CLASS,
   WORKBENCH_TAB_STRIP_GUTTER_CLASS,
@@ -60,6 +56,12 @@ const TerminalEditor = lazy(() =>
   })),
 );
 
+const ConfirmDialog = lazy(() =>
+  import("@/components/ui/confirm-dialog").then((module) => ({
+    default: module.ConfirmDialog,
+  })),
+);
+
 interface TabDragPointer {
   clientX: number;
   clientY: number;
@@ -73,7 +75,7 @@ interface TabDragState extends TabDragPointer {
   indicatorHeight: number;
 }
 
-export function EditorArea() {
+export const EditorArea = memo(function EditorArea() {
   const { t } = useI18n();
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
@@ -200,6 +202,26 @@ export function EditorArea() {
   const dirtyTabs = tabs.filter(
     (tab): tab is FileTab => tab.kind === "file" && isFileDirty(tab),
   );
+  const saveAllBeforeWindowClose = async () => {
+    if (savingBeforeWindowCloseRef.current) return false;
+    savingBeforeWindowCloseRef.current = true;
+    setSavingBeforeWindowClose(true);
+    try {
+      for (const tab of dirtyTabs) {
+        if (!(await useTabsStore.getState().saveFile(tab.id))) {
+          return false;
+        }
+      }
+      const stillDirty = useTabsStore
+        .getState()
+        .tabs.some((tab) => tab.kind === "file" && isFileDirty(tab));
+      if (stillDirty) return false;
+      return destroyWindow();
+    } finally {
+      savingBeforeWindowCloseRef.current = false;
+      setSavingBeforeWindowClose(false);
+    }
+  };
   const confirmState: ConfirmState | null = pendingWindowClose
     ? {
         title: t("editor.unsavedTitle"),
@@ -216,26 +238,7 @@ export function EditorArea() {
           {
             label: t("editor.saveAll"),
             loading: savingBeforeWindowClose,
-            onSelect: async () => {
-              if (savingBeforeWindowCloseRef.current) return false;
-              savingBeforeWindowCloseRef.current = true;
-              setSavingBeforeWindowClose(true);
-              try {
-                for (const tab of dirtyTabs) {
-                  if (!(await useTabsStore.getState().saveFile(tab.id))) {
-                    return false;
-                  }
-                }
-                const stillDirty = useTabsStore
-                  .getState()
-                  .tabs.some((tab) => tab.kind === "file" && isFileDirty(tab));
-                if (stillDirty) return false;
-                return destroyWindow();
-              } finally {
-                savingBeforeWindowCloseRef.current = false;
-                setSavingBeforeWindowClose(false);
-              }
-            },
+            onSelect: saveAllBeforeWindowClose,
           },
         ],
       }
@@ -382,17 +385,21 @@ export function EditorArea() {
           ))}
         </div>
 
-        <ConfirmDialog
-          state={confirmState}
-          onClose={() => {
-            if (pendingWindowClose) clearPendingWindowClose();
-            else clearPendingClose();
-          }}
-        />
+        {(pendingWindowClose || pendingTab) && (
+          <Suspense fallback={null}>
+            <ConfirmDialog
+              state={confirmState}
+              onClose={() => {
+                if (pendingWindowClose) clearPendingWindowClose();
+                else clearPendingClose();
+              }}
+            />
+          </Suspense>
+        )}
       </div>
     </Tabs>
   );
-}
+});
 
 function EditorLoading() {
   return (
@@ -577,8 +584,7 @@ function TabItem({
         className={cn(
           WORKBENCH_TAB_CLOSE_CLASS,
           "size-5",
-          !active &&
-            "pointer-events-none -ml-2 w-0 opacity-0 group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-5 group-hover:opacity-70",
+          !active && WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
         )}
       >
         <X className="size-3.5" />

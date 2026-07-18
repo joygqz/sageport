@@ -66,7 +66,6 @@ import {
   useSetAiModel,
 } from "@/features/ai/api";
 import {
-  CORE_TOOL_NAMES,
   normalizeEnabledToolNames,
   resolveEnabledToolNames,
   TOOL_GROUPS,
@@ -233,52 +232,56 @@ function AppearanceSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Field label={t("settings.appearance.colorMode")}>
-        <SegmentedControl
-          value={preference.mode}
-          onChange={setMode}
-          options={modes}
-        />
-      </Field>
+      <div className="flex flex-col gap-4">
+        <Field label={t("settings.appearance.colorMode")}>
+          <SegmentedControl
+            value={preference.mode}
+            onChange={setMode}
+            options={modes}
+          />
+        </Field>
 
-      <Field label={t("settings.appearance.themeFamily")}>
-        <RadioGroup
-          value={preference.familyId}
-          onValueChange={setFamily}
-          className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3"
-        >
-          {THEME_FAMILIES.map((family) => (
-            <ThemeFamilyCard
-              key={family.id}
-              family={family}
-              active={family.id === preference.familyId}
-              description={t(THEME_DESCRIPTION_KEYS[family.id])}
-            />
-          ))}
-        </RadioGroup>
-      </Field>
+        <Field label={t("settings.appearance.themeFamily")}>
+          <RadioGroup
+            value={preference.familyId}
+            onValueChange={setFamily}
+            className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3"
+          >
+            {THEME_FAMILIES.map((family) => (
+              <ThemeFamilyCard
+                key={family.id}
+                family={family}
+                active={family.id === preference.familyId}
+                description={t(THEME_DESCRIPTION_KEYS[family.id])}
+              />
+            ))}
+          </RadioGroup>
+        </Field>
+      </div>
 
       <Separator />
 
-      <Field
-        label={t("settings.appearance.language")}
-        hint={t("settings.appearance.languageHint")}
-      >
-        <Select
-          value={locale}
-          onValueChange={(value) =>
-            setLocale(value as (typeof LOCALES)[number])
-          }
-          options={LOCALES.map((code) => ({
-            value: code,
-            label: LOCALE_LABELS[code],
-          }))}
-        />
-      </Field>
+      <div className="flex flex-col gap-4">
+        <Field
+          label={t("settings.appearance.language")}
+          hint={t("settings.appearance.languageHint")}
+        >
+          <Select
+            value={locale}
+            onValueChange={(value) =>
+              setLocale(value as (typeof LOCALES)[number])
+            }
+            options={LOCALES.map((code) => ({
+              value: code,
+              label: LOCALE_LABELS[code],
+            }))}
+          />
+        </Field>
 
-      <FontField />
+        <FontField />
 
-      <ZoomField />
+        <ZoomField />
+      </div>
     </div>
   );
 }
@@ -762,17 +765,8 @@ function AiForm({ config }: { config: AiConfig }) {
         </Field>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
         <SectionHeader title={t("settings.ai.tools.title")} />
-        <p className="text-xs text-muted-foreground">
-          {t("settings.ai.tools.enabledSummary", {
-            enabled: CORE_TOOL_NAMES.size + enabledTools.length,
-            total: TOOL_GROUPS.reduce(
-              (count, group) => count + group.tools.length,
-              0,
-            ),
-          })}
-        </p>
 
         <div
           aria-label={t("settings.ai.tools.title")}
@@ -790,7 +784,7 @@ function AiForm({ config }: { config: AiConfig }) {
             />
           ))}
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {t("settings.ai.tools.description")}
         </p>
       </div>

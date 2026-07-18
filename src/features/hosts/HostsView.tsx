@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -20,20 +22,21 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { type ConfirmState } from "@/components/ui/confirm-dialog";
 import {
-  Button,
-  ConfirmDialog,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   EmptyState,
   ErrorState,
   LoadingState,
-  Tooltip,
-  type ConfirmState,
-} from "@/components/ui";
+} from "@/components/ui/empty-state";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { useDragCursor } from "@/lib/pointerDrag";
 import { cn } from "@/lib/utils";
@@ -65,7 +68,18 @@ import {
 } from "./api";
 import { HostSystemIcon } from "./HostSystemIcon";
 import { formatSshCommand } from "./ssh-command";
-import { SshConfigImportDialog } from "./SshConfigImportDialog";
+
+const ConfirmDialog = lazy(() =>
+  import("@/components/ui/confirm-dialog").then((module) => ({
+    default: module.ConfirmDialog,
+  })),
+);
+
+const SshConfigImportDialog = lazy(() =>
+  import("./SshConfigImportDialog").then((module) => ({
+    default: module.SshConfigImportDialog,
+  })),
+);
 
 const UNGROUPED = "__ungrouped__";
 interface HostDragPointer {
@@ -526,14 +540,19 @@ export function HostsView() {
         )}
       </PanelContent>
 
-      <ConfirmDialog
-        state={confirmState}
-        onClose={() => setConfirmState(null)}
-      />
-      <SshConfigImportDialog
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-      />
+      {confirmState && (
+        <Suspense fallback={null}>
+          <ConfirmDialog
+            state={confirmState}
+            onClose={() => setConfirmState(null)}
+          />
+        </Suspense>
+      )}
+      {importOpen && (
+        <Suspense fallback={null}>
+          <SshConfigImportDialog open onClose={() => setImportOpen(false)} />
+        </Suspense>
+      )}
       {dragState && <HostDragGhost dragState={dragState} />}
     </SideBarView>
   );

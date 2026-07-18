@@ -112,3 +112,8 @@ export function useUpdateNotifier() {
     }
   }, [state, t, canSelfUpdate]);
 }
+
+export function UpdateNotifier() {
+  useUpdateNotifier();
+  return null;
+}

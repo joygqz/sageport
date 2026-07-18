@@ -875,7 +875,6 @@ export const en = {
         title: "Assistant tools",
         description:
           "Core tools are always available. Enable only the additional tools you need to keep prompts shorter and stop the assistant from picking irrelevant tools.",
-        enabledSummary: "{enabled} of {total} tools available globally",
         required: "Required",
         group: {
           core: "Core",

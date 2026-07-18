@@ -29,7 +29,10 @@ export const WORKBENCH_TAB_INACTIVE_CLASS =
   "text-muted-foreground hover:text-foreground hover:[--tab-background:var(--color-list-hover)]";
 
 export const WORKBENCH_TAB_CLOSE_CLASS =
-  "flex shrink-0 items-center justify-center overflow-hidden rounded text-current opacity-70 outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/35";
+  "flex shrink-0 items-center justify-center overflow-hidden rounded text-current opacity-70 outline-none transition-[background-color,color,opacity] hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/35";
+
+export const WORKBENCH_TAB_CLOSE_INACTIVE_CLASS =
+  "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-70";
 
 export const WORKBENCH_TAB_DROP_INDICATOR_CLASS =
   "pointer-events-none fixed z-[1000] w-0.5 rounded-full bg-primary";

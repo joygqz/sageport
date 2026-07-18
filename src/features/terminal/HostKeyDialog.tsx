@@ -1,28 +1,15 @@
-import { useEffect } from "react";
 import { ShieldAlert, ShieldQuestion } from "lucide-react";
 
-import { Button, Dialog, DialogContent, DialogToolbar } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogToolbar } from "@/components/ui/dialog";
 import { useI18n } from "@/i18n";
 import type { HostKeyDecision } from "@/types/models";
-import { listenHostKeyEvents, useHostKeyStore } from "./host-key";
+import { useHostKeyStore } from "./host-key";
 
 export function HostKeyDialog() {
   const { t } = useI18n();
   const queue = useHostKeyStore((s) => s.queue);
   const respondTo = useHostKeyStore((s) => s.respond);
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    void listenHostKeyEvents().then((un) => {
-      if (disposed) un();
-      else unlisten = un;
-    });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
 
   const current = queue[0];
 

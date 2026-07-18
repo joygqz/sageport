@@ -1,93 +1,42 @@
-import type { ComponentType, SVGProps } from "react";
-import {
-  SiAlmalinux,
-  SiAlpinelinux,
-  SiAlibabacloud,
-  SiApple,
-  SiArchlinux,
-  SiCentos,
-  SiDebian,
-  SiDeepin,
-  SiFedora,
-  SiFreebsd,
-  SiGentoo,
-  SiHarmonyos,
-  SiHuawei,
-  SiKalilinux,
-  SiLinux,
-  SiLinuxmint,
-  SiManjaro,
-  SiNixos,
-  SiOpensuse,
-  SiRedhat,
-  SiRockylinux,
-  SiSuse,
-  SiUbuntu,
-} from "@icons-pack/react-simple-icons";
+import { lazy, Suspense, type SVGProps } from "react";
 import { Server } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { PANEL_LIST_ICON_CLASS } from "@/workbench/PanelHeader";
 import { detectHostSystem, type HostSystem } from "./hostSystem";
 
-type BrandIcon = ComponentType<{
-  color?: string;
-  size?: string | number;
-  title?: string;
-}>;
+const HostBrandIcon = lazy(() =>
+  import("./HostBrandIcon").then((module) => ({
+    default: module.HostBrandIcon,
+  })),
+);
 
-function OpenEulerLogo({
-  size = 24,
-  title = "openEuler",
-}: {
-  color?: string;
-  size?: string | number;
-  title?: string;
-}) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 512 512" role="img">
-      <title>{title}</title>
-      {/* Official openEuler community mark: https://www.openeuler.org/assets/logo.XeUCiAZu.svg */}
-      <path
-        fill="#1d2aa6"
-        fillRule="evenodd"
-        d="M475.7 116.6 272.3 4.2c-10.1-5.6-22.5-5.6-32.6 0L36.3 116.6c-10.1 5.6-16.3 15.9-16.3 27v224.8c0 11.1 6.2 21.4 16.3 27l203.4 112.4c10.1 5.6 22.5 5.6 32.6 0l203.4-112.4c10.1-5.6 16.3-15.9 16.3-27V143.6c0-11.1-6.2-21.4-16.3-27"
-      />
-      <path
-        fill="#fff"
-        fillRule="evenodd"
-        d="M443.4 199.6c-10.4 12.6-37.2 17.7-58.4 11.2-20.3-6.2-26.8-20.4-15.8-31.6 10.6-10.8 34.3-15.4 54-10.6 20.6 5.2 30.2 18.9 20.2 31m-93.8-25.7c-11.1 10.8-34.9 15.5-52.1 10.3-9.6-2.9-14.8-9-15.1-14.1-.2-3.9-6.4-7.5-13.2-9.5s-14.8-1.8-22.7-.9c-2 .2-6.3 1.1-9 2-7.3 2.3-13.6 5-18.9 9.1-6.5 5.2-8.7 14.5-8.6 17.9.2 4.8 4.9 8.9 11.9 11.5 7 2.5 15.6 3 24.2 1.7 10.5-2.7 22-2.8 31.5.4 17.3 5.8 21.7 20.7 8.6 33.5-13.6 13.3-39.9 18.3-57.3 11-9.7-4.1-13.1-11.5-13.6-18.4-.4-5.4-5.4-9.7-12.3-12.3-6.9-2.7-14.9-2.6-23.9-1.9-1.2.1-6.5 1.1-9.8 2-4.5 1.1-13.7 3.6-21.5 10.9-6.1 5.8-8.9 11.2-10.4 14.5-.9 1.9-2 6.2-2 7.6-.2 6 3.4 11.5 10.4 15 6.9 3.5 16 4.4 25.4 3.1 11.7-3 24-2.7 33.4 1.7 17.4 8.1 19.5 27.5 3.1 43.5-17.1 16.7-46.3 22.1-63.6 11.8-9.5-5.7-12.2-14.2-10.9-24.1v-.1c0-.1 0-2.4-.4-3.6 0 0-.3-2-1.6-4.5-1.8-3.4-4.7-6.2-8.6-8.4-6.7-3.7-15.6-4.7-24.9-3.4-11.6 3-23 2.6-30.5-1.9-12.7-7.6-8.9-23.8 7.4-36 8.4-6.3 18.7-10.4 28.4-12 9.2-1.8 18.8-5.8 26.2-11.5 7.3-5.6 11.1-11.7 11.5-17 0-.1.1-2.8-.4-5.7-.3-4.6-.1-9.1 4.2-14 2.8-3.1 8.8-6.2 15.4-7.4 4.5-.8 10.3-.6 13.6-.8 2.8-.1 7.8-.7 9.5-1.2 6.6-1.9 10.6-4 15.5-7.8 5-3.9 8.1-7.9 8.7-11.6.1-.8.4-4.4.3-4.8-1.7-8.6 10.9-18.1 28.1-21.2 8.7-1.5 16.9-1.1 23.1.8.2 0 .4.1.7.1 6.3 1.6 10.3 4.4 11.8 8h.1v.3c.2.6.4 1.3.5 2 1.5 3.8 5.8 7.1 12.8 8.9 6.9 1.8 15.1 1.9 23.1.7 9.6-2.4 20.4-2.8 29.7-.6 17.1 4.2 22.9 15.9 12.2 26.4m-40.2 192.2c-17 20.7-50.8 26.6-73.5 13.1-21.3-12.8-23.2-37.4-6.1-55 16.4-16.8 45.4-22.1 66.6-12.2 22.5 10.4 29.1 34.5 13 54.1"
-      />
-    </svg>
-  );
-}
-
-const BRAND_ICONS: Partial<Record<HostSystem, BrandIcon>> = {
-  alibaba: SiAlibabacloud,
-  alma: SiAlmalinux,
-  alpine: SiAlpinelinux,
-  apple: SiApple,
-  arch: SiArchlinux,
-  centos: SiCentos,
-  debian: SiDebian,
-  deepin: SiDeepin,
-  euleros: SiHuawei,
-  fedora: SiFedora,
-  freebsd: SiFreebsd,
-  gentoo: SiGentoo,
-  harmonyos: SiHarmonyos,
-  kali: SiKalilinux,
-  linux: SiLinux,
-  mint: SiLinuxmint,
-  manjaro: SiManjaro,
-  nixos: SiNixos,
-  openeuler: OpenEulerLogo,
-  opensuse: SiOpensuse,
-  redhat: SiRedhat,
-  rocky: SiRockylinux,
-  suse: SiSuse,
-  ubuntu: SiUbuntu,
-};
+const BRAND_SYSTEMS = new Set<HostSystem>([
+  "alibaba",
+  "alma",
+  "alpine",
+  "apple",
+  "arch",
+  "centos",
+  "debian",
+  "deepin",
+  "euleros",
+  "fedora",
+  "freebsd",
+  "gentoo",
+  "harmonyos",
+  "kali",
+  "linux",
+  "mint",
+  "manjaro",
+  "nixos",
+  "openeuler",
+  "opensuse",
+  "redhat",
+  "rocky",
+  "suse",
+  "ubuntu",
+]);
 
 const CUSTOM_MARKS: Partial<
   Record<HostSystem, { label: string; color: string; title: string }>
@@ -146,7 +95,7 @@ function WindowsLogo(props: SVGProps<SVGSVGElement>) {
 
 export function HostSystemIcon({ os }: { os: string | null | undefined }) {
   const system = detectHostSystem(os);
-  const Brand = BRAND_ICONS[system];
+  const branded = BRAND_SYSTEMS.has(system);
   const customMark = CUSTOM_MARKS[system];
 
   return (
@@ -154,17 +103,17 @@ export function HostSystemIcon({ os }: { os: string | null | undefined }) {
       className={cn(
         PANEL_LIST_ICON_CLASS,
         "relative",
-        (Brand || customMark) && "bg-card",
+        (branded || customMark) && "bg-card",
         system === "apple" && "text-foreground/80",
         system === "windows" && "bg-sky-500/10 text-[#00A4EF]",
       )}
     >
-      {Brand ? (
-        <Brand
-          size={18}
-          color={system === "apple" ? "currentColor" : "default"}
-          title={os?.trim() || system}
-        />
+      {branded ? (
+        <Suspense
+          fallback={<Server className="size-4 text-muted-foreground" />}
+        >
+          <HostBrandIcon system={system} title={os?.trim() || system} />
+        </Suspense>
       ) : customMark ? (
         <SystemLettermark {...customMark} />
       ) : system === "windows" ? (

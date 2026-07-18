@@ -92,7 +92,7 @@ export function TransferHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={false}
-        className="flex max-h-[70vh] max-w-2xl flex-col gap-0 p-0 sm:p-0"
+        className="flex max-h-[70vh] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:p-0"
         onInteractOutside={(e) => {
           if (confirmState) e.preventDefault();
         }}

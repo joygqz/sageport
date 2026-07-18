@@ -7,8 +7,9 @@ import {
   SquareTerminal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { memo } from "react";
 
-import { Tooltip } from "@/components/ui";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n, type TKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type Activity } from "./layout";
@@ -29,7 +30,7 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
 const ACTIVITY_BUTTON_CLASS =
   "flex size-9 items-center justify-center rounded-lg outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35";
 
-export function ActivityBar() {
+export const ActivityBar = memo(function ActivityBar() {
   const { t } = useI18n();
   const activity = useLayoutStore((s) => s.activity);
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
@@ -77,4 +78,4 @@ export function ActivityBar() {
       </Tooltip>
     </nav>
   );
-}
+});

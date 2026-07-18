@@ -49,6 +49,7 @@ import {
   WORKBENCH_TAB_ACTIVE_CLASS,
   WORKBENCH_TAB_CLASS,
   WORKBENCH_TAB_CLOSE_CLASS,
+  WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
   WORKBENCH_TAB_DROP_INDICATOR_CLASS,
   WORKBENCH_TAB_INACTIVE_CLASS,
 } from "@/workbench/tab-styles";
@@ -724,6 +725,7 @@ function SftpTabItem({
       <button
         data-tab-close
         type="button"
+        tabIndex={active ? 0 : -1}
         aria-label={t("editor.closeTab")}
         onClick={(event) => {
           event.stopPropagation();
@@ -732,8 +734,7 @@ function SftpTabItem({
         className={cn(
           WORKBENCH_TAB_CLOSE_CLASS,
           "size-4",
-          !active &&
-            "pointer-events-none -ml-1.5 w-0 opacity-0 group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-4 group-hover:opacity-70",
+          !active && WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
         )}
       >
         <X className="size-3" />

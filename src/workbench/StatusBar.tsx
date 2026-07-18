@@ -8,6 +8,7 @@ import {
   MemoryStick,
   Radio,
 } from "lucide-react";
+import { memo, type ButtonHTMLAttributes } from "react";
 
 import { useI18n } from "@/i18n";
 import { cn, formatBytes } from "@/lib/utils";
@@ -19,45 +20,53 @@ import { useUpdateStatus } from "@/features/updates/api";
 import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { STATUS_DOT_CLASS } from "./tab-styles";
-import { findPane, targetPaneId, useTabsStore } from "./tabs";
+import { findPane, paneTab, targetPaneId, useTabsStore } from "./tabs";
 
-export function StatusBar() {
+const STATUS_BAR_ITEM_LAYOUT_CLASS =
+  "flex h-full items-center gap-1.5 whitespace-nowrap px-2 [&_svg]:shrink-0";
+
+export const StatusBar = memo(function StatusBar() {
   const { t } = useI18n();
 
   return (
-    <footer className="flex h-[var(--statusbar-height)] shrink-0 items-center justify-between border-t border-border bg-surface/95 px-1 text-2xs text-muted-foreground">
-      <div className="flex h-full items-center">
+    <footer className="flex h-[var(--statusbar-height)] shrink-0 select-none items-center justify-between border-t border-border bg-surface/95 text-2xs text-muted-foreground">
+      <div className="flex h-full min-w-0 items-center overflow-hidden">
         <SessionItem />
         <MonitorItem />
         <BroadcastItem />
         <TransfersItem />
       </div>
-      <div className="flex h-full items-center">
+      <div className="flex h-full shrink-0 items-center">
         <UpdateItem />
         <SyncItem />
-        <span className="px-2 tabular-nums">
+        <span className="flex h-full shrink-0 items-center whitespace-nowrap px-2 tabular-nums">
           {t("statusBar.version", { version: __APP_VERSION__ })}
         </span>
       </div>
     </footer>
   );
-}
+});
 
 function StatusBarItem({
   onClick,
   title,
+  className,
   children,
-}: {
-  onClick?: () => void;
-  title?: string;
-  children: React.ReactNode;
+  ...props
+}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> & {
+  onClick: () => void;
 }) {
   return (
     <button
+      {...props}
       type="button"
       onClick={onClick}
       title={title}
-      className="flex h-full items-center gap-1.5 rounded-md px-2 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+      className={cn(
+        STATUS_BAR_ITEM_LAYOUT_CLASS,
+        "outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35",
+        className,
+      )}
     >
       {children}
     </button>
@@ -75,8 +84,8 @@ function SessionItem() {
   const session = findPane(tabs, id);
   if (!session) return null;
 
-  return (
-    <StatusBarItem onClick={() => setActive(session.id)}>
+  const content = (
+    <>
       <span
         className={cn(
           "size-1.5 shrink-0 rounded-full",
@@ -85,7 +94,16 @@ function SessionItem() {
       />
       <span className="max-w-48 truncate">{session.title}</span>
       <span>{t(`terminal.status.${session.status}`)}</span>
+    </>
+  );
+  const canActivate = paneTab(tabs, session.id)?.id !== activeId;
+
+  return canActivate ? (
+    <StatusBarItem className="min-w-0" onClick={() => setActive(session.id)}>
+      {content}
     </StatusBarItem>
+  ) : (
+    <div className={cn(STATUS_BAR_ITEM_LAYOUT_CLASS, "min-w-0")}>{content}</div>
   );
 }
 
@@ -113,7 +131,7 @@ function MonitorItem() {
 
   return (
     <div
-      className="flex h-full items-center gap-3 px-2 tabular-nums"
+      className="flex h-full shrink-0 items-center gap-3 whitespace-nowrap px-2 tabular-nums [&_svg]:shrink-0"
       title={t("statusBar.monitorHint")}
     >
       <span className="flex items-center gap-1">
@@ -174,14 +192,16 @@ function SyncItem() {
   const { data: status } = useSyncStatus();
   const openSettings = useOverlayStore((s) => s.openSettings);
 
-  const connected = Boolean(status?.provider);
+  if (!status) return null;
+  const connected = Boolean(status.provider);
   return (
     <StatusBarItem
       onClick={() => openSettings("sync")}
+      aria-haspopup="dialog"
       title={
-        status?.autoSyncError
+        status.autoSyncError
           ? t("statusBar.syncError", { error: status.autoSyncError })
-          : connected && status?.lastSyncedAt
+          : connected && status.lastSyncedAt
             ? t("statusBar.lastSynced", {
                 time: new Date(status.lastSyncedAt).toLocaleString(),
               })
@@ -193,12 +213,12 @@ function SyncItem() {
           <Cloud
             className={cn(
               "size-3",
-              status?.autoSyncInProgress && "animate-pulse",
+              status.autoSyncInProgress && "animate-pulse",
             )}
           />
           <span>
             {t(
-              status?.autoSyncInProgress
+              status.autoSyncInProgress
                 ? "statusBar.syncPending"
                 : "statusBar.syncOn",
             )}
@@ -228,7 +248,7 @@ function UpdateItem() {
   }
 
   return (
-    <StatusBarItem onClick={() => openSettings("about")}>
+    <StatusBarItem onClick={() => openSettings("about")} aria-haspopup="dialog">
       <ArrowUpCircle className="size-3 text-info" />
       <span>
         {status.status === "ready"

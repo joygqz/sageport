@@ -1,37 +1,17 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogToolbar,
-  Field,
-  Input,
-  PasswordInput,
-} from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogToolbar } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useI18n } from "@/i18n";
-import {
-  listenPasswordPrompts,
-  usePasswordPromptStore,
-} from "./password-prompt";
+import { usePasswordPromptStore } from "./password-prompt";
 
 export function PasswordPromptDialog() {
   const queue = usePasswordPromptStore((state) => state.queue);
   const respondTo = usePasswordPromptStore((state) => state.respond);
   const current = queue[0];
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    void listenPasswordPrompts().then((un) => {
-      if (disposed) un();
-      else unlisten = un;
-    });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
 
   return (
     <Dialog

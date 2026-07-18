@@ -1,6 +1,6 @@
-import { lazy, Suspense } from "react";
+import { lazy, memo, Suspense } from "react";
 
-import { Spinner } from "@/components/ui";
+import { Spinner } from "@/components/ui/spinner";
 import { useLayoutStore } from "./layout";
 
 const HostsView = lazy(() =>
@@ -33,7 +33,7 @@ const SnippetsView = lazy(() =>
   })),
 );
 
-export function SideBar({ width }: { width: number }) {
+export const SideBar = memo(function SideBar({ width }: { width: number }) {
   const activity = useLayoutStore((s) => s.activity);
 
   return (
@@ -56,4 +56,4 @@ export function SideBar({ width }: { width: number }) {
       </Suspense>
     </aside>
   );
-}
+});

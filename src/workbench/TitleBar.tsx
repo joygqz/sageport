@@ -1,7 +1,10 @@
 import { PanelBottom, PanelRight, Search } from "lucide-react";
+import { memo } from "react";
 
 import appLogo from "@/assets/app-logo.svg";
-import { CONTROL_INTERACTION_CLASS, Kbd, Tooltip } from "@/components/ui";
+import { Kbd } from "@/components/ui/kbd";
+import { CONTROL_INTERACTION_CLASS } from "@/components/ui/styles";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { IS_MACOS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -9,7 +12,7 @@ import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { WindowControls } from "./WindowControls";
 
-export function TitleBar() {
+export const TitleBar = memo(function TitleBar() {
   const { t } = useI18n();
   const openPalette = useOverlayStore((s) => s.openPalette);
   const panelVisible = useLayoutStore((s) => s.panelVisible);
@@ -89,7 +92,7 @@ export function TitleBar() {
       </div>
     </header>
   );
-}
+});
 
 function LayoutToggle({
   label,
