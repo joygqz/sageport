@@ -1,4 +1,5 @@
 use tauri::{AppHandle, Manager, State};
+use tokio::task::JoinSet;
 
 use crate::domain::{forward_kind, PortForward, PortForwardInput};
 use crate::error::{AppError, AppResult};
@@ -13,7 +14,7 @@ fn valid_port(port: i64) -> AppResult<u16> {
         .ok_or_else(|| AppError::Invalid("port must be between 1 and 65535".into()))
 }
 
-async fn build_spec(state: &State<'_, AppState>, forward: &PortForward) -> AppResult<ForwardSpec> {
+async fn build_spec(state: &AppState, forward: &PortForward) -> AppResult<ForwardSpec> {
     if !matches!(
         forward.kind.as_str(),
         forward_kind::LOCAL | forward_kind::REMOTE | forward_kind::DYNAMIC
@@ -90,13 +91,30 @@ pub async fn forwards_create(
 
 #[tauri::command]
 pub async fn forwards_update(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     input: PortForwardInput,
 ) -> AppResult<PortForward> {
+    let was_active = state
+        .forwards
+        .active_ids()
+        .iter()
+        .any(|active| active == &id);
     let forward = forward_repo::update(&state.db, &id, input).await?;
     state.forwards.stop(&id).await;
     state.forwards.forget(&id);
+    if was_active {
+        match build_spec(&state, &forward).await {
+            Ok(spec) => {
+                let _ = state
+                    .forwards
+                    .start(app, state.connection_prompts.clone(), spec)
+                    .await;
+            }
+            Err(error) => state.forwards.report_error(&app, &id, &error),
+        }
+    }
     Ok(forward)
 }
 
@@ -141,15 +159,51 @@ pub async fn start_auto_forwards(app: &AppHandle) {
     let Ok(forwards) = forward_repo::list_auto_start(&state.db).await else {
         return;
     };
+    let mut starts = JoinSet::new();
     for forward in forwards {
-        match build_spec(&state, &forward).await {
-            Ok(spec) => {
-                let _ = state
-                    .forwards
-                    .start(app.clone(), state.connection_prompts.clone(), spec)
-                    .await;
+        let task_app = app.clone();
+        starts.spawn(async move {
+            let state = task_app.state::<AppState>();
+            match build_spec(&state, &forward).await {
+                Ok(spec) => {
+                    let _ = state
+                        .forwards
+                        .start(task_app.clone(), state.connection_prompts.clone(), spec)
+                        .await;
+                }
+                Err(error) => state.forwards.report_error(&task_app, &forward.id, &error),
             }
-            Err(error) => state.forwards.report_error(app, &forward.id, &error),
-        }
+        });
+    }
+    while starts.join_next().await.is_some() {}
+}
+
+pub fn reconcile_running_forwards(app: &AppHandle, previous: Vec<ForwardSpec>) {
+    for old_spec in previous {
+        let task_app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let state = task_app.state::<AppState>();
+            let current = match forward_repo::get(&state.db, &old_spec.id).await {
+                Ok(forward) => build_spec(&state, &forward).await,
+                Err(error) => Err(error),
+            };
+            if current.as_ref().is_ok_and(|spec| spec == &old_spec) {
+                return;
+            }
+            if !state.forwards.stop_if_spec(&old_spec).await {
+                return;
+            }
+            state.forwards.forget(&old_spec.id);
+            match current {
+                Ok(spec) => {
+                    let _ = state
+                        .forwards
+                        .start(task_app.clone(), state.connection_prompts.clone(), spec)
+                        .await;
+                }
+                Err(AppError::NotFound(_)) => {}
+                Err(error) => state.forwards.report_error(&task_app, &old_spec.id, &error),
+            }
+        });
     }
 }

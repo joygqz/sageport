@@ -29,7 +29,7 @@ pub const EVENT_PASSWORD_CLOSED: &str = "ssh://password-closed";
 pub const TERM: &str = "xterm-256color";
 pub const JUMP_DEPTH_LIMIT: usize = 8;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthMethod {
     Password(Option<String>),
     Key {
@@ -40,7 +40,7 @@ pub enum AuthMethod {
     Automatic,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hop {
     pub host: String,
     pub port: u16,

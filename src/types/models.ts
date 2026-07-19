@@ -120,6 +120,7 @@ export interface ForwardStatusEvent {
   code?: string;
   generation: number;
   sequence: number;
+  publicBindRestricted: boolean;
 }
 
 export interface SshConfigHost {

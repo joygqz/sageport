@@ -129,6 +129,15 @@ export const en = {
       action: "Delete port forward",
       error: "Failed to delete port forward",
     },
+    gatewayPorts: {
+      title: "Configure public SSH forwarding",
+      description:
+        'The SSH server did not allow "{name}" to listen on {endpoint}. Ask an administrator to run this command on the server. It lets remote forwards select their listen address while loopback addresses remain private.',
+      restartHint: "After the command succeeds, start this port forward again.",
+      copyCommand: "Copy setup command",
+      commandCopied: "Setup command copied",
+      copyError: "Failed to copy setup command",
+    },
     form: {
       newTitle: "New port forward",
       editTitle: "Edit port forward",
@@ -137,6 +146,14 @@ export const en = {
       targetRequired: "Enter a target host",
       invalidTargetPort: "Enter a target port from 1 to 65535",
       saveError: "Failed to save port forward",
+      publicSocks: {
+        title: "Expose SOCKS proxy?",
+        description:
+          "Anyone who can reach {endpoint} can use this unauthenticated proxy to access services through your SSH host.",
+        hint: "This address exposes the unauthenticated SOCKS proxy beyond this device.",
+        cancel: "Keep editing",
+        action: "Expose SOCKS proxy",
+      },
     },
   },
 

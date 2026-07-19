@@ -9,6 +9,7 @@ interface ForwardRuntime {
   code?: string;
   generation: number;
   sequence: number;
+  publicBindRestricted: boolean;
 }
 
 interface ForwardState {
@@ -25,6 +26,7 @@ function fromEvent(event: ForwardStatusEvent): ForwardRuntime {
     code: event.code,
     generation: event.generation,
     sequence: event.sequence,
+    publicBindRestricted: event.publicBindRestricted,
   };
 }
 

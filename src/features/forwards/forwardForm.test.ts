@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatForwardEndpoint, forwardInput } from "./forwardForm";
+import {
+  formatForwardEndpoint,
+  forwardInput,
+  isLoopbackBindHost,
+} from "./forwardForm";
 
 const values = {
   hostId: " host ",
@@ -18,6 +22,16 @@ describe("forwardInput", () => {
     expect(formatForwardEndpoint("127.0.0.1", 8080)).toBe("127.0.0.1:8080");
     expect(formatForwardEndpoint("localhost", 8080)).toBe("localhost:8080");
     expect(formatForwardEndpoint("::1", 8080)).toBe("[::1]:8080");
+  });
+
+  it("distinguishes private loopback listeners from exposed listeners", () => {
+    expect(isLoopbackBindHost("127.0.0.1")).toBe(true);
+    expect(isLoopbackBindHost("127.0.0.2")).toBe(true);
+    expect(isLoopbackBindHost("LOCALHOST")).toBe(true);
+    expect(isLoopbackBindHost("::1")).toBe(true);
+    expect(isLoopbackBindHost("0.0.0.0")).toBe(false);
+    expect(isLoopbackBindHost("::")).toBe(false);
+    expect(isLoopbackBindHost("192.168.1.10")).toBe(false);
   });
 
   it("normalizes a valid local forward", () => {

@@ -23,6 +23,7 @@ export interface ConfirmState {
   title: string;
   description?: ReactNode;
   cancelLabel: string;
+  contentClassName?: string;
 
   actions: ConfirmAction[];
 }
@@ -41,7 +42,7 @@ export function ConfirmDialog({
       open={!!state}
       onOpenChange={(open) => !open && !busy && onClose()}
     >
-      <AlertDialogContent className="max-w-sm">
+      <AlertDialogContent className={state?.contentClassName ?? "max-w-sm"}>
         {state && (
           <>
             <DialogHeader>

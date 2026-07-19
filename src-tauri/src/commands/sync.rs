@@ -1,14 +1,17 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
 use tokio::sync::oneshot;
 
+use crate::crypto::EncryptedEnvelope;
 use crate::domain::now;
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
 use crate::state::AppState;
 use crate::sync::{self, oauth, ProviderConfig, ProviderKind, SyncVersion};
+
+use super::forwards;
 
 const CONNECTION_KEY: &str = "sync.connection";
 const MAX_CONNECTION_BYTES: usize = 256 * 1024;
@@ -318,6 +321,7 @@ fn parse_settings<T: serde::de::DeserializeOwned>(
 
 #[tauri::command]
 pub async fn sync_connect(
+    app: AppHandle,
     state: State<'_, AppState>,
     provider: String,
     settings: Option<serde_json::Value>,
@@ -343,7 +347,7 @@ pub async fn sync_connect(
         let envelope = backend.pull_version(&latest.id).await?;
         match sync::decrypt_snapshot(&envelope, &passphrase).await {
             Ok(snapshot) => {
-                sync::import_snapshot(&state.db, &snapshot).await?;
+                import_snapshot(&app, &state, &snapshot).await?;
                 last_synced_at = Some(now());
             }
             Err(AppError::Crypto(_)) => return Ok(ConnectOutcome::PassphraseMismatch),
@@ -389,16 +393,16 @@ pub async fn sync_disconnect(state: State<'_, AppState>) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub async fn sync_push(state: State<'_, AppState>) -> AppResult<PushOutcome> {
-    run_sync(&state).await
+pub async fn sync_push(app: AppHandle, state: State<'_, AppState>) -> AppResult<PushOutcome> {
+    run_sync(&app, &state).await
 }
 
-async fn run_sync(state: &AppState) -> AppResult<PushOutcome> {
+async fn run_sync(app: &AppHandle, state: &AppState) -> AppResult<PushOutcome> {
     {
         let mut runtime = state.sync_runtime.lock();
         runtime.active_operations = runtime.active_operations.saturating_add(1);
     }
-    let result = sync_push_inner(state).await;
+    let result = sync_push_inner(app, state).await;
     {
         let mut runtime = state.sync_runtime.lock();
         runtime.active_operations = runtime.active_operations.saturating_sub(1);
@@ -407,7 +411,7 @@ async fn run_sync(state: &AppState) -> AppResult<PushOutcome> {
     result
 }
 
-async fn sync_push_inner(state: &AppState) -> AppResult<PushOutcome> {
+async fn sync_push_inner(app: &AppHandle, state: &AppState) -> AppResult<PushOutcome> {
     let _operation = state.sync_operation.lock().await;
     let mut conn = require_connection(state).await?;
     let mut backend = sync::make_provider(conn.config.clone())?;
@@ -436,7 +440,7 @@ async fn sync_push_inner(state: &AppState) -> AppResult<PushOutcome> {
             }
         };
         if !conn.pending_restore {
-            sync::import_snapshot(&state.db, &snapshot).await?;
+            import_snapshot(app, state, &snapshot).await?;
         }
         remote = Some(snapshot);
     }
@@ -454,7 +458,7 @@ async fn sync_push_inner(state: &AppState) -> AppResult<PushOutcome> {
                 }
             };
             match sync::decrypt_snapshot(&envelope, &conn.passphrase).await {
-                Ok(snapshot) => sync::import_snapshot(&state.db, &snapshot).await?,
+                Ok(snapshot) => import_snapshot(app, state, &snapshot).await?,
                 Err(error) if is_ignorable_historical_error(&error) => continue,
                 Err(error) => {
                     save_refreshed_config(state, &mut conn, backend.config()).await;
@@ -500,7 +504,7 @@ pub fn run_periodic(app: tauri::AppHandle) {
             };
             let connected = load_connection(&state).await.ok().flatten().is_some();
             if connected {
-                match run_sync(&state).await {
+                match run_sync(&app, &state).await {
                     Ok(_) => retry = std::time::Duration::from_secs(120),
                     Err(_) => {
                         retry = (retry * 2).min(std::time::Duration::from_secs(900));
@@ -533,6 +537,7 @@ pub async fn sync_list_versions(state: State<'_, AppState>) -> AppResult<Vec<Syn
 
 #[tauri::command]
 pub async fn sync_restore_version(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
 ) -> AppResult<RestoreOutcome> {
@@ -562,7 +567,7 @@ pub async fn sync_restore_version(
             return Err(error);
         }
     };
-    if let Err(error) = sync::restore_encrypted(&state.db, &envelope, &conn.passphrase).await {
+    if let Err(error) = restore_encrypted(&app, &state, &envelope, &conn.passphrase).await {
         save_refreshed_config(&state, &mut conn, backend.config()).await;
         return Err(error);
     }
@@ -597,6 +602,7 @@ pub async fn sync_file_export(
 
 #[tauri::command]
 pub async fn sync_file_import(
+    app: AppHandle,
     state: State<'_, AppState>,
     path: String,
     passphrase: String,
@@ -608,7 +614,32 @@ pub async fn sync_file_import(
     let envelope = tokio::task::spawn_blocking(move || sync::read_envelope_file(&path))
         .await
         .map_err(|e| AppError::Other(format!("backup file read task failed: {e}")))??;
+    let previous = state.forwards.active_specs();
     sync::import_encrypted(&state.db, &envelope, &passphrase).await?;
+    forwards::reconcile_running_forwards(&app, previous);
+    Ok(())
+}
+
+async fn import_snapshot(
+    app: &AppHandle,
+    state: &AppState,
+    snapshot: &sync::VaultSnapshot,
+) -> AppResult<()> {
+    let previous = state.forwards.active_specs();
+    sync::import_snapshot(&state.db, snapshot).await?;
+    forwards::reconcile_running_forwards(app, previous);
+    Ok(())
+}
+
+async fn restore_encrypted(
+    app: &AppHandle,
+    state: &AppState,
+    envelope: &EncryptedEnvelope,
+    passphrase: &str,
+) -> AppResult<()> {
+    let previous = state.forwards.active_specs();
+    sync::restore_encrypted(&state.db, envelope, passphrase).await?;
+    forwards::reconcile_running_forwards(app, previous);
     Ok(())
 }
 

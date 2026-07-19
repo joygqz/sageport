@@ -13,6 +13,7 @@ use tokio::task::JoinSet;
 use tokio::time::{Instant, MissedTickBehavior};
 
 use super::connect::{establish, establish_with_forwarded_tcpip, SshConnection};
+use super::exec::exec_capture_limited;
 use super::{ConnectionPrompts, Hop};
 use crate::error::{AppError, AppResult};
 
@@ -22,14 +23,16 @@ const BIND_TIMEOUT: Duration = Duration::from_secs(10);
 const CHANNEL_OPEN_TIMEOUT: Duration = Duration::from_secs(15);
 const SOCKS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
 const CONNECTION_CHECK_INTERVAL: Duration = Duration::from_secs(1);
+const REMOTE_LISTENER_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_FORWARD_CONNECTIONS: usize = 256;
+const MAX_REMOTE_LISTENER_OUTPUT_BYTES: usize = 16 * 1024;
 
 pub mod kind {
     pub const DYNAMIC: &str = "dynamic";
     pub const REMOTE: &str = "remote";
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ForwardSpec {
     pub id: String,
     pub kind: String,
@@ -51,10 +54,12 @@ pub struct StatusEvent {
     pub code: Option<String>,
     pub generation: u64,
     pub sequence: u64,
+    pub public_bind_restricted: bool,
 }
 
 struct ActiveForward {
     generation: u64,
+    spec: ForwardSpec,
     shutdown: watch::Sender<bool>,
     finished: oneshot::Receiver<()>,
 }
@@ -97,12 +102,40 @@ impl ForwardManager {
         self.active.lock().keys().cloned().collect()
     }
 
+    pub fn active_specs(&self) -> Vec<ForwardSpec> {
+        self.active
+            .lock()
+            .values()
+            .map(|entry| entry.spec.clone())
+            .collect()
+    }
+
     pub fn runtime(&self) -> Vec<StatusEvent> {
         self.runtime.lock().values().cloned().collect()
     }
 
     pub async fn stop(&self, id: &str) -> bool {
         let entry = self.active.lock().remove(id);
+        let Some(entry) = entry else {
+            return false;
+        };
+        let _ = entry.shutdown.send(true);
+        let _ = entry.finished.await;
+        true
+    }
+
+    pub async fn stop_if_spec(&self, spec: &ForwardSpec) -> bool {
+        let entry = {
+            let mut active = self.active.lock();
+            if active
+                .get(&spec.id)
+                .is_some_and(|entry| entry.spec == *spec)
+            {
+                active.remove(&spec.id)
+            } else {
+                None
+            }
+        };
         let Some(entry) = entry else {
             return false;
         };
@@ -207,6 +240,7 @@ impl ForwardManager {
                 spec.id.clone(),
                 ActiveForward {
                     generation,
+                    spec: spec.clone(),
                     shutdown: shutdown_tx,
                     finished: finished_rx,
                 },
@@ -265,6 +299,29 @@ fn emit(
     status: &str,
     error: Option<&AppError>,
 ) {
+    emit_with_public_bind(
+        app,
+        runtime,
+        next_sequence,
+        id,
+        generation,
+        status,
+        error,
+        false,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_with_public_bind(
+    app: &AppHandle,
+    runtime: &Mutex<HashMap<String, StatusEvent>>,
+    next_sequence: &AtomicU64,
+    id: &str,
+    generation: u64,
+    status: &str,
+    error: Option<&AppError>,
+    public_bind_restricted: bool,
+) {
     let event = StatusEvent {
         forward_id: id.to_string(),
         status: status.to_string(),
@@ -272,6 +329,7 @@ fn emit(
         code: error.map(|error| error.code().to_string()),
         generation,
         sequence: next_sequence.fetch_add(1, Ordering::Relaxed) + 1,
+        public_bind_restricted,
     };
     runtime.lock().insert(id.to_string(), event.clone());
     let _ = app.emit(EVENT_STATUS, event);
@@ -440,6 +498,61 @@ async fn run_forward(
     }
 }
 
+async fn remote_listener_is_loopback_only(conn: &SshConnection, spec: &ForwardSpec) -> bool {
+    if !requests_non_loopback_bind(&spec.bind_host) {
+        return false;
+    }
+    remote_listener_output(conn, spec)
+        .await
+        .is_some_and(|output| listener_output_is_loopback_only(&output))
+}
+
+async fn remote_bind_setup_required(conn: &SshConnection, spec: &ForwardSpec) -> bool {
+    if !requests_non_loopback_bind(&spec.bind_host) {
+        return false;
+    }
+    remote_listener_output(conn, spec)
+        .await
+        .is_some_and(|output| output.trim().is_empty())
+}
+
+async fn remote_listener_output(conn: &SshConnection, spec: &ForwardSpec) -> Option<String> {
+    let command = format!(
+        "command -v ss >/dev/null 2>&1 && ss -H -ltn 'sport = :{}'",
+        spec.bind_port
+    );
+    let output = tokio::time::timeout(
+        REMOTE_LISTENER_CHECK_TIMEOUT,
+        exec_capture_limited(&conn.handle, &command, MAX_REMOTE_LISTENER_OUTPUT_BYTES),
+    )
+    .await;
+    let Ok(Ok(output)) = output else {
+        return None;
+    };
+    (output.code == 0).then_some(output.stdout)
+}
+
+fn requests_non_loopback_bind(host: &str) -> bool {
+    !matches!(
+        host.trim().to_ascii_lowercase().as_str(),
+        "127.0.0.1" | "localhost" | "::1"
+    )
+}
+
+fn listener_output_is_loopback_only(output: &str) -> bool {
+    let addresses = output
+        .lines()
+        .filter_map(|line| line.split_whitespace().nth(3));
+    let mut found = false;
+    for address in addresses {
+        found = true;
+        if !address.starts_with("127.") && !address.starts_with("[::1]:") {
+            return false;
+        }
+    }
+    found
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_remote_forward(
     app: AppHandle,
@@ -494,7 +607,12 @@ async fn run_remote_forward(
         } else {
             "error"
         };
-        emit(
+        let public_bind_restricted = if status == "error" {
+            remote_bind_setup_required(&conn, &spec).await
+        } else {
+            false
+        };
+        emit_with_public_bind(
             &app,
             &runtime,
             &next_sequence,
@@ -502,13 +620,19 @@ async fn run_remote_forward(
             generation,
             status,
             (status == "error").then_some(&error),
+            public_bind_restricted,
         );
-        let _ = ready.send(Err(error));
+        let _ = if public_bind_restricted {
+            ready.send(Ok(()))
+        } else {
+            ready.send(Err(error))
+        };
         return;
     }
 
+    let public_bind_restricted = remote_listener_is_loopback_only(&conn, &spec).await;
     let _ = ready.send(Ok(()));
-    emit(
+    emit_with_public_bind(
         &app,
         &runtime,
         &next_sequence,
@@ -516,6 +640,7 @@ async fn run_remote_forward(
         generation,
         "active",
         None,
+        public_bind_restricted,
     );
 
     let target_host = match spec.target_host.clone() {
@@ -797,6 +922,18 @@ where
 mod tests {
     use super::*;
 
+    fn forward_spec(target_port: u16) -> ForwardSpec {
+        ForwardSpec {
+            id: "forward".into(),
+            kind: "local".into(),
+            bind_host: "127.0.0.1".into(),
+            bind_port: 8080,
+            target_host: Some("localhost".into()),
+            target_port: Some(target_port),
+            hops: Vec::new(),
+        }
+    }
+
     #[tokio::test]
     async fn socks5_parses_domain_connect_without_premature_success() {
         let (mut client, mut server) = tokio::io::duplex(256);
@@ -871,6 +1008,7 @@ mod tests {
             "forward".into(),
             ActiveForward {
                 generation: 2,
+                spec: forward_spec(80),
                 shutdown: old_shutdown,
                 finished: old_finished,
             },
@@ -880,6 +1018,30 @@ mod tests {
         assert_eq!(active.lock().get("forward").unwrap().generation, 2);
         remove_finished(&active, "forward", 2);
         assert!(!active.lock().contains_key("forward"));
+    }
+
+    #[tokio::test]
+    async fn conditional_stop_does_not_stop_a_replacement() {
+        let manager = ForwardManager::new();
+        let current = forward_spec(80);
+        let (shutdown, _) = watch::channel(false);
+        let (finished, finished_rx) = oneshot::channel();
+        manager.active.lock().insert(
+            current.id.clone(),
+            ActiveForward {
+                generation: 1,
+                spec: current.clone(),
+                shutdown,
+                finished: finished_rx,
+            },
+        );
+
+        assert!(!manager.stop_if_spec(&forward_spec(81)).await);
+        assert!(manager.active_specs().iter().any(|spec| spec == &current));
+
+        let _ = finished.send(());
+        assert!(manager.stop_if_spec(&current).await);
+        assert!(manager.active_specs().is_empty());
     }
 
     #[test]
@@ -905,5 +1067,23 @@ mod tests {
         drop(guard);
 
         assert_eq!(preparing.lock().get("forward"), Some(&2));
+    }
+
+    #[test]
+    fn detects_loopback_only_remote_listener() {
+        let loopback = "LISTEN 0 128 127.0.0.1:8020 0.0.0.0:*\nLISTEN 0 128 [::1]:8020 [::]:*\n";
+        let public = "LISTEN 0 128 0.0.0.0:8020 0.0.0.0:*\n";
+
+        assert!(listener_output_is_loopback_only(loopback));
+        assert!(!listener_output_is_loopback_only(public));
+        assert!(!listener_output_is_loopback_only(""));
+    }
+
+    #[test]
+    fn recognizes_non_loopback_bind_requests() {
+        assert!(!requests_non_loopback_bind("127.0.0.1"));
+        assert!(!requests_non_loopback_bind("LOCALHOST"));
+        assert!(requests_non_loopback_bind("0.0.0.0"));
+        assert!(requests_non_loopback_bind("203.0.113.10"));
     }
 }

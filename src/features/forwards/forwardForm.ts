@@ -8,6 +8,16 @@ export function formatForwardEndpoint(host: string, port: number): string {
   return `${displayHost}:${port}`;
 }
 
+export function isLoopbackBindHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "::1" ||
+    normalized === "[::1]" ||
+    normalized.startsWith("127.")
+  );
+}
+
 export type ForwardFormError =
   "required" | "invalidBindPort" | "targetRequired" | "invalidTargetPort";
 

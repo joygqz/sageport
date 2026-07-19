@@ -126,6 +126,15 @@ export const zhCN: Dictionary = {
       action: "删除端口转发",
       error: "删除端口转发失败",
     },
+    gatewayPorts: {
+      title: "配置 SSH 公网转发",
+      description:
+        "SSH 服务器不允许“{name}”监听 {endpoint}。请让管理员在服务器上运行以下命令，使远程转发可以自行选择监听地址，回环地址仍保持仅本机可见。",
+      restartHint: "命令执行成功后，请重新启动此端口转发。",
+      copyCommand: "复制配置命令",
+      commandCopied: "已复制配置命令",
+      copyError: "复制配置命令失败",
+    },
     form: {
       newTitle: "新建端口转发",
       editTitle: "编辑端口转发",
@@ -134,6 +143,14 @@ export const zhCN: Dictionary = {
       targetRequired: "请输入目标主机",
       invalidTargetPort: "请输入 1 到 65535 之间的目标端口",
       saveError: "保存端口转发失败",
+      publicSocks: {
+        title: "公开 SOCKS 代理？",
+        description:
+          "任何能访问 {endpoint} 的用户都可以通过这个无认证代理，经由 SSH 主机访问其他服务。",
+        hint: "此地址会将无认证 SOCKS 代理暴露给本机以外的设备。",
+        cancel: "继续编辑",
+        action: "公开 SOCKS 代理",
+      },
     },
   },
 

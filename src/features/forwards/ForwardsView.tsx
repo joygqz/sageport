@@ -38,6 +38,14 @@ import { ForwardFormDialog } from "./ForwardFormDialog";
 import { formatForwardEndpoint } from "./forwardForm";
 import { bridgeForwardEvents, useForwardStore } from "./store";
 
+const PUBLIC_FORWARDING_ADMIN_COMMAND = `test "$(id -u)" = 0 && sageport_run= || sageport_run=sudo
+$sageport_run install -d -m 0755 /etc/ssh/sshd_config.d &&
+echo 'GatewayPorts clientspecified' | $sageport_run tee /etc/ssh/sshd_config.d/00-00-sageport-gateway-ports.conf >/dev/null &&
+$sageport_run sshd -t &&
+$sageport_run sshd -T | grep -qx 'gatewayports clientspecified' &&
+$sageport_run sh -c 'systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || service sshd reload 2>/dev/null || service ssh reload'`;
+const promptedPublicForwardingGenerations = new Map<string, number>();
+
 export function ForwardsView() {
   const { t } = useI18n();
   const { data: forwards = [], isLoading, isError, refetch } = useForwards();
@@ -57,6 +65,72 @@ export function ForwardsView() {
       toast.error(t("forwards.statusError"), errorMessage(err));
     });
   }, [t]);
+
+  useEffect(() => {
+    if (confirmState) return;
+    const forward = forwards.find((candidate) => {
+      const state = runtime[candidate.id];
+      return (
+        (state?.status === "active" || state?.status === "error") &&
+        state.publicBindRestricted &&
+        promptedPublicForwardingGenerations.get(candidate.id) !==
+          state.generation
+      );
+    });
+    if (!forward) return;
+    const state = runtime[forward.id];
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      promptedPublicForwardingGenerations.set(forward.id, state.generation);
+      setConfirmState({
+        title: t("forwards.gatewayPorts.title"),
+        description: (
+          <span className="block min-w-0 max-w-full space-y-3">
+            <span className="block break-words">
+              {t("forwards.gatewayPorts.description", {
+                name: forward.label,
+                endpoint: formatForwardEndpoint(
+                  forward.bindHost,
+                  forward.bindPort,
+                ),
+              })}
+            </span>
+            <code className="block max-h-64 w-full min-w-0 max-w-full select-text overflow-auto whitespace-pre rounded-md bg-terminal-background p-3 text-left font-mono text-xs leading-relaxed text-terminal-foreground">
+              {PUBLIC_FORWARDING_ADMIN_COMMAND}
+            </code>
+            <span className="block">
+              {t("forwards.gatewayPorts.restartHint")}
+            </span>
+          </span>
+        ),
+        cancelLabel: t("common.close"),
+        contentClassName: "max-w-2xl overflow-x-hidden",
+        actions: [
+          {
+            label: t("forwards.gatewayPorts.copyCommand"),
+            onSelect: async () => {
+              try {
+                await navigator.clipboard.writeText(
+                  PUBLIC_FORWARDING_ADMIN_COMMAND,
+                );
+                toast.success(t("forwards.gatewayPorts.commandCopied"));
+              } catch (err) {
+                toast.error(
+                  t("forwards.gatewayPorts.copyError"),
+                  errorMessage(err),
+                );
+                return false;
+              }
+            },
+          },
+        ],
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [confirmState, forwards, runtime, t]);
 
   const isActive = (id: string) => {
     const status = runtime[id]?.status;

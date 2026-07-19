@@ -249,7 +249,7 @@ pub async fn ssh_host_key_pending(state: State<'_, AppState>) -> AppResult<Vec<H
     ))
 }
 
-pub(crate) async fn build_hops(state: &State<'_, AppState>, host: &Host) -> AppResult<Vec<Hop>> {
+pub(crate) async fn build_hops(state: &AppState, host: &Host) -> AppResult<Vec<Hop>> {
     let mut chain = Vec::new();
     let mut visited = HashSet::new();
     let mut current = host.clone();
@@ -277,7 +277,7 @@ pub(crate) async fn build_hops(state: &State<'_, AppState>, host: &Host) -> AppR
 }
 
 pub(crate) async fn resolve_credentials(
-    state: &State<'_, AppState>,
+    state: &AppState,
     host: &Host,
 ) -> AppResult<(String, AuthMethod)> {
     let (username, auth_type, key_id, password) = if let Some(identity_id) = &host.identity_id {
