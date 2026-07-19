@@ -20,6 +20,7 @@ import {
   normalizeArgs,
   prepareTool,
   selectionResult,
+  TOOLS_ALWAYS_REQUIRING_APPROVAL,
   TOOLS_REQUIRING_APPROVAL,
   validateToolArguments,
 } from "./tools";
@@ -368,7 +369,12 @@ async function targetsApprovalHost(
   collectIds(args);
 
   if (
-    ["update_host", "delete_host", "move_host"].includes(toolName) &&
+    [
+      "update_host",
+      "reveal_host_password",
+      "delete_host",
+      "move_host",
+    ].includes(toolName) &&
     typeof args.id === "string"
   ) {
     ids.add(args.id);
@@ -382,6 +388,7 @@ async function targetsApprovalHost(
   }
   const indirectLookupTools = new Set([
     "update_identity",
+    "reveal_identity_password",
     "delete_identity",
     "update_ssh_key",
     "delete_ssh_key",
@@ -396,7 +403,11 @@ async function targetsApprovalHost(
   try {
     const hosts = await ipc.hosts.list();
     if (
-      ["update_identity", "delete_identity"].includes(toolName) &&
+      [
+        "update_identity",
+        "reveal_identity_password",
+        "delete_identity",
+      ].includes(toolName) &&
       typeof args.id === "string"
     ) {
       for (const host of hosts) {
@@ -495,11 +506,14 @@ async function runToolCall(
   const args = normalizeArgs(call.arguments);
   const logId = crypto.randomUUID();
   const needsApproval = TOOLS_REQUIRING_APPROVAL.has(call.name);
+  const alwaysRequireApproval = TOOLS_ALWAYS_REQUIRING_APPROVAL.has(call.name);
   const approvalTarget =
     needsApproval &&
+    !alwaysRequireApproval &&
     autoApprove &&
     (await targetsApprovalHost(call.name, args));
-  const waitForApproval = needsApproval && (!autoApprove || approvalTarget);
+  const waitForApproval =
+    needsApproval && (alwaysRequireApproval || !autoApprove || approvalTarget);
   const isQuestion =
     call.name === "ask_user" &&
     Boolean(askUserQuestion(args)) &&

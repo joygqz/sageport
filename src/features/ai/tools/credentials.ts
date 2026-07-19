@@ -12,7 +12,9 @@ import type {
   AuthType,
   Identity,
   IdentityInput,
+  SshKey,
   SshKeyAlgorithm,
+  SshKeyInput,
 } from "@/types/models";
 import { invalidateIdentities, invalidateSshKeys } from "./cache";
 import {
@@ -100,6 +102,15 @@ async function updateIdentity(
   return toolSuccess(`Updated identity "${identity.name}".`);
 }
 
+async function revealIdentityPassword(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const id = str(args, "id");
+  if (!id) return toolFailure("Error: no identity id given.");
+  const password = await ipc.identities.revealPassword(id);
+  return toolSuccess(JSON.stringify({ id, password }));
+}
+
 async function deleteIdentity(
   args: Record<string, unknown>,
 ): Promise<ToolExecutionResult> {
@@ -124,9 +135,69 @@ async function listSshKeys(): Promise<ToolExecutionResult> {
         name: k.name,
         publicKey: k.publicKey ?? undefined,
         hasPrivateKey: k.hasPrivateKey,
+        hasPassphrase: k.hasPassphrase,
       })),
     ),
   );
+}
+
+async function findSshKey(id: string): Promise<SshKey | undefined> {
+  const keys = await ipc.keys.list();
+  return keys.find((key) => key.id === id);
+}
+
+function sshKeyInput(
+  args: Record<string, unknown>,
+  base?: SshKey,
+): SshKeyInput {
+  const publicKey = nullableStr(args, "publicKey");
+  const privateKey = nullableStr(args, "privateKey");
+  const passphrase = nullableStr(args, "passphrase");
+  return {
+    name: optionalStr(args, "name") ?? base?.name ?? "",
+    publicKey: publicKey === undefined ? undefined : publicKey,
+    privateKey: privateKey === undefined ? undefined : privateKey,
+    passphrase: passphrase === undefined ? undefined : passphrase,
+  };
+}
+
+async function createSshKey(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  if (!optionalStr(args, "name") || !optionalStr(args, "privateKey")) {
+    return toolFailure("Error: name and privateKey are required.");
+  }
+  const key = await ipc.keys.create(sshKeyInput(args));
+  invalidateSshKeys();
+  return toolSuccess(`Created SSH key "${key.name}". id: ${key.id}`);
+}
+
+async function updateSshKey(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const id = str(args, "id");
+  if (!id) return toolFailure("Error: no key id given.");
+  const current = await findSshKey(id);
+  if (!current) return toolFailure(`Error: no key with id "${id}".`);
+  const key = await ipc.keys.update(id, sshKeyInput(args, current));
+  invalidateSshKeys();
+  return toolSuccess(`Updated SSH key "${key.name}".`);
+}
+
+async function importSshKeyFile(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const path = optionalStr(args, "path");
+  if (!path) return toolFailure("Error: a key file path is required.");
+  const file = await ipc.keys.importFile(path);
+  const key = await ipc.keys.create({
+    name: optionalStr(args, "name") ?? file.name,
+    privateKey: file.privateKey,
+    publicKey: file.publicKey,
+    passphrase: optionalStr(args, "passphrase") ?? null,
+  });
+  invalidateSshKeys();
+  return toolSuccess(`Imported SSH key "${key.name}". id: ${key.id}`);
 }
 
 async function generateSshKey(
@@ -253,6 +324,25 @@ export const credentialTools: AiTool[] = [
   },
   {
     spec: {
+      name: "reveal_identity_password",
+      description:
+        "Reveal a saved identity password. The result is sensitive and is not retained in chat history.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string", description: "Identity id." } },
+        required: ["id"],
+        additionalProperties: false,
+      },
+    },
+    icon: KeyRound,
+    labelKey: "ai.tool.revealIdentityPassword",
+    requiresApproval: true,
+    alwaysRequireApproval: true,
+    sensitiveResult: true,
+    execute: async (args) => revealIdentityPassword(args),
+  },
+  {
+    spec: {
       name: "delete_identity",
       description: "Delete a saved identity by id.",
       parameters: {
@@ -309,6 +399,89 @@ export const credentialTools: AiTool[] = [
     labelKey: "ai.tool.generateSshKey",
     requiresApproval: true,
     execute: async (args) => generateSshKey(args),
+  },
+  {
+    spec: {
+      name: "create_ssh_key",
+      description:
+        "Save existing SSH private key material. Use import_ssh_key_file when the key is already in a local file.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Key name." },
+          privateKey: { type: "string", description: "Private key text." },
+          publicKey: {
+            type: ["string", "null"],
+            description: "Optional public key text.",
+          },
+          passphrase: {
+            type: ["string", "null"],
+            description: "Passphrase for encrypted private key material.",
+          },
+        },
+        required: ["name", "privateKey"],
+        additionalProperties: false,
+      },
+    },
+    icon: KeyRound,
+    labelKey: "ai.tool.createSshKey",
+    requiresApproval: true,
+    execute: async (args) => createSshKey(args),
+  },
+  {
+    spec: {
+      name: "import_ssh_key_file",
+      description: "Import and save an SSH private key from a local file path.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Absolute local key path." },
+          name: { type: "string", description: "Optional saved key name." },
+          passphrase: {
+            type: "string",
+            description: "Passphrase when the private key is encrypted.",
+          },
+        },
+        required: ["path"],
+        additionalProperties: false,
+      },
+    },
+    icon: KeyRound,
+    labelKey: "ai.tool.importSshKeyFile",
+    requiresApproval: true,
+    execute: async (args) => importSshKeyFile(args),
+  },
+  {
+    spec: {
+      name: "update_ssh_key",
+      description:
+        "Rename a saved SSH key or replace its key material. Only the given fields change.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "SSH key id." },
+          name: { type: "string", description: "New key name." },
+          privateKey: {
+            type: ["string", "null"],
+            description: "Replacement private key text.",
+          },
+          publicKey: {
+            type: ["string", "null"],
+            description: "Replacement public key text.",
+          },
+          passphrase: {
+            type: ["string", "null"],
+            description: "Replacement key passphrase. Set null to clear it.",
+          },
+        },
+        required: ["id"],
+        additionalProperties: false,
+      },
+    },
+    icon: SquarePen,
+    labelKey: "ai.tool.updateSshKey",
+    requiresApproval: true,
+    execute: async (args) => updateSshKey(args),
   },
   {
     spec: {

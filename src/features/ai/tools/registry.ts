@@ -2,8 +2,10 @@ import type { LucideIcon } from "lucide-react";
 
 import type { TKey } from "@/i18n";
 import type { AiToolSpec } from "@/types/models";
+import { administrationTools } from "./administration";
 import { askTools } from "./ask";
 import { bookmarkTools } from "./bookmarks";
+import { setAiToolCatalog } from "./catalog";
 import { credentialTools } from "./credentials";
 import { fileTools } from "./files";
 import { forwardTools } from "./forwards";
@@ -31,6 +33,7 @@ export const ALL_TOOLS: AiTool[] = [
   ...bookmarkTools,
   ...credentialTools,
   ...monitorTools,
+  ...administrationTools,
 ];
 
 export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -39,6 +42,13 @@ export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "read_terminal_output",
   "run_terminal_command",
 ]);
+
+setAiToolCatalog(
+  ALL_TOOLS.map((tool) => ({
+    name: tool.spec.name,
+    required: CORE_TOOL_NAMES.has(tool.spec.name),
+  })),
+);
 
 export const TOOL_GROUPS = [
   {
@@ -53,6 +63,7 @@ export const TOOL_GROUPS = [
   { id: "files", tools: [...fileTools, ...bookmarkTools] },
   { id: "automation", tools: [...snippetTools, ...forwardTools] },
   { id: "credentials", tools: credentialTools },
+  { id: "administration", tools: administrationTools },
 ] as const;
 
 const TOOLS_BY_NAME = new Map(ALL_TOOLS.map((tool) => [tool.spec.name, tool]));
@@ -63,6 +74,15 @@ const SENSITIVE_ARGUMENTS: Readonly<Record<string, ReadonlySet<string>>> = {
   create_identity: new Set(["password"]),
   update_identity: new Set(["password"]),
   generate_ssh_key: new Set(["passphrase"]),
+  create_ssh_key: new Set(["privateKey", "passphrase"]),
+  import_ssh_key_file: new Set(["passphrase"]),
+  update_ssh_key: new Set(["privateKey", "passphrase"]),
+  update_ai_settings: new Set(["apiKey"]),
+  connect_sync: new Set(["passphrase", "settings"]),
+  export_sync_backup: new Set(["passphrase"]),
+  import_sync_backup: new Set(["passphrase"]),
+  send_terminal_input: new Set(["data"]),
+  respond_password_prompt: new Set(["password"]),
 };
 
 export function getTool(name: string): AiTool | undefined {
@@ -243,6 +263,18 @@ export function enabledToolSpecs(names: readonly string[]): AiToolSpec[] {
 
 export const TOOLS_REQUIRING_APPROVAL: ReadonlySet<string> = new Set(
   ALL_TOOLS.filter((tool) => tool.requiresApproval).map(
+    (tool) => tool.spec.name,
+  ),
+);
+
+export const TOOLS_ALWAYS_REQUIRING_APPROVAL: ReadonlySet<string> = new Set(
+  ALL_TOOLS.filter((tool) => tool.alwaysRequireApproval).map(
+    (tool) => tool.spec.name,
+  ),
+);
+
+export const TOOLS_WITH_SENSITIVE_RESULTS: ReadonlySet<string> = new Set(
+  ALL_TOOLS.filter((tool) => tool.sensitiveResult).map(
     (tool) => tool.spec.name,
   ),
 );

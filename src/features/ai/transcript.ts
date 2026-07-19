@@ -1,5 +1,9 @@
 import type { AiChatMessage } from "@/types/models";
-import { normalizeArgs, redactToolArguments } from "./tools";
+import {
+  normalizeArgs,
+  redactToolArguments,
+  TOOLS_WITH_SENSITIVE_RESULTS,
+} from "./tools";
 
 export const DECLINED_RESULT = "The user declined to run this command.";
 export const STOPPED_RESULT =
@@ -81,8 +85,21 @@ export function deriveTitle(prompt: string): string {
 export function redactSensitiveHistory(
   messages: AiChatMessage[],
 ): AiChatMessage[] {
+  const sensitiveCallIds = new Set(
+    messages.flatMap((message) =>
+      (message.toolCalls ?? [])
+        .filter((call) => TOOLS_WITH_SENSITIVE_RESULTS.has(call.name))
+        .map((call) => call.id),
+    ),
+  );
   return messages.map((message) => ({
     ...message,
+    content:
+      message.role === "tool" &&
+      message.toolCallId &&
+      sensitiveCallIds.has(message.toolCallId)
+        ? "[REDACTED]"
+        : message.content,
     toolCalls: message.toolCalls?.map((call) => ({
       ...call,
       arguments: redactToolArguments(call.name, call.arguments),

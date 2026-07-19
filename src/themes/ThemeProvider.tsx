@@ -9,6 +9,7 @@ import {
   readStoredThemePreference,
   serializeThemePreference,
   storeThemePreference,
+  THEME_PREFERENCE_EVENT,
 } from "./apply";
 import { ThemeContext } from "./context";
 import {
@@ -34,6 +35,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     () => resolveTheme(preference, systemTheme),
     [preference, systemTheme],
   );
+
+  useEffect(() => {
+    const update = (event: Event) => {
+      setPreference((event as CustomEvent<ThemePreference>).detail);
+    };
+    window.addEventListener(THEME_PREFERENCE_EVENT, update);
+    return () => window.removeEventListener(THEME_PREFERENCE_EVENT, update);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia(DARK_SCHEME_QUERY);

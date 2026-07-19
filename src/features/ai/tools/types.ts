@@ -33,6 +33,8 @@ export interface AiTool {
   icon: LucideIcon;
   labelKey: TKey;
   requiresApproval?: boolean;
+  alwaysRequireApproval?: boolean;
+  sensitiveResult?: boolean;
   confirmKey?: TKey;
   execute?: ToolExecute;
   prepare?: ToolPrepare;

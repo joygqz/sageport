@@ -30,6 +30,7 @@ import {
 import { invalidateHosts } from "./cache";
 import { sleep } from "./terminal";
 import {
+  bool,
   num,
   nullableStr,
   optionalStr,
@@ -99,7 +100,13 @@ async function listHosts(): Promise<ToolExecutionResult> {
           username: h.username || undefined,
           group: h.groupId ? groupNames.get(h.groupId) : undefined,
           identityId: h.identityId ?? undefined,
+          authType: h.authType ?? undefined,
+          keyId: h.keyId ?? undefined,
           jumpHostId: h.jumpHostId ?? undefined,
+          startupCommand: h.startupCommand ?? undefined,
+          hasPassword: h.hasPassword,
+          requiresApproval: h.requiresApproval,
+          osHint: h.osHint ?? undefined,
           notes: notes ? notes.slice(0, 200) : undefined,
         };
       }),
@@ -181,7 +188,7 @@ async function connectHost(
   );
 }
 
-async function runCommandOnHosts(
+export async function runCommandOnHosts(
   args: Record<string, unknown>,
   context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
@@ -297,9 +304,13 @@ function inputFromArgs(args: Record<string, unknown>, base?: Host): HostInput {
       null,
     keyId: keyId === undefined ? (base?.keyId ?? null) : keyId,
     osHint: base?.osHint ?? null,
-    requiresApproval: base?.requiresApproval ?? false,
+    requiresApproval:
+      "requiresApproval" in args
+        ? bool(args, "requiresApproval")
+        : (base?.requiresApproval ?? false),
     notes: notes === undefined ? (base?.notes ?? null) : notes,
-    jumpHostId: jumpHostId === undefined ? (base?.jumpHostId ?? null) : jumpHostId,
+    jumpHostId:
+      jumpHostId === undefined ? (base?.jumpHostId ?? null) : jumpHostId,
     startupCommand:
       startupCommand === undefined
         ? (base?.startupCommand ?? null)
@@ -342,6 +353,15 @@ async function updateHost(
   return toolSuccess(`Updated host "${host.label}".`);
 }
 
+async function revealHostPassword(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const id = str(args, "id");
+  if (!id) return toolFailure("Error: no host id given.");
+  const password = await ipc.hosts.revealPassword(id);
+  return toolSuccess(JSON.stringify({ id, password }));
+}
+
 async function deleteHost(
   args: Record<string, unknown>,
 ): Promise<ToolExecutionResult> {
@@ -375,9 +395,24 @@ async function moveHost(
   }
 }
 
-async function importSshConfig(): Promise<ToolExecutionResult> {
+async function importSshConfig(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
   const preview = await ipc.hosts.importPreview();
-  const importable = preview.filter(
+  const aliases = strArray(args, "aliases");
+  const selected = aliases.length
+    ? preview.filter((host) => aliases.includes(host.alias))
+    : preview;
+  if (aliases.length) {
+    const knownAliases = new Set(preview.map((host) => host.alias));
+    const unknown = aliases.filter((alias) => !knownAliases.has(alias));
+    if (unknown.length) {
+      return toolFailure(
+        `Error: SSH config has no matching alias: ${unknown.join(", ")}.`,
+      );
+    }
+  }
+  const importable = selected.filter(
     (host) => !host.existing && host.warnings.length === 0,
   );
   if (importable.length === 0) {
@@ -392,6 +427,11 @@ async function importSshConfig(): Promise<ToolExecutionResult> {
       .map((h) => h.alias)
       .join(", ")}`,
   );
+}
+
+async function previewSshConfig(): Promise<ToolExecutionResult> {
+  const preview = await ipc.hosts.importPreview();
+  return toolSuccess(JSON.stringify(preview));
 }
 
 const HOST_FIELDS = {
@@ -438,6 +478,11 @@ const HOST_FIELDS = {
   notes: {
     type: ["string", "null"],
     description: "Free-form notes. Set null to clear it.",
+  },
+  requiresApproval: {
+    type: "boolean",
+    description:
+      "Require manual approval for sensitive AI operations on this host, even in autonomous mode.",
   },
 } as const;
 
@@ -577,6 +622,25 @@ export const hostTools: AiTool[] = [
   },
   {
     spec: {
+      name: "reveal_host_password",
+      description:
+        "Reveal a saved host password. The result is sensitive and is not retained in chat history.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string", description: "Host id." } },
+        required: ["id"],
+        additionalProperties: false,
+      },
+    },
+    icon: ServerCog,
+    labelKey: "ai.tool.revealHostPassword",
+    requiresApproval: true,
+    alwaysRequireApproval: true,
+    sensitiveResult: true,
+    execute: async (args) => revealHostPassword(args),
+  },
+  {
+    spec: {
       name: "delete_host",
       description: "Delete a saved host by id.",
       parameters: {
@@ -616,9 +680,9 @@ export const hostTools: AiTool[] = [
   },
   {
     spec: {
-      name: "import_ssh_config",
+      name: "preview_ssh_config",
       description:
-        "Import hosts from the user's ~/.ssh/config that are not saved yet.",
+        "Preview hosts from the user's SSH config, including existing entries and import warnings.",
       parameters: {
         type: "object",
         properties: {},
@@ -626,8 +690,29 @@ export const hostTools: AiTool[] = [
       },
     },
     icon: Import,
+    labelKey: "ai.tool.previewSshConfig",
+    execute: async () => previewSshConfig(),
+  },
+  {
+    spec: {
+      name: "import_ssh_config",
+      description:
+        "Import selected hosts from the user's ~/.ssh/config that are not saved yet. Omit aliases to import every valid new entry.",
+      parameters: {
+        type: "object",
+        properties: {
+          aliases: {
+            type: "array",
+            items: { type: "string" },
+            description: "Aliases returned by preview_ssh_config.",
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    icon: Import,
     labelKey: "ai.tool.importSshConfig",
     requiresApproval: true,
-    execute: async () => importSshConfig(),
+    execute: async (args) => importSshConfig(args),
   },
 ];

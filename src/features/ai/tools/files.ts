@@ -12,12 +12,18 @@ import {
 import { octalToMode } from "@/features/sftp/permissions";
 import { parentPath, useSftpStore } from "@/features/sftp/store";
 import { ipc } from "@/lib/ipc";
+import { queryClient } from "@/lib/query";
 import { errorMessage } from "@/lib/toast";
-import type { SftpStatusKind } from "@/types/models";
-import type { FsEndpoint, TransferEvent } from "@/types/models";
+import type {
+  FsEndpoint,
+  SftpStatusKind,
+  TransferEvent,
+  TransferHistoryEntry,
+} from "@/types/models";
 import { resolveTerminalPane, sleep } from "./terminal";
 import {
   bool,
+  num,
   optionalStr,
   str,
   toolFailure,
@@ -338,7 +344,7 @@ async function transferFile(
       transferId,
       resolvedSource.endpoint,
       resolvedDestination.endpoint,
-      undefined,
+      optionalStr(args, "targetName"),
       bool(args, "overwrite"),
     );
     const event = await waiter.completion;
@@ -359,6 +365,63 @@ async function transferFile(
   } finally {
     waiter?.cleanup();
   }
+}
+
+function invalidateTransferHistory(): void {
+  void queryClient.invalidateQueries({
+    queryKey: ["sftp", "transferHistory"],
+  });
+}
+
+async function listTransferHistory(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const entries = await ipc.sftp.historyList(num(args, "limit"));
+  return toolSuccess(JSON.stringify(entries));
+}
+
+async function deleteTransferHistory(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const id = str(args, "id");
+  if (!id) return toolFailure("Error: no transfer record id given.");
+  await ipc.sftp.historyDelete(id);
+  invalidateTransferHistory();
+  return toolSuccess(`Deleted transfer record ${id}.`);
+}
+
+async function clearTransferHistory(): Promise<ToolExecutionResult> {
+  await ipc.sftp.historyClear();
+  invalidateTransferHistory();
+  return toolSuccess("Cleared transfer history.");
+}
+
+async function retryTransfer(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const id = str(args, "id");
+  if (!id) return toolFailure("Error: no transfer record id given.");
+  const entry = (await ipc.sftp.historyList()).find(
+    (candidate: TransferHistoryEntry) => candidate.id === id,
+  );
+  if (!entry) return toolFailure(`Error: no transfer record with id "${id}".`);
+  const transferId = crypto.randomUUID();
+  await ipc.sftp.transfer(
+    transferId,
+    { connectionId: entry.sourceConnectionId, path: entry.sourcePath },
+    { connectionId: entry.destConnectionId, path: entry.destPath },
+  );
+  invalidateTransferHistory();
+  return toolSuccess(`Retried transfer ${id}. transferId: ${transferId}`);
+}
+
+async function cancelTransfer(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const id = str(args, "transferId");
+  if (!id) return toolFailure("Error: no transfer id given.");
+  await ipc.sftp.cancelTransfer(id);
+  return toolSuccess(`Cancel requested for transfer ${id}.`);
 }
 
 async function listFiles(
@@ -488,6 +551,11 @@ export const fileTools: AiTool[] = [
             description:
               "Replace the destination entry if it already exists. Defaults to false.",
           },
+          targetName: {
+            type: "string",
+            description:
+              "Name to use in the destination directory. Defaults to the source name.",
+          },
           source: {
             type: "object",
             description: "File or directory to transfer.",
@@ -532,6 +600,85 @@ export const fileTools: AiTool[] = [
     confirmKey: "ai.confirmTransfer",
     requiresApproval: true,
     execute: async (args, context) => transferFile(args, context),
+  },
+  {
+    spec: {
+      name: "list_transfer_history",
+      description: "List recent file transfer records and their status.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "integer", minimum: 1, maximum: 500 },
+        },
+        additionalProperties: false,
+      },
+    },
+    icon: ArrowRightLeft,
+    labelKey: "ai.tool.listTransferHistory",
+    execute: async (args) => listTransferHistory(args),
+  },
+  {
+    spec: {
+      name: "retry_transfer",
+      description: "Retry a transfer from transfer history by record id.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+        additionalProperties: false,
+      },
+    },
+    icon: ArrowRightLeft,
+    labelKey: "ai.tool.retryTransfer",
+    requiresApproval: true,
+    execute: async (args) => retryTransfer(args),
+  },
+  {
+    spec: {
+      name: "cancel_transfer",
+      description: "Cancel an active file transfer by transfer id.",
+      parameters: {
+        type: "object",
+        properties: { transferId: { type: "string" } },
+        required: ["transferId"],
+        additionalProperties: false,
+      },
+    },
+    icon: ArrowRightLeft,
+    labelKey: "ai.tool.cancelTransfer",
+    requiresApproval: true,
+    execute: async (args) => cancelTransfer(args),
+  },
+  {
+    spec: {
+      name: "delete_transfer_history",
+      description: "Permanently delete one transfer history record.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+        additionalProperties: false,
+      },
+    },
+    icon: Trash2,
+    labelKey: "ai.tool.deleteTransferHistory",
+    requiresApproval: true,
+    execute: async (args) => deleteTransferHistory(args),
+  },
+  {
+    spec: {
+      name: "clear_transfer_history",
+      description: "Permanently clear all transfer history.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    icon: Trash2,
+    labelKey: "ai.tool.clearTransferHistory",
+    requiresApproval: true,
+    execute: async () => clearTransferHistory(),
   },
   {
     spec: {

@@ -10,6 +10,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 };
 
 export const LOCALE_STORAGE_KEY = "sageport.locale";
+export const LOCALE_CHANGE_EVENT = "sageport:locale-change";
 
 export function isLocale(value: unknown): value is Locale {
   return (
@@ -24,4 +25,10 @@ export function detectLocale(): Locale {
   const nav = navigator.language.toLowerCase();
   if (nav.startsWith("zh")) return "zh-CN";
   return DEFAULT_LOCALE;
+}
+
+export function publishLocale(locale: Locale): void {
+  window.dispatchEvent(
+    new CustomEvent<Locale>(LOCALE_CHANGE_EVENT, { detail: locale }),
+  );
 }

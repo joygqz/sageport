@@ -8,7 +8,7 @@ import {
 
 describe("assistant suggestions", () => {
   it("keeps three prompts in every tool group", () => {
-    expect(SUGGESTION_POOL).toHaveLength(6);
+    expect(SUGGESTION_POOL).toHaveLength(7);
     expect(SUGGESTION_POOL.every((group) => group.keys.length === 3)).toBe(
       true,
     );
@@ -19,7 +19,7 @@ describe("assistant suggestions", () => {
     let index = 0;
     const suggestions = pickSuggestions(
       SUGGESTION_POOL.map(({ group }) => group),
-      () => values[index++],
+      () => values[index++ % values.length],
     );
 
     expect(suggestions).toHaveLength(3);

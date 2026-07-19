@@ -99,6 +99,31 @@ describe("redactSensitiveHistory", () => {
       password: "secret",
     });
   });
+
+  it("removes sensitive tool results from persisted/provider history", () => {
+    const history: AiChatMessage[] = [
+      {
+        role: "assistant",
+        toolCalls: [
+          {
+            id: "call-1",
+            name: "reveal_host_password",
+            arguments: { id: "host-1" },
+          },
+        ],
+      },
+      {
+        role: "tool",
+        toolCallId: "call-1",
+        content: '{"password":"secret"}',
+      },
+    ];
+
+    const redacted = redactSensitiveHistory(history);
+
+    expect(redacted[1].content).toBe("[REDACTED]");
+    expect(history[1].content).toBe('{"password":"secret"}');
+  });
 });
 
 describe("buildLogFromHistory", () => {

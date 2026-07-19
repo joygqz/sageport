@@ -45,7 +45,7 @@ export function useSetAiConfig() {
           baseUrl: input.baseUrl,
           protocol: input.protocol,
           autoApprove: input.autoApprove,
-          enabledTools: input.enabledTools,
+          enabledTools: input.enabledTools ?? prev.enabledTools,
           maxHistoryTokens: input.maxHistoryTokens,
           hasApiKey:
             input.apiKey === undefined

@@ -4,6 +4,7 @@ import { parseVariables, substitute } from "@/features/snippets/variables";
 import { ipc } from "@/lib/ipc";
 import type { Snippet, SnippetInput } from "@/types/models";
 import { invalidateSnippets } from "./cache";
+import { runCommandOnHosts } from "./hosts";
 import { executeTerminalCommand, prepareTerminalTarget } from "./terminal";
 import {
   optionalStr,
@@ -62,6 +63,30 @@ async function prepareRunSnippet(
     };
   }
   return prepareTerminalTarget({ ...args, command });
+}
+
+async function prepareRunSnippetOnHosts(
+  args: Record<string, unknown>,
+): Promise<PreparedCall> {
+  const snippetId = str(args, "snippetId");
+  if (!snippetId) {
+    return { args, preflightError: "Error: no snippetId given." };
+  }
+  const snippet = await findSnippet(snippetId);
+  if (!snippet) {
+    return {
+      args,
+      preflightError: `Error: no snippet with id "${snippetId}".`,
+    };
+  }
+  const command = substitute(snippet.command, record(args, "values")).trim();
+  if (!command) {
+    return {
+      args: { ...args, command },
+      preflightError: "Error: the snippet resolved to an empty command.",
+    };
+  }
+  return { args: { ...args, command } };
 }
 
 function inputFromArgs(
@@ -166,6 +191,36 @@ export const snippetTools: AiTool[] = [
     confirmKey: "ai.confirmRun",
     prepare: (args) => prepareRunSnippet(args),
     execute: executeTerminalCommand,
+  },
+  {
+    spec: {
+      name: "run_snippet_on_hosts",
+      description: "Run a saved snippet non-interactively on several hosts.",
+      parameters: {
+        type: "object",
+        properties: {
+          snippetId: { type: "string", description: "Snippet id." },
+          hostIds: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 1,
+            maxItems: 100,
+          },
+          values: {
+            type: "object",
+            additionalProperties: { type: "string" },
+          },
+        },
+        required: ["snippetId", "hostIds"],
+        additionalProperties: false,
+      },
+    },
+    icon: Play,
+    labelKey: "ai.tool.runSnippetOnHosts",
+    requiresApproval: true,
+    confirmKey: "ai.confirmRun",
+    prepare: (args) => prepareRunSnippetOnHosts(args),
+    execute: runCommandOnHosts,
   },
   {
     spec: {

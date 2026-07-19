@@ -328,6 +328,28 @@ describe("runAgentLoop", () => {
     );
   });
 
+  it("still requests approval for always-manual tools in autonomous mode", async () => {
+    chat
+      .mockResolvedValueOnce({
+        toolCalls: [
+          {
+            id: "call-1",
+            name: "update_ai_settings",
+            arguments: { autoApprove: false },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "Done." });
+    const run = harness();
+
+    await runAgentLoop(run.host, "session", "model", true, [
+      "update_ai_settings",
+    ]);
+
+    expect(run.host.requestApproval).toHaveBeenCalledTimes(1);
+    expect(executeTool).not.toHaveBeenCalled();
+  });
+
   it("still requests approval for protected hosts in autonomous mode", async () => {
     useTabsStore.setState({
       tabs: [

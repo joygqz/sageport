@@ -70,6 +70,7 @@ async function listForwards(): Promise<ToolExecutionResult> {
           status: state?.status ?? "stopped",
           error: state?.status === "error" ? state.message : undefined,
           gatewayPortsRestricted: state?.publicBindRestricted || undefined,
+          autoStart: Boolean(f.autoStart),
         };
       }),
     ),
@@ -169,7 +170,9 @@ async function startForward(
       );
     }
     if (state?.status === "stopped") {
-      return toolFailure(`Error: forward ${id} stopped before becoming active.`);
+      return toolFailure(
+        `Error: forward ${id} stopped before becoming active.`,
+      );
     }
     await sleep(250);
   }

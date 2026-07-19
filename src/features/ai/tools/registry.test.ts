@@ -8,6 +8,7 @@ import {
   CORE_TOOL_NAMES,
   TOOL_ICONS,
   TOOL_LABEL_KEYS,
+  TOOLS_ALWAYS_REQUIRING_APPROVAL,
   TOOLS_REQUIRING_APPROVAL,
   getTool,
   enabledToolSpecs,
@@ -17,12 +18,14 @@ import {
   redactToolArguments,
   validateToolArguments,
 } from "./registry";
+import { getAiToolCatalog } from "./catalog";
 
 describe("tool registry", () => {
   it("exposes a spec, icon, and label for every tool with unique names", () => {
     const names = ALL_TOOLS.map((tool) => tool.spec.name);
     expect(new Set(names).size).toBe(names.length);
     expect(AI_TOOL_SPECS).toHaveLength(ALL_TOOLS.length);
+    expect(getAiToolCatalog().map((entry) => entry.name)).toEqual(names);
     for (const name of names) {
       expect(TOOL_ICONS[name]).toBeTruthy();
       expect(TOOL_LABEL_KEYS[name]).toBeTruthy();
@@ -37,6 +40,10 @@ describe("tool registry", () => {
       );
       if (tool.requiresApproval) {
         expect(tool.execute).toBeTypeOf("function");
+      }
+      if (tool.alwaysRequireApproval) {
+        expect(tool.requiresApproval).toBe(true);
+        expect(TOOLS_ALWAYS_REQUIRING_APPROVAL.has(name)).toBe(true);
       }
     }
   });

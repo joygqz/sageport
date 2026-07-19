@@ -266,6 +266,145 @@ async function searchHistory(
   return toolSuccess(results.join("\n"));
 }
 
+async function listCommandHistory(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const hostId = "hostId" in args ? (optionalStr(args, "hostId") ?? "") : null;
+  const query = str(args, "query");
+  const limit = num(args, "limit");
+  const entries = await ipc.history.list(hostId, query, limit);
+  return toolSuccess(JSON.stringify(entries));
+}
+
+async function clearCommandHistory(): Promise<ToolExecutionResult> {
+  await ipc.history.clear();
+  return toolSuccess("Cleared command history.");
+}
+
+async function openLocalTerminal(): Promise<ToolExecutionResult> {
+  const id = useTabsStore.getState().openLocalTerminal();
+  return id
+    ? toolSuccess(`Opened local terminal. sessionId: ${id}`)
+    : toolFailure("Error: the terminal session limit has been reached.");
+}
+
+async function openAdhocTerminal(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const host = optionalStr(args, "host");
+  const username = optionalStr(args, "username");
+  if (!host || !username) {
+    return toolFailure("Error: host and username are required.");
+  }
+  const id = useTabsStore.getState().openAdhocTerminal({
+    host,
+    username,
+    port: num(args, "port") ?? 22,
+  });
+  return id
+    ? toolSuccess(`Opened temporary SSH terminal. sessionId: ${id}`)
+    : toolFailure("Error: the terminal session limit has been reached.");
+}
+
+async function splitTerminal(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const pane = resolveTerminalPane(optionalStr(args, "sessionId"));
+  if (!pane) return toolFailure(noTerminalSessionError(str(args, "sessionId")));
+  const direction =
+    optionalStr(args, "direction") === "down" ? "down" : "right";
+  const id = useTabsStore.getState().splitPane(pane.id, direction);
+  return id
+    ? toolSuccess(`Split terminal ${direction}. sessionId: ${id}`)
+    : toolFailure("Error: the terminal pane limit has been reached.");
+}
+
+async function closeTerminal(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const pane = resolveTerminalPane(optionalStr(args, "sessionId"));
+  if (!pane) return toolFailure(noTerminalSessionError(str(args, "sessionId")));
+  useTabsStore.getState().closePane(pane.id);
+  return toolSuccess(`Closed terminal ${pane.id}.`);
+}
+
+async function focusTerminal(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const pane = resolveTerminalPane(optionalStr(args, "sessionId"));
+  if (!pane) return toolFailure(noTerminalSessionError(str(args, "sessionId")));
+  useTabsStore.getState().focusPane(pane.id);
+  return toolSuccess(`Focused terminal ${pane.id}.`);
+}
+
+async function reconnectTerminal(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const pane = resolveTerminalPane(optionalStr(args, "sessionId"));
+  if (!pane) return toolFailure(noTerminalSessionError(str(args, "sessionId")));
+  useTabsStore.getState().reconnectTerminal(pane.id);
+  return toolSuccess(`Reconnecting terminal ${pane.id}.`);
+}
+
+async function sendTerminalInput(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const pane = resolveTerminalPane(optionalStr(args, "sessionId"));
+  if (!pane) return toolFailure(noTerminalSessionError(str(args, "sessionId")));
+  if (pane.status !== "connected")
+    return toolFailure(sessionNotConnectedError(pane));
+  const data = str(args, "data");
+  getSession(pane.id)?.send(data);
+  useTabsStore.getState().focusPane(pane.id);
+  return toolSuccess(
+    `Sent ${data.length} character(s) to terminal ${pane.id}.`,
+  );
+}
+
+async function listConnectionPrompts(): Promise<ToolExecutionResult> {
+  const [hostKeys, passwords] = await Promise.all([
+    ipc.ssh.pendingHostKeys(),
+    ipc.ssh.pendingPasswords(),
+  ]);
+  return toolSuccess(JSON.stringify({ hostKeys, passwords }));
+}
+
+async function respondHostKeyPrompt(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const promptId = str(args, "promptId");
+  const decision = optionalStr(args, "decision");
+  if (!promptId || !decision) {
+    return toolFailure("Error: promptId and decision are required.");
+  }
+  if (!["reject", "once", "remember"].includes(decision)) {
+    return toolFailure("Error: invalid host key decision.");
+  }
+  await ipc.ssh.respondHostKey(
+    promptId,
+    decision as "reject" | "once" | "remember",
+  );
+  return toolSuccess(`Responded to host key prompt ${promptId}.`);
+}
+
+async function respondPasswordPrompt(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const promptId = str(args, "promptId");
+  if (!promptId) return toolFailure("Error: no promptId given.");
+  const password = "password" in args ? str(args, "password") : null;
+  await ipc.ssh.respondPassword(promptId, password);
+  return toolSuccess(`Responded to password prompt ${promptId}.`);
+}
+
+const SESSION_ID_PARAMETER = {
+  sessionId: {
+    type: "string",
+    description:
+      "Session id from list_terminal_sessions. Omit to use the current terminal.",
+  },
+} as const;
+
 export const terminalTools: AiTool[] = [
   {
     spec: {
@@ -371,5 +510,216 @@ export const terminalTools: AiTool[] = [
     icon: History,
     labelKey: "ai.tool.searchCommandHistory",
     execute: async (args) => searchHistory(args),
+  },
+  {
+    spec: {
+      name: "list_command_history",
+      description:
+        "List detailed command history entries. Omit hostId for all hosts, or set it to an empty string for local terminals.",
+      parameters: {
+        type: "object",
+        properties: {
+          hostId: { type: "string" },
+          query: { type: "string" },
+          limit: { type: "integer", minimum: 1, maximum: 500 },
+        },
+        additionalProperties: false,
+      },
+    },
+    icon: History,
+    labelKey: "ai.tool.listCommandHistory",
+    execute: async (args) => listCommandHistory(args),
+  },
+  {
+    spec: {
+      name: "clear_command_history",
+      description: "Permanently clear all command history.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    icon: History,
+    labelKey: "ai.tool.clearCommandHistory",
+    requiresApproval: true,
+    execute: async () => clearCommandHistory(),
+  },
+  {
+    spec: {
+      name: "open_local_terminal",
+      description: "Open a new local shell terminal.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.openLocalTerminal",
+    requiresApproval: true,
+    execute: async () => openLocalTerminal(),
+  },
+  {
+    spec: {
+      name: "open_temporary_ssh_terminal",
+      description: "Open a temporary SSH terminal without saving a host.",
+      parameters: {
+        type: "object",
+        properties: {
+          host: { type: "string", description: "Hostname or IP address." },
+          port: { type: "integer", minimum: 1, maximum: 65535 },
+          username: { type: "string", description: "Login user." },
+        },
+        required: ["host", "username"],
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.openTemporarySshTerminal",
+    requiresApproval: true,
+    execute: async (args) => openAdhocTerminal(args),
+  },
+  {
+    spec: {
+      name: "send_terminal_input",
+      description:
+        "Send exact interactive input to a connected terminal, including control characters.",
+      parameters: {
+        type: "object",
+        properties: {
+          ...SESSION_ID_PARAMETER,
+          data: { type: "string", description: "Exact input bytes as text." },
+        },
+        required: ["data"],
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.sendTerminalInput",
+    requiresApproval: true,
+    execute: async (args) => sendTerminalInput(args),
+  },
+  {
+    spec: {
+      name: "list_connection_prompts",
+      description: "List pending SSH host key and password prompts.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.listConnectionPrompts",
+    execute: async () => listConnectionPrompts(),
+  },
+  {
+    spec: {
+      name: "respond_host_key_prompt",
+      description:
+        "Accept a host key once, remember it, or reject the connection prompt.",
+      parameters: {
+        type: "object",
+        properties: {
+          promptId: { type: "string" },
+          decision: {
+            type: "string",
+            enum: ["reject", "once", "remember"],
+          },
+        },
+        required: ["promptId", "decision"],
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.respondHostKeyPrompt",
+    requiresApproval: true,
+    alwaysRequireApproval: true,
+    execute: async (args) => respondHostKeyPrompt(args),
+  },
+  {
+    spec: {
+      name: "respond_password_prompt",
+      description:
+        "Submit a password to a pending SSH prompt, or omit password to cancel it.",
+      parameters: {
+        type: "object",
+        properties: {
+          promptId: { type: "string" },
+          password: { type: "string" },
+        },
+        required: ["promptId"],
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.respondPasswordPrompt",
+    requiresApproval: true,
+    alwaysRequireApproval: true,
+    execute: async (args) => respondPasswordPrompt(args),
+  },
+  {
+    spec: {
+      name: "split_terminal",
+      description: "Split a terminal pane to the right or down.",
+      parameters: {
+        type: "object",
+        properties: {
+          ...SESSION_ID_PARAMETER,
+          direction: { type: "string", enum: ["right", "down"] },
+        },
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.splitTerminal",
+    requiresApproval: true,
+    execute: async (args) => splitTerminal(args),
+  },
+  {
+    spec: {
+      name: "close_terminal",
+      description: "Close a terminal pane or its tab when it is the last pane.",
+      parameters: {
+        type: "object",
+        properties: SESSION_ID_PARAMETER,
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.closeTerminal",
+    requiresApproval: true,
+    execute: async (args) => closeTerminal(args),
+  },
+  {
+    spec: {
+      name: "focus_terminal",
+      description: "Focus an open terminal pane.",
+      parameters: {
+        type: "object",
+        properties: SESSION_ID_PARAMETER,
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.focusTerminal",
+    requiresApproval: true,
+    execute: async (args) => focusTerminal(args),
+  },
+  {
+    spec: {
+      name: "reconnect_terminal",
+      description: "Reconnect a closed or failed terminal session.",
+      parameters: {
+        type: "object",
+        properties: SESSION_ID_PARAMETER,
+        additionalProperties: false,
+      },
+    },
+    icon: TerminalIcon,
+    labelKey: "ai.tool.reconnectTerminal",
+    requiresApproval: true,
+    execute: async (args) => reconnectTerminal(args),
   },
 ];

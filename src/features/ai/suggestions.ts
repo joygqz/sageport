@@ -49,6 +49,14 @@ export const SUGGESTION_POOL = [
       "ai.suggestion.credentials.audit",
     ],
   },
+  {
+    group: "administration",
+    keys: [
+      "ai.suggestion.administration.settings",
+      "ai.suggestion.administration.sync",
+      "ai.suggestion.administration.updates",
+    ],
+  },
 ] as const satisfies readonly {
   group: string;
   keys: readonly TKey[];

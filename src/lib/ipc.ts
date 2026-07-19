@@ -328,7 +328,7 @@ export const ipc = {
       protocol: AiProtocol;
       apiKey?: string;
       autoApprove: boolean;
-      enabledTools: string[];
+      enabledTools?: string[];
       maxHistoryTokens: number | null;
     }) => invoke<void>("ai_set_config", { input }),
 

@@ -5,6 +5,7 @@ import { errorMessage, toast } from "@/lib/toast";
 import {
   detectLocale,
   isLocale,
+  LOCALE_CHANGE_EVENT,
   LOCALE_STORAGE_KEY,
   type Locale,
 } from "./config";
@@ -15,6 +16,15 @@ const LOCALE_SYNC_KEY = "general.locale";
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectLocale);
+
+  useEffect(() => {
+    const update = (event: Event) => {
+      const next = (event as CustomEvent<Locale>).detail;
+      if (isLocale(next)) setLocaleState(next);
+    };
+    window.addEventListener(LOCALE_CHANGE_EVENT, update);
+    return () => window.removeEventListener(LOCALE_CHANGE_EVENT, update);
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale;

@@ -48,8 +48,7 @@ pub struct AiConfigInput {
     pub api_key: Option<String>,
     #[serde(default)]
     pub auto_approve: bool,
-    #[serde(default)]
-    pub enabled_tools: Vec<String>,
+    pub enabled_tools: Option<Vec<String>>,
     #[serde(default)]
     pub max_history_tokens: Option<u32>,
 }
@@ -301,7 +300,11 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
         .map(str::trim)
         .map(|value| bounded_text(value, "API key", MAX_API_KEY_BYTES))
         .transpose()?;
-    if input.enabled_tools.len() > MAX_ENABLED_TOOLS {
+    if input
+        .enabled_tools
+        .as_ref()
+        .is_some_and(|tools| tools.len() > MAX_ENABLED_TOOLS)
+    {
         return Err(AppError::Invalid(format!(
             "more than {MAX_ENABLED_TOOLS} AI tools were enabled"
         )));
@@ -310,17 +313,6 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
     let previous_base_url = stored_base_url(&state).await?;
     let endpoint_changed =
         previous_protocol != input.protocol || effective_base_url(&previous_base_url) != base_url;
-    let mut enabled_tools = input
-        .enabled_tools
-        .into_iter()
-        .map(|name| name.trim().to_string())
-        .filter(|name| !name.is_empty())
-        .collect::<Vec<_>>();
-    for name in &enabled_tools {
-        bounded_text(name, "tool name", MAX_TOOL_NAME_BYTES)?;
-    }
-    enabled_tools.sort();
-    enabled_tools.dedup();
     let mut entries = vec![
         (BASE_URL_SETTING.to_string(), base_url),
         (
@@ -332,10 +324,6 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
             if input.auto_approve { "true" } else { "false" }.to_string(),
         ),
         (
-            ENABLED_TOOLS_SETTING.to_string(),
-            serde_json::to_string(&enabled_tools)?,
-        ),
-        (
             MAX_HISTORY_TOKENS_SETTING.to_string(),
             input
                 .max_history_tokens
@@ -344,6 +332,22 @@ pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> 
                 .unwrap_or_default(),
         ),
     ];
+    if let Some(enabled_tools) = input.enabled_tools {
+        let mut enabled_tools = enabled_tools
+            .into_iter()
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .collect::<Vec<_>>();
+        for name in &enabled_tools {
+            bounded_text(name, "tool name", MAX_TOOL_NAME_BYTES)?;
+        }
+        enabled_tools.sort();
+        enabled_tools.dedup();
+        entries.push((
+            ENABLED_TOOLS_SETTING.to_string(),
+            serde_json::to_string(&enabled_tools)?,
+        ));
+    }
     if let Some(api_key) = api_key {
         entries.push((API_KEY_SETTING.to_string(), api_key.to_string()));
     }
@@ -624,6 +628,19 @@ mod tests {
         let value = serde_json::to_value(config).unwrap();
         assert_eq!(value["hasApiKey"], true);
         assert!(value.get("apiKey").is_none());
+    }
+
+    #[test]
+    fn omitted_enabled_tools_deserializes_as_unchanged() {
+        let input: AiConfigInput = serde_json::from_value(serde_json::json!({
+            "baseUrl": "https://example.com/v1",
+            "protocol": "openai",
+            "autoApprove": false,
+            "maxHistoryTokens": null
+        }))
+        .unwrap();
+
+        assert!(input.enabled_tools.is_none());
     }
 
     #[test]

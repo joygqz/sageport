@@ -14,6 +14,7 @@ import type {
 const THEME_STORAGE_KEY = "sageport.theme";
 const BOOTSTRAP_BG_KEY = "sageport.theme.bg";
 const BOOTSTRAP_SCHEME_KEY = "sageport.theme.scheme";
+export const THEME_PREFERENCE_EVENT = "sageport:theme-preference";
 
 export function parseThemePreference(value: string | null): ThemePreference {
   if (!value) {
@@ -50,6 +51,14 @@ export function storeThemePreference(
   localStorage.setItem(THEME_STORAGE_KEY, serializeThemePreference(preference));
   localStorage.setItem(BOOTSTRAP_BG_KEY, theme.colors.background);
   localStorage.setItem(BOOTSTRAP_SCHEME_KEY, theme.appearance);
+}
+
+export function publishThemePreference(preference: ThemePreference): void {
+  window.dispatchEvent(
+    new CustomEvent<ThemePreference>(THEME_PREFERENCE_EVENT, {
+      detail: preference,
+    }),
+  );
 }
 
 function isThemeMode(value: string | undefined): value is ThemeMode {
