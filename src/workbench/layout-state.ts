@@ -12,7 +12,7 @@ import {
   TITLE_BAR_H,
 } from "./layout-sizing";
 
-export const ACTIVITIES = [
+const ACTIVITIES = [
   "hosts",
   "credentials",
   "snippets",

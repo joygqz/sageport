@@ -637,6 +637,32 @@ async fn run_remote_forward(
     runtime: Arc<Mutex<HashMap<String, StatusEvent>>>,
     next_sequence: Arc<AtomicU64>,
 ) {
+    let target = spec
+        .target_host
+        .clone()
+        .ok_or_else(|| AppError::Invalid("missing remote forward target host".into()))
+        .and_then(|host| {
+            spec.target_port
+                .map(|port| (host, port))
+                .ok_or_else(|| AppError::Invalid("missing remote forward target port".into()))
+        });
+    let (target_host, target_port) = match target {
+        Ok(target) => target,
+        Err(error) => {
+            emit(
+                &app,
+                &runtime,
+                &next_sequence,
+                &spec.id,
+                generation,
+                "error",
+                Some(&error),
+            );
+            let _ = ready.send(Err(error));
+            return;
+        }
+    };
+
     let (forwarded_tx, mut forwarded_rx) = mpsc::channel(MAX_FORWARD_CONNECTIONS);
     let conn = tokio::select! {
         result = establish_with_forwarded_tcpip(
@@ -715,39 +741,6 @@ async fn run_remote_forward(
         None,
         public_bind_restricted,
     );
-
-    let target_host = match spec.target_host.clone() {
-        Some(host) => host,
-        None => {
-            let error = AppError::Invalid("missing remote forward target host".into());
-            emit(
-                &app,
-                &runtime,
-                &next_sequence,
-                &spec.id,
-                generation,
-                "error",
-                Some(&error),
-            );
-            return;
-        }
-    };
-    let target_port = match spec.target_port {
-        Some(port) => port,
-        None => {
-            let error = AppError::Invalid("missing remote forward target port".into());
-            emit(
-                &app,
-                &runtime,
-                &next_sequence,
-                &spec.id,
-                generation,
-                "error",
-                Some(&error),
-            );
-            return;
-        }
-    };
 
     let mut connections = JoinSet::new();
     let mut connection_check = tokio::time::interval_at(

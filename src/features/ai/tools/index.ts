@@ -1,28 +1,18 @@
 export {
   askUserOptions,
   askUserQuestion,
-  automaticTerminalSelectionResult,
   defaultTerminalOption,
   selectionResult,
 } from "./ask";
 export {
-  executeTerminalCommand,
   newOutput,
-  noTerminalSessionError,
-  resolveTerminalPane,
-  sessionNotConnectedError,
   terminalTargetDisplay,
   terminalReadLineLimit,
 } from "./terminal";
 export { reusableHostSession } from "./hosts";
 export {
-  AI_TOOL_SPECS,
-  ALL_TOOLS,
-  CORE_TOOL_NAMES,
   enabledToolSpecs,
-  enabledTools,
   executeTool,
-  getTool,
   prepareTool,
   redactToolArguments,
   validateToolArguments,
@@ -34,10 +24,4 @@ export {
   normalizeEnabledToolNames,
   resolveEnabledToolNames,
 } from "./registry";
-export {
-  normalizeArgs,
-  type AiTool,
-  type PreparedCall,
-  type ToolExecutionContext,
-  type ToolExecutionResult,
-} from "./types";
+export { normalizeArgs } from "./types";

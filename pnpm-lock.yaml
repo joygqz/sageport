@@ -17,9 +17,6 @@ importers:
       '@fontsource-variable/jetbrains-mono':
         specifier: ^5.2.8
         version: 5.2.8
-      '@hookform/resolvers':
-        specifier: ^5.4.0
-        version: 5.4.0(react-hook-form@7.81.0(react@19.2.7))
       '@icons-pack/react-simple-icons':
         specifier: 13.13.0
         version: 13.13.0(react@19.2.7)
@@ -80,9 +77,6 @@ importers:
       '@tauri-apps/plugin-dialog':
         specifier: ^2.7.1
         version: 2.7.1
-      '@tauri-apps/plugin-fs':
-        specifier: ^2.5.1
-        version: 2.5.1
       '@tauri-apps/plugin-opener':
         specifier: ^2.5.4
         version: 2.5.4
@@ -92,9 +86,6 @@ importers:
       '@tauri-apps/plugin-process':
         specifier: ^2.3.1
         version: 2.3.1
-      '@tauri-apps/plugin-store':
-        specifier: ^2.4.3
-        version: 2.4.3
       '@xterm/addon-clipboard':
         specifier: ^0.2.0
         version: 0.2.0
@@ -149,9 +140,6 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
       zustand:
         specifier: ^5.0.14
         version: 5.0.14(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)
@@ -510,11 +498,6 @@ packages:
 
   '@fontsource-variable/jetbrains-mono@5.2.8':
     resolution: {integrity: sha512-WBA9elru6Jdp5df2mES55wuOO0WIrn3kpXnI4+W2ek5u3ZgLS9XS4gmIlcQhiZOWEKl95meYdvK7xI+ETLCq/Q==}
-
-  '@hookform/resolvers@5.4.0':
-    resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
-    peerDependencies:
-      react-hook-form: ^7.55.0
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1118,9 +1101,6 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@standard-schema/utils@0.3.0':
-    resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
-
   '@tailwindcss/node@4.3.3':
     resolution: {integrity: sha512-/T8IKEsf9VTU6tLjgC7+sv2mOPtQxzE2jMw7u4Tt40Tx+QSZxpzh95/H6cMKoja9XuW7iMdLJYBB0o9G1CaAgg==}
 
@@ -1311,9 +1291,6 @@ packages:
   '@tauri-apps/plugin-dialog@2.7.1':
     resolution: {integrity: sha512-OK1UBXYt+ojcmxMktzzuyonYIFta8CmAASpX+CA+DTGK24KlHjhYI6x2iOJ/TjZF4N7/ACK1oFmEOjIY9IhzOQ==}
 
-  '@tauri-apps/plugin-fs@2.5.1':
-    resolution: {integrity: sha512-9Lz+Jopp6QyeEWhlpkMx4R/+P9HgR+AVAI4vOZhlT8Xaymtz8iVI/Ov984/XTqgJz/5gz5NretqPB/XEMS3NhQ==}
-
   '@tauri-apps/plugin-opener@2.5.4':
     resolution: {integrity: sha512-1HnPkb+AmgO29HBazm4uPLKB+r7zzcTBW1d0fyYp1uP+jwtpoiNDGKMMzz58SFp49nOIrxdE3aUJtT57lfO9CQ==}
 
@@ -1322,9 +1299,6 @@ packages:
 
   '@tauri-apps/plugin-process@2.3.1':
     resolution: {integrity: sha512-nCa4fGVaDL/B9ai03VyPOjfAHRHSBz5v6F/ObsB73r/dA3MHHhZtldaDMIc0V/pnUw9ehzr2iEG+XkSEyC0JJA==}
-
-  '@tauri-apps/plugin-store@2.4.3':
-    resolution: {integrity: sha512-9LWPj9yMphRi9czEtUv87XHbl1b6xgd9EXpPrUnq6nG7+nbtoF84d4Kwz9xhAv/Hf30sr58pq7EOlyI936y8qw==}
 
   '@tybys/wasm-util@0.10.3':
     resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
@@ -2829,11 +2803,6 @@ snapshots:
 
   '@fontsource-variable/jetbrains-mono@5.2.8': {}
 
-  '@hookform/resolvers@5.4.0(react-hook-form@7.81.0(react@19.2.7))':
-    dependencies:
-      '@standard-schema/utils': 0.3.0
-      react-hook-form: 7.81.0(react@19.2.7)
-
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -3405,8 +3374,6 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@standard-schema/utils@0.3.0': {}
-
   '@tailwindcss/node@4.3.3':
     dependencies:
       '@jridgewell/remapping': 2.3.5
@@ -3543,10 +3510,6 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.11.1
 
-  '@tauri-apps/plugin-fs@2.5.1':
-    dependencies:
-      '@tauri-apps/api': 2.11.1
-
   '@tauri-apps/plugin-opener@2.5.4':
     dependencies:
       '@tauri-apps/api': 2.11.1
@@ -3556,10 +3519,6 @@ snapshots:
       '@tauri-apps/api': 2.11.1
 
   '@tauri-apps/plugin-process@2.3.1':
-    dependencies:
-      '@tauri-apps/api': 2.11.1
-
-  '@tauri-apps/plugin-store@2.4.3':
     dependencies:
       '@tauri-apps/api': 2.11.1
 

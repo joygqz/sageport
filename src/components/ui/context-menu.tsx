@@ -18,14 +18,6 @@ function ContextMenuTrigger(
   );
 }
 
-function ContextMenuGroup(
-  props: React.ComponentProps<typeof ContextMenuPrimitive.Group>,
-) {
-  return (
-    <ContextMenuPrimitive.Group data-slot="context-menu-group" {...props} />
-  );
-}
-
 function ContextMenuContent({
   className,
   collisionPadding = 8,
@@ -87,32 +79,10 @@ function ContextMenuSeparator({
   );
 }
 
-function ContextMenuLabel({
-  className,
-  ref,
-  ...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Label> & {
-  ref?: React.Ref<React.ComponentRef<typeof ContextMenuPrimitive.Label>>;
-}) {
-  return (
-    <ContextMenuPrimitive.Label
-      ref={ref}
-      data-slot="context-menu-label"
-      className={cn(
-        "px-2 py-1.5 text-xs font-medium text-muted-foreground",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
 export {
   ContextMenu,
   ContextMenuTrigger,
-  ContextMenuGroup,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuLabel,
 };

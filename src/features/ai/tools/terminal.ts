@@ -25,7 +25,7 @@ import {
   type ToolExecutionResult,
 } from "./types";
 
-export const MAX_TERMINAL_READ_LINES = 2_000;
+const MAX_TERMINAL_READ_LINES = 2_000;
 
 export function sleep(ms: number): Promise<void> {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));

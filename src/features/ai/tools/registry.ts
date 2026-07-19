@@ -229,7 +229,7 @@ export function resolveEnabledToolNames(
   return normalizeEnabledToolNames(names);
 }
 
-export function enabledTools(names: readonly string[]): AiTool[] {
+function enabledTools(names: readonly string[]): AiTool[] {
   const optional = new Set(normalizeEnabledToolNames(names));
   return ALL_TOOLS.filter(
     (tool) =>

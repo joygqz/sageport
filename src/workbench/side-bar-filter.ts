@@ -1,4 +1,4 @@
-export const SIDE_BAR_FILTER_THRESHOLD = 8;
+const SIDE_BAR_FILTER_THRESHOLD = 8;
 
 export function shouldShowSideBarFilter(
   itemCount: number,

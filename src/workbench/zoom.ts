@@ -6,11 +6,7 @@ import { ipc } from "@/lib/ipc";
 import { IS_MACOS } from "@/lib/platform";
 import { normalizeZoomLevel } from "./appearance";
 
-export {
-  normalizeZoomLevel,
-  ZOOM_LEVEL_MAX,
-  ZOOM_LEVEL_MIN,
-} from "./appearance";
+export { ZOOM_LEVEL_MAX, ZOOM_LEVEL_MIN } from "./appearance";
 
 const BASE_ROOT_FONT_PERCENT = 93.75;
 

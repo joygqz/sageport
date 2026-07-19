@@ -4,8 +4,6 @@ import { persist } from "zustand/middleware";
 import { applyTerminalFontFamily } from "@/features/terminal/sessions";
 import { normalizeFontFamily } from "./appearance";
 
-export { normalizeFontFamily } from "./appearance";
-
 export const FONT_SYNC_KEY = "general.fontFamily";
 
 function defaultMonoStack(): string {

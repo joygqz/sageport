@@ -102,7 +102,7 @@ export function defaultTerminalOption(
   return option ? { option, tab: current } : null;
 }
 
-export function automaticTerminalSelectionResult(
+function automaticTerminalSelectionResult(
   option: string,
   tab: TerminalPane,
 ): string {

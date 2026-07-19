@@ -17,15 +17,6 @@ import {
   type LayoutSnapshot,
 } from "./layout-state";
 
-export {
-  AUX_DEFAULT,
-  AUX_MIN,
-  PANEL_DEFAULT,
-  PANEL_MIN,
-  SIDEBAR_DEFAULT,
-  SIDEBAR_MIN,
-} from "./layout-sizing";
-
 export type { Activity } from "./layout-state";
 
 const uiScale = () => zoomFactor(useZoomStore.getState().level);

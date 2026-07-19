@@ -4,7 +4,7 @@ import { ipc } from "@/lib/ipc";
 import type { SnippetInput } from "@/types/models";
 
 export const snippetsKey = ["snippets"] as const;
-export const commandHistoryKey = ["commandHistory"] as const;
+const commandHistoryKey = ["commandHistory"] as const;
 
 export function useSnippets() {
   return useQuery({ queryKey: snippetsKey, queryFn: ipc.snippets.list });

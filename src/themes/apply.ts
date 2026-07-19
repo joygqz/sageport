@@ -11,7 +11,7 @@ import type {
   ThemePreference,
 } from "./types";
 
-export const THEME_STORAGE_KEY = "sageport.theme";
+const THEME_STORAGE_KEY = "sageport.theme";
 const BOOTSTRAP_BG_KEY = "sageport.theme.bg";
 const BOOTSTRAP_SCHEME_KEY = "sageport.theme.scheme";
 

@@ -119,11 +119,3 @@ export function record(
   }
   return out;
 }
-
-export const EMPTY_SPEC = {
-  type: "object" as const,
-  properties: {},
-  additionalProperties: false,
-};
-
-export type { AiToolSpec };

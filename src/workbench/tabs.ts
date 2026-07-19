@@ -37,7 +37,7 @@ export type PaneSplitDirection = "right" | "down";
 
 export const MAX_TERMINAL_SESSIONS = 10;
 export const MAX_FILE_TABS = 10;
-export const MAX_PANES_PER_DIRECTION: Record<SplitDirection, number> = {
+const MAX_PANES_PER_DIRECTION: Record<SplitDirection, number> = {
   row: 3,
   column: 2,
 };
