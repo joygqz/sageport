@@ -8,7 +8,7 @@ mod settings_compat;
 mod webdav;
 
 pub use provider::{make_provider, ProviderConfig, ProviderKind, SyncProvider, SyncVersion};
-pub(crate) use settings_compat::sanitize_appearance_value;
+pub(crate) use settings_compat::sanitize_general_value;
 
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
@@ -430,19 +430,6 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
     records!(&snapshot.snippets, "snippet");
     records!(&snapshot.port_forwards, "port forward");
     records!(&snapshot.sftp_bookmarks, "SFTP bookmark");
-    ids.clear();
-    for entry in &snapshot.settings {
-        if entry.key.is_empty()
-            || entry.key.len() > MAX_SYNC_ID_BYTES
-            || entry.key.chars().any(char::is_control)
-            || !ids.insert(entry.key.clone())
-        {
-            return Err(AppError::Invalid(
-                "invalid or duplicate setting key in backup".into(),
-            ));
-        }
-        validate_timestamp(&entry.updated_at, "setting update time")?;
-    }
     Ok(())
 }
 
@@ -848,7 +835,7 @@ mod tests {
     #[tokio::test]
     async fn restore_drops_invalid_settings_and_keeps_internal_local_settings() {
         let pool = test_pool().await;
-        settings_repo::set(&pool, "appearance.theme", "graphite:dark")
+        settings_repo::set(&pool, "general.theme", "graphite:dark")
             .await
             .unwrap();
         settings_repo::set(&pool, "sync.connection", "local-connection")
@@ -856,18 +843,18 @@ mod tests {
             .unwrap();
 
         let snapshot = empty_snapshot(vec![
-            setting("appearance.theme", "removed-theme"),
-            setting("appearance.locale", "en"),
+            setting("general.theme", "removed-theme"),
+            setting("general.locale", "en"),
             setting("sync.connection", "backup-connection"),
         ]);
         restore_snapshot(&pool, &snapshot).await.unwrap();
 
         assert_eq!(
-            settings_repo::get(&pool, "appearance.theme").await.unwrap(),
+            settings_repo::get(&pool, "general.theme").await.unwrap(),
             None
         );
         assert_eq!(
-            settings_repo::get(&pool, "appearance.locale")
+            settings_repo::get(&pool, "general.locale")
                 .await
                 .unwrap()
                 .as_deref(),
@@ -883,18 +870,62 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn import_migrates_compatible_legacy_settings() {
+    async fn import_drops_legacy_setting_keys() {
         let pool = test_pool().await;
-        let snapshot = empty_snapshot(vec![setting("appearance.theme", "dark-modern")]);
+        let snapshot = empty_snapshot(vec![
+            setting("appearance.theme", "midnight:dark"),
+            setting("general.theme", "graphite:dark"),
+        ]);
 
         import_snapshot(&pool, &snapshot).await.unwrap();
 
         assert_eq!(
-            settings_repo::get(&pool, "appearance.theme")
+            settings_repo::get(&pool, "appearance.theme").await.unwrap(),
+            None
+        );
+        assert_eq!(
+            settings_repo::get(&pool, "general.theme")
                 .await
                 .unwrap()
                 .as_deref(),
-            Some("midnight:dark")
+            Some("graphite:dark")
+        );
+    }
+
+    #[tokio::test]
+    async fn import_drops_each_incompatible_setting_individually() {
+        let pool = test_pool().await;
+        let mut invalid_timestamp = setting("general.fontFamily", "Mono");
+        invalid_timestamp.updated_at = "invalid".into();
+        let snapshot = empty_snapshot(vec![
+            setting("general.locale", "zh-CN"),
+            setting("general.theme", "removed-theme"),
+            setting("future.setting", "value"),
+            invalid_timestamp,
+        ]);
+
+        import_snapshot(&pool, &snapshot).await.unwrap();
+
+        assert_eq!(
+            settings_repo::get(&pool, "general.locale")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("zh-CN")
+        );
+        assert_eq!(
+            settings_repo::get(&pool, "general.theme").await.unwrap(),
+            None
+        );
+        assert_eq!(
+            settings_repo::get(&pool, "future.setting").await.unwrap(),
+            None
+        );
+        assert_eq!(
+            settings_repo::get(&pool, "general.fontFamily")
+                .await
+                .unwrap(),
+            None
         );
     }
 

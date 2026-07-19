@@ -1,17 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Check,
   ChevronRight,
   Info,
-  Laptop,
-  Minus,
-  Moon,
-  Palette,
-  Plus,
   RefreshCw,
   Settings2,
   Sparkles,
-  Sun,
 } from "lucide-react";
 
 import {
@@ -19,45 +12,21 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-  CONTROL_BORDER_CLASS,
-  CONTROL_FOCUS_CLASS,
   Dialog,
   DialogContent,
   DialogToolbar,
   ErrorState,
   Field,
-  Input,
-  Kbd,
   LoadingState,
-  PasswordInput,
-  RadioGroup,
-  RadioGroupItem,
   ScrollArea,
   SectionHeader,
-  SegmentedControl,
-  Separator,
   Select,
   SwitchField,
-  Tooltip,
 } from "@/components/ui";
-import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
+import { useI18n, type TKey } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import {
-  THEME_FAMILIES,
-  useTheme,
-  type ThemeAppearance,
-  type ThemeFamilyDefinition,
-  type ThemeMode,
-} from "@/themes";
-import { useFontStore } from "@/workbench/font";
 import type { SettingsSection } from "@/workbench/overlays";
-import {
-  useZoomStore,
-  zoomFactor,
-  ZOOM_LEVEL_MAX,
-  ZOOM_LEVEL_MIN,
-} from "@/workbench/zoom";
 import type { AiConfig, AiProtocol } from "@/types/models";
 import {
   AI_PROTOCOLS,
@@ -73,16 +42,16 @@ import {
 } from "@/features/ai/tools";
 import { SyncSection } from "@/features/sync/SyncSection";
 import { AboutSection } from "./AboutSection";
-import { AutostartSetting } from "./AutostartSetting";
+import { DraftInput } from "./DraftInput";
+import { GeneralSection } from "./GeneralSection";
 
 const NAV: {
   id: SettingsSection;
   labelKey: TKey;
   descriptionKey?: TKey;
-  icon: typeof Palette;
+  icon: typeof Settings2;
 }[] = [
   { id: "general", labelKey: "settings.nav.general", icon: Settings2 },
-  { id: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
   {
     id: "ai",
     labelKey: "settings.nav.ai",
@@ -97,12 +66,6 @@ const NAV: {
   },
   { id: "about", labelKey: "settings.nav.about", icon: Info },
 ];
-
-const THEME_DESCRIPTION_KEYS: Record<string, TKey> = {
-  midnight: "settings.appearance.familyMidnight",
-  graphite: "settings.appearance.familyGraphite",
-  dracula: "settings.appearance.familyDracula",
-};
 
 export function SettingsDialog({
   open,
@@ -189,326 +152,12 @@ function SettingsPage({
                 )}
               </div>
             )}
-            {section === "general" && <AutostartSetting />}
-            {section === "appearance" && <AppearanceSection />}
+            {section === "general" && <GeneralSection />}
             {section === "ai" && <AiSection />}
             {section === "sync" && <SyncSection />}
             {section === "about" && <AboutSection />}
           </main>
         </ScrollArea>
-      </div>
-    </div>
-  );
-}
-
-function AppearanceSection() {
-  const { t, locale, setLocale } = useI18n();
-  const { preference, setFamily, setMode } = useTheme();
-
-  const modes: { value: ThemeMode; label: React.ReactNode }[] = [
-    {
-      value: "system",
-      label: (
-        <span className="flex items-center justify-center gap-2">
-          <Laptop className="size-3.5" />
-          {t("settings.appearance.modeSystem")}
-        </span>
-      ),
-    },
-    {
-      value: "light",
-      label: (
-        <span className="flex items-center justify-center gap-2">
-          <Sun className="size-3.5" />
-          {t("settings.appearance.modeLight")}
-        </span>
-      ),
-    },
-    {
-      value: "dark",
-      label: (
-        <span className="flex items-center justify-center gap-2">
-          <Moon className="size-3.5" />
-          {t("settings.appearance.modeDark")}
-        </span>
-      ),
-    },
-  ];
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4">
-        <Field label={t("settings.appearance.colorMode")}>
-          <SegmentedControl
-            value={preference.mode}
-            onChange={setMode}
-            options={modes}
-          />
-        </Field>
-
-        <Field label={t("settings.appearance.themeFamily")}>
-          <RadioGroup
-            value={preference.familyId}
-            onValueChange={setFamily}
-            className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3"
-          >
-            {THEME_FAMILIES.map((family) => (
-              <ThemeFamilyCard
-                key={family.id}
-                family={family}
-                active={family.id === preference.familyId}
-                description={t(THEME_DESCRIPTION_KEYS[family.id])}
-              />
-            ))}
-          </RadioGroup>
-        </Field>
-      </div>
-
-      <Separator />
-
-      <div className="flex flex-col gap-4">
-        <Field
-          label={t("settings.appearance.language")}
-          hint={t("settings.appearance.languageHint")}
-        >
-          <Select
-            value={locale}
-            onValueChange={(value) =>
-              setLocale(value as (typeof LOCALES)[number])
-            }
-            options={LOCALES.map((code) => ({
-              value: code,
-              label: LOCALE_LABELS[code],
-            }))}
-          />
-        </Field>
-
-        <FontField />
-
-        <ZoomField />
-      </div>
-    </div>
-  );
-}
-
-function DraftInput({
-  value,
-  onCommit,
-  password = false,
-  ...props
-}: Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "onBlur"> & {
-  value: string;
-  onCommit: (next: string) => void;
-  password?: boolean;
-}) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const pending = useRef({ draft, value, onCommit });
-
-  useEffect(() => {
-    pending.current = { draft, value, onCommit };
-  });
-
-  useEffect(
-    () => () => {
-      const { draft, value, onCommit } = pending.current;
-      if (draft !== null && draft !== value) onCommit(draft);
-    },
-    [],
-  );
-
-  const commit = () => {
-    if (draft === null) return;
-    setDraft(null);
-    if (draft !== value) onCommit(draft);
-  };
-
-  const inputProps = {
-    ...props,
-    value: draft ?? value,
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-      setDraft(e.target.value),
-    onBlur: commit,
-  };
-  return password ? (
-    <PasswordInput {...inputProps} />
-  ) : (
-    <Input {...inputProps} />
-  );
-}
-
-function FontField() {
-  const { t } = useI18n();
-  const family = useFontStore((s) => s.family);
-  const setFamily = useFontStore((s) => s.setFamily);
-
-  return (
-    <Field
-      label={t("settings.appearance.fontFamily")}
-      hint={t("settings.appearance.fontFamilyHint")}
-    >
-      <DraftInput
-        value={family}
-        onCommit={setFamily}
-        maxLength={1024}
-        placeholder='"JetBrains Mono Variable"'
-        autoComplete="off"
-        spellCheck={false}
-      />
-    </Field>
-  );
-}
-
-function ZoomField() {
-  const { t } = useI18n();
-  const level = useZoomStore((s) => s.level);
-  const zoomIn = useZoomStore((s) => s.zoomIn);
-  const zoomOut = useZoomStore((s) => s.zoomOut);
-  const resetZoom = useZoomStore((s) => s.resetZoom);
-
-  const percent = Math.round(zoomFactor(level) * 100);
-
-  return (
-    <Field
-      label={t("settings.appearance.zoom")}
-      hint={
-        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
-          {t("settings.appearance.zoomHint")}
-          <Kbd keys={["mod", "+"]} className="h-4 min-w-4" /> /
-          <Kbd keys={["mod", "−"]} className="h-4 min-w-4" /> /
-          <Kbd keys={["mod", "0"]} className="h-4 min-w-4" />
-        </span>
-      }
-    >
-      <div className="flex items-center gap-1.5">
-        <Tooltip content={t("settings.appearance.zoomOut")}>
-          <Button
-            size="icon"
-            variant="outline"
-            className="size-7"
-            disabled={level <= ZOOM_LEVEL_MIN}
-            onClick={zoomOut}
-          >
-            <Minus className="size-3.5" />
-          </Button>
-        </Tooltip>
-        <span className="min-w-14 text-center text-sm tabular-nums text-foreground">
-          {percent}%
-        </span>
-        <Tooltip content={t("settings.appearance.zoomIn")}>
-          <Button
-            size="icon"
-            variant="outline"
-            className="size-7"
-            disabled={level >= ZOOM_LEVEL_MAX}
-            onClick={zoomIn}
-          >
-            <Plus className="size-3.5" />
-          </Button>
-        </Tooltip>
-        {level !== 0 && (
-          <Button size="sm" variant="ghost" onClick={resetZoom}>
-            {t("settings.appearance.zoomReset")}
-          </Button>
-        )}
-      </div>
-    </Field>
-  );
-}
-
-function ThemeFamilyCard({
-  family,
-  active,
-  description,
-}: {
-  family: ThemeFamilyDefinition;
-  active: boolean;
-  description: string;
-}) {
-  return (
-    <RadioGroupItem
-      value={family.id}
-      className={cn(
-        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left transition-[border-color,box-shadow]",
-        CONTROL_FOCUS_CLASS,
-        active ? "border-primary ring-2 ring-primary/25" : CONTROL_BORDER_CLASS,
-      )}
-    >
-      <div className="grid h-24 grid-cols-2">
-        {(["light", "dark"] as const).map((appearance) => (
-          <ThemePreview key={appearance} theme={family.themes[appearance]} />
-        ))}
-      </div>
-      <div className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold text-card-foreground">
-            {family.name}
-          </p>
-          <p className="mt-0.5 truncate text-2xs text-muted-foreground">
-            {description}
-          </p>
-        </div>
-        {active && (
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Check className="size-3" strokeWidth={3} />
-          </span>
-        )}
-      </div>
-    </RadioGroupItem>
-  );
-}
-
-function ThemePreview({
-  theme,
-}: {
-  theme: ThemeFamilyDefinition["themes"][ThemeAppearance];
-}) {
-  const { colors, terminal } = theme;
-  return (
-    <div
-      className="flex min-w-0 border-r last:border-r-0"
-      style={{
-        backgroundColor: terminal.background,
-        borderColor: colors.border,
-        color: terminal.foreground,
-      }}
-    >
-      <div
-        className="flex w-1/3 flex-col gap-1 border-r p-1.5"
-        style={{
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-        }}
-      >
-        <span
-          className="h-1 w-2/3 rounded-full"
-          style={{ backgroundColor: colors.primary }}
-        />
-        <span
-          className="h-1 w-full rounded-full opacity-55"
-          style={{ backgroundColor: colors.mutedForeground }}
-        />
-        <span
-          className="h-1 w-3/4 rounded-full opacity-55"
-          style={{ backgroundColor: colors.mutedForeground }}
-        />
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-1.5">
-        <span
-          className="h-3 rounded-sm"
-          style={{ backgroundColor: colors.listActive }}
-        />
-        <span
-          className="h-1 w-3/4 rounded-full"
-          style={{ backgroundColor: terminal.blue }}
-        />
-        <span
-          className="h-1 w-1/2 rounded-full"
-          style={{ backgroundColor: terminal.green }}
-        />
-        <span
-          className="mt-auto h-1 w-5/6 rounded-full opacity-60"
-          style={{ backgroundColor: terminal.foreground }}
-        />
       </div>
     </div>
   );

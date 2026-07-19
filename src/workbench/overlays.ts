@@ -1,7 +1,14 @@
 import { create } from "zustand";
 
-export type SettingsSection =
-  "general" | "appearance" | "ai" | "sync" | "about";
+export type SettingsSection = "general" | "ai" | "sync" | "about";
+
+type SettingsSectionInput = SettingsSection | "appearance";
+
+function normalizeSettingsSection(
+  section: SettingsSectionInput,
+): SettingsSection {
+  return section === "appearance" ? "general" : section;
+}
 
 export type Overlay =
   | { type: "host-form"; hostId: string | null; groupId: string | null }
@@ -14,8 +21,8 @@ interface OverlayState {
   openHostForm: (hostId?: string, groupId?: string) => void;
   openGroupForm: (groupId?: string, parentId?: string) => void;
   openPalette: (mode: "quick" | "commands") => void;
-  openSettings: (section?: SettingsSection) => void;
-  setSettingsSection: (section: SettingsSection) => void;
+  openSettings: (section?: SettingsSectionInput) => void;
+  setSettingsSection: (section: SettingsSectionInput) => void;
   close: () => void;
 }
 
@@ -42,17 +49,22 @@ export const useOverlayStore = create<OverlayState>((set) => ({
     set((state) => ({
       overlay: {
         type: "settings",
-        section:
-          section ??
-          (state.overlay?.type === "settings"
+        section: section
+          ? normalizeSettingsSection(section)
+          : state.overlay?.type === "settings"
             ? state.overlay.section
-            : "general"),
+            : "general",
       },
     })),
   setSettingsSection: (section) =>
     set((state) =>
       state.overlay?.type === "settings"
-        ? { overlay: { ...state.overlay, section } }
+        ? {
+            overlay: {
+              ...state.overlay,
+              section: normalizeSettingsSection(section),
+            },
+          }
         : state,
     ),
   close: () => set({ overlay: null }),

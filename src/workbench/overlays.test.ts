@@ -37,6 +37,20 @@ describe("settings overlay", () => {
     });
   });
 
+  it("redirects legacy appearance entries to general", () => {
+    useOverlayStore.getState().openSettings("appearance");
+    expect(useOverlayStore.getState().overlay).toEqual({
+      type: "settings",
+      section: "general",
+    });
+
+    useOverlayStore.getState().setSettingsSection("appearance");
+    expect(useOverlayStore.getState().overlay).toEqual({
+      type: "settings",
+      section: "general",
+    });
+  });
+
   it("presets the parent group for nested create flows", () => {
     useOverlayStore.getState().openHostForm(undefined, "group-1");
     expect(useOverlayStore.getState().overlay).toEqual({

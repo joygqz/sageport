@@ -137,7 +137,7 @@ export function useCommands(): WorkbenchCommand[] {
         shortcut: ["mod", ","],
         run: () => overlays().openSettings(),
       },
-      ...(["appearance", "ai", "sync", "about"] as const).map((section) => ({
+      ...(["general", "ai", "sync", "about"] as const).map((section) => ({
         id: `settings.${section}`,
         categoryKey: "commands.category.preferences" as TKey,
         label: t(`settings.nav.${section}`),

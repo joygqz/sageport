@@ -17,10 +17,10 @@ pub(super) fn sanitize(entry: &SettingEntry) -> Option<SettingEntry> {
     // Intentionally allow-list persisted settings. New settings must define
     // their backup compatibility here before they can be restored or exported.
     let value = match entry.key.as_str() {
-        "appearance.theme" => sanitize_appearance_value(&entry.key, &entry.value)?,
-        "appearance.locale" => one_of(&entry.value, &["en", "zh-CN"])?,
-        "appearance.zoomLevel" => sanitize_appearance_value(&entry.key, &entry.value)?,
-        "appearance.fontFamily" => sanitize_appearance_value(&entry.key, &entry.value)?,
+        "general.theme" => sanitize_general_value(&entry.key, &entry.value)?,
+        "general.locale" => one_of(&entry.value, &["en", "zh-CN"])?,
+        "general.zoomLevel" => sanitize_general_value(&entry.key, &entry.value)?,
+        "general.fontFamily" => sanitize_general_value(&entry.key, &entry.value)?,
         "ai.protocol" => one_of(&entry.value, &["openai", "anthropic"])?,
         "ai.base_url" => sanitize_base_url(&entry.value)?,
         "ai.api_key" => bounded_text(&entry.value, MAX_API_KEY_BYTES)?.to_string(),
@@ -64,12 +64,12 @@ fn sanitize_zoom(value: &str) -> Option<String> {
     (-3..=5).contains(&level).then(|| level.to_string())
 }
 
-pub(crate) fn sanitize_appearance_value(key: &str, value: &str) -> Option<String> {
+pub(crate) fn sanitize_general_value(key: &str, value: &str) -> Option<String> {
     match key {
-        "appearance.theme" => sanitize_theme(value),
-        "appearance.locale" => one_of(value, &["en", "zh-CN"]),
-        "appearance.zoomLevel" => sanitize_zoom(value),
-        "appearance.fontFamily" => bounded_text(value, MAX_FONT_FAMILY_BYTES).map(str::to_string),
+        "general.theme" => sanitize_theme(value),
+        "general.locale" => one_of(value, &["en", "zh-CN"]),
+        "general.zoomLevel" => sanitize_zoom(value),
+        "general.fontFamily" => bounded_text(value, MAX_FONT_FAMILY_BYTES).map(str::to_string),
         _ => None,
     }
 }
@@ -135,23 +135,23 @@ mod tests {
 
     #[test]
     fn migrates_legacy_theme_values() {
-        let migrated = sanitize(&setting("appearance.theme", "dark-modern")).unwrap();
+        let migrated = sanitize(&setting("general.theme", "dark-modern")).unwrap();
         assert_eq!(migrated.value, "midnight:dark");
 
-        let migrated = sanitize(&setting("appearance.theme", "dracula")).unwrap();
+        let migrated = sanitize(&setting("general.theme", "dracula")).unwrap();
         assert_eq!(migrated.value, "dracula:dark");
     }
 
     #[test]
     fn keeps_valid_current_settings() {
         assert_eq!(
-            sanitize(&setting("appearance.theme", "graphite:system"))
+            sanitize(&setting("general.theme", "graphite:system"))
                 .unwrap()
                 .value,
             "graphite:system"
         );
-        assert!(sanitize(&setting("appearance.locale", "zh-CN")).is_some());
-        assert!(sanitize(&setting("appearance.zoomLevel", "-3")).is_some());
+        assert!(sanitize(&setting("general.locale", "zh-CN")).is_some());
+        assert!(sanitize(&setting("general.zoomLevel", "-3")).is_some());
         assert!(sanitize(&setting("ai.protocol", "anthropic")).is_some());
         assert!(sanitize(&setting("ai.base_url", "http://localhost:11434/v1")).is_some());
         assert!(sanitize(&setting("ai.auto_approve", "false")).is_some());
@@ -160,9 +160,10 @@ mod tests {
 
     #[test]
     fn drops_incompatible_or_unknown_settings() {
-        assert!(sanitize(&setting("appearance.theme", "removed-theme")).is_none());
-        assert!(sanitize(&setting("appearance.locale", "invalid")).is_none());
-        assert!(sanitize(&setting("appearance.zoomLevel", "99")).is_none());
+        assert!(sanitize(&setting("general.theme", "removed-theme")).is_none());
+        assert!(sanitize(&setting("general.locale", "invalid")).is_none());
+        assert!(sanitize(&setting("general.zoomLevel", "99")).is_none());
+        assert!(sanitize(&setting("appearance.theme", "midnight:dark")).is_none());
         assert!(sanitize(&setting("ai.protocol", "removed-protocol")).is_none());
         assert!(sanitize(&setting("ai.base_url", "not a url")).is_none());
         assert!(sanitize(&setting("ai.base_url", "https://user:pass@example.com")).is_none());
@@ -182,7 +183,7 @@ mod tests {
         assert!(sanitize(&setting("ai.enabled_tools", r#"[1,2]"#)).is_none());
         assert!(sanitize(&setting("ai.max_history_tokens", "-1")).is_none());
 
-        let mut invalid_timestamp = setting("appearance.locale", "en");
+        let mut invalid_timestamp = setting("general.locale", "en");
         invalid_timestamp.updated_at = "yesterday".to_string();
         assert!(sanitize(&invalid_timestamp).is_none());
     }

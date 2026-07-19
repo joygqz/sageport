@@ -19,7 +19,7 @@ import {
 } from "./themes";
 import type { ThemeAppearance, ThemeMode, ThemePreference } from "./types";
 
-const THEME_SYNC_KEY = "appearance.theme";
+const THEME_SYNC_KEY = "general.theme";
 const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
 function systemAppearance(): ThemeAppearance {

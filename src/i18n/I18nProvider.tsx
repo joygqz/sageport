@@ -11,7 +11,7 @@ import {
 import { I18nContext } from "./i18n-context";
 import { translate } from "./translate";
 
-const LOCALE_SYNC_KEY = "appearance.locale";
+const LOCALE_SYNC_KEY = "general.locale";
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectLocale);

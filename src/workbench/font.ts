@@ -6,7 +6,7 @@ import { normalizeFontFamily } from "./appearance";
 
 export { normalizeFontFamily } from "./appearance";
 
-export const FONT_SYNC_KEY = "appearance.fontFamily";
+export const FONT_SYNC_KEY = "general.fontFamily";
 
 function defaultMonoStack(): string {
   return getComputedStyle(document.documentElement)

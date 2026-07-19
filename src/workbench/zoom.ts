@@ -17,7 +17,7 @@ const BASE_ROOT_FONT_PERCENT = 93.75;
 const TERMINAL_FONT_BASE = 13;
 
 const STEP = 0.1;
-export const ZOOM_SYNC_KEY = "appearance.zoomLevel";
+export const ZOOM_SYNC_KEY = "general.zoomLevel";
 
 export function zoomFactor(level: number): number {
   return 1 + level * STEP;
