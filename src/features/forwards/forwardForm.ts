@@ -25,6 +25,10 @@ export function isLoopbackBindHost(host: string): boolean {
   );
 }
 
+export function defaultBindHost(kind: ForwardKind): string {
+  return kind === "remote" ? "0.0.0.0" : "127.0.0.1";
+}
+
 function normalizeForwardHost(host: string): string {
   const value = host.trim();
   return value.startsWith("[") && value.endsWith("]") && value.includes(":")
@@ -79,7 +83,8 @@ export function forwardInput(
       hostId,
       label,
       kind: values.kind,
-      bindHost: normalizeForwardHost(values.bindHost) || "127.0.0.1",
+      bindHost:
+        normalizeForwardHost(values.bindHost) || defaultBindHost(values.kind),
       bindPort,
       targetHost: hasFixedTarget ? targetHost : null,
       targetPort,

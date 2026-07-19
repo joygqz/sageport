@@ -289,12 +289,13 @@ function HostFormBody({
             })}
           />
         </Field>
-        <Field label={t("hostForm.port")} error={errors.port?.message}>
+        <Field label={t("hostForm.port")} error={errors.port?.message} required>
           <Input
             type="number"
             min={1}
             max={65535}
             step={1}
+            placeholder="1-65535"
             {...register("port", {
               valueAsNumber: true,
               required: t("hostForm.portInvalid"),

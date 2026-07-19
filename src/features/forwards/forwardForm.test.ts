@@ -53,6 +53,22 @@ describe("forwardInput", () => {
     });
   });
 
+  it("defaults an empty bind host per kind", () => {
+    expect(forwardInput({ ...values, kind: "remote" })).toMatchObject({
+      input: { bindHost: "0.0.0.0" },
+    });
+    expect(
+      forwardInput({
+        ...values,
+        kind: "dynamic",
+        targetHost: "",
+        targetPort: "",
+      }),
+    ).toMatchObject({
+      input: { bindHost: "127.0.0.1" },
+    });
+  });
+
   it("normalizes bracketed IPv6 literals for socket APIs", () => {
     expect(
       forwardInput({

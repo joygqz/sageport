@@ -20,6 +20,7 @@ import type {
 import { useHosts } from "@/features/hosts/api";
 import { useCreateForward, useUpdateForward } from "./api";
 import {
+  defaultBindHost,
   formatForwardEndpoint,
   forwardInput,
   isLoopbackBindHost,
@@ -70,7 +71,7 @@ function ForwardFormBody({
   const [label, setLabel] = useState(forward?.label ?? "");
   const [hostId, setHostId] = useState(forward?.hostId ?? "");
   const [kind, setKind] = useState<ForwardKind>(forward?.kind ?? "local");
-  const [bindHost, setBindHost] = useState(forward?.bindHost ?? "127.0.0.1");
+  const [bindHost, setBindHost] = useState(forward?.bindHost ?? "");
   const [bindPort, setBindPort] = useState(String(forward?.bindPort ?? ""));
   const [targetHost, setTargetHost] = useState(forward?.targetHost ?? "");
   const [targetPort, setTargetPort] = useState(
@@ -132,15 +133,20 @@ function ForwardFormBody({
         submitLabel={forward ? t("common.saveChanges") : t("common.create")}
         pending={publicSocksPending}
       >
-        <SegmentedControl
-          value={kind}
-          onChange={setKind}
-          options={[
-            { value: "local", label: t("forwards.kind.local") },
-            { value: "remote", label: t("forwards.kind.remote") },
-            { value: "dynamic", label: t("forwards.kind.dynamic") },
-          ]}
-        />
+        <div className="space-y-2">
+          <SegmentedControl
+            value={kind}
+            onChange={setKind}
+            options={[
+              { value: "local", label: t("forwards.kind.local") },
+              { value: "remote", label: t("forwards.kind.remote") },
+              { value: "dynamic", label: t("forwards.kind.dynamic") },
+            ]}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t(`forwards.kindHint.${kind}`)}
+          </p>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label={t("forwards.label")} required>
@@ -148,7 +154,7 @@ function ForwardFormBody({
               autoFocus
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder={t("forwards.labelPlaceholder")}
+              placeholder={t(`forwards.labelPlaceholder.${kind}`)}
             />
           </Field>
           <Field label={t("forwards.host")} required>
@@ -170,7 +176,8 @@ function ForwardFormBody({
           <Field
             label={t("forwards.bindHost")}
             hint={
-              kind === "dynamic" && !isLoopbackBindHost(bindHost)
+              kind === "dynamic" &&
+              !isLoopbackBindHost(bindHost.trim() || defaultBindHost(kind))
                 ? t("forwards.form.publicSocks.hint")
                 : undefined
             }
@@ -178,7 +185,7 @@ function ForwardFormBody({
             <Input
               value={bindHost}
               onChange={(e) => setBindHost(e.target.value)}
-              placeholder="127.0.0.1"
+              placeholder={defaultBindHost(kind)}
             />
           </Field>
           <Field label={t("forwards.bindPort")} required>
@@ -188,6 +195,7 @@ function ForwardFormBody({
               max={65535}
               value={bindPort}
               onChange={(e) => setBindPort(e.target.value)}
+              placeholder="1-65535"
             />
           </Field>
         </div>
@@ -208,6 +216,7 @@ function ForwardFormBody({
                 max={65535}
                 value={targetPort}
                 onChange={(e) => setTargetPort(e.target.value)}
+                placeholder="1-65535"
               />
             </Field>
           </div>

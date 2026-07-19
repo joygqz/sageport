@@ -106,7 +106,11 @@ export const en = {
     stopError: "Failed to stop port forward",
     statusError: "Failed to monitor port forward status",
     label: "Name",
-    labelPlaceholder: "Database tunnel",
+    labelPlaceholder: {
+      local: "Database tunnel",
+      remote: "Expose local service",
+      dynamic: "SOCKS proxy",
+    },
     host: "Host",
     selectHost: "Select a host",
     bindHost: "Listen address",
@@ -120,9 +124,18 @@ export const en = {
       remote: "Remote (-R)",
       dynamic: "Dynamic SOCKS (-D)",
     },
+    kindHint: {
+      local:
+        "Listen on this machine and reach a service the remote host can access, such as a database on the server.",
+      remote:
+        "Listen on the remote host and forward back to a service on this machine, such as a local dev server.",
+      dynamic:
+        "Run a SOCKS proxy on this machine that routes traffic through the SSH host, such as reaching an internal network.",
+    },
     empty: {
       title: "No port forwards yet",
-      description: "Forward a local port to a remote service over SSH.",
+      description:
+        "Tunnel local or remote ports over SSH, or run a SOCKS proxy.",
     },
     delete: {
       title: "Delete port forward?",

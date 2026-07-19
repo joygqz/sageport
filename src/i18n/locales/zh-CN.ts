@@ -103,7 +103,11 @@ export const zhCN: Dictionary = {
     stopError: "停止端口转发失败",
     statusError: "监听端口转发状态失败",
     label: "名称",
-    labelPlaceholder: "数据库隧道",
+    labelPlaceholder: {
+      local: "数据库隧道",
+      remote: "暴露本地服务",
+      dynamic: "SOCKS 代理",
+    },
     host: "主机",
     selectHost: "选择主机",
     bindHost: "监听地址",
@@ -117,9 +121,17 @@ export const zhCN: Dictionary = {
       remote: "远程 (-R)",
       dynamic: "动态 SOCKS (-D)",
     },
+    kindHint: {
+      local:
+        "在本机监听端口，经 SSH 访问远程主机能连到的服务，例如服务器上的数据库。",
+      remote:
+        "在远程主机监听端口，转发回本机的服务，例如把本地开发服务暴露给服务器。",
+      dynamic:
+        "在本机开启 SOCKS 代理，流量经由 SSH 主机转发，例如通过服务器访问内网。",
+    },
     empty: {
       title: "暂无端口转发",
-      description: "通过 SSH 将本地端口转发到远程服务。",
+      description: "通过 SSH 隧道转发本地或远程端口，或创建 SOCKS 代理。",
     },
     delete: {
       title: "删除端口转发？",
