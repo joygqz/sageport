@@ -8,7 +8,7 @@ export const INTERACTIVE_FOCUS_CLASS =
 
 export const CONTROL_INTERACTION_CLASS = `${CONTROL_BORDER_CLASS} ${CONTROL_FOCUS_CLASS}`;
 
-export const CONTROL_BASE_CLASS = `w-full rounded-lg border bg-surface text-foreground transition-[background-color,border-color,box-shadow] placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-danger aria-[invalid=true]:focus-visible:ring-danger/30 ${CONTROL_INTERACTION_CLASS}`;
+export const CONTROL_BASE_CLASS = `w-full rounded-lg border bg-surface text-foreground transition-[background-color,border-color,box-shadow] placeholder:text-muted-foreground/60 disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-danger aria-[invalid=true]:focus-visible:ring-danger/30 ${CONTROL_INTERACTION_CLASS}`;
 
 export const CONTROL_CONTAINER_CLASS =
   "rounded-lg border border-input bg-surface transition-[background-color,border-color,box-shadow] hover:border-ring/60 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30";
