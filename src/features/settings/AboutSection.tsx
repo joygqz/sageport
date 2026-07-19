@@ -209,7 +209,7 @@ function UpdateStatusCard({
       </span>
 
       <div className="flex min-w-0 flex-1 basis-64 flex-col">
-        <h4 className="text-sm font-medium text-foreground">{title}</h4>
+        <span className="text-sm font-medium text-foreground">{title}</span>
         <p
           className={cn(
             "mt-0.5 whitespace-pre-line text-xs leading-relaxed text-muted-foreground",

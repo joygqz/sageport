@@ -11,7 +11,6 @@ import {
   SectionHeader,
   SegmentedControl,
   Select,
-  Separator,
   Tooltip,
 } from "@/components/ui";
 import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
@@ -41,11 +40,9 @@ const THEME_DESCRIPTION_KEYS: Record<string, TKey> = {
 
 export function GeneralSection() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <AutostartSetting />
-      <Separator />
       <ThemeSettings />
-      <Separator />
       <DisplaySettings />
     </div>
   );

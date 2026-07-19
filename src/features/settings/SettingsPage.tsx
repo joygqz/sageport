@@ -140,18 +140,16 @@ function SettingsPage({
 
         <ScrollArea className="min-h-0 min-w-0 flex-1">
           <main className="settings-content flex w-full max-w-3xl flex-col gap-6 px-5 py-6 sm:px-8 sm:py-8">
-            {section !== "sync" && (
-              <div>
-                <h1 className="text-lg font-semibold tracking-tight text-foreground">
-                  {t(currentSection.labelKey)}
-                </h1>
-                {currentSection.descriptionKey && (
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                    {t(currentSection.descriptionKey)}
-                  </p>
-                )}
-              </div>
-            )}
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-foreground">
+                {t(currentSection.labelKey)}
+              </h1>
+              {currentSection.descriptionKey && (
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {t(currentSection.descriptionKey)}
+                </p>
+              )}
+            </div>
             {section === "general" && <GeneralSection />}
             {section === "ai" && <AiSection />}
             {section === "sync" && <SyncSection />}
@@ -221,8 +219,6 @@ function AiForm({ config }: { config: AiConfig }) {
     saveTimer.current = null;
     const input = values.current;
     const { apiKey: _apiKey, ...retained } = input;
-    // Do not retain a submitted secret in long-lived React refs or resend it
-    // with unrelated settings changes.
     values.current = retained;
     mutate(input, {
       onError: (err) =>
@@ -322,7 +318,7 @@ function AiForm({ config }: { config: AiConfig }) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
         <Field label={t("settings.ai.protocolLabel")}>
           <Select
@@ -419,8 +415,11 @@ function AiForm({ config }: { config: AiConfig }) {
         </Field>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <SectionHeader title={t("settings.ai.tools.title")} />
+      <div className="flex flex-col gap-4">
+        <SectionHeader
+          title={t("settings.ai.tools.title")}
+          description={t("settings.ai.tools.description")}
+        />
 
         <div
           aria-label={t("settings.ai.tools.title")}
@@ -438,9 +437,6 @@ function AiForm({ config }: { config: AiConfig }) {
             />
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">
-          {t("settings.ai.tools.description")}
-        </p>
       </div>
     </div>
   );

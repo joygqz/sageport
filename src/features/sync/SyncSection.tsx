@@ -16,7 +16,6 @@ import {
   LoadingState,
   PasswordInput,
   SectionHeader,
-  Separator,
   Spinner,
   Tooltip,
   type ConfirmState,
@@ -42,23 +41,11 @@ export function SyncSection() {
   const { data: status, isLoading, isError, refetch } = useSyncStatus();
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <section
-        aria-labelledby="sync-storage-heading"
-        className="flex flex-col gap-6"
+        aria-label={t("settings.nav.sync")}
+        className="flex flex-col gap-8"
       >
-        <div>
-          <h1
-            id="sync-storage-heading"
-            className="text-lg font-semibold tracking-tight text-foreground"
-          >
-            {t("settings.nav.sync")}
-          </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            {t("settings.sync.description")}
-          </p>
-        </div>
-
         {isLoading && <LoadingState label={t("common.loading")} />}
         {!isLoading && (isError || !status) && (
           <ErrorState
@@ -70,7 +57,6 @@ export function SyncSection() {
         {!isLoading && !isError && status?.provider && (
           <>
             <ConnectedCard status={status} />
-            <Separator />
             <VersionsCard />
           </>
         )}
@@ -78,7 +64,6 @@ export function SyncSection() {
           <SetupView status={status} />
         )}
       </section>
-      <Separator />
       <FileBackupCard />
     </div>
   );
@@ -392,20 +377,13 @@ function FileBackupCard() {
 
   return (
     <section
-      aria-labelledby="file-backup-heading"
+      aria-label={t("settings.sync.file.title")}
       className="flex flex-col gap-4"
     >
-      <div>
-        <h2
-          id="file-backup-heading"
-          className="text-lg font-semibold tracking-tight text-foreground"
-        >
-          {t("settings.sync.file.title")}
-        </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-          {t("settings.sync.file.description")}
-        </p>
-      </div>
+      <SectionHeader
+        title={t("settings.sync.file.title")}
+        description={t("settings.sync.file.description")}
+      />
 
       <div className="flex flex-wrap gap-2">
         <Button
