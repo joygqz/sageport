@@ -168,7 +168,7 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={doPush} loading={push.isPending}>
+        <Button variant="outline" onClick={doPush} loading={push.isPending}>
           {t("settings.sync.connected.pushButton")}
         </Button>
         <Button
