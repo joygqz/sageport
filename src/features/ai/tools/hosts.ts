@@ -13,6 +13,7 @@ import {
 
 import { ipc } from "@/lib/ipc";
 import type {
+  AuthType,
   BatchExecEvent,
   Host,
   HostHealthCheck,
@@ -97,6 +98,8 @@ async function listHosts(): Promise<ToolExecutionResult> {
           port: h.port,
           username: h.username || undefined,
           group: h.groupId ? groupNames.get(h.groupId) : undefined,
+          identityId: h.identityId ?? undefined,
+          jumpHostId: h.jumpHostId ?? undefined,
           notes: notes ? notes.slice(0, 200) : undefined,
         };
       }),
@@ -277,6 +280,9 @@ function inputFromArgs(args: Record<string, unknown>, base?: Host): HostInput {
   const username = nullableStr(args, "username");
   const notes = nullableStr(args, "notes");
   const password = nullableStr(args, "password");
+  const keyId = nullableStr(args, "keyId");
+  const jumpHostId = nullableStr(args, "jumpHostId");
+  const startupCommand = nullableStr(args, "startupCommand");
   return {
     label: optionalStr(args, "label") ?? base?.label ?? "",
     address: optionalStr(args, "address") ?? base?.address ?? "",
@@ -285,13 +291,19 @@ function inputFromArgs(args: Record<string, unknown>, base?: Host): HostInput {
     identityId:
       identityId === undefined ? (base?.identityId ?? null) : identityId,
     username: username === undefined ? (base?.username ?? null) : username,
-    authType: base?.authType ?? null,
-    keyId: base?.keyId ?? null,
+    authType:
+      (optionalStr(args, "authType") as AuthType | undefined) ??
+      base?.authType ??
+      null,
+    keyId: keyId === undefined ? (base?.keyId ?? null) : keyId,
     osHint: base?.osHint ?? null,
     requiresApproval: base?.requiresApproval ?? false,
     notes: notes === undefined ? (base?.notes ?? null) : notes,
-    jumpHostId: base?.jumpHostId ?? null,
-    startupCommand: base?.startupCommand ?? null,
+    jumpHostId: jumpHostId === undefined ? (base?.jumpHostId ?? null) : jumpHostId,
+    startupCommand:
+      startupCommand === undefined
+        ? (base?.startupCommand ?? null)
+        : startupCommand,
     password:
       password === undefined ? undefined : password === null ? "" : password,
   };
@@ -398,6 +410,26 @@ const HOST_FIELDS = {
     type: ["string", "null"],
     description:
       "Saved identity id (from list_identities) to authenticate as. Set null to clear it.",
+  },
+  authType: {
+    type: "string",
+    enum: ["password", "key", "agent"],
+    description: "Authentication method when not using an identity.",
+  },
+  keyId: {
+    type: ["string", "null"],
+    description:
+      "SSH key id (from list_ssh_keys) when authType is key. Set null to clear it.",
+  },
+  jumpHostId: {
+    type: ["string", "null"],
+    description:
+      "Saved host id (from list_hosts) to use as a jump host. Set null to clear it.",
+  },
+  startupCommand: {
+    type: ["string", "null"],
+    description:
+      "Command sent automatically after connecting. Set null to clear it.",
   },
   groupId: {
     type: ["string", "null"],

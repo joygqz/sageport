@@ -119,6 +119,8 @@ describe("transfer_file", () => {
       expect.any(String),
       { connectionId: null, path: "/tmp/file.txt" },
       { connectionId: "conn-1", path: "/uploads" },
+      undefined,
+      false,
     );
     expect(mocks.onTransfer.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.transfer.mock.invocationCallOrder[0],
@@ -158,6 +160,8 @@ describe("transfer_file", () => {
       expect.any(String),
       { connectionId: "conn-a", path: "/src/app" },
       { connectionId: "conn-b", path: "/backup" },
+      undefined,
+      false,
     );
   });
 

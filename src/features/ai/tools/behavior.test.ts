@@ -4,7 +4,8 @@ const {
   snippetsList,
   snippetsCreate,
   forwardsList,
-  forwardsActive,
+  forwardsRuntime,
+  forwardsStart,
   hostsRun,
   hostsList,
   groupsCreate,
@@ -13,7 +14,8 @@ const {
   snippetsList: vi.fn(),
   snippetsCreate: vi.fn(),
   forwardsList: vi.fn(),
-  forwardsActive: vi.fn(),
+  forwardsRuntime: vi.fn(),
+  forwardsStart: vi.fn(),
   hostsRun: vi.fn(),
   hostsList: vi.fn(),
   groupsCreate: vi.fn(),
@@ -23,7 +25,11 @@ const {
 vi.mock("@/lib/ipc", () => ({
   ipc: {
     snippets: { list: snippetsList, create: snippetsCreate },
-    forwards: { list: forwardsList, active: forwardsActive },
+    forwards: {
+      list: forwardsList,
+      runtime: forwardsRuntime,
+      start: forwardsStart,
+    },
     hosts: { runCommand: hostsRun, list: hostsList },
     groups: { create: groupsCreate },
     keys: { list: keysList },
@@ -129,7 +135,7 @@ describe("SFTP target preparation", () => {
 });
 
 describe("list_forwards", () => {
-  it("merges the active set into each forward", async () => {
+  it("merges runtime status into each forward", async () => {
     forwardsList.mockResolvedValue([
       {
         id: "f1",
@@ -152,17 +158,67 @@ describe("list_forwards", () => {
         targetPort: null,
       },
     ]);
-    forwardsActive.mockResolvedValue(["f1"]);
+    forwardsRuntime.mockResolvedValue([
+      {
+        forwardId: "f1",
+        status: "error",
+        message: "bind failed",
+        generation: 1,
+        sequence: 2,
+        publicBindRestricted: true,
+      },
+    ]);
 
     const result = await getTool("list_forwards")!.execute!({}, {});
     const parsed = JSON.parse(result.content);
     expect(parsed[0]).toMatchObject({
       id: "f1",
-      active: true,
+      status: "error",
+      error: "bind failed",
+      gatewayPortsRestricted: true,
       target: "10.0.0.1:80",
     });
-    expect(parsed[1]).toMatchObject({ id: "f2", active: false });
+    expect(parsed[1]).toMatchObject({ id: "f2", status: "stopped" });
     expect(parsed[1].target).toBeUndefined();
+    expect(parsed[1].error).toBeUndefined();
+    expect(parsed[1].gatewayPortsRestricted).toBeUndefined();
+  });
+});
+
+describe("start_forward", () => {
+  it("waits for the runtime state and surfaces the GatewayPorts restriction", async () => {
+    forwardsStart.mockResolvedValue(undefined);
+    forwardsRuntime.mockResolvedValue([
+      {
+        forwardId: "f1",
+        status: "active",
+        generation: 1,
+        sequence: 1,
+        publicBindRestricted: true,
+      },
+    ]);
+
+    const result = await getTool("start_forward")!.execute!({ id: "f1" }, {});
+    expect(result.isError).toBe(false);
+    expect(result.content).toContain("GatewayPorts");
+  });
+
+  it("reports the runtime error message when the forward fails", async () => {
+    forwardsStart.mockResolvedValue(undefined);
+    forwardsRuntime.mockResolvedValue([
+      {
+        forwardId: "f1",
+        status: "error",
+        message: "address already in use",
+        generation: 1,
+        sequence: 1,
+        publicBindRestricted: false,
+      },
+    ]);
+
+    const result = await getTool("start_forward")!.execute!({ id: "f1" }, {});
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("address already in use");
   });
 });
 

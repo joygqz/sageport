@@ -8,12 +8,15 @@ import {
 } from "lucide-react";
 
 import { ipc } from "@/lib/ipc";
+import { errorMessage } from "@/lib/toast";
 import type {
   ForwardKind,
+  ForwardStatusEvent,
   PortForward,
   PortForwardInput,
 } from "@/types/models";
 import { invalidateForwards } from "./cache";
+import { sleep } from "./terminal";
 import {
   bool,
   num,
@@ -24,6 +27,7 @@ import {
   toolFailure,
   toolSuccess,
   type AiTool,
+  type ToolExecutionContext,
   type ToolExecutionResult,
 } from "./types";
 
@@ -32,27 +36,42 @@ async function findForward(id: string): Promise<PortForward | undefined> {
   return forwards.find((f) => f.id === id);
 }
 
+const GATEWAY_PORTS_NOTE =
+  "Note: the SSH server restricts public binds (GatewayPorts), so the remote listener is only reachable via loopback on the server.";
+
+async function forwardRuntime(
+  id: string,
+): Promise<ForwardStatusEvent | undefined> {
+  const runtime = await ipc.forwards.runtime();
+  return runtime.find((event) => event.forwardId === id);
+}
+
 async function listForwards(): Promise<ToolExecutionResult> {
-  const [forwards, active] = await Promise.all([
+  const [forwards, runtime] = await Promise.all([
     ipc.forwards.list(),
-    ipc.forwards.active(),
+    ipc.forwards.runtime(),
   ]);
   if (forwards.length === 0) return toolSuccess("No port forwards saved yet.");
-  const activeSet = new Set(active);
+  const runtimeById = new Map(runtime.map((e) => [e.forwardId, e]));
   return toolSuccess(
     JSON.stringify(
-      forwards.map((f) => ({
-        id: f.id,
-        label: f.label,
-        hostId: f.hostId,
-        kind: f.kind,
-        bind: `${f.bindHost}:${f.bindPort}`,
-        target:
-          f.kind !== "dynamic" && f.targetHost
-            ? `${f.targetHost}:${f.targetPort}`
-            : undefined,
-        active: activeSet.has(f.id),
-      })),
+      forwards.map((f) => {
+        const state = runtimeById.get(f.id);
+        return {
+          id: f.id,
+          label: f.label,
+          hostId: f.hostId,
+          kind: f.kind,
+          bind: `${f.bindHost}:${f.bindPort}`,
+          target:
+            f.kind !== "dynamic" && f.targetHost
+              ? `${f.targetHost}:${f.targetPort}`
+              : undefined,
+          status: state?.status ?? "stopped",
+          error: state?.status === "error" ? state.message : undefined,
+          gatewayPortsRestricted: state?.publicBindRestricted || undefined,
+        };
+      }),
     ),
   );
 }
@@ -118,15 +137,45 @@ async function updateForward(
 
 async function startForward(
   args: Record<string, unknown>,
+  context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const id = str(args, "id");
   if (!id) return toolFailure("Error: no forward id given.");
   try {
     await ipc.forwards.start(id);
-  } catch {
-    return toolFailure(`Error: could not start forward "${id}".`);
+  } catch (err) {
+    return toolFailure(
+      `Error: could not start forward "${id}": ${errorMessage(err)}`,
+    );
   }
-  return toolSuccess(`Started forward ${id}.`);
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if (context.isCancelled?.()) {
+      return toolFailure(
+        "Error: the assistant run was stopped; the forward may still be starting.",
+      );
+    }
+    const state = await forwardRuntime(id);
+    if (state?.status === "active") {
+      return toolSuccess(
+        state.publicBindRestricted
+          ? `Started forward ${id}. ${GATEWAY_PORTS_NOTE}`
+          : `Started forward ${id}.`,
+      );
+    }
+    if (state?.status === "error") {
+      return toolFailure(
+        `Error: forward ${id} failed to start${state.message ? `: ${state.message}` : "."}`,
+      );
+    }
+    if (state?.status === "stopped") {
+      return toolFailure(`Error: forward ${id} stopped before becoming active.`);
+    }
+    await sleep(250);
+  }
+  return toolSuccess(
+    `Forward ${id} is still starting. Check list_forwards for its status.`,
+  );
 }
 
 async function stopForward(
@@ -136,8 +185,10 @@ async function stopForward(
   if (!id) return toolFailure("Error: no forward id given.");
   try {
     await ipc.forwards.stop(id);
-  } catch {
-    return toolFailure(`Error: could not stop forward "${id}".`);
+  } catch (err) {
+    return toolFailure(
+      `Error: could not stop forward "${id}": ${errorMessage(err)}`,
+    );
   }
   return toolSuccess(`Stopped forward ${id}.`);
 }
@@ -149,8 +200,10 @@ async function deleteForward(
   if (!id) return toolFailure("Error: no forward id given.");
   try {
     await ipc.forwards.remove(id);
-  } catch {
-    return toolFailure(`Error: could not delete forward "${id}".`);
+  } catch (err) {
+    return toolFailure(
+      `Error: could not delete forward "${id}": ${errorMessage(err)}`,
+    );
   }
   invalidateForwards();
   return toolSuccess(`Deleted forward ${id}.`);
@@ -197,7 +250,7 @@ export const forwardTools: AiTool[] = [
     spec: {
       name: "list_forwards",
       description:
-        "List saved port forwards with their bind/target and whether each is currently active.",
+        "List saved port forwards with their bind/target and runtime status (active, starting, error, stopped), including any error message. gatewayPortsRestricted means the SSH server limits remote binds to loopback.",
       parameters: {
         type: "object",
         properties: {},
@@ -245,13 +298,14 @@ export const forwardTools: AiTool[] = [
   {
     spec: {
       name: "start_forward",
-      description: "Start a saved port forward by id.",
+      description:
+        "Start a saved port forward by id and wait briefly until it is active or fails.",
       parameters: byId,
     },
     icon: Play,
     labelKey: "ai.tool.startForward",
     requiresApproval: true,
-    execute: async (args) => startForward(args),
+    execute: startForward,
   },
   {
     spec: {

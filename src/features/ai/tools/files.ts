@@ -338,6 +338,8 @@ async function transferFile(
       transferId,
       resolvedSource.endpoint,
       resolvedDestination.endpoint,
+      undefined,
+      bool(args, "overwrite"),
     );
     const event = await waiter.completion;
     if (event.status === "done") {
@@ -477,10 +479,15 @@ export const fileTools: AiTool[] = [
     spec: {
       name: "transfer_file",
       description:
-        "Transfer a file or directory between the local computer and an SFTP host, or between two SFTP hosts. The destination path must be an existing directory. Use absolute paths for local endpoints. Directories are automatically compressed in transit when supported.",
+        "Transfer a file or directory between the local computer and an SFTP host, or between two SFTP hosts. The destination path must be an existing directory; it fails if the destination already contains an entry with the same name unless overwrite is true. Use absolute paths for local endpoints. Directories are automatically compressed in transit when supported.",
       parameters: {
         type: "object",
         properties: {
+          overwrite: {
+            type: "boolean",
+            description:
+              "Replace the destination entry if it already exists. Defaults to false.",
+          },
           source: {
             type: "object",
             description: "File or directory to transfer.",
