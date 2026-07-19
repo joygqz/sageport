@@ -24,8 +24,6 @@ const PASSWORD_PROMPT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_KEYBOARD_INTERACTIVE_QUESTIONS: usize = 16;
 const MAX_PROMPT_CHARS: usize = 1024;
 const MAX_INSTRUCTIONS_CHARS: usize = 4096;
-// Detect a vanished network in roughly 30 seconds instead of leaving the UI
-// looking connected for up to a minute and a half.
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
 pub struct SshConnection {
@@ -55,7 +53,7 @@ fn client_config() -> Arc<Config> {
     Arc::new(Config {
         inactivity_timeout: None,
         keepalive_interval: Some(KEEPALIVE_INTERVAL),
-        keepalive_max: 2,
+        keepalive_max: 0,
         ..Default::default()
     })
 }
@@ -515,8 +513,16 @@ async fn authenticate(
 
 #[cfg(test)]
 mod tests {
-    use super::with_host_key_aware_timeout_for;
+    use super::{client_config, with_host_key_aware_timeout_for, KEEPALIVE_INTERVAL};
     use std::time::Duration;
+
+    #[test]
+    fn keepalives_do_not_close_compatible_servers_that_ignore_replies() {
+        let config = client_config();
+
+        assert_eq!(config.keepalive_interval, Some(KEEPALIVE_INTERVAL));
+        assert_eq!(config.keepalive_max, 0);
+    }
 
     #[tokio::test]
     async fn handshake_timeout_pauses_while_a_host_key_prompt_is_open() {

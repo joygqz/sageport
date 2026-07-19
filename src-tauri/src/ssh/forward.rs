@@ -759,7 +759,7 @@ async fn run_remote_forward(
         tokio::select! {
             channel = forwarded_rx.recv(), if connections.len() < MAX_FORWARD_CONNECTIONS => {
                 let Some(channel) = channel else {
-                    break Some(AppError::Network("remote forwarding channel was closed".into()));
+                    break Some(AppError::Network("SSH connection for remote port forward was closed".into()));
                 };
                 let host = target_host.clone();
                 let mut child = shutdown.clone();
