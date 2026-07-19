@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::oneshot;
 
-use crate::crypto::EncryptedEnvelope;
 use crate::domain::now;
 use crate::error::{AppError, AppResult};
 use crate::repository::settings_repo;
@@ -22,6 +21,7 @@ const MAX_LABEL_BYTES: usize = 1024;
 const MAX_PREFIX_BYTES: usize = 4096;
 const MAX_PATH_BYTES: usize = 32 * 1024;
 const MAX_VERSION_ID_BYTES: usize = 4096;
+pub const EVENT_COMPLETED: &str = "sync://completed";
 
 #[derive(Serialize, Deserialize)]
 struct Connection {
@@ -64,6 +64,31 @@ async fn require_connection(state: &AppState) -> AppResult<Connection> {
 
 async fn save_connection(state: &AppState, conn: &Connection) -> AppResult<()> {
     settings_repo::set(&state.db, CONNECTION_KEY, &serde_json::to_string(conn)?).await
+}
+
+enum SnapshotMode {
+    Merge,
+    Replace,
+}
+
+async fn save_connection_with_snapshot(
+    app: &AppHandle,
+    state: &AppState,
+    conn: &Connection,
+    snapshot: &sync::VaultSnapshot,
+    mode: SnapshotMode,
+) -> AppResult<()> {
+    let connection = serde_json::to_string(conn)?;
+    let previous = state.forwards.active_specs();
+    let mut tx = state.db.begin().await?;
+    match mode {
+        SnapshotMode::Merge => sync::import_snapshot_in(&mut tx, snapshot).await?,
+        SnapshotMode::Replace => sync::restore_snapshot_in(&mut tx, snapshot).await?,
+    }
+    settings_repo::set_in(&mut tx, CONNECTION_KEY, &connection).await?;
+    tx.commit().await?;
+    forwards::reconcile_running_forwards(app, previous);
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -340,6 +365,7 @@ pub async fn sync_connect(
     let mut backend = sync::make_provider(config)?;
 
     let mut last_synced_at = None;
+    let mut remote_snapshot = None;
     let versions = backend.list_versions().await?;
     if !versions.is_empty() && force {
         backend.clear().await?;
@@ -347,8 +373,8 @@ pub async fn sync_connect(
         let envelope = backend.pull_version(&latest.id).await?;
         match sync::decrypt_snapshot(&envelope, &passphrase).await {
             Ok(snapshot) => {
-                import_snapshot(&app, &state, &snapshot).await?;
                 last_synced_at = Some(now());
+                remote_snapshot = Some(snapshot);
             }
             Err(AppError::Crypto(_)) => return Ok(ConnectOutcome::PassphraseMismatch),
             Err(error) => return Err(error),
@@ -356,25 +382,28 @@ pub async fn sync_connect(
     }
     let seen_version_ids = versions.into_iter().map(|version| version.id).collect();
 
-    save_connection(
-        &state,
-        &Connection {
-            config: backend.config(),
-            account,
-            passphrase,
-            last_synced_at,
-            pending_restore: false,
-            seen_version_ids,
-            seen_versions_initialized: true,
-        },
-    )
-    .await?;
+    let connection = Connection {
+        config: backend.config(),
+        account,
+        passphrase,
+        last_synced_at,
+        pending_restore: false,
+        seen_version_ids,
+        seen_versions_initialized: true,
+    };
+    if let Some(snapshot) = remote_snapshot.as_ref() {
+        save_connection_with_snapshot(&app, &state, &connection, snapshot, SnapshotMode::Merge)
+            .await?;
+    } else {
+        save_connection(&state, &connection).await?;
+    }
     if let Some(generation) = oauth_generation {
         let mut slot = state.sync_oauth.lock();
         if slot.generation == generation {
             slot.pending = None;
         }
     }
+    state.sync_runtime.lock().last_error = None;
 
     Ok(ConnectOutcome::Connected)
 }
@@ -389,6 +418,8 @@ pub async fn sync_disconnect(state: State<'_, AppState>) -> AppResult<()> {
     if let Some(cancel) = slot.cancel.take() {
         let _ = cancel.send(());
     }
+    drop(slot);
+    state.sync_runtime.lock().last_error = None;
     Ok(())
 }
 
@@ -403,11 +434,17 @@ async fn run_sync(app: &AppHandle, state: &AppState) -> AppResult<PushOutcome> {
         runtime.active_operations = runtime.active_operations.saturating_add(1);
     }
     let result = sync_push_inner(app, state).await;
+    let connected = load_connection(state).await.ok().flatten().is_some();
     {
         let mut runtime = state.sync_runtime.lock();
         runtime.active_operations = runtime.active_operations.saturating_sub(1);
-        runtime.last_error = result.as_ref().err().map(ToString::to_string);
+        runtime.last_error = if connected {
+            result.as_ref().err().map(ToString::to_string)
+        } else {
+            None
+        };
     }
+    let _ = app.emit(EVENT_COMPLETED, ());
     result
 }
 
@@ -567,17 +604,20 @@ pub async fn sync_restore_version(
             return Err(error);
         }
     };
-    if let Err(error) = restore_encrypted(&app, &state, &envelope, &conn.passphrase).await {
-        save_refreshed_config(&state, &mut conn, backend.config()).await;
-        return Err(error);
-    }
+    let snapshot = match sync::decrypt_snapshot(&envelope, &conn.passphrase).await {
+        Ok(value) => value,
+        Err(error) => {
+            save_refreshed_config(&state, &mut conn, backend.config()).await;
+            return Err(error);
+        }
+    };
 
     conn.config = backend.config();
     conn.pending_restore = !target_is_latest;
     conn.seen_version_ids = versions.into_iter().map(|version| version.id).collect();
     conn.seen_versions_initialized = true;
     conn.last_synced_at = Some(now());
-    save_connection(&state, &conn).await?;
+    save_connection_with_snapshot(&app, &state, &conn, &snapshot, SnapshotMode::Replace).await?;
 
     Ok(RestoreOutcome {
         remote_synced: target_is_latest,
@@ -615,7 +655,7 @@ pub async fn sync_file_import(
         .await
         .map_err(|e| AppError::Other(format!("backup file read task failed: {e}")))??;
     let previous = state.forwards.active_specs();
-    sync::import_encrypted(&state.db, &envelope, &passphrase).await?;
+    sync::restore_encrypted(&state.db, &envelope, &passphrase).await?;
     forwards::reconcile_running_forwards(&app, previous);
     Ok(())
 }
@@ -627,18 +667,6 @@ async fn import_snapshot(
 ) -> AppResult<()> {
     let previous = state.forwards.active_specs();
     sync::import_snapshot(&state.db, snapshot).await?;
-    forwards::reconcile_running_forwards(app, previous);
-    Ok(())
-}
-
-async fn restore_encrypted(
-    app: &AppHandle,
-    state: &AppState,
-    envelope: &EncryptedEnvelope,
-    passphrase: &str,
-) -> AppResult<()> {
-    let previous = state.forwards.active_specs();
-    sync::restore_encrypted(&state.db, envelope, passphrase).await?;
     forwards::reconcile_running_forwards(app, previous);
     Ok(())
 }

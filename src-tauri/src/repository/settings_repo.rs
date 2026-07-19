@@ -1,4 +1,4 @@
-use sqlx::{Executor, Sqlite, SqlitePool};
+use sqlx::{Executor, Sqlite, SqliteConnection, SqlitePool};
 
 use crate::domain::now;
 use crate::error::AppResult;
@@ -13,6 +13,11 @@ pub async fn get(pool: &SqlitePool, key: &str) -> AppResult<Option<String>> {
 }
 
 pub async fn set(pool: &SqlitePool, key: &str, value: &str) -> AppResult<()> {
+    let mut connection = pool.acquire().await?;
+    set_in(&mut connection, key, value).await
+}
+
+pub async fn set_in(connection: &mut SqliteConnection, key: &str, value: &str) -> AppResult<()> {
     let ts = now();
     let value = secrets::seal_setting(key, value)?;
     sqlx::query(
@@ -22,7 +27,7 @@ pub async fn set(pool: &SqlitePool, key: &str, value: &str) -> AppResult<()> {
     .bind(key)
     .bind(&value)
     .bind(&ts)
-    .execute(pool)
+    .execute(connection)
     .await?;
     Ok(())
 }

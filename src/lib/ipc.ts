@@ -318,6 +318,8 @@ export const ipc = {
       invoke<void>("sync_file_export", { path, passphrase }),
     fileImport: (path: string, passphrase: string) =>
       invoke<void>("sync_file_import", { path, passphrase }),
+    onCompleted: (handler: () => void): Promise<UnlistenFn> =>
+      listen("sync://completed", handler),
   },
   ai: {
     getConfig: () => invoke<AiConfig>("ai_get_config"),

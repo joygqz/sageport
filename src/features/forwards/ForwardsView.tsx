@@ -201,6 +201,7 @@ export function ForwardsView() {
             variant="ghost"
             className={PANEL_HEADER_ACTION_CLASS}
             onClick={() => setForm({ open: true, forward: null })}
+            aria-label={t("forwards.new")}
           >
             <Plus className="size-4" />
           </Button>
@@ -311,6 +312,9 @@ export function ForwardsView() {
                         type="button"
                         onClick={() => void toggle(forward)}
                         className={PANEL_LIST_ACTION_CLASS}
+                        aria-label={
+                          active ? t("forwards.stop") : t("forwards.start")
+                        }
                       >
                         {active ? (
                           <Square className="size-3.5" />

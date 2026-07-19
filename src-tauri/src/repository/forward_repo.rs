@@ -7,31 +7,48 @@ const MAX_ID_BYTES: usize = 128;
 const MAX_LABEL_BYTES: usize = 255;
 const MAX_HOST_BYTES: usize = 255;
 
-fn normalize(mut input: PortForwardInput) -> AppResult<PortForwardInput> {
+fn normalize_host(value: String) -> String {
+    let value = value.trim();
+    if value.starts_with('[')
+        && value.ends_with(']')
+        && value[1..value.len() - 1]
+            .parse::<std::net::Ipv6Addr>()
+            .is_ok()
+    {
+        value[1..value.len() - 1].to_string()
+    } else {
+        value.to_string()
+    }
+}
+
+pub(crate) fn normalize(mut input: PortForwardInput) -> AppResult<PortForwardInput> {
     input.host_id = input.host_id.trim().to_string();
     input.label = input.label.trim().to_string();
-    input.bind_host = input.bind_host.trim().to_string();
+    input.bind_host = normalize_host(input.bind_host);
     if input.bind_host.is_empty() {
         input.bind_host = "127.0.0.1".to_string();
     }
     input.target_host = input
         .target_host
         .take()
-        .map(|v| v.trim().to_string())
+        .map(normalize_host)
         .filter(|v| !v.is_empty());
 
     if input.label.is_empty() {
         return Err(AppError::Invalid("forward label is required".into()));
     }
-    if input.host_id.is_empty() || input.host_id.len() > MAX_ID_BYTES {
+    if input.host_id.is_empty()
+        || input.host_id.len() > MAX_ID_BYTES
+        || input.host_id.chars().any(char::is_control)
+    {
         return Err(AppError::Invalid("invalid forward host id".into()));
     }
-    if input.label.len() > MAX_LABEL_BYTES {
-        return Err(AppError::Invalid(format!(
-            "forward label exceeds {MAX_LABEL_BYTES} bytes"
-        )));
+    if input.label.len() > MAX_LABEL_BYTES || input.label.chars().any(char::is_control) {
+        return Err(AppError::Invalid(
+            "invalid or oversized forward label".into(),
+        ));
     }
-    if input.bind_host.len() > MAX_HOST_BYTES || input.bind_host.contains('\0') {
+    if input.bind_host.len() > MAX_HOST_BYTES || input.bind_host.chars().any(char::is_control) {
         return Err(AppError::Invalid("invalid forward bind address".into()));
     }
     if !(1..=65535).contains(&input.bind_port) {
@@ -48,11 +65,9 @@ fn normalize(mut input: PortForwardInput) -> AppResult<PortForwardInput> {
                     "local and remote forwards need a target host and port".into(),
                 ));
             }
-            if input
-                .target_host
-                .as_ref()
-                .is_some_and(|host| host.len() > MAX_HOST_BYTES || host.contains('\0'))
-            {
+            if input.target_host.as_ref().is_some_and(|host| {
+                host.len() > MAX_HOST_BYTES || host.chars().any(char::is_control)
+            }) {
                 return Err(AppError::Invalid("invalid forward target host".into()));
             }
         }
@@ -267,8 +282,23 @@ mod tests {
         assert_eq!(normalized.bind_host, "127.0.0.1");
         assert_eq!(normalized.target_host.as_deref(), Some("db.internal"));
 
+        let mut ipv6 = input("host".into(), forward_kind::LOCAL);
+        ipv6.bind_host = " [::1] ".into();
+        ipv6.target_host = Some("[2001:db8::1]".into());
+        let ipv6 = normalize(ipv6).unwrap();
+        assert_eq!(ipv6.bind_host, "::1");
+        assert_eq!(ipv6.target_host.as_deref(), Some("2001:db8::1"));
+
         let mut invalid = input("host".into(), forward_kind::LOCAL);
         invalid.bind_port = 0;
+        assert!(matches!(normalize(invalid), Err(AppError::Invalid(_))));
+
+        let mut invalid = input("host".into(), forward_kind::LOCAL);
+        invalid.target_host = Some("db.internal\nspoofed".into());
+        assert!(matches!(normalize(invalid), Err(AppError::Invalid(_))));
+
+        let mut invalid = input("host".into(), forward_kind::LOCAL);
+        invalid.label = "Database\nspoofed".into();
         assert!(matches!(normalize(invalid), Err(AppError::Invalid(_))));
 
         let mut dynamic = input("host".into(), forward_kind::DYNAMIC);

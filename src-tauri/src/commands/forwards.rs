@@ -15,29 +15,30 @@ fn valid_port(port: i64) -> AppResult<u16> {
 }
 
 async fn build_spec(state: &AppState, forward: &PortForward) -> AppResult<ForwardSpec> {
-    if !matches!(
-        forward.kind.as_str(),
-        forward_kind::LOCAL | forward_kind::REMOTE | forward_kind::DYNAMIC
-    ) {
-        return Err(AppError::Invalid(format!(
-            "unknown forward kind: {}",
-            forward.kind
-        )));
-    }
-    let host = host_repo::get(&state.db, &forward.host_id).await?;
+    let input = forward_repo::normalize(PortForwardInput {
+        host_id: forward.host_id.clone(),
+        label: forward.label.clone(),
+        kind: forward.kind.clone(),
+        bind_host: forward.bind_host.clone(),
+        bind_port: forward.bind_port,
+        target_host: forward.target_host.clone(),
+        target_port: forward.target_port,
+        auto_start: forward.auto_start != 0,
+    })?;
+    let host = host_repo::get(&state.db, &input.host_id).await?;
     let hops = super::ssh::build_hops(state, &host).await?;
     let (target_host, target_port) = if matches!(
-        forward.kind.as_str(),
+        input.kind.as_str(),
         forward_kind::LOCAL | forward_kind::REMOTE
     ) {
-        let target_host = forward
+        let target_host = input
             .target_host
             .as_deref()
             .map(str::trim)
             .filter(|host| !host.is_empty())
             .ok_or_else(|| AppError::Invalid("forward target host is required".into()))?;
         let target_port = valid_port(
-            forward
+            input
                 .target_port
                 .ok_or_else(|| AppError::Invalid("forward target port is required".into()))?,
         )?;
@@ -47,9 +48,9 @@ async fn build_spec(state: &AppState, forward: &PortForward) -> AppResult<Forwar
     };
     Ok(ForwardSpec {
         id: forward.id.clone(),
-        kind: forward.kind.clone(),
-        bind_host: forward.bind_host.clone(),
-        bind_port: valid_port(forward.bind_port)?,
+        kind: input.kind,
+        bind_host: input.bind_host,
+        bind_port: valid_port(input.bind_port)?,
         target_host,
         target_port,
         hops,

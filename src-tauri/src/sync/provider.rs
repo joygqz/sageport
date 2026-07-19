@@ -239,7 +239,7 @@ pub(crate) fn request_error(context: &str, error: reqwest::Error) -> AppError {
     if error.is_timeout() {
         AppError::Timeout(format!("{context} timed out"))
     } else {
-        AppError::Network(format!("{context} failed: {error}"))
+        AppError::Network(format!("{context} failed: {}", error.without_url()))
     }
 }
 
@@ -265,7 +265,7 @@ pub(crate) async fn read_response_limited(
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|e| AppError::Other(format!("failed to read {context}: {e}")))?
+        .map_err(|error| request_error(&format!("reading {context}"), error))?
     {
         if bytes.len().saturating_add(chunk.len()) > limit {
             return Err(AppError::Invalid(format!(

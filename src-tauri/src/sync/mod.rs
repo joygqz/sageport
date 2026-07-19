@@ -18,9 +18,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Executor, Sqlite, SqlitePool};
 
 use crate::crypto::{self, EncryptedEnvelope};
-use crate::domain::{now, Group, Host, Identity, PortForward, SftpBookmark, Snippet, SshKey};
+use crate::domain::{
+    now, Group, Host, Identity, PortForward, PortForwardInput, SftpBookmark, Snippet, SshKey,
+};
 use crate::error::{AppError, AppResult};
-use crate::repository::settings_repo;
+use crate::repository::{forward_repo, settings_repo};
 use crate::secrets;
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["security.", "sync.", "update."];
@@ -156,38 +158,46 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
 }
 
 pub async fn import_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
-    validate_snapshot(snapshot)?;
     let mut tx = pool.begin().await?;
+    import_snapshot_in(&mut tx, snapshot).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+pub(crate) async fn import_snapshot_in(
+    tx: &mut sqlx::Transaction<'_, Sqlite>,
+    snapshot: &VaultSnapshot,
+) -> AppResult<()> {
+    validate_snapshot(snapshot)?;
     sqlx::query("PRAGMA defer_foreign_keys = ON")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
 
     for g in &snapshot.groups {
-        merge_group(&mut *tx, g).await?;
+        merge_group(&mut **tx, g).await?;
     }
     for i in &snapshot.identities {
-        merge_identity(&mut *tx, i).await?;
+        merge_identity(&mut **tx, i).await?;
     }
     for k in &snapshot.keys {
-        merge_key(&mut *tx, k).await?;
+        merge_key(&mut **tx, k).await?;
     }
     for h in &snapshot.hosts {
-        merge_host(&mut *tx, h).await?;
+        merge_host(&mut **tx, h).await?;
     }
     for s in &snapshot.snippets {
-        merge_snippet(&mut *tx, s).await?;
+        merge_snippet(&mut **tx, s).await?;
     }
     for f in &snapshot.port_forwards {
-        merge_forward(&mut *tx, f).await?;
+        merge_forward(&mut **tx, f).await?;
     }
     for b in &snapshot.sftp_bookmarks {
-        merge_bookmark(&mut *tx, b).await?;
+        merge_bookmark(&mut **tx, b).await?;
     }
     for entry in &snapshot.settings {
-        merge_setting(&mut *tx, entry).await?;
+        merge_setting(&mut **tx, entry).await?;
     }
-    repair_reference_cycles(&mut tx).await?;
-    tx.commit().await?;
+    repair_reference_cycles(tx).await?;
     Ok(())
 }
 
@@ -234,67 +244,65 @@ pub async fn decrypt_snapshot(
     Ok(snapshot)
 }
 
-pub async fn import_encrypted(
-    pool: &SqlitePool,
-    envelope: &EncryptedEnvelope,
-    passphrase: &str,
-) -> AppResult<VaultSnapshot> {
-    let snapshot = decrypt_snapshot(envelope, passphrase).await?;
-    import_snapshot(pool, &snapshot).await?;
-    Ok(snapshot)
+pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    restore_snapshot_in(&mut tx, snapshot).await?;
+    tx.commit().await?;
+    Ok(())
 }
 
-pub async fn restore_snapshot(pool: &SqlitePool, snapshot: &VaultSnapshot) -> AppResult<()> {
+pub(crate) async fn restore_snapshot_in(
+    tx: &mut sqlx::Transaction<'_, Sqlite>,
+    snapshot: &VaultSnapshot,
+) -> AppResult<()> {
     validate_snapshot(snapshot)?;
-    let mut tx = pool.begin().await?;
     sqlx::query("PRAGMA defer_foreign_keys = ON")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
 
     sqlx::query("DELETE FROM sftp_bookmarks")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
     sqlx::query("DELETE FROM port_forwards")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
-    sqlx::query("DELETE FROM hosts").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM hosts").execute(&mut **tx).await?;
     sqlx::query("DELETE FROM identities")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
-    sqlx::query("DELETE FROM keys").execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM groups").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM keys").execute(&mut **tx).await?;
+    sqlx::query("DELETE FROM groups").execute(&mut **tx).await?;
     sqlx::query("DELETE FROM snippets")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
 
-    delete_settings_excluding_prefixes(&mut *tx, EXCLUDED_SETTINGS_PREFIXES).await?;
+    delete_settings_excluding_prefixes(&mut **tx, EXCLUDED_SETTINGS_PREFIXES).await?;
 
     for g in &snapshot.groups {
-        merge_group(&mut *tx, g).await?;
+        merge_group(&mut **tx, g).await?;
     }
     for k in &snapshot.keys {
-        merge_key(&mut *tx, k).await?;
+        merge_key(&mut **tx, k).await?;
     }
     for i in &snapshot.identities {
-        merge_identity(&mut *tx, i).await?;
+        merge_identity(&mut **tx, i).await?;
     }
     for h in &snapshot.hosts {
-        merge_host(&mut *tx, h).await?;
+        merge_host(&mut **tx, h).await?;
     }
     for s in &snapshot.snippets {
-        merge_snippet(&mut *tx, s).await?;
+        merge_snippet(&mut **tx, s).await?;
     }
     for f in &snapshot.port_forwards {
-        merge_forward(&mut *tx, f).await?;
+        merge_forward(&mut **tx, f).await?;
     }
     for b in &snapshot.sftp_bookmarks {
-        merge_bookmark(&mut *tx, b).await?;
+        merge_bookmark(&mut **tx, b).await?;
     }
     for entry in &snapshot.settings {
-        merge_setting(&mut *tx, entry).await?;
+        merge_setting(&mut **tx, entry).await?;
     }
-    repair_reference_cycles(&mut tx).await?;
-    tx.commit().await?;
+    repair_reference_cycles(tx).await?;
     Ok(())
 }
 
@@ -429,8 +437,29 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
     records!(&snapshot.keys, "key");
     records!(&snapshot.snippets, "snippet");
     records!(&snapshot.port_forwards, "port forward");
+    for forward in &snapshot.port_forwards {
+        normalized_forward(forward)?;
+    }
     records!(&snapshot.sftp_bookmarks, "SFTP bookmark");
     Ok(())
+}
+
+fn normalized_forward(forward: &PortForward) -> AppResult<PortForwardInput> {
+    if !matches!(forward.auto_start, 0 | 1) {
+        return Err(AppError::Invalid(
+            "invalid port forward auto-start value".into(),
+        ));
+    }
+    forward_repo::normalize(PortForwardInput {
+        host_id: forward.host_id.clone(),
+        label: forward.label.clone(),
+        kind: forward.kind.clone(),
+        bind_host: forward.bind_host.clone(),
+        bind_port: forward.bind_port,
+        target_host: forward.target_host.clone(),
+        target_port: forward.target_port,
+        auto_start: forward.auto_start == 1,
+    })
 }
 
 fn validate_record(
@@ -673,6 +702,7 @@ async fn merge_forward<'e, E>(executor: E, f: &PortForward) -> AppResult<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
+    let input = normalized_forward(f)?;
     sqlx::query(
         "INSERT INTO port_forwards
            (id, host_id, label, kind, bind_host, bind_port, target_host, target_port,
@@ -686,9 +716,9 @@ where
            updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, revision = excluded.revision
          WHERE excluded.updated_at > port_forwards.updated_at",
     )
-    .bind(&f.id).bind(&f.host_id).bind(&f.label).bind(&f.kind)
-    .bind(&f.bind_host).bind(f.bind_port).bind(&f.target_host).bind(f.target_port)
-    .bind(f.auto_start).bind(&f.created_at).bind(&f.updated_at).bind(&f.deleted_at).bind(f.revision)
+    .bind(&f.id).bind(&input.host_id).bind(&input.label).bind(&input.kind)
+    .bind(&input.bind_host).bind(input.bind_port).bind(&input.target_host).bind(input.target_port)
+    .bind(input.auto_start as i64).bind(&f.created_at).bind(&f.updated_at).bind(&f.deleted_at).bind(f.revision)
     .execute(executor).await?;
     Ok(())
 }
@@ -981,6 +1011,31 @@ mod tests {
         assert_eq!(count, 0);
     }
 
+    #[test]
+    fn rejects_invalid_port_forward_records_before_import() {
+        let mut snapshot = empty_snapshot(Vec::new());
+        snapshot.port_forwards.push(PortForward {
+            id: "forward-1".into(),
+            host_id: "host-1".into(),
+            label: "Database".into(),
+            kind: "local".into(),
+            bind_host: "127.0.0.1".into(),
+            bind_port: 15432,
+            target_host: Some("db.internal\nspoofed".into()),
+            target_port: Some(5432),
+            auto_start: 2,
+            created_at: BACKUP_TIMESTAMP.into(),
+            updated_at: BACKUP_TIMESTAMP.into(),
+            deleted_at: None,
+            revision: 1,
+        });
+
+        assert!(matches!(
+            validate_snapshot(&snapshot),
+            Err(AppError::Invalid(_))
+        ));
+    }
+
     #[tokio::test]
     async fn conflict_merge_breaks_reference_cycles_deterministically() {
         let pool = test_pool().await;
@@ -1050,5 +1105,70 @@ mod tests {
             );
         }
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn encrypted_restore_replaces_records_instead_of_merging_them() {
+        let pool = test_pool().await;
+        let snapshot = empty_snapshot(Vec::new());
+        let envelope = encrypt_snapshot(&snapshot, "passphrase").await.unwrap();
+        sqlx::query(
+            "INSERT INTO groups (id, name, sort_order, created_at, updated_at, revision) \
+             VALUES ('local-only', 'Local only', 0, ?, ?, 1)",
+        )
+        .bind(BACKUP_TIMESTAMP)
+        .bind(BACKUP_TIMESTAMP)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        restore_encrypted(&pool, &envelope, "passphrase")
+            .await
+            .unwrap();
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM groups")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn snapshot_and_connection_changes_can_roll_back_together() {
+        let pool = test_pool().await;
+        sqlx::query(
+            "INSERT INTO groups (id, name, sort_order, created_at, updated_at, revision) \
+             VALUES ('local-only', 'Local only', 0, ?, ?, 1)",
+        )
+        .bind(BACKUP_TIMESTAMP)
+        .bind(BACKUP_TIMESTAMP)
+        .execute(&pool)
+        .await
+        .unwrap();
+        settings_repo::set(&pool, "sync.connection", "old")
+            .await
+            .unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        restore_snapshot_in(&mut tx, &empty_snapshot(Vec::new()))
+            .await
+            .unwrap();
+        settings_repo::set_in(&mut tx, "sync.connection", "new")
+            .await
+            .unwrap();
+        tx.rollback().await.unwrap();
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM groups")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(
+            settings_repo::get(&pool, "sync.connection")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("old")
+        );
     }
 }

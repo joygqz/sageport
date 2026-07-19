@@ -10,12 +10,26 @@ export function formatForwardEndpoint(host: string, port: number): string {
 
 export function isLoopbackBindHost(host: string): boolean {
   const normalized = host.trim().toLowerCase();
-  return (
+  if (
     normalized === "localhost" ||
     normalized === "::1" ||
-    normalized === "[::1]" ||
-    normalized.startsWith("127.")
+    normalized === "[::1]"
+  ) {
+    return true;
+  }
+  const octets = normalized.split(".");
+  return (
+    octets.length === 4 &&
+    octets[0] === "127" &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)
   );
+}
+
+function normalizeForwardHost(host: string): string {
+  const value = host.trim();
+  return value.startsWith("[") && value.endsWith("]") && value.includes(":")
+    ? value.slice(1, -1)
+    : value;
 }
 
 export type ForwardFormError =
@@ -50,7 +64,7 @@ export function forwardInput(
   const bindPort = port(values.bindPort);
   if (bindPort === null) return { error: "invalidBindPort" };
 
-  const targetHost = values.targetHost.trim();
+  const targetHost = normalizeForwardHost(values.targetHost);
   const hasFixedTarget = values.kind !== "dynamic";
   if (hasFixedTarget && !targetHost) {
     return { error: "targetRequired" };
@@ -65,7 +79,7 @@ export function forwardInput(
       hostId,
       label,
       kind: values.kind,
-      bindHost: values.bindHost.trim() || "127.0.0.1",
+      bindHost: normalizeForwardHost(values.bindHost) || "127.0.0.1",
       bindPort,
       targetHost: hasFixedTarget ? targetHost : null,
       targetPort,

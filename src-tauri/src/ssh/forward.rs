@@ -61,13 +61,24 @@ struct ActiveForward {
     generation: u64,
     spec: ForwardSpec,
     shutdown: watch::Sender<bool>,
-    finished: oneshot::Receiver<()>,
+    finished: watch::Receiver<bool>,
+}
+
+struct RetiringForward {
+    generation: u64,
+    finished: watch::Receiver<bool>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct StartReservation {
+    lifecycle: u64,
+    token: u64,
 }
 
 struct StartGuard {
     id: String,
-    lifecycle: u64,
-    preparing: Arc<Mutex<HashMap<String, u64>>>,
+    reservation: StartReservation,
+    preparing: Arc<Mutex<HashMap<String, StartReservation>>>,
 }
 
 impl Drop for StartGuard {
@@ -75,7 +86,7 @@ impl Drop for StartGuard {
         let mut preparing = self.preparing.lock();
         if preparing
             .get(&self.id)
-            .is_some_and(|lifecycle| *lifecycle == self.lifecycle)
+            .is_some_and(|reservation| *reservation == self.reservation)
         {
             preparing.remove(&self.id);
         }
@@ -85,11 +96,12 @@ impl Drop for StartGuard {
 #[derive(Default)]
 pub struct ForwardManager {
     active: Arc<Mutex<HashMap<String, ActiveForward>>>,
-    retiring: Arc<Mutex<HashMap<String, oneshot::Receiver<()>>>>,
-    preparing: Arc<Mutex<HashMap<String, u64>>>,
+    retiring: Arc<Mutex<HashMap<String, RetiringForward>>>,
+    preparing: Arc<Mutex<HashMap<String, StartReservation>>>,
     runtime: Arc<Mutex<HashMap<String, StatusEvent>>>,
     next_generation: Arc<AtomicU64>,
     next_sequence: Arc<AtomicU64>,
+    next_reservation: Arc<AtomicU64>,
     lifecycle: Arc<Mutex<u64>>,
 }
 
@@ -115,32 +127,59 @@ impl ForwardManager {
     }
 
     pub async fn stop(&self, id: &str) -> bool {
-        let entry = self.active.lock().remove(id);
+        let was_preparing = self.preparing.lock().remove(id).is_some();
+        let entry = {
+            let mut active = self.active.lock();
+            let entry = active.remove(id);
+            if let Some(entry) = entry.as_ref() {
+                self.retiring.lock().insert(
+                    id.to_string(),
+                    RetiringForward {
+                        generation: entry.generation,
+                        finished: entry.finished.clone(),
+                    },
+                );
+            }
+            entry
+        };
         let Some(entry) = entry else {
-            return false;
+            return was_preparing;
         };
         let _ = entry.shutdown.send(true);
-        let _ = entry.finished.await;
+        wait_finished(entry.finished).await;
+        clear_retiring(&self.retiring, id, entry.generation);
         true
     }
 
     pub async fn stop_if_spec(&self, spec: &ForwardSpec) -> bool {
         let entry = {
             let mut active = self.active.lock();
-            if active
+            let entry = if active
                 .get(&spec.id)
                 .is_some_and(|entry| entry.spec == *spec)
             {
                 active.remove(&spec.id)
             } else {
                 None
+            };
+            if let Some(entry) = entry.as_ref() {
+                self.preparing.lock().remove(&spec.id);
+                self.retiring.lock().insert(
+                    spec.id.clone(),
+                    RetiringForward {
+                        generation: entry.generation,
+                        finished: entry.finished.clone(),
+                    },
+                );
             }
+            entry
         };
         let Some(entry) = entry else {
             return false;
         };
         let _ = entry.shutdown.send(true);
-        let _ = entry.finished.await;
+        wait_finished(entry.finished).await;
+        clear_retiring(&self.retiring, &spec.id, entry.generation);
         true
     }
 
@@ -155,7 +194,13 @@ impl ForwardManager {
         let mut retiring = self.retiring.lock();
         for (id, entry) in entries {
             let _ = entry.shutdown.send(true);
-            retiring.insert(id, entry.finished);
+            retiring.insert(
+                id,
+                RetiringForward {
+                    generation: entry.generation,
+                    finished: entry.finished,
+                },
+            );
         }
     }
 
@@ -196,6 +241,10 @@ impl ForwardManager {
         spec: ForwardSpec,
     ) -> AppResult<()> {
         let lifecycle = *self.lifecycle.lock();
+        let reservation = StartReservation {
+            lifecycle,
+            token: self.next_reservation.fetch_add(1, Ordering::Relaxed) + 1,
+        };
         if self.active.lock().contains_key(&spec.id) {
             return Ok(());
         }
@@ -203,20 +252,20 @@ impl ForwardManager {
             let mut preparing = self.preparing.lock();
             if preparing
                 .get(&spec.id)
-                .is_some_and(|pending| *pending == lifecycle)
+                .is_some_and(|pending| pending.lifecycle == lifecycle)
             {
                 return Ok(());
             }
-            preparing.insert(spec.id.clone(), lifecycle);
+            preparing.insert(spec.id.clone(), reservation);
         }
         let _start_guard = StartGuard {
             id: spec.id.clone(),
-            lifecycle,
+            reservation,
             preparing: self.preparing.clone(),
         };
         let retiring = self.retiring.lock().remove(&spec.id);
-        if let Some(finished) = retiring {
-            let _ = finished.await;
+        if let Some(retiring) = retiring {
+            wait_finished(retiring.finished).await;
         }
         if self.active.lock().contains_key(&spec.id) {
             return Ok(());
@@ -225,14 +274,15 @@ impl ForwardManager {
         let generation = self.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let (ready_tx, ready_rx) = oneshot::channel();
-        let (finished_tx, finished_rx) = oneshot::channel();
+        let (finished_tx, finished_rx) = watch::channel(false);
 
         {
             let current_lifecycle = self.lifecycle.lock();
-            if *current_lifecycle != lifecycle {
+            let mut active = self.active.lock();
+            let preparing = self.preparing.lock();
+            if *current_lifecycle != lifecycle || preparing.get(&spec.id) != Some(&reservation) {
                 return Err(AppError::Cancelled);
             }
-            let mut active = self.active.lock();
             if active.contains_key(&spec.id) {
                 return Ok(());
             }
@@ -273,10 +323,26 @@ impl ForwardManager {
             )
             .await;
             remove_finished(&active, &spec.id, generation);
-            let _ = finished_tx.send(());
+            let _ = finished_tx.send(true);
         });
 
         ready_rx.await.unwrap_or(Err(AppError::Cancelled))
+    }
+}
+
+async fn wait_finished(mut finished: watch::Receiver<bool>) {
+    if !*finished.borrow() {
+        let _ = finished.wait_for(|value| *value).await;
+    }
+}
+
+fn clear_retiring(retiring: &Mutex<HashMap<String, RetiringForward>>, id: &str, generation: u64) {
+    let mut retiring = retiring.lock();
+    if retiring
+        .get(id)
+        .is_some_and(|current| current.generation == generation)
+    {
+        retiring.remove(id);
     }
 }
 
@@ -533,10 +599,17 @@ async fn remote_listener_output(conn: &SshConnection, spec: &ForwardSpec) -> Opt
 }
 
 fn requests_non_loopback_bind(host: &str) -> bool {
-    !matches!(
-        host.trim().to_ascii_lowercase().as_str(),
-        "127.0.0.1" | "localhost" | "::1"
-    )
+    let host = host.trim().to_ascii_lowercase();
+    if host == "localhost" {
+        return false;
+    }
+    let unbracketed = host
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(&host);
+    !unbracketed
+        .parse::<std::net::IpAddr>()
+        .is_ok_and(|address| address.is_loopback())
 }
 
 fn listener_output_is_loopback_only(output: &str) -> bool {
@@ -1003,7 +1076,7 @@ mod tests {
     fn old_generation_cannot_remove_new_forward() {
         let active = Mutex::new(HashMap::new());
         let (old_shutdown, _) = watch::channel(false);
-        let (_, old_finished) = oneshot::channel();
+        let (_, old_finished) = watch::channel(false);
         active.lock().insert(
             "forward".into(),
             ActiveForward {
@@ -1025,7 +1098,7 @@ mod tests {
         let manager = ForwardManager::new();
         let current = forward_spec(80);
         let (shutdown, _) = watch::channel(false);
-        let (finished, finished_rx) = oneshot::channel();
+        let (finished, finished_rx) = watch::channel(false);
         manager.active.lock().insert(
             current.id.clone(),
             ActiveForward {
@@ -1035,13 +1108,22 @@ mod tests {
                 finished: finished_rx,
             },
         );
+        manager.preparing.lock().insert(
+            current.id.clone(),
+            StartReservation {
+                lifecycle: 0,
+                token: 1,
+            },
+        );
 
         assert!(!manager.stop_if_spec(&forward_spec(81)).await);
         assert!(manager.active_specs().iter().any(|spec| spec == &current));
+        assert!(manager.preparing.lock().contains_key(&current.id));
 
-        let _ = finished.send(());
+        let _ = finished.send(true);
         assert!(manager.stop_if_spec(&current).await);
         assert!(manager.active_specs().is_empty());
+        assert!(!manager.preparing.lock().contains_key(&current.id));
     }
 
     #[test]
@@ -1055,18 +1137,26 @@ mod tests {
     }
 
     #[test]
-    fn stale_start_guard_does_not_clear_a_new_lifecycle_reservation() {
-        let preparing = Arc::new(Mutex::new(HashMap::from([("forward".into(), 1)])));
+    fn stale_start_guard_does_not_clear_a_new_reservation() {
+        let first = StartReservation {
+            lifecycle: 1,
+            token: 1,
+        };
+        let second = StartReservation {
+            lifecycle: 1,
+            token: 2,
+        };
+        let preparing = Arc::new(Mutex::new(HashMap::from([("forward".into(), first)])));
         let guard = StartGuard {
             id: "forward".into(),
-            lifecycle: 1,
+            reservation: first,
             preparing: preparing.clone(),
         };
-        preparing.lock().insert("forward".into(), 2);
+        preparing.lock().insert("forward".into(), second);
 
         drop(guard);
 
-        assert_eq!(preparing.lock().get("forward"), Some(&2));
+        assert_eq!(preparing.lock().get("forward"), Some(&second));
     }
 
     #[test]
@@ -1082,8 +1172,59 @@ mod tests {
     #[test]
     fn recognizes_non_loopback_bind_requests() {
         assert!(!requests_non_loopback_bind("127.0.0.1"));
+        assert!(!requests_non_loopback_bind("127.0.0.2"));
+        assert!(requests_non_loopback_bind("127.example.com"));
+        assert!(requests_non_loopback_bind("127.0.0.999"));
         assert!(!requests_non_loopback_bind("LOCALHOST"));
+        assert!(!requests_non_loopback_bind("[::1]"));
         assert!(requests_non_loopback_bind("0.0.0.0"));
         assert!(requests_non_loopback_bind("203.0.113.10"));
+    }
+
+    #[tokio::test]
+    async fn stop_clears_a_pending_start_reservation() {
+        let manager = ForwardManager::new();
+        manager.preparing.lock().insert(
+            "forward".into(),
+            StartReservation {
+                lifecycle: 0,
+                token: 1,
+            },
+        );
+
+        assert!(manager.stop("forward").await);
+        assert!(!manager.preparing.lock().contains_key("forward"));
+    }
+
+    #[tokio::test]
+    async fn stop_and_restart_can_wait_for_the_same_retirement() {
+        let manager = Arc::new(ForwardManager::new());
+        let (shutdown, _) = watch::channel(false);
+        let (finished, finished_rx) = watch::channel(false);
+        manager.active.lock().insert(
+            "forward".into(),
+            ActiveForward {
+                generation: 1,
+                spec: forward_spec(80),
+                shutdown,
+                finished: finished_rx,
+            },
+        );
+
+        let stop_manager = manager.clone();
+        let stop = tokio::spawn(async move { stop_manager.stop("forward").await });
+        tokio::task::yield_now().await;
+        let restart_wait = manager
+            .retiring
+            .lock()
+            .get("forward")
+            .map(|retiring| retiring.finished.clone())
+            .unwrap();
+        let restart = tokio::spawn(wait_finished(restart_wait));
+
+        finished.send(true).unwrap();
+        assert!(stop.await.unwrap());
+        restart.await.unwrap();
+        assert!(!manager.retiring.lock().contains_key("forward"));
     }
 }

@@ -22,13 +22,17 @@ describe("forwardInput", () => {
     expect(formatForwardEndpoint("127.0.0.1", 8080)).toBe("127.0.0.1:8080");
     expect(formatForwardEndpoint("localhost", 8080)).toBe("localhost:8080");
     expect(formatForwardEndpoint("::1", 8080)).toBe("[::1]:8080");
+    expect(formatForwardEndpoint("[::1]", 8080)).toBe("[::1]:8080");
   });
 
   it("distinguishes private loopback listeners from exposed listeners", () => {
     expect(isLoopbackBindHost("127.0.0.1")).toBe(true);
     expect(isLoopbackBindHost("127.0.0.2")).toBe(true);
+    expect(isLoopbackBindHost("127.example.com")).toBe(false);
+    expect(isLoopbackBindHost("127.0.0.999")).toBe(false);
     expect(isLoopbackBindHost("LOCALHOST")).toBe(true);
     expect(isLoopbackBindHost("::1")).toBe(true);
+    expect(isLoopbackBindHost("[::1]")).toBe(true);
     expect(isLoopbackBindHost("0.0.0.0")).toBe(false);
     expect(isLoopbackBindHost("::")).toBe(false);
     expect(isLoopbackBindHost("192.168.1.10")).toBe(false);
@@ -46,6 +50,18 @@ describe("forwardInput", () => {
         targetPort: 5432,
         autoStart: true,
       },
+    });
+  });
+
+  it("normalizes bracketed IPv6 literals for socket APIs", () => {
+    expect(
+      forwardInput({
+        ...values,
+        bindHost: " [::1] ",
+        targetHost: " [2001:db8::1] ",
+      }),
+    ).toMatchObject({
+      input: { bindHost: "::1", targetHost: "2001:db8::1" },
     });
   });
 
