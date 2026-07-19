@@ -70,16 +70,20 @@ function GroupFormBody({
     setFocus,
     formState: { errors },
   } = useForm<FormValues>({
-    defaultValues: { name: "", parentId: initialParentId ?? "" },
+    defaultValues: {
+      name: group?.name ?? "",
+      parentId: group?.parentId ?? initialParentId ?? "",
+    },
   });
 
   useEffect(() => {
+    if (groupId && !group) return;
     reset({
       name: group?.name ?? "",
       parentId: group?.parentId ?? initialParentId ?? "",
     });
     setFocus("name");
-  }, [group, initialParentId, reset, setFocus]);
+  }, [group, groupId, initialParentId, reset, setFocus]);
 
   const unavailable = groupId
     ? descendantGroupIds(groups, groupId)
