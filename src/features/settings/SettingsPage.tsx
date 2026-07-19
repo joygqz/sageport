@@ -9,6 +9,7 @@ import {
   Palette,
   Plus,
   RefreshCw,
+  Settings2,
   Sparkles,
   Sun,
 } from "lucide-react";
@@ -72,6 +73,7 @@ import {
 } from "@/features/ai/tools";
 import { SyncSection } from "@/features/sync/SyncSection";
 import { AboutSection } from "./AboutSection";
+import { AutostartSetting } from "./AutostartSetting";
 
 const NAV: {
   id: SettingsSection;
@@ -79,6 +81,7 @@ const NAV: {
   descriptionKey?: TKey;
   icon: typeof Palette;
 }[] = [
+  { id: "general", labelKey: "settings.nav.general", icon: Settings2 },
   { id: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
   {
     id: "ai",
@@ -186,6 +189,7 @@ function SettingsPage({
                 )}
               </div>
             )}
+            {section === "general" && <AutostartSetting />}
             {section === "appearance" && <AppearanceSection />}
             {section === "ai" && <AiSection />}
             {section === "sync" && <SyncSection />}

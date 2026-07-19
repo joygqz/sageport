@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-export type SettingsSection = "appearance" | "ai" | "sync" | "about";
+export type SettingsSection =
+  "general" | "appearance" | "ai" | "sync" | "about";
 
 export type Overlay =
   | { type: "host-form"; hostId: string | null; groupId: string | null }
@@ -45,7 +46,7 @@ export const useOverlayStore = create<OverlayState>((set) => ({
           section ??
           (state.overlay?.type === "settings"
             ? state.overlay.section
-            : "appearance"),
+            : "general"),
       },
     })),
   setSettingsSection: (section) =>

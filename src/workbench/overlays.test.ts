@@ -7,11 +7,11 @@ beforeEach(() => {
 });
 
 describe("settings overlay", () => {
-  it("opens at appearance by default and changes sections in place", () => {
+  it("opens at general by default and changes sections in place", () => {
     useOverlayStore.getState().openSettings();
     expect(useOverlayStore.getState().overlay).toEqual({
       type: "settings",
-      section: "appearance",
+      section: "general",
     });
 
     useOverlayStore.getState().setSettingsSection("sync");

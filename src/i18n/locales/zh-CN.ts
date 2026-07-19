@@ -823,10 +823,23 @@ export const zhCN: Dictionary = {
       saveError: "保存设置失败",
     },
     nav: {
+      general: "常规",
       appearance: "外观",
       ai: "AI",
       sync: "同步",
       about: "关于",
+    },
+    general: {
+      startup: "启动",
+      autostart: {
+        label: "登录时启动 Sageport",
+        description:
+          "登录设备后自动启动 Sageport。已启用“启动时自动开启”的端口转发也会随之启动。",
+        loading: "正在检查启动设置",
+        loadError: "检查启动设置失败",
+        saveError: "更新启动设置失败",
+        notApplied: "系统未应用启动设置",
+      },
     },
     appearance: {
       colorMode: "颜色模式",

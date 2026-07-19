@@ -856,10 +856,23 @@ export const en = {
       saveError: "Failed to save settings",
     },
     nav: {
+      general: "General",
       appearance: "Appearance",
       ai: "AI",
       sync: "Sync",
       about: "About",
+    },
+    general: {
+      startup: "Startup",
+      autostart: {
+        label: "Launch Sageport at login",
+        description:
+          "Start Sageport automatically after you sign in. Port forwards set to start on launch will start too.",
+        loading: "Checking startup settings",
+        loadError: "Failed to check startup settings",
+        saveError: "Failed to update startup settings",
+        notApplied: "The system did not apply the startup setting",
+      },
     },
     appearance: {
       colorMode: "Color mode",
