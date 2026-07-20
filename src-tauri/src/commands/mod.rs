@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod app;
 pub mod batch;
 pub mod bookmarks;
 pub mod clipboard;

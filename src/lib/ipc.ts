@@ -446,6 +446,9 @@ export const ipc = {
         handler(event.payload),
       ),
   },
+  app: {
+    isPortable: () => invoke<boolean>("app_is_portable"),
+  },
   window: {
     setTrafficLightInset: (x: number, height: number) =>
       invoke<void>("window_set_traffic_light_inset", { x, height }),

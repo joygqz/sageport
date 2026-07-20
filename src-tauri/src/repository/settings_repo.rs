@@ -2,14 +2,13 @@ use sqlx::{Executor, Sqlite, SqliteConnection, SqlitePool};
 
 use crate::domain::now;
 use crate::error::AppResult;
-use crate::secrets;
 
 pub async fn get(pool: &SqlitePool, key: &str) -> AppResult<Option<String>> {
     let row: Option<(String,)> = sqlx::query_as("SELECT value FROM settings WHERE key = ?")
         .bind(key)
         .fetch_optional(pool)
         .await?;
-    row.map(|(v,)| secrets::open_setting(key, &v)).transpose()
+    Ok(row.map(|(v,)| v))
 }
 
 pub async fn set(pool: &SqlitePool, key: &str, value: &str) -> AppResult<()> {
@@ -19,13 +18,12 @@ pub async fn set(pool: &SqlitePool, key: &str, value: &str) -> AppResult<()> {
 
 pub async fn set_in(connection: &mut SqliteConnection, key: &str, value: &str) -> AppResult<()> {
     let ts = now();
-    let value = secrets::seal_setting(key, value)?;
     sqlx::query(
         "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
     )
     .bind(key)
-    .bind(&value)
+    .bind(value)
     .bind(&ts)
     .execute(connection)
     .await?;
@@ -36,13 +34,12 @@ pub async fn set_many(pool: &SqlitePool, entries: &[(String, String)]) -> AppRes
     let mut tx = pool.begin().await?;
     let ts = now();
     for (key, value) in entries {
-        let value = secrets::seal_setting(key, value)?;
         sqlx::query(
             "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         )
         .bind(key)
-        .bind(&value)
+        .bind(value)
         .bind(&ts)
         .execute(&mut *tx)
         .await?;
@@ -69,13 +66,5 @@ where
         query = query.bind(format!("{prefix}%"));
     }
     let rows: Vec<(String, String, String)> = query.fetch_all(executor).await?;
-    rows.into_iter()
-        .map(|(key, value, updated_at)| {
-            Ok((
-                key.clone(),
-                secrets::open_setting(&key, &value)?,
-                updated_at,
-            ))
-        })
-        .collect()
+    Ok(rows)
 }

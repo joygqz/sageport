@@ -39,13 +39,15 @@ It all lives in a familiar VS Code-style workspace with a command palette, keybo
 
 Grab the installer for your computer from the [latest release](https://github.com/joygqz/sageport/releases/latest):
 
-| System                          | Download              |
-| ------------------------------- | --------------------- |
-| macOS (Apple Silicon and Intel) | Universal `.dmg`      |
-| Windows (64-bit)                | `.exe` installer      |
-| Linux (64-bit)                  | `.AppImage` or `.deb` |
+| System                          | Download                            |
+| ------------------------------- | ----------------------------------- |
+| macOS (Apple Silicon and Intel) | Universal `.dmg`                    |
+| Windows (64-bit)                | `.exe` installer or portable `.zip` |
+| Linux (64-bit)                  | `.AppImage` or `.deb`               |
 
 Sageport keeps itself up to date — new versions install right from the app.
+
+The Windows portable build installs nothing. Unzip it anywhere, including a USB drive, and Sageport keeps every setting, host, key, and session record in the `data` folder next to `Sageport.exe`. Move that folder and your setup travels with it. Portable builds do not self-update and do not register for startup on the host machine. Anyone who has the folder can read the credentials inside it, so keep the drive itself safe.
 
 ## Get started in 3 minutes
 
@@ -60,8 +62,9 @@ On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd
 ## Your data stays yours
 
 - Everything is stored on your device. There is no Sageport cloud service and no account.
-- Passwords, keys, and other secrets are always encrypted — on disk, in backups, and during sync.
-- Sync and backups are locked with a passphrase only you know. Sageport cannot read them — and cannot recover a lost passphrase, so keep it safe.
+- Passwords and keys are stored in a local database on your device, in plain text. Anything that can read your user account's files can read them, so protect the device itself.
+- Backups and sync are encrypted with a passphrase before they ever leave your device.
+- The sync passphrase is known only to you. Sageport cannot read your backups and cannot recover a lost passphrase, so keep it safe.
 - Connecting to an unfamiliar server always asks you to verify it first, and AI actions never run without your say-so unless you explicitly allow it.
 
 ## License

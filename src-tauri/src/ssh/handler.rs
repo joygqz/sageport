@@ -48,7 +48,7 @@ impl client::Handler for ClientHandler {
     type Error = russh::Error;
 
     async fn check_server_key(&mut self, key: &PublicKey) -> Result<bool, Self::Error> {
-        let status = match known_hosts::evaluate(&self.app, &self.host, self.port, key) {
+        let status = match known_hosts::evaluate(&self.host, self.port, key) {
             KnownHostStatus::Trusted => return Ok(true),
             KnownHostStatus::Unknown => "unknown",
             KnownHostStatus::Changed => "changed",
@@ -90,8 +90,7 @@ impl client::Handler for ClientHandler {
             HostKeyDecision::Reject => Ok(false),
             HostKeyDecision::AcceptOnce => Ok(true),
             HostKeyDecision::AcceptRemember => {
-                known_hosts::learn(&self.app, &self.host, self.port, key)
-                    .map_err(russh::Error::from)?;
+                known_hosts::learn(&self.host, self.port, key).map_err(russh::Error::from)?;
                 Ok(true)
             }
         }
