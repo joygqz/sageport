@@ -4,9 +4,10 @@ mod crypto;
 mod db;
 mod domain;
 mod error;
+mod legacy;
+mod paths;
 mod pty;
 mod repository;
-mod secrets;
 mod sftp;
 mod ssh;
 mod sshkey;
@@ -42,16 +43,10 @@ fn cleanup_orphaned_sessions(state: &AppState) {
 }
 
 fn initialize_app(app: &mut tauri::App) -> AppResult<()> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| AppError::Other(format!("cannot locate application data: {error}")))?;
+    let data_dir = paths::initialize(app.handle())?;
     let db_path = data_dir.join("sageport.db");
-    let requires_existing_key =
-        tauri::async_runtime::block_on(secrets::database_requires_existing_key(&db_path))?;
-    secrets::initialize(&data_dir, !requires_existing_key)?;
     let pool = tauri::async_runtime::block_on(db::init(&db_path))?;
-    tauri::async_runtime::block_on(secrets::migrate_plaintext(&pool))?;
+    tauri::async_runtime::block_on(legacy::decrypt_sealed_values(&data_dir, &pool))?;
     tauri::async_runtime::block_on(repository::transfer_repo::mark_interrupted(&pool))?;
     app.manage(AppState::new(pool));
     Ok(())
@@ -65,7 +60,7 @@ fn report_startup_failure(app: &mut tauri::App, error: AppError) {
     let handle = app.handle().clone();
     app.dialog()
         .message(format!(
-            "Sageport 无法安全读取本地数据，未对现有数据做任何修改。\n\n如果刚才拒绝了钥匙串访问，请重新打开 Sageport 并选择“允许”或“始终允许”。\n\nSageport could not safely read its local data. No existing data was modified.\n\nIf Keychain access was denied, reopen Sageport and choose Allow or Always Allow.\n\n详细信息 / Details:\n{error}"
+            "Sageport 无法打开本地数据库，未对现有数据做任何修改。\n\n请确认数据目录可读写，且磁盘空间充足。\n\nSageport could not open its local database. No existing data was modified.\n\nCheck that the data directory is readable and writable and that the disk has free space.\n\n详细信息 / Details:\n{error}"
         ))
         .title("Sageport 启动失败 / Startup failed")
         .kind(MessageDialogKind::Error)
@@ -214,6 +209,7 @@ pub fn run() {
             commands::sync::sync_restore_version,
             commands::sync::sync_file_export,
             commands::sync::sync_file_import,
+            commands::app::app_is_portable,
             commands::window::window_set_traffic_light_inset,
             commands::update::update_status,
             commands::update::update_can_self_update,

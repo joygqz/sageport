@@ -7,12 +7,18 @@ import {
   SwitchField,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import { autostartQueryKey, readAutostart, writeAutostart } from "./autostart";
 
 export function AutostartSetting() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const portable = useQuery({
+    queryKey: ["system", "portable"],
+    queryFn: ipc.app.isPortable,
+    staleTime: Infinity,
+  });
   const state = useQuery({
     queryKey: autostartQueryKey,
     queryFn: readAutostart,
@@ -34,6 +40,10 @@ export function AutostartSetting() {
       void queryClient.invalidateQueries({ queryKey: autostartQueryKey });
     },
   });
+
+  if (portable.isPending || portable.data) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col gap-4">

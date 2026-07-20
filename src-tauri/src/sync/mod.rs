@@ -23,7 +23,6 @@ use crate::domain::{
 };
 use crate::error::{AppError, AppResult};
 use crate::repository::{forward_repo, settings_repo};
-use crate::secrets;
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["security.", "sync.", "update."];
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -111,21 +110,9 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     // mutation, producing an encrypted backup that never existed locally.
     let mut tx = pool.begin().await?;
     let groups = fetch_all::<Group, _>(&mut *tx, "groups").await?;
-    let hosts = fetch_all::<Host, _>(&mut *tx, "hosts")
-        .await?
-        .into_iter()
-        .map(secrets::open_host)
-        .collect::<AppResult<Vec<_>>>()?;
-    let identities = fetch_all::<Identity, _>(&mut *tx, "identities")
-        .await?
-        .into_iter()
-        .map(secrets::open_identity)
-        .collect::<AppResult<Vec<_>>>()?;
-    let keys = fetch_all::<SshKey, _>(&mut *tx, "keys")
-        .await?
-        .into_iter()
-        .map(secrets::open_key)
-        .collect::<AppResult<Vec<_>>>()?;
+    let hosts = fetch_all::<Host, _>(&mut *tx, "hosts").await?;
+    let identities = fetch_all::<Identity, _>(&mut *tx, "identities").await?;
+    let keys = fetch_all::<SshKey, _>(&mut *tx, "keys").await?;
     let snippets = fetch_all::<Snippet, _>(&mut *tx, "snippets").await?;
     let port_forwards = fetch_all::<PortForward, _>(&mut *tx, "port_forwards").await?;
     let sftp_bookmarks = fetch_all::<SftpBookmark, _>(&mut *tx, "sftp_bookmarks").await?;
@@ -632,10 +619,6 @@ async fn merge_identity<'e, E>(executor: E, i: &Identity) -> AppResult<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let password = secrets::seal_optional(
-        &format!("identities:{}:password", i.id),
-        i.password.as_deref(),
-    )?;
     sqlx::query(
         "INSERT INTO identities (id, name, username, auth_type, key_id, password, created_at, updated_at, deleted_at, revision)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -645,7 +628,7 @@ where
            deleted_at = excluded.deleted_at, revision = excluded.revision
          WHERE excluded.updated_at > identities.updated_at",
     )
-    .bind(&i.id).bind(&i.name).bind(&i.username).bind(&i.auth_type).bind(&i.key_id).bind(password)
+    .bind(&i.id).bind(&i.name).bind(&i.username).bind(&i.auth_type).bind(&i.key_id).bind(&i.password)
     .bind(&i.created_at).bind(&i.updated_at).bind(&i.deleted_at).bind(i.revision)
     .execute(executor).await?;
     Ok(())
@@ -655,14 +638,6 @@ async fn merge_key<'e, E>(executor: E, k: &SshKey) -> AppResult<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let private_key = secrets::seal_optional(
-        &format!("keys:{}:private_key", k.id),
-        k.private_key.as_deref(),
-    )?;
-    let passphrase = secrets::seal_optional(
-        &format!("keys:{}:passphrase", k.id),
-        k.passphrase.as_deref(),
-    )?;
     sqlx::query(
         "INSERT INTO keys (id, name, public_key, private_key, passphrase, created_at, updated_at, deleted_at, revision)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -672,7 +647,7 @@ where
            deleted_at = excluded.deleted_at, revision = excluded.revision
          WHERE excluded.updated_at > keys.updated_at",
     )
-    .bind(&k.id).bind(&k.name).bind(&k.public_key).bind(private_key).bind(passphrase)
+    .bind(&k.id).bind(&k.name).bind(&k.public_key).bind(&k.private_key).bind(&k.passphrase)
     .bind(&k.created_at).bind(&k.updated_at).bind(&k.deleted_at).bind(k.revision)
     .execute(executor).await?;
     Ok(())
@@ -727,8 +702,6 @@ async fn merge_host<'e, E>(executor: E, h: &Host) -> AppResult<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let password =
-        secrets::seal_optional(&format!("hosts:{}:password", h.id), h.password.as_deref())?;
     let requires_approval = h.requires_approval || h.color.as_deref() == Some("#ef4444");
     sqlx::query(
         "INSERT INTO hosts
@@ -750,7 +723,7 @@ where
     .bind(&h.identity_id).bind(&h.username).bind(&h.auth_type).bind(&h.key_id)
     .bind(&h.os_hint).bind(requires_approval).bind(&h.notes)
     .bind(&h.jump_host_id).bind(&h.startup_command)
-    .bind(password).bind(&h.last_used_at)
+    .bind(&h.password).bind(&h.last_used_at)
     .bind(&h.created_at).bind(&h.updated_at).bind(&h.deleted_at).bind(h.revision)
     .execute(executor).await?;
     Ok(())
@@ -781,14 +754,13 @@ where
     let Some(entry) = settings_compat::sanitize(entry) else {
         return Ok(());
     };
-    let value = secrets::seal_setting(&entry.key, &entry.value)?;
     sqlx::query(
         "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
          WHERE excluded.updated_at > settings.updated_at",
     )
     .bind(entry.key)
-    .bind(value)
+    .bind(entry.value)
     .bind(entry.updated_at)
     .execute(executor)
     .await?;

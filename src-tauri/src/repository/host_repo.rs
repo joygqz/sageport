@@ -5,7 +5,6 @@ use sqlx::{SqliteConnection, SqlitePool};
 use crate::domain::{auth, new_id, now, Host, HostInput};
 use crate::error::{AppError, AppResult};
 use crate::repository::none_if_empty;
-use crate::secrets;
 use crate::ssh::JUMP_DEPTH_LIMIT;
 
 const MIN_PORT: i64 = 1;
@@ -113,8 +112,6 @@ async fn validate_references(
         let private_key = key
             .ok_or_else(|| AppError::NotFound(format!("key {key_id}")))?
             .0;
-        let private_key =
-            secrets::open_optional(&format!("keys:{key_id}:private_key"), private_key)?;
         if private_key.as_deref().is_none_or(str::is_empty) {
             return Err(AppError::Invalid(
                 "the selected SSH key has no private key".into(),
@@ -158,7 +155,7 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Host>> {
     )
     .fetch_all(pool)
     .await?;
-    rows.into_iter().map(secrets::open_host).collect()
+    Ok(rows)
 }
 
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Host> {
@@ -167,7 +164,7 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Host> {
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
-    secrets::open_host(host)
+    Ok(host)
 }
 
 pub async fn create(pool: &SqlitePool, input: HostInput) -> AppResult<Host> {
@@ -193,10 +190,7 @@ async fn create_normalized_in(
 ) -> AppResult<Host> {
     let id = new_id();
     let ts = now();
-    let password = secrets::seal_optional(
-        &format!("hosts:{id}:password"),
-        none_if_empty(input.password.as_deref()),
-    )?;
+    let password = none_if_empty(input.password.as_deref());
     sqlx::query(
         "INSERT INTO hosts
            (id, label, address, port, group_id, identity_id, username, auth_type, key_id,
@@ -229,7 +223,7 @@ async fn create_normalized_in(
         .fetch_optional(&mut *connection)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
-    secrets::open_host(host)
+    Ok(host)
 }
 
 pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<Host> {
@@ -268,10 +262,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
     }
 
     if input.password.is_some() {
-        let password = secrets::seal_optional(
-            &format!("hosts:{id}:password"),
-            none_if_empty(input.password.as_deref()),
-        )?;
+        let password = none_if_empty(input.password.as_deref());
         sqlx::query("UPDATE hosts SET password = ? WHERE id = ?")
             .bind(password)
             .bind(id)
@@ -284,7 +275,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
         .await?
         .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
     tx.commit().await?;
-    secrets::open_host(host)
+    Ok(host)
 }
 
 pub async fn move_to_group(
@@ -327,7 +318,7 @@ pub async fn move_to_group(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("host {id}")))?;
     tx.commit().await?;
-    secrets::open_host(host)
+    Ok(host)
 }
 
 pub async fn set_os_hint(pool: &SqlitePool, id: &str, os_hint: String) -> AppResult<Host> {
@@ -498,8 +489,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert!(secrets::is_sealed(&stored));
-        assert_ne!(stored, "secret");
+        assert_eq!(stored, "secret");
 
         let kept = update(&pool, &host.id, update_input(&host, None))
             .await

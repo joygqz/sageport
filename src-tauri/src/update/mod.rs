@@ -73,6 +73,9 @@ impl UpdateManager {
 }
 
 pub fn can_self_update() -> bool {
+    if crate::paths::is_portable() {
+        return false;
+    }
     #[cfg(target_os = "linux")]
     {
         std::env::var_os("APPIMAGE")

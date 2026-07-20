@@ -179,6 +179,37 @@ jobs:
           releaseId: ${{ needs.release.outputs.release_id }}
           args: ${{ matrix.args }}
 
+      - name: Package portable build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = $env:TAG.TrimStart("v")
+          $name = "Sageport_${version}_x64-portable"
+          $staging = Join-Path $env:RUNNER_TEMP $name
+          New-Item -ItemType Directory -Path (Join-Path $staging "data") -Force | Out-Null
+          Copy-Item "src-tauri/target/release/Sageport.exe" -Destination $staging
+          $readme = @(
+            "Sageport portable build.",
+            "",
+            "Every setting, host, key and session record lives in this folder.",
+            "Keep it next to Sageport.exe and move the whole folder together.",
+            "Credentials in this folder are not encrypted — keep the drive safe.",
+            "",
+            "Sageport 便携版。",
+            "",
+            "所有设置、主机、密钥与会话记录都保存在此目录。",
+            "请让它与 Sageport.exe 保持在同一目录，迁移时整个目录一起移动。",
+            "该目录中的凭据未经加密，请自行保管好磁盘。"
+          )
+          Set-Content -Path (Join-Path $staging "data/README.txt") -Encoding utf8 -Value $readme
+          Compress-Archive -Path $staging -DestinationPath "$name.zip"
+          gh release upload "$env:TAG" "$name.zip" --clobber
+
   publish:
     needs: [prepare, build]
     runs-on: ubuntu-latest

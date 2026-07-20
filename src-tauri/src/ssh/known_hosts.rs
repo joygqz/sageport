@@ -3,7 +3,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use russh::keys::ssh_key::{HashAlg, PublicKey};
-use tauri::{AppHandle, Manager};
 
 pub enum KnownHostStatus {
     Trusted,
@@ -11,9 +10,8 @@ pub enum KnownHostStatus {
     Changed,
 }
 
-pub fn app_known_hosts_path(app: &AppHandle) -> Option<PathBuf> {
-    let dir = app.path().app_data_dir().ok()?;
-    Some(dir.join("known_hosts"))
+pub fn app_known_hosts_path() -> Option<PathBuf> {
+    crate::paths::data_dir().map(|dir| dir.join("known_hosts"))
 }
 
 fn user_known_hosts_path() -> Option<PathBuf> {
@@ -31,9 +29,9 @@ fn dirs_home() -> Option<PathBuf> {
     }
 }
 
-pub fn evaluate(app: &AppHandle, host: &str, port: u16, key: &PublicKey) -> KnownHostStatus {
+pub fn evaluate(host: &str, port: u16, key: &PublicKey) -> KnownHostStatus {
     let mut changed = false;
-    for path in [app_known_hosts_path(app), user_known_hosts_path()]
+    for path in [app_known_hosts_path(), user_known_hosts_path()]
         .into_iter()
         .flatten()
     {
@@ -53,13 +51,8 @@ pub fn evaluate(app: &AppHandle, host: &str, port: u16, key: &PublicKey) -> Know
     }
 }
 
-pub fn learn(
-    app: &AppHandle,
-    host: &str,
-    port: u16,
-    key: &PublicKey,
-) -> Result<(), russh::keys::Error> {
-    let path = app_known_hosts_path(app).ok_or(russh::keys::Error::NoHomeDir)?;
+pub fn learn(host: &str, port: u16, key: &PublicKey) -> Result<(), russh::keys::Error> {
+    let path = app_known_hosts_path().ok_or(russh::keys::Error::NoHomeDir)?;
     remember_path(&path, host, port, key)
 }
 
