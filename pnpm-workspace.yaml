@@ -1,5 +1,7 @@
 allowBuilds:
   esbuild: true
 
+minimumReleaseAge: 0
+
 overrides:
   dompurify: ^3.4.11
