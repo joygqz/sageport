@@ -14,6 +14,8 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-22.04
+    env:
+      PNPM_CONFIG_MINIMUM_RELEASE_AGE: 0
     steps:
       - uses: actions/checkout@v7
         with:
