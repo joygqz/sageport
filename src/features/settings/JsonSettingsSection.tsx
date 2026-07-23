@@ -121,6 +121,7 @@ function JsonSettingsForm({
     const aiConfigChanged = [
       "ai.protocol",
       "ai.base_url",
+      "ai.api_key",
       "ai.auto_approve",
       "ai.enabled_tools",
       "ai.max_history_tokens",
@@ -135,6 +136,7 @@ function JsonSettingsForm({
         await setAiConfig.mutateAsync({
           protocol: next["ai.protocol"],
           baseUrl: next["ai.base_url"],
+          apiKey: next["ai.api_key"],
           autoApprove: next["ai.auto_approve"],
           enabledTools: next["ai.enabled_tools"],
           maxHistoryTokens: next["ai.max_history_tokens"],
@@ -211,16 +213,6 @@ function JsonSettingsForm({
       contentClassName="gap-2"
     >
       <div className="overflow-hidden rounded-lg border border-border">
-        <div className="flex h-[var(--compact-toolbar-height)] items-center border-b border-border bg-surface px-3">
-          <span className="font-mono text-xs text-muted-foreground">
-            settings.json
-          </span>
-          {dirty && (
-            <span className="ml-auto text-2xs text-muted-foreground">
-              {t("settings.json.unsaved")}
-            </span>
-          )}
-        </div>
         <Suspense fallback={<LoadingState label={t("common.loading")} />}>
           <JsonSettingsEditor
             value={draft}

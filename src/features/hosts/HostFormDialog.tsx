@@ -4,7 +4,6 @@ import { Controller, useForm } from "react-hook-form";
 
 import {
   Field,
-  Button,
   ErrorState,
   FormBody,
   FormDialog,
@@ -105,7 +104,6 @@ function HostFormBody({
     useIdentities();
   const createHost = useCreateHost();
   const updateHost = useUpdateHost();
-  const [clearSavedPassword, setClearSavedPassword] = useState(false);
 
   const {
     data: host,
@@ -151,7 +149,6 @@ function HostFormBody({
         startupCommand: host.startupCommand ?? "",
         notes: host.notes ?? "",
       });
-      setClearSavedPassword(false);
       setPasswordEdited(false);
     }
   }, [host, hostId, identitiesLoading, keysLoading, reset]);
@@ -203,8 +200,8 @@ function HostFormBody({
 
           password: passwordSubmissionValue({
             authType: values.authType,
-            value: hostId && !passwordEdited ? "" : values.password,
-            clearSavedPassword,
+            value: values.password,
+            edited: passwordEdited,
           }),
         };
 
@@ -375,50 +372,19 @@ function HostFormBody({
       )}
 
       {!useIdentity && authType === "password" && (
-        <div className="space-y-2">
-          <Field
-            label={t("hostForm.password")}
-            hint={
-              clearSavedPassword
-                ? t("hostForm.passwordWillClear")
-                : hostId
-                  ? t("hostForm.passwordKeepHint")
-                  : undefined
-            }
-          >
-            <PasswordInput
-              placeholder="••••••••"
-              autoComplete="new-password"
-              disabled={clearSavedPassword}
-              onBeforeReveal={
-                host?.hasPassword ? revealSavedPassword : undefined
-              }
-              {...register("password", {
-                onChange: (event) => {
-                  if (event.target.value) setClearSavedPassword(false);
-                  setPasswordEdited(true);
-                },
-              })}
-            />
-          </Field>
-          {host?.hasPassword && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-auto px-0 py-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={() => {
-                if (!clearSavedPassword) resetField("password");
-                setPasswordEdited(false);
-                setClearSavedPassword((value) => !value);
-              }}
-            >
-              {clearSavedPassword
-                ? t("hostForm.passwordClearUndo")
-                : t("hostForm.passwordClear")}
-            </Button>
-          )}
-        </div>
+        <Field
+          label={t("hostForm.password")}
+          hint={host?.hasPassword ? t("hostForm.passwordSavedHint") : undefined}
+        >
+          <PasswordInput
+            placeholder="••••••••"
+            autoComplete="new-password"
+            onBeforeReveal={host?.hasPassword ? revealSavedPassword : undefined}
+            {...register("password", {
+              onChange: () => setPasswordEdited(true),
+            })}
+          />
+        </Field>
       )}
 
       {!useIdentity && authType === "key" && (

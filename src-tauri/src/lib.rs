@@ -138,6 +138,7 @@ pub fn run() {
             commands::identities::identities_update,
             commands::identities::identities_delete,
             commands::keys::keys_list,
+            commands::keys::keys_reveal_passphrase,
             commands::keys::keys_create,
             commands::keys::keys_update,
             commands::keys::keys_delete,

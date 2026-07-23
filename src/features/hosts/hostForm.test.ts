@@ -8,7 +8,7 @@ describe("passwordSubmissionValue", () => {
       passwordSubmissionValue({
         authType: "password",
         value: "",
-        clearSavedPassword: false,
+        edited: false,
       }),
     ).toBeUndefined();
   });
@@ -18,14 +18,14 @@ describe("passwordSubmissionValue", () => {
       passwordSubmissionValue({
         authType: "password",
         value: "replacement",
-        clearSavedPassword: false,
+        edited: true,
       }),
     ).toBe("replacement");
     expect(
       passwordSubmissionValue({
         authType: "password",
         value: "",
-        clearSavedPassword: true,
+        edited: true,
       }),
     ).toBe("");
   });
@@ -35,7 +35,7 @@ describe("passwordSubmissionValue", () => {
       passwordSubmissionValue({
         authType: "agent",
         value: "ignored",
-        clearSavedPassword: false,
+        edited: true,
       }),
     ).toBeNull();
   });

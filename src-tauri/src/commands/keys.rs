@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::domain::{SshKeyGenerateInput, SshKeyInput, SshKeyView};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::key_repo;
 use crate::sshkey::{self, KeyFile};
 use crate::state::AppState;
@@ -14,6 +14,15 @@ pub async fn keys_list(state: State<'_, AppState>) -> AppResult<Vec<SshKeyView>>
         .into_iter()
         .map(SshKeyView::from)
         .collect())
+}
+
+#[tauri::command]
+pub async fn keys_reveal_passphrase(state: State<'_, AppState>, id: String) -> AppResult<String> {
+    key_repo::get(&state.db, &id)
+        .await?
+        .passphrase
+        .filter(|passphrase| !passphrase.is_empty())
+        .ok_or_else(|| AppError::NotFound(format!("passphrase for key {id}")))
 }
 
 #[derive(Debug, Clone, Serialize)]

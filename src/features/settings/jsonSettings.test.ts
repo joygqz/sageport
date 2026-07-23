@@ -12,14 +12,14 @@ import {
 const defaults = defaultJsonSettings("en");
 
 describe("JSON settings", () => {
-  it("omits default values and secrets", () => {
+  it("omits default values", () => {
     const values = createJsonSettingsValues({
       locale: "en",
       theme: "midnight:dark",
       fontFamily: "",
       zoomLevel: 0,
       ai: {
-        hasApiKey: true,
+        apiKey: "",
         protocol: "openai",
         baseUrl: "",
         model: "",
@@ -33,17 +33,16 @@ describe("JSON settings", () => {
     );
 
     expect(text).toBe("{}\n");
-    expect(text).not.toContain("hasApiKey");
   });
 
-  it("uses persisted setting keys for overrides", () => {
+  it("uses persisted setting keys for overrides including the API key", () => {
     const values = createJsonSettingsValues({
       locale: "zh-CN",
       theme: "graphite:system",
       fontFamily: "JetBrains Mono",
       zoomLevel: 1,
       ai: {
-        hasApiKey: false,
+        apiKey: "sk-secret",
         protocol: "anthropic",
         baseUrl: "https://api.anthropic.com",
         model: "claude-sonnet",
@@ -60,6 +59,7 @@ describe("JSON settings", () => {
     });
     expect(document).toMatchObject({
       "ai.base_url": "https://api.anthropic.com",
+      "ai.api_key": "sk-secret",
       "ai.auto_approve": true,
       "ai.enabled_tools": [],
       "ai.max_history_tokens": 200_000,
@@ -73,6 +73,7 @@ describe("JSON settings", () => {
       "general.zoomLevel": 2,
       "ai.protocol": "openai",
       "ai.base_url": "",
+      "ai.api_key": "",
     });
     expect(resolveJsonSettings({}, defaults)).toEqual(defaults);
   });
@@ -102,6 +103,10 @@ describe("JSON settings", () => {
     expect(parseJsonSettings('{ "ai.max_history_tokens": 0 }')).toEqual({
       ok: false,
       issue: { kind: "invalid", key: "ai.max_history_tokens" },
+    });
+    expect(parseJsonSettings('{ "ai.api_key": "bad\\nkey" }')).toEqual({
+      ok: false,
+      issue: { kind: "invalid", key: "ai.api_key" },
     });
   });
 });

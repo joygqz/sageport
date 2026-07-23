@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import {
-  Button,
   Field,
   FormBody,
   FormDialog,
@@ -66,7 +65,6 @@ function IdentityFormBody({
   );
   const [password, setPassword] = useState("");
   const [passwordEdited, setPasswordEdited] = useState(false);
-  const [clearSavedPassword, setClearSavedPassword] = useState(false);
   const [keyId, setKeyId] = useState(identity?.keyId ?? "");
 
   const editing = Boolean(identity);
@@ -102,8 +100,8 @@ function IdentityFormBody({
 
       password: identityPasswordSubmissionValue({
         authType,
-        value: identity && !passwordEdited ? "" : password,
-        clearSavedPassword,
+        value: password,
+        edited: passwordEdited,
       }),
     };
     try {
@@ -156,50 +154,27 @@ function IdentityFormBody({
       </Field>
 
       {authType === "password" && (
-        <div className="space-y-2">
-          <Field
-            label={t("credentials.identities.password")}
-            hint={
-              clearSavedPassword
-                ? t("credentials.identities.passwordWillClear")
-                : editing
-                  ? t("credentials.identities.passwordKeepHint")
-                  : undefined
+        <Field
+          label={t("credentials.identities.password")}
+          hint={
+            identity?.hasPassword
+              ? t("credentials.identities.passwordSavedHint")
+              : undefined
+          }
+        >
+          <PasswordInput
+            value={password}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              setPasswordEdited(true);
+            }}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            onBeforeReveal={
+              identity?.hasPassword ? revealSavedPassword : undefined
             }
-          >
-            <PasswordInput
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-                setPasswordEdited(true);
-                if (event.target.value) setClearSavedPassword(false);
-              }}
-              placeholder="••••••••"
-              disabled={clearSavedPassword}
-              autoComplete="new-password"
-              onBeforeReveal={
-                identity?.hasPassword ? revealSavedPassword : undefined
-              }
-            />
-          </Field>
-          {identity?.hasPassword && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-auto px-0 py-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={() => {
-                if (!clearSavedPassword) setPassword("");
-                setPasswordEdited(false);
-                setClearSavedPassword((value) => !value);
-              }}
-            >
-              {clearSavedPassword
-                ? t("credentials.identities.passwordClearUndo")
-                : t("credentials.identities.passwordClear")}
-            </Button>
-          )}
-        </div>
+          />
+        </Field>
       )}
 
       {authType === "key" && (

@@ -31,7 +31,7 @@ const MAX_HISTORY_TOKENS_SETTING: &str = "ai.max_history_tokens";
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfig {
-    pub has_api_key: bool,
+    pub api_key: String,
     pub base_url: String,
     pub protocol: Protocol,
     pub model: String,
@@ -246,9 +246,9 @@ fn validate_tools(tools: &[ai::ToolSpec]) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
-    let has_api_key = settings_repo::get(&state.db, API_KEY_SETTING)
+    let api_key = settings_repo::get(&state.db, API_KEY_SETTING)
         .await?
-        .is_some_and(|value| !value.trim().is_empty());
+        .unwrap_or_default();
     let protocol = stored_protocol(&state).await?;
     let base_url = stored_base_url(&state).await?;
     let model = settings_repo::get(&state.db, MODEL_SETTING)
@@ -282,7 +282,7 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
         .and_then(|value| value.trim().parse::<u32>().ok())
         .filter(|value| *value > 0);
     Ok(AiConfig {
-        has_api_key,
+        api_key,
         base_url,
         protocol,
         model,
@@ -616,9 +616,9 @@ mod tests {
     }
 
     #[test]
-    fn public_ai_config_only_exposes_api_key_presence() {
+    fn ai_config_exposes_the_saved_api_key() {
         let config = AiConfig {
-            has_api_key: true,
+            api_key: "sk-secret".into(),
             base_url: "https://example.com/v1".into(),
             protocol: Protocol::Openai,
             model: "model".into(),
@@ -627,8 +627,7 @@ mod tests {
             max_history_tokens: None,
         };
         let value = serde_json::to_value(config).unwrap();
-        assert_eq!(value["hasApiKey"], true);
-        assert!(value.get("apiKey").is_none());
+        assert_eq!(value["apiKey"], "sk-secret");
     }
 
     #[test]

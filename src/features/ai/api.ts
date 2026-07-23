@@ -47,10 +47,7 @@ export function useSetAiConfig() {
           autoApprove: input.autoApprove,
           enabledTools: input.enabledTools ?? prev.enabledTools,
           maxHistoryTokens: input.maxHistoryTokens,
-          hasApiKey:
-            input.apiKey === undefined
-              ? prev.hasApiKey
-              : Boolean(input.apiKey.trim()),
+          apiKey: input.apiKey === undefined ? prev.apiKey : input.apiKey,
           model: endpointChanged ? "" : prev.model,
         });
       }

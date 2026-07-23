@@ -402,28 +402,15 @@ function AiForm({ config }: { config: AiConfig }) {
             label={t("settings.ai.apiKeyLabel")}
             hint={t("settings.ai.apiKeyHint")}
           >
-            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1">
-                <DraftInput
-                  password
-                  value=""
-                  onCommit={commitApiKey}
-                  maxLength={16384}
-                  placeholder={
-                    config.hasApiKey
-                      ? t("settings.ai.apiKeySavedPlaceholder")
-                      : "sk-…"
-                  }
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </div>
-              {config.hasApiKey && (
-                <Button variant="outline" onClick={() => commitApiKey("")}>
-                  {t("settings.ai.apiKeyClear")}
-                </Button>
-              )}
-            </div>
+            <DraftInput
+              password
+              value={config.apiKey}
+              onCommit={commitApiKey}
+              maxLength={16384}
+              placeholder="sk-…"
+              autoComplete="off"
+              spellCheck={false}
+            />
           </Field>
         </div>
       </SettingsGroup>

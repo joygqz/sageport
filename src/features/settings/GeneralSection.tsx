@@ -116,10 +116,7 @@ function DisplaySettings() {
 
   return (
     <SettingsGroup title={t("settings.general.display.title")}>
-      <Field
-        label={t("settings.general.display.language")}
-        hint={t("settings.general.display.languageHint")}
-      >
+      <Field label={t("settings.general.display.language")}>
         <Select
           value={locale}
           onValueChange={(value) =>

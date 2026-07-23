@@ -18,6 +18,7 @@ export interface JsonSettingsValues {
   "general.zoomLevel": number;
   "ai.protocol": AiProtocol;
   "ai.base_url": string;
+  "ai.api_key": string;
   "ai.model": string;
   "ai.auto_approve": boolean;
   "ai.enabled_tools": string[];
@@ -43,6 +44,7 @@ const SETTING_KEYS = [
   "general.zoomLevel",
   "ai.protocol",
   "ai.base_url",
+  "ai.api_key",
   "ai.model",
   "ai.auto_approve",
   "ai.enabled_tools",
@@ -103,6 +105,7 @@ export function defaultJsonSettings(locale: Locale): JsonSettingsValues {
     "general.zoomLevel": 0,
     "ai.protocol": "openai",
     "ai.base_url": "",
+    "ai.api_key": "",
     "ai.model": "",
     "ai.auto_approve": false,
     "ai.enabled_tools": resolveEnabledToolNames(null),
@@ -124,6 +127,7 @@ export function createJsonSettingsValues(input: {
     "general.zoomLevel": input.zoomLevel,
     "ai.protocol": input.ai.protocol,
     "ai.base_url": input.ai.baseUrl,
+    "ai.api_key": input.ai.apiKey,
     "ai.model": input.ai.model,
     "ai.auto_approve": input.ai.autoApprove,
     "ai.enabled_tools": resolveEnabledToolNames(input.ai.enabledTools),
@@ -178,6 +182,10 @@ export function jsonSettingsSchema(): Record<string, unknown> {
       "ai.base_url": {
         type: "string",
         maxLength: 8192,
+      },
+      "ai.api_key": {
+        type: "string",
+        maxLength: 16384,
       },
       "ai.model": {
         type: "string",
@@ -287,6 +295,14 @@ export function parseJsonSettings(text: string): JsonSettingsParseResult {
       return invalid("ai.base_url");
     }
     patch["ai.base_url"] = value;
+  }
+
+  if (has("ai.api_key")) {
+    const value = raw["ai.api_key"];
+    if (!isBoundedText(value, 16384)) {
+      return invalid("ai.api_key");
+    }
+    patch["ai.api_key"] = value.trim();
   }
 
   if (has("ai.model")) {

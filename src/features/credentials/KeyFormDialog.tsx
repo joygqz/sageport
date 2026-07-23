@@ -14,6 +14,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useI18n, type TKey } from "@/i18n";
+import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import type { SshKey, SshKeyAlgorithm } from "@/types/models";
 import {
@@ -82,10 +83,27 @@ function KeyFormBody({
   const [mode, setMode] = useState<Mode>("generate");
   const [name, setName] = useState(sshKey?.name ?? "");
   const [passphrase, setPassphrase] = useState("");
+  const [passphraseEdited, setPassphraseEdited] = useState(false);
   const [algorithm, setAlgorithm] = useState<SshKeyAlgorithm>("ed25519");
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
   const editing = Boolean(sshKey);
+
+  const revealSavedPassphrase = async () => {
+    if (passphrase) return true;
+    if (!sshKey?.hasPassphrase) return true;
+    try {
+      setPassphrase(await ipc.keys.revealPassphrase(sshKey.id));
+      setPassphraseEdited(false);
+      return true;
+    } catch (error) {
+      toast.error(
+        t("credentials.keys.passphraseRevealError"),
+        errorMessage(error),
+      );
+      return false;
+    }
+  };
 
   const pickFile = async () => {
     try {
@@ -108,7 +126,7 @@ function KeyFormBody({
     if (!name.trim()) {
       return toast.error(t("credentials.keys.nameRequired"));
     }
-    if (editing && passphrase && !privateKey.trim()) {
+    if (editing && passphraseEdited && !privateKey.trim()) {
       return toast.error(t("credentials.keys.passphraseRequiresPrivateKey"));
     }
     try {
@@ -219,7 +237,10 @@ function KeyFormBody({
           >
             <PasswordInput
               value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
+              onChange={(e) => {
+                setPassphrase(e.target.value);
+                setPassphraseEdited(true);
+              }}
               autoComplete="off"
             />
           </Field>
@@ -264,8 +285,15 @@ function KeyFormBody({
           >
             <PasswordInput
               value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
+              onChange={(e) => {
+                setPassphrase(e.target.value);
+                setPassphraseEdited(true);
+              }}
               autoComplete="off"
+              placeholder={sshKey?.hasPassphrase ? "••••••••" : undefined}
+              onBeforeReveal={
+                sshKey?.hasPassphrase ? revealSavedPassphrase : undefined
+              }
             />
           </Field>
         </>

@@ -65,6 +65,7 @@ describe("locale parity", () => {
       "Google",
       "I",
       "ID",
+      "JSON",
       "L",
       "MB",
       "MinIO",
