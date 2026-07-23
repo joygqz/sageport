@@ -913,7 +913,7 @@ export const zhCN: Dictionary = {
       unsaved: "有未保存的更改",
       saved: "设置已保存",
       saveError: "保存 JSON 设置失败",
-      hint: "仅显示非默认设置。移除设置可恢复默认值。",
+      hint: "仅显示非默认设置。移除设置可恢复默认值。已保存的 API 密钥不会显示。仅在需要替换或清空密钥时添加 ai.api_key。",
       error: {
         syntax: "请修正 JSON 语法后再保存。",
         root: "顶层内容必须是 JSON 对象。",
@@ -973,6 +973,7 @@ export const zhCN: Dictionary = {
       modelHint: "接口未提供模型列表时，请输入模型 ID。",
       apiKeyLabel: "API 密钥",
       apiKeyHint: "用于验证模型服务请求。Ollama 等服务通常不需要密钥。",
+      apiKeyRevealError: "显示 API 密钥失败",
       autonomousModeLabel: "助手模式",
       autonomousMode: "自动模式",
       autonomousModeHint:

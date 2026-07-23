@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -13,6 +12,7 @@ use crate::error::{AppError, AppResult};
 
 const PHASE_DELETING: &str = "deleting";
 const PHASE_SCANNING: &str = "scanning";
+const MAX_REMOTE_DELETE_ENTRIES: u64 = 250_000;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
 pub struct DeleteRequest {
@@ -317,7 +317,7 @@ fn scan_remote_node<'a>(
                 }
             }
         };
-        *discovered += 1;
+        record_discovery(discovered)?;
         reporter.active(*discovered, 0, &path, PHASE_SCANNING, false);
         if !metadata.file_type().is_dir() || metadata.file_type().is_symlink() {
             plan.files.push(path);
@@ -427,66 +427,27 @@ fn delete_local(
     cancel: &Arc<TransferCancel>,
     reporter: &mut ProgressReporter,
 ) -> DeleteOutcome {
-    let mut plan = DeletePlan::default();
-    let mut discovered = 0;
-    for path in paths {
-        if let Err(error) = scan_local_node(
-            Path::new(path),
-            0,
-            &mut plan,
-            &mut discovered,
-            reporter,
-            cancel,
-        ) {
-            return DeleteOutcome {
-                completed: 0,
-                total: plan.total(),
-                current_path: path.clone(),
-                result: Err(error),
-            };
-        }
-    }
-
-    let total = plan.total();
+    let total = paths.len() as u64;
     let current_path = paths.first().cloned().unwrap_or_default();
     reporter.active(0, total, &current_path, PHASE_DELETING, true);
     let mut completed = 0;
     let mut failures = DeleteFailures::default();
-    for path in plan.files {
+    for path in paths {
         if cancel.is_cancelled() {
             return DeleteOutcome {
                 completed,
                 total,
-                current_path: path,
+                current_path: path.clone(),
                 result: Err(AppError::Cancelled),
             };
         }
-        match ops::local_remove(&path) {
+        match ops::local_remove(path) {
             Ok(()) => {}
             Err(error) if error.code() == "not_found" => {}
-            Err(error) => failures.push(&path, error),
+            Err(error) => failures.push(path, error),
         }
         completed += 1;
-        reporter.active(completed, total, &path, PHASE_DELETING, false);
-    }
-    plan.directories
-        .sort_by_key(|(depth, _)| std::cmp::Reverse(*depth));
-    for (_, path) in plan.directories {
-        if cancel.is_cancelled() {
-            return DeleteOutcome {
-                completed,
-                total,
-                current_path: path,
-                result: Err(AppError::Cancelled),
-            };
-        }
-        match std::fs::remove_dir(&path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => failures.push(&path, error.into()),
-        }
-        completed += 1;
-        reporter.active(completed, total, &path, PHASE_DELETING, false);
+        reporter.active(completed, total, path, PHASE_DELETING, false);
     }
     DeleteOutcome {
         completed,
@@ -496,35 +457,26 @@ fn delete_local(
     }
 }
 
-fn scan_local_node(
-    path: &Path,
-    depth: usize,
-    plan: &mut DeletePlan,
-    discovered: &mut u64,
-    reporter: &mut ProgressReporter,
-    cancel: &Arc<TransferCancel>,
-) -> AppResult<()> {
-    if cancel.is_cancelled() {
-        return Err(AppError::Cancelled);
+fn record_discovery(discovered: &mut u64) -> AppResult<()> {
+    if *discovered >= MAX_REMOTE_DELETE_ENTRIES {
+        return Err(AppError::Invalid(format!(
+            "directory contains more than {MAX_REMOTE_DELETE_ENTRIES} items. Delete smaller sections"
+        )));
     }
-    let metadata = std::fs::symlink_metadata(path)?;
-    let path_string = path.to_string_lossy().into_owned();
     *discovered += 1;
-    reporter.active(*discovered, 0, &path_string, PHASE_SCANNING, false);
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        plan.files.push(path_string);
-        return Ok(());
-    }
-    for entry in std::fs::read_dir(path)? {
-        scan_local_node(
-            &entry?.path(),
-            depth + 1,
-            plan,
-            discovered,
-            reporter,
-            cancel,
-        )?;
-    }
-    plan.directories.push((depth, path_string));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{record_discovery, MAX_REMOTE_DELETE_ENTRIES};
+
+    #[test]
+    fn bounds_remote_delete_plans() {
+        let mut discovered = MAX_REMOTE_DELETE_ENTRIES - 1;
+
+        assert!(record_discovery(&mut discovered).is_ok());
+        assert!(record_discovery(&mut discovered).is_err());
+        assert_eq!(discovered, MAX_REMOTE_DELETE_ENTRIES);
+    }
 }

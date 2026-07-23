@@ -148,6 +148,19 @@ export const ipc = {
     get: (key: string) => invoke<string | null>("settings_get", { key }),
     set: (key: string, value: string) =>
       invoke<void>("settings_set", { key, value }),
+    applyJson: (input: {
+      locale: string;
+      theme: string;
+      fontFamily: string;
+      zoomLevel: number;
+      protocol: AiProtocol;
+      baseUrl: string;
+      apiKey?: string;
+      model: string;
+      autoApprove: boolean;
+      enabledTools: string[];
+      maxHistoryTokens: number | null;
+    }) => invoke<void>("settings_apply_json", { input }),
   },
   ssh: {
     connect: (params: {
@@ -340,6 +353,7 @@ export const ipc = {
   },
   ai: {
     getConfig: () => invoke<AiConfig>("ai_get_config"),
+    revealApiKey: () => invoke<string>("ai_reveal_api_key"),
     setConfig: (input: {
       baseUrl: string;
       protocol: AiProtocol;

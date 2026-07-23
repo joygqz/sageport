@@ -194,12 +194,16 @@ impl SftpManager {
         Self::default()
     }
 
-    pub fn register_operation(&self, operation_id: &str) -> Arc<TransferCancel> {
+    pub fn register_operation(&self, operation_id: &str) -> AppResult<Arc<TransferCancel>> {
         let flag = Arc::new(TransferCancel::new());
-        self.operation_cancels
-            .lock()
-            .insert(operation_id.to_string(), flag.clone());
-        flag
+        let mut operations = self.operation_cancels.lock();
+        if operations.contains_key(operation_id) {
+            return Err(AppError::Conflict(format!(
+                "operation id {operation_id} is already active"
+            )));
+        }
+        operations.insert(operation_id.to_string(), flag.clone());
+        Ok(flag)
     }
 
     pub fn cancel_operation(&self, operation_id: &str) {
@@ -208,8 +212,14 @@ impl SftpManager {
         }
     }
 
-    pub fn unregister_operation(&self, operation_id: &str) {
-        self.operation_cancels.lock().remove(operation_id);
+    pub fn unregister_operation(&self, operation_id: &str, flag: &Arc<TransferCancel>) {
+        let mut operations = self.operation_cancels.lock();
+        if operations
+            .get(operation_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flag))
+        {
+            operations.remove(operation_id);
+        }
     }
 
     pub async fn acquire_operation_slot(&self) -> OwnedSemaphorePermit {
@@ -468,12 +478,42 @@ mod tests {
     #[test]
     fn disconnect_all_cancels_and_releases_registered_operations() {
         let manager = SftpManager::new();
-        let cancel = manager.register_operation("transfer-1");
+        let cancel = manager
+            .register_operation("transfer-1")
+            .expect("operation should register");
 
         manager.disconnect_all();
 
         assert!(cancel.is_cancelled());
         assert!(manager.operation_cancels.lock().is_empty());
+    }
+
+    #[test]
+    fn duplicate_operation_ids_do_not_replace_active_cancellation() {
+        let manager = SftpManager::new();
+        let cancel = manager
+            .register_operation("transfer-1")
+            .expect("operation should register");
+
+        assert!(manager.register_operation("transfer-1").is_err());
+        manager.cancel_operation("transfer-1");
+
+        assert!(cancel.is_cancelled());
+    }
+
+    #[test]
+    fn unregister_only_removes_the_registered_operation() {
+        let manager = SftpManager::new();
+        let cancel = manager
+            .register_operation("transfer-1")
+            .expect("operation should register");
+        let unrelated = Arc::new(TransferCancel::new());
+
+        manager.unregister_operation("transfer-1", &unrelated);
+
+        assert!(manager.register_operation("transfer-1").is_err());
+        manager.unregister_operation("transfer-1", &cancel);
+        assert!(manager.register_operation("transfer-1").is_ok());
     }
 
     #[tokio::test]

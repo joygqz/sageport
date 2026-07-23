@@ -25,6 +25,7 @@ import {
   Tooltip,
 } from "@/components/ui";
 import { useI18n, type TKey } from "@/i18n";
+import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { SettingsSection } from "@/workbench/overlays";
@@ -222,6 +223,7 @@ function AiForm({ config }: { config: AiConfig }) {
   const setModelMutation = useSetAiModel();
   const [protocol, setProtocol] = useState<AiProtocol>(config.protocol);
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
+  const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(config.model);
   const [autoApprove, setAutoApprove] = useState(config.autoApprove);
   const [enabledTools, setEnabledTools] = useState(() =>
@@ -259,6 +261,9 @@ function AiForm({ config }: { config: AiConfig }) {
     const { apiKey: _apiKey, ...retained } = input;
     values.current = retained;
     mutate(input, {
+      onSuccess: () => {
+        if (input.apiKey !== undefined) setApiKey("");
+      },
       onError: (err) =>
         toast.error(t("settings.ai.saveError"), errorMessage(err)),
     });
@@ -298,7 +303,19 @@ function AiForm({ config }: { config: AiConfig }) {
   };
 
   const commitApiKey = (next: string) => {
+    setApiKey(next);
     saveConfig({ apiKey: next });
+  };
+
+  const revealApiKey = async () => {
+    if (apiKey || !config.hasApiKey) return true;
+    try {
+      setApiKey(await ipc.ai.revealApiKey());
+      return true;
+    } catch (error) {
+      toast.error(t("settings.ai.apiKeyRevealError"), errorMessage(error));
+      return false;
+    }
   };
 
   const commitMaxHistoryTokens = (raw: string) => {
@@ -404,12 +421,13 @@ function AiForm({ config }: { config: AiConfig }) {
           >
             <DraftInput
               password
-              value={config.apiKey}
+              value={apiKey}
               onCommit={commitApiKey}
               maxLength={16384}
-              placeholder="sk-…"
+              placeholder={config.hasApiKey ? "••••••••" : "sk-…"}
               autoComplete="off"
               spellCheck={false}
+              onBeforeReveal={config.hasApiKey ? revealApiKey : undefined}
             />
           </Field>
         </div>

@@ -58,7 +58,6 @@ async function getApplicationSettings(): Promise<ToolExecutionResult> {
       import("@/workbench/zoom"),
     ],
   );
-  const { apiKey, ...publicAi } = ai;
   return toolSuccess(
     JSON.stringify({
       autostart,
@@ -68,8 +67,7 @@ async function getApplicationSettings(): Promise<ToolExecutionResult> {
       zoomLevel: useZoomStore.getState().level,
       themeFamilies: THEME_FAMILIES.map(({ id, name }) => ({ id, name })),
       ai: {
-        ...publicAi,
-        hasApiKey: Boolean(apiKey),
+        ...ai,
         availableTools: getAiToolCatalog(),
       },
     }),

@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Input, PasswordInput } from "@/components/ui";
+import { Input, PasswordInput, type PasswordInputProps } from "@/components/ui";
 
 export function DraftInput({
   value,
   onCommit,
   password = false,
+  onBeforeReveal,
   ...props
 }: Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "onBlur"> & {
   value: string;
   onCommit: (next: string) => void;
   password?: boolean;
+  onBeforeReveal?: PasswordInputProps["onBeforeReveal"];
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const pending = useRef({ draft, value, onCommit });
@@ -42,7 +44,7 @@ export function DraftInput({
   };
 
   return password ? (
-    <PasswordInput {...inputProps} />
+    <PasswordInput {...inputProps} onBeforeReveal={onBeforeReveal} />
   ) : (
     <Input {...inputProps} />
   );

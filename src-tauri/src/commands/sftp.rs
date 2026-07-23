@@ -260,7 +260,8 @@ pub async fn fs_delete_batch(
     if let Some(connection_id) = connection_id.as_deref() {
         manager.get(connection_id)?;
     }
-    let cancel = manager.register_operation(&operation_id);
+    let cancel = manager.register_operation(&operation_id)?;
+    let registered_cancel = cancel.clone();
     tokio::spawn(async move {
         let permit = tokio::select! {
             biased;
@@ -279,7 +280,7 @@ pub async fn fs_delete_batch(
         )
         .await;
         drop(permit);
-        manager.unregister_operation(&operation_id);
+        manager.unregister_operation(&operation_id, &registered_cancel);
     });
     Ok(())
 }
@@ -400,7 +401,9 @@ pub async fn fs_transfer(
         .connection_id
         .as_deref()
         .and_then(|id| mgr.host_label(id).ok());
-    transfer_repo::create(
+    let cancel = mgr.register_operation(&transfer_id)?;
+    let registered_cancel = cancel.clone();
+    if let Err(error) = transfer_repo::create(
         &pool,
         &transfer_id,
         &sftp::base_name(&source.path),
@@ -411,9 +414,11 @@ pub async fn fs_transfer(
         dest.connection_id.as_deref(),
         dest_host_label.as_deref(),
     )
-    .await?;
-
-    let cancel = mgr.register_operation(&transfer_id);
+    .await
+    {
+        mgr.unregister_operation(&transfer_id, &registered_cancel);
+        return Err(error);
+    }
     tokio::spawn(async move {
         let permit = tokio::select! {
             biased;
@@ -434,7 +439,7 @@ pub async fn fs_transfer(
         )
         .await;
         drop(permit);
-        mgr.unregister_operation(&transfer_id);
+        mgr.unregister_operation(&transfer_id, &registered_cancel);
         let _ = transfer_repo::finish(
             &pool,
             &transfer_id,

@@ -2,10 +2,20 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
+import { queryClient } from "@/lib/query";
 
 interface SettingQueryData {
   value: string | null;
   revision: number;
+}
+
+export function cacheSettingValue(key: string, value: string): void {
+  const queryKey = ["settings", key] as const;
+  const current = queryClient.getQueryData<SettingQueryData>(queryKey);
+  queryClient.setQueryData<SettingQueryData>(queryKey, {
+    value,
+    revision: current?.revision ?? 0,
+  });
 }
 
 interface SettingSyncOptions {

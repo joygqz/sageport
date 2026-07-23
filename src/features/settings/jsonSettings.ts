@@ -127,7 +127,7 @@ export function createJsonSettingsValues(input: {
     "general.zoomLevel": input.zoomLevel,
     "ai.protocol": input.ai.protocol,
     "ai.base_url": input.ai.baseUrl,
-    "ai.api_key": input.ai.apiKey,
+    "ai.api_key": "",
     "ai.model": input.ai.model,
     "ai.auto_approve": input.ai.autoApprove,
     "ai.enabled_tools": resolveEnabledToolNames(input.ai.enabledTools),
@@ -141,7 +141,8 @@ export function createJsonSettingsDocument(
 ): JsonSettingsDocument {
   return Object.fromEntries(
     SETTING_KEYS.filter(
-      (key) => !equalSettingValue(values[key], defaults[key]),
+      (key) =>
+        key !== "ai.api_key" && !equalSettingValue(values[key], defaults[key]),
     ).map((key) => [key, values[key]]),
   ) as JsonSettingsDocument;
 }

@@ -1,10 +1,14 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Save, Undo2 } from "lucide-react";
 
 import { Button, ErrorState, LoadingState } from "@/components/ui";
-import { useAiConfig, useSetAiConfig, useSetAiModel } from "@/features/ai/api";
+import { useAiConfig } from "@/features/ai/api";
+import { clearModelLimitsCache } from "@/features/ai/model-limits";
 import { useI18n, type TFunction } from "@/i18n";
 import { systemLocale } from "@/i18n/config";
+import { ipc } from "@/lib/ipc";
+import { queryClient } from "@/lib/query";
+import { cacheSettingValue } from "@/lib/settingSync";
 import { errorMessage, toast } from "@/lib/toast";
 import { serializeThemePreference } from "@/themes/apply";
 import { useTheme } from "@/themes";
@@ -69,32 +73,21 @@ export function JsonSettingsSection() {
   const defaults = defaultJsonSettings(systemLocale());
   const document = createJsonSettingsDocument(values, defaults);
 
-  return (
-    <JsonSettingsForm
-      initialDocument={document}
-      initialValues={values}
-      defaults={defaults}
-    />
-  );
+  return <JsonSettingsForm initialDocument={document} defaults={defaults} />;
 }
 
 function JsonSettingsForm({
   initialDocument,
-  initialValues,
   defaults,
 }: {
   initialDocument: JsonSettingsDocument;
-  initialValues: JsonSettingsValues;
   defaults: JsonSettingsValues;
 }) {
   const { t, locale, setLocale } = useI18n();
   const { preference, setPreference } = useTheme();
   const setFontFamily = useFontStore((state) => state.setFamily);
   const setZoomLevel = useZoomStore((state) => state.setLevel);
-  const setAiConfig = useSetAiConfig();
-  const setAiModel = useSetAiModel();
   const initialText = stringifyJsonSettings(initialDocument);
-  const currentValuesRef = useRef(initialValues);
   const [savedText, setSavedText] = useState(initialText);
   const [draft, setDraft] = useState(initialText);
   const [issue, setIssue] = useState<JsonSettingsIssue | null>(null);
@@ -111,40 +104,33 @@ function JsonSettingsForm({
 
     setIssue(null);
     setSaving(true);
-    const current = currentValuesRef.current;
     const next = resolveJsonSettings(parsed.value, defaults);
-    const endpointChanged =
-      next["ai.protocol"] !== current["ai.protocol"] ||
-      next["ai.base_url"].trim().replace(/\/+$/, "") !==
-        current["ai.base_url"].trim().replace(/\/+$/, "");
-    const modelChanged = next["ai.model"] !== current["ai.model"];
-    const aiConfigChanged = [
-      "ai.protocol",
-      "ai.base_url",
+    const includesApiKey = Object.prototype.hasOwnProperty.call(
+      parsed.value,
       "ai.api_key",
-      "ai.auto_approve",
-      "ai.enabled_tools",
-      "ai.max_history_tokens",
-    ].some(
-      (key) =>
-        JSON.stringify(next[key as keyof JsonSettingsValues]) !==
-        JSON.stringify(current[key as keyof JsonSettingsValues]),
     );
 
     try {
-      if (aiConfigChanged) {
-        await setAiConfig.mutateAsync({
-          protocol: next["ai.protocol"],
-          baseUrl: next["ai.base_url"],
-          apiKey: next["ai.api_key"],
-          autoApprove: next["ai.auto_approve"],
-          enabledTools: next["ai.enabled_tools"],
-          maxHistoryTokens: next["ai.max_history_tokens"],
-        });
-      }
-      if (modelChanged || endpointChanged) {
-        await setAiModel.mutateAsync(next["ai.model"]);
-      }
+      await ipc.settings.applyJson({
+        locale: next["general.locale"],
+        theme: next["general.theme"],
+        fontFamily: next["general.fontFamily"],
+        zoomLevel: next["general.zoomLevel"],
+        protocol: next["ai.protocol"],
+        baseUrl: next["ai.base_url"],
+        apiKey: includesApiKey ? next["ai.api_key"] : undefined,
+        model: next["ai.model"],
+        autoApprove: next["ai.auto_approve"],
+        enabledTools: next["ai.enabled_tools"],
+        maxHistoryTokens: next["ai.max_history_tokens"],
+      });
+
+      cacheSettingValue("general.locale", next["general.locale"]);
+      cacheSettingValue("general.theme", next["general.theme"]);
+      cacheSettingValue("general.fontFamily", next["general.fontFamily"]);
+      cacheSettingValue("general.zoomLevel", String(next["general.zoomLevel"]));
+      clearModelLimitsCache();
+      void queryClient.invalidateQueries({ queryKey: ["ai"] });
 
       if (next["general.locale"] !== locale) {
         setLocale(next["general.locale"]);
@@ -156,20 +142,9 @@ function JsonSettingsForm({
       ) {
         setPreference(nextPreference);
       }
-      if (
-        next["general.fontFamily"] !==
-        currentValuesRef.current["general.fontFamily"]
-      ) {
-        setFontFamily(next["general.fontFamily"]);
-      }
-      if (
-        next["general.zoomLevel"] !==
-        currentValuesRef.current["general.zoomLevel"]
-      ) {
-        setZoomLevel(next["general.zoomLevel"]);
-      }
+      setFontFamily(next["general.fontFamily"]);
+      setZoomLevel(next["general.zoomLevel"]);
 
-      currentValuesRef.current = next;
       const formatted = stringifyJsonSettings(
         createJsonSettingsDocument(next, defaults),
       );

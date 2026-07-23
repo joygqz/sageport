@@ -19,7 +19,7 @@ describe("JSON settings", () => {
       fontFamily: "",
       zoomLevel: 0,
       ai: {
-        apiKey: "",
+        hasApiKey: false,
         protocol: "openai",
         baseUrl: "",
         model: "",
@@ -35,14 +35,14 @@ describe("JSON settings", () => {
     expect(text).toBe("{}\n");
   });
 
-  it("uses persisted setting keys for overrides including the API key", () => {
+  it("uses persisted setting keys for overrides without exposing the API key", () => {
     const values = createJsonSettingsValues({
       locale: "zh-CN",
       theme: "graphite:system",
       fontFamily: "JetBrains Mono",
       zoomLevel: 1,
       ai: {
-        apiKey: "sk-secret",
+        hasApiKey: true,
         protocol: "anthropic",
         baseUrl: "https://api.anthropic.com",
         model: "claude-sonnet",
@@ -59,10 +59,17 @@ describe("JSON settings", () => {
     });
     expect(document).toMatchObject({
       "ai.base_url": "https://api.anthropic.com",
-      "ai.api_key": "sk-secret",
       "ai.auto_approve": true,
       "ai.enabled_tools": [],
       "ai.max_history_tokens": 200_000,
+    });
+    expect(document).not.toHaveProperty("ai.api_key");
+  });
+
+  it("accepts an API key only as an explicit write", () => {
+    expect(parseJsonSettings('{ "ai.api_key": " sk-secret " }')).toEqual({
+      ok: true,
+      value: { "ai.api_key": "sk-secret" },
     });
   });
 

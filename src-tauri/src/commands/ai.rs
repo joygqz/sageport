@@ -31,7 +31,7 @@ const MAX_HISTORY_TOKENS_SETTING: &str = "ai.max_history_tokens";
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfig {
-    pub api_key: String,
+    pub has_api_key: bool,
     pub base_url: String,
     pub protocol: Protocol,
     pub model: String,
@@ -51,6 +51,12 @@ pub struct AiConfigInput {
     pub enabled_tools: Option<Vec<String>>,
     #[serde(default)]
     pub max_history_tokens: Option<u32>,
+}
+
+pub(crate) struct ValidatedAiConfig {
+    pub base_url: String,
+    pub protocol: Protocol,
+    pub entries: Vec<(String, String)>,
 }
 
 async fn stored_protocol(state: &AppState) -> AppResult<Protocol> {
@@ -117,6 +123,72 @@ fn validate_model(raw: &str, allow_empty: bool) -> AppResult<&str> {
         return Err(AppError::Invalid("no model selected".into()));
     }
     Ok(model)
+}
+
+pub(crate) fn validate_ai_model(raw: &str) -> AppResult<String> {
+    Ok(validate_model(raw, true)?.to_string())
+}
+
+pub(crate) fn validate_ai_config(input: AiConfigInput) -> AppResult<ValidatedAiConfig> {
+    let base_url = validate_base_url(&input.base_url)?;
+    let api_key = input
+        .api_key
+        .as_deref()
+        .map(str::trim)
+        .map(|value| bounded_text(value, "API key", MAX_API_KEY_BYTES))
+        .transpose()?;
+    if input
+        .enabled_tools
+        .as_ref()
+        .is_some_and(|tools| tools.len() > MAX_ENABLED_TOOLS)
+    {
+        return Err(AppError::Invalid(format!(
+            "more than {MAX_ENABLED_TOOLS} AI tools were enabled"
+        )));
+    }
+    let mut entries = vec![
+        (BASE_URL_SETTING.to_string(), base_url.clone()),
+        (
+            PROTOCOL_SETTING.to_string(),
+            input.protocol.as_str().to_string(),
+        ),
+        (
+            AUTO_APPROVE_SETTING.to_string(),
+            if input.auto_approve { "true" } else { "false" }.to_string(),
+        ),
+        (
+            MAX_HISTORY_TOKENS_SETTING.to_string(),
+            input
+                .max_history_tokens
+                .filter(|value| *value > 0)
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+        ),
+    ];
+    if let Some(enabled_tools) = input.enabled_tools {
+        let mut enabled_tools = enabled_tools
+            .into_iter()
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .collect::<Vec<_>>();
+        for name in &enabled_tools {
+            bounded_text(name, "tool name", MAX_TOOL_NAME_BYTES)?;
+        }
+        enabled_tools.sort();
+        enabled_tools.dedup();
+        entries.push((
+            ENABLED_TOOLS_SETTING.to_string(),
+            serde_json::to_string(&enabled_tools)?,
+        ));
+    }
+    if let Some(api_key) = api_key {
+        entries.push((API_KEY_SETTING.to_string(), api_key.to_string()));
+    }
+    Ok(ValidatedAiConfig {
+        base_url,
+        protocol: input.protocol,
+        entries,
+    })
 }
 
 fn validate_id<'a>(value: &'a str, field: &str, max_bytes: usize) -> AppResult<&'a str> {
@@ -246,9 +318,9 @@ fn validate_tools(tools: &[ai::ToolSpec]) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
-    let api_key = settings_repo::get(&state.db, API_KEY_SETTING)
+    let has_api_key = settings_repo::get(&state.db, API_KEY_SETTING)
         .await?
-        .unwrap_or_default();
+        .is_some_and(|value| !value.is_empty());
     let protocol = stored_protocol(&state).await?;
     let base_url = stored_base_url(&state).await?;
     let model = settings_repo::get(&state.db, MODEL_SETTING)
@@ -282,7 +354,7 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
         .and_then(|value| value.trim().parse::<u32>().ok())
         .filter(|value| *value > 0);
     Ok(AiConfig {
-        api_key,
+        has_api_key,
         base_url,
         protocol,
         model,
@@ -293,65 +365,22 @@ pub async fn ai_get_config(state: State<'_, AppState>) -> AppResult<AiConfig> {
 }
 
 #[tauri::command]
+pub async fn ai_reveal_api_key(state: State<'_, AppState>) -> AppResult<String> {
+    let api_key = settings_repo::get(&state.db, API_KEY_SETTING)
+        .await?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| AppError::NotFound("AI API key".into()))?;
+    Ok(bounded_text(&api_key, "API key", MAX_API_KEY_BYTES)?.to_string())
+}
+
+#[tauri::command]
 pub async fn ai_set_config(state: State<'_, AppState>, input: AiConfigInput) -> AppResult<()> {
-    let base_url = validate_base_url(&input.base_url)?;
-    let api_key = input
-        .api_key
-        .as_deref()
-        .map(str::trim)
-        .map(|value| bounded_text(value, "API key", MAX_API_KEY_BYTES))
-        .transpose()?;
-    if input
-        .enabled_tools
-        .as_ref()
-        .is_some_and(|tools| tools.len() > MAX_ENABLED_TOOLS)
-    {
-        return Err(AppError::Invalid(format!(
-            "more than {MAX_ENABLED_TOOLS} AI tools were enabled"
-        )));
-    }
     let previous_protocol = stored_protocol(&state).await?;
     let previous_base_url = stored_base_url(&state).await?;
-    let endpoint_changed =
-        previous_protocol != input.protocol || effective_base_url(&previous_base_url) != base_url;
-    let mut entries = vec![
-        (BASE_URL_SETTING.to_string(), base_url),
-        (
-            PROTOCOL_SETTING.to_string(),
-            input.protocol.as_str().to_string(),
-        ),
-        (
-            AUTO_APPROVE_SETTING.to_string(),
-            if input.auto_approve { "true" } else { "false" }.to_string(),
-        ),
-        (
-            MAX_HISTORY_TOKENS_SETTING.to_string(),
-            input
-                .max_history_tokens
-                .filter(|value| *value > 0)
-                .map(|value| value.to_string())
-                .unwrap_or_default(),
-        ),
-    ];
-    if let Some(enabled_tools) = input.enabled_tools {
-        let mut enabled_tools = enabled_tools
-            .into_iter()
-            .map(|name| name.trim().to_string())
-            .filter(|name| !name.is_empty())
-            .collect::<Vec<_>>();
-        for name in &enabled_tools {
-            bounded_text(name, "tool name", MAX_TOOL_NAME_BYTES)?;
-        }
-        enabled_tools.sort();
-        enabled_tools.dedup();
-        entries.push((
-            ENABLED_TOOLS_SETTING.to_string(),
-            serde_json::to_string(&enabled_tools)?,
-        ));
-    }
-    if let Some(api_key) = api_key {
-        entries.push((API_KEY_SETTING.to_string(), api_key.to_string()));
-    }
+    let validated = validate_ai_config(input)?;
+    let endpoint_changed = previous_protocol != validated.protocol
+        || effective_base_url(&previous_base_url) != validated.base_url;
+    let mut entries = validated.entries;
     if endpoint_changed {
         entries.push((MODEL_SETTING.to_string(), String::new()));
     }
@@ -616,9 +645,9 @@ mod tests {
     }
 
     #[test]
-    fn ai_config_exposes_the_saved_api_key() {
+    fn ai_config_only_exposes_api_key_presence() {
         let config = AiConfig {
-            api_key: "sk-secret".into(),
+            has_api_key: true,
             base_url: "https://example.com/v1".into(),
             protocol: Protocol::Openai,
             model: "model".into(),
@@ -627,7 +656,8 @@ mod tests {
             max_history_tokens: None,
         };
         let value = serde_json::to_value(config).unwrap();
-        assert_eq!(value["apiKey"], "sk-secret");
+        assert_eq!(value["hasApiKey"], true);
+        assert!(value.get("apiKey").is_none());
     }
 
     #[test]

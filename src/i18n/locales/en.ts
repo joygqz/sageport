@@ -941,7 +941,7 @@ export const en = {
       unsaved: "Unsaved changes",
       saved: "Settings saved",
       saveError: "Failed to save settings",
-      hint: "Only non-default settings appear. Removing a setting restores its default.",
+      hint: "Only non-default settings appear. Removing a setting restores its default. Saved API keys stay hidden. Add ai.api_key only to replace or clear one.",
       error: {
         syntax: "Fix invalid syntax before saving.",
         root: "Use an object at the top level.",
@@ -1003,6 +1003,7 @@ export const en = {
       apiKeyLabel: "API key",
       apiKeyHint:
         "Authenticates requests to the model provider. Services such as Ollama usually don't require one.",
+      apiKeyRevealError: "Failed to reveal the API key",
       autonomousModeLabel: "Assistant mode",
       autonomousMode: "Autonomous mode",
       autonomousModeHint:

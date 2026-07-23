@@ -260,7 +260,7 @@ export interface SnippetInput {
 export type AiProtocol = "openai" | "anthropic";
 
 export interface AiConfig {
-  apiKey: string;
+  hasApiKey: boolean;
   baseUrl: string;
   protocol: AiProtocol;
   model: string;
