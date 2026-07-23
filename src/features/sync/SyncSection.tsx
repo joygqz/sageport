@@ -35,17 +35,18 @@ import {
 } from "./api";
 import { providerMeta } from "./providers";
 import { SetupView } from "./SetupView";
+import {
+  SettingsGroup,
+  SETTINGS_GROUP_STACK_CLASS,
+} from "@/features/settings/SettingsGroup";
 
 export function SyncSection() {
   const { t } = useI18n();
   const { data: status, isLoading, isError, refetch } = useSyncStatus();
 
   return (
-    <div className="flex flex-col gap-8">
-      <section
-        aria-label={t("settings.nav.sync")}
-        className="flex flex-col gap-8"
-      >
+    <div className={SETTINGS_GROUP_STACK_CLASS}>
+      <SettingsGroup title={t("settings.sync.providerLabel")}>
         {isLoading && <LoadingState label={t("common.loading")} />}
         {!isLoading && (isError || !status) && (
           <ErrorState
@@ -55,15 +56,13 @@ export function SyncSection() {
           />
         )}
         {!isLoading && !isError && status?.provider && (
-          <>
-            <ConnectedCard status={status} />
-            <VersionsCard />
-          </>
+          <ConnectedCard status={status} />
         )}
         {!isLoading && !isError && status && !status.provider && (
           <SetupView status={status} />
         )}
-      </section>
+      </SettingsGroup>
+      {!isLoading && !isError && status?.provider && <VersionsCard />}
       <FileBackupCard />
     </div>
   );
@@ -129,18 +128,18 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
     : null;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
         <Icon className="size-6 shrink-0 text-foreground" />
-        <div className="flex min-w-0 flex-1 basis-64 flex-col">
-          <span className="text-sm font-medium text-foreground">
+        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-0.5">
+          <span className="text-sm font-semibold text-foreground">
             {meta.name}
-            {status.account && (
-              <span className="ml-2 font-normal text-muted-foreground">
-                {status.account}
-              </span>
-            )}
           </span>
+          {status.account && (
+            <span className="truncate text-xs text-muted-foreground">
+              {status.account}
+            </span>
+          )}
           <span className="truncate text-xs text-muted-foreground">
             {status.detail ? `${status.detail} · ` : ""}
             {t("settings.sync.connected.lastSyncedLabel")}{" "}
@@ -152,7 +151,7 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
         <Badge variant="primary">{t("settings.sync.connected.badge")}</Badge>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 border-t border-border/70 bg-surface/35 px-4 py-3">
         <Button variant="outline" onClick={doPush} loading={push.isPending}>
           {t("settings.sync.connected.pushButton")}
         </Button>
@@ -194,7 +193,7 @@ function VersionsCard() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className="size-8"
               onClick={() => void refetch()}
               disabled={isFetching}
               aria-label={t("settings.sync.versions.refreshButton")}
@@ -376,15 +375,10 @@ function FileBackupCard() {
   };
 
   return (
-    <section
-      aria-label={t("settings.sync.file.title")}
-      className="flex flex-col gap-4"
+    <SettingsGroup
+      title={t("settings.sync.file.title")}
+      description={t("settings.sync.file.description")}
     >
-      <SectionHeader
-        title={t("settings.sync.file.title")}
-        description={t("settings.sync.file.description")}
-      />
-
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
@@ -408,7 +402,7 @@ function FileBackupCard() {
         onOpenChange={(next) => !next && setAction(null)}
         onConfirm={handleConfirm}
       />
-    </section>
+    </SettingsGroup>
   );
 }
 

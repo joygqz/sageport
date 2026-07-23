@@ -86,13 +86,13 @@ export function SetupView({ status }: { status: SyncStatus }) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <RadioGroup
         value={kind}
         disabled={connect.isPending}
         onValueChange={(value) => selectProvider(value as SyncProviderKind)}
         aria-label={t("settings.sync.providerLabel")}
-        className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-2"
+        className="grid w-full grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-2"
       >
         {SYNC_PROVIDERS.map((p) => {
           const Icon = p.icon;
@@ -257,7 +257,7 @@ function OAuthPanel({
 
   if (phase.step === "device") {
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3">
         <p className="text-sm text-muted-foreground">
           {t("settings.sync.setup.deviceCodeHint")}
         </p>
@@ -298,7 +298,7 @@ function OAuthPanel({
 
   if (phase.step === "browser") {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
         <Spinner />
         <p className="flex-1 text-sm text-muted-foreground">
           {t("settings.sync.setup.browserWaiting")}
@@ -390,7 +390,7 @@ function ConnectForm({
               maxLength={8192}
             />
           </Field>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
+          <>
             <Field label={t("settings.sync.setup.usernameLabel")}>
               <Input
                 value={webdav.username}
@@ -411,7 +411,7 @@ function ConnectForm({
                 maxLength={16384}
               />
             </Field>
-          </div>
+          </>
         </>
       )}
 
@@ -431,7 +431,7 @@ function ConnectForm({
               maxLength={8192}
             />
           </Field>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
+          <>
             <Field label={t("settings.sync.setup.s3BucketLabel")} required>
               <Input
                 value={s3.bucket}
@@ -454,8 +454,8 @@ function ConnectForm({
                 maxLength={1024}
               />
             </Field>
-          </div>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
+          </>
+          <>
             <Field label={t("settings.sync.setup.s3AccessKeyLabel")} required>
               <PasswordInput
                 value={s3.accessKey}
@@ -472,7 +472,7 @@ function ConnectForm({
                 maxLength={16384}
               />
             </Field>
-          </div>
+          </>
           <Field
             label={t("settings.sync.setup.s3PrefixLabel")}
             hint={t("settings.sync.setup.s3PrefixHint")}

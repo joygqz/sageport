@@ -8,7 +8,6 @@ import {
   Kbd,
   RadioGroup,
   RadioGroupItem,
-  SectionHeader,
   SegmentedControl,
   Select,
   Tooltip,
@@ -31,6 +30,7 @@ import {
 } from "@/workbench/zoom";
 import { AutostartSetting } from "./AutostartSetting";
 import { DraftInput } from "./DraftInput";
+import { SettingsGroup, SETTINGS_GROUP_STACK_CLASS } from "./SettingsGroup";
 
 const THEME_DESCRIPTION_KEYS: Record<string, TKey> = {
   midnight: "settings.general.theme.familyMidnight",
@@ -40,10 +40,10 @@ const THEME_DESCRIPTION_KEYS: Record<string, TKey> = {
 
 export function GeneralSection() {
   return (
-    <div className="flex flex-col gap-8">
-      <AutostartSetting />
+    <div className={SETTINGS_GROUP_STACK_CLASS}>
       <ThemeSettings />
       <DisplaySettings />
+      <AutostartSetting />
     </div>
   );
 }
@@ -82,9 +82,7 @@ function ThemeSettings() {
   ];
 
   return (
-    <div className="flex flex-col gap-4">
-      <SectionHeader title={t("settings.general.theme.title")} />
-
+    <SettingsGroup title={t("settings.general.theme.title")}>
       <Field label={t("settings.general.theme.colorMode")}>
         <SegmentedControl
           value={preference.mode}
@@ -97,7 +95,7 @@ function ThemeSettings() {
         <RadioGroup
           value={preference.familyId}
           onValueChange={setFamily}
-          className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3"
+          className="grid w-full grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-3"
         >
           {THEME_FAMILIES.map((family) => (
             <ThemeFamilyCard
@@ -109,7 +107,7 @@ function ThemeSettings() {
           ))}
         </RadioGroup>
       </Field>
-    </div>
+    </SettingsGroup>
   );
 }
 
@@ -117,9 +115,7 @@ function DisplaySettings() {
   const { t, locale, setLocale } = useI18n();
 
   return (
-    <div className="flex flex-col gap-4">
-      <SectionHeader title={t("settings.general.display.title")} />
-
+    <SettingsGroup title={t("settings.general.display.title")}>
       <Field
         label={t("settings.general.display.language")}
         hint={t("settings.general.display.languageHint")}
@@ -138,7 +134,7 @@ function DisplaySettings() {
 
       <FontField />
       <ZoomField />
-    </div>
+    </SettingsGroup>
   );
 }
 
@@ -184,12 +180,11 @@ function ZoomField() {
         </span>
       }
     >
-      <div className="flex items-center gap-1.5">
+      <div className="flex w-full flex-wrap items-center gap-1.5">
         <Tooltip content={t("settings.general.display.zoomOut")}>
           <Button
             size="icon"
             variant="outline"
-            className="size-7"
             disabled={level <= ZOOM_LEVEL_MIN}
             onClick={zoomOut}
           >
@@ -203,7 +198,6 @@ function ZoomField() {
           <Button
             size="icon"
             variant="outline"
-            className="size-7"
             disabled={level >= ZOOM_LEVEL_MAX}
             onClick={zoomIn}
           >
@@ -211,7 +205,7 @@ function ZoomField() {
           </Button>
         </Tooltip>
         {level !== 0 && (
-          <Button size="sm" variant="ghost" onClick={resetZoom}>
+          <Button variant="outline" onClick={resetZoom}>
             {t("settings.general.display.zoomReset")}
           </Button>
         )}

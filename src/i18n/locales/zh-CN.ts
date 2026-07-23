@@ -924,6 +924,8 @@ export const zhCN: Dictionary = {
     ai: {
       description:
         "支持 Anthropic 和任意 OpenAI 兼容接口，包括 Ollama 等本地服务。更改会自动保存。",
+      modelProviderTitle: "模型服务",
+      behaviorTitle: "助手行为",
       protocolLabel: "接口格式",
       protocol: {
         openai: "OpenAI 兼容",

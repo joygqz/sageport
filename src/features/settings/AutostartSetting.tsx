@@ -1,15 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import {
-  ErrorState,
-  LoadingState,
-  SectionHeader,
-  SwitchField,
-} from "@/components/ui";
+import { ErrorState, LoadingState, SwitchField } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import { autostartQueryKey, readAutostart, writeAutostart } from "./autostart";
+import { SettingsGroup } from "./SettingsGroup";
 
 export function AutostartSetting() {
   const { t } = useI18n();
@@ -46,8 +42,7 @@ export function AutostartSetting() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <SectionHeader title={t("settings.general.startup")} />
+    <SettingsGroup title={t("settings.general.startup")}>
       {state.isPending ? (
         <LoadingState label={t("settings.general.autostart.loading")} />
       ) : state.isError ? (
@@ -65,6 +60,6 @@ export function AutostartSetting() {
           onCheckedChange={(enabled) => update.mutate(enabled)}
         />
       )}
-    </div>
+    </SettingsGroup>
   );
 }

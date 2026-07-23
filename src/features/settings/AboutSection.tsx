@@ -22,6 +22,7 @@ import {
   useUpdateStatus,
 } from "@/features/updates/api";
 import { updateDownloadProgress } from "@/features/updates/progress";
+import { SETTINGS_GROUP_STACK_CLASS } from "./SettingsGroup";
 
 const AUTHOR_NAME = "Quincy Zhang";
 const AUTHOR_URL = "https://github.com/joygqz";
@@ -47,40 +48,46 @@ export function AboutSection() {
   const canSelfUpdate = useCanSelfUpdate();
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
+    <div className={SETTINGS_GROUP_STACK_CLASS}>
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <img
           src="/app-icon.png"
           alt=""
           className="size-14 shrink-0 rounded-xl"
         />
-        <div>
+        <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-foreground">Sageport</h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {t("settings.about.version", { version: __APP_VERSION__ })}
           </p>
-          <p className="text-sm text-muted-foreground">
-            {t("settings.about.author")}{" "}
-            <button
-              type="button"
-              className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
-              onClick={() => openExternal(AUTHOR_URL, t)}
-            >
-              {AUTHOR_NAME}
-            </button>
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {t("settings.about.license")}{" "}
-            <button
-              type="button"
-              className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
-              onClick={() => openExternal(LICENSE_URL, t)}
-            >
-              {LICENSE_NAME}
-            </button>
-          </p>
+          <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">
+              {t("settings.about.author")}
+            </dt>
+            <dd>
+              <button
+                type="button"
+                className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
+                onClick={() => openExternal(AUTHOR_URL, t)}
+              >
+                {AUTHOR_NAME}
+              </button>
+            </dd>
+            <dt className="text-muted-foreground">
+              {t("settings.about.license")}
+            </dt>
+            <dd className="min-w-0">
+              <button
+                type="button"
+                className="max-w-full truncate rounded-sm text-left text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
+                onClick={() => openExternal(LICENSE_URL, t)}
+              >
+                {LICENSE_NAME}
+              </button>
+            </dd>
+          </dl>
         </div>
-      </div>
+      </section>
 
       <UpdateStatusCard state={state} canSelfUpdate={canSelfUpdate} />
     </div>

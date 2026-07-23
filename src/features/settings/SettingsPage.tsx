@@ -19,7 +19,6 @@ import {
   Field,
   LoadingState,
   ScrollArea,
-  SectionHeader,
   Select,
   SwitchField,
 } from "@/components/ui";
@@ -44,27 +43,33 @@ import { SyncSection } from "@/features/sync/SyncSection";
 import { AboutSection } from "./AboutSection";
 import { DraftInput } from "./DraftInput";
 import { GeneralSection } from "./GeneralSection";
+import { SettingsGroup, SETTINGS_GROUP_STACK_CLASS } from "./SettingsGroup";
 
 const NAV: {
   id: SettingsSection;
   labelKey: TKey;
-  descriptionKey?: TKey;
   icon: typeof Settings2;
 }[] = [
-  { id: "general", labelKey: "settings.nav.general", icon: Settings2 },
+  {
+    id: "general",
+    labelKey: "settings.nav.general",
+    icon: Settings2,
+  },
   {
     id: "ai",
     labelKey: "settings.nav.ai",
-    descriptionKey: "settings.ai.description",
     icon: Sparkles,
   },
   {
     id: "sync",
     labelKey: "settings.nav.sync",
-    descriptionKey: "settings.sync.description",
     icon: RefreshCw,
   },
-  { id: "about", labelKey: "settings.nav.about", icon: Info },
+  {
+    id: "about",
+    labelKey: "settings.nav.about",
+    icon: Info,
+  },
 ];
 
 export function SettingsDialog({
@@ -104,8 +109,6 @@ function SettingsPage({
   onSectionChange: (section: SettingsSection) => void;
 }) {
   const { t } = useI18n();
-  const currentSection = NAV.find((item) => item.id === section)!;
-
   return (
     <div className="settings-page min-h-0 flex-1 overflow-hidden bg-background">
       <div className="flex h-full min-w-0 flex-col sm:flex-row">
@@ -139,17 +142,7 @@ function SettingsPage({
         </aside>
 
         <ScrollArea className="min-h-0 min-w-0 flex-1">
-          <main className="settings-content flex w-full max-w-3xl flex-col gap-6 px-5 py-6 sm:px-8 sm:py-8">
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight text-foreground">
-                {t(currentSection.labelKey)}
-              </h1>
-              {currentSection.descriptionKey && (
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                  {t(currentSection.descriptionKey)}
-                </p>
-              )}
-            </div>
+          <main className="settings-content mx-auto flex w-full max-w-3xl flex-col px-5 py-6 sm:px-8 sm:py-8">
             {section === "general" && <GeneralSection />}
             {section === "ai" && <AiSection />}
             {section === "sync" && <SyncSection />}
@@ -318,109 +311,113 @@ function AiForm({ config }: { config: AiConfig }) {
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <Field label={t("settings.ai.protocolLabel")}>
-          <Select
-            value={protocol}
-            onValueChange={(value) => changeProtocol(value as AiProtocol)}
-            options={AI_PROTOCOLS.map((item) => ({
-              value: item.value,
-              label: t(`settings.ai.protocol.${item.value}`),
-            }))}
-          />
-        </Field>
+    <div className={SETTINGS_GROUP_STACK_CLASS}>
+      <SettingsGroup title={t("settings.ai.modelProviderTitle")}>
+        <div className="flex flex-col gap-4">
+          <Field label={t("settings.ai.protocolLabel")}>
+            <Select
+              value={protocol}
+              onValueChange={(value) => changeProtocol(value as AiProtocol)}
+              options={AI_PROTOCOLS.map((item) => ({
+                value: item.value,
+                label: t(`settings.ai.protocol.${item.value}`),
+              }))}
+            />
+          </Field>
 
-        <Field
-          label={t("settings.ai.baseUrlLabel")}
-          hint={t("settings.ai.baseUrlHint")}
-        >
-          <DraftInput
-            value={baseUrl}
-            onCommit={commitBaseUrl}
-            maxLength={8192}
-            placeholder={exampleBaseUrl(protocol)}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </Field>
+          <Field
+            label={t("settings.ai.modelLabel")}
+            hint={t("settings.ai.modelHint")}
+          >
+            <DraftInput
+              value={model}
+              onCommit={commitModel}
+              maxLength={1024}
+              placeholder="provider/model-id"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </Field>
 
-        <Field
-          label={t("settings.ai.modelLabel")}
-          hint={t("settings.ai.modelHint")}
-        >
-          <DraftInput
-            value={model}
-            onCommit={commitModel}
-            maxLength={1024}
-            placeholder="provider/model-id"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </Field>
+          <Field
+            label={t("settings.ai.baseUrlLabel")}
+            hint={t("settings.ai.baseUrlHint")}
+          >
+            <DraftInput
+              value={baseUrl}
+              onCommit={commitBaseUrl}
+              maxLength={8192}
+              placeholder={exampleBaseUrl(protocol)}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </Field>
 
-        <Field
-          label={t("settings.ai.apiKeyLabel")}
-          hint={t("settings.ai.apiKeyHint")}
-        >
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <DraftInput
-                password
-                value=""
-                onCommit={commitApiKey}
-                maxLength={16384}
-                placeholder={
-                  config.hasApiKey
-                    ? t("settings.ai.apiKeySavedPlaceholder")
-                    : "sk-…"
-                }
-                autoComplete="off"
-                spellCheck={false}
-              />
+          <Field
+            label={t("settings.ai.apiKeyLabel")}
+            hint={t("settings.ai.apiKeyHint")}
+          >
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <DraftInput
+                  password
+                  value=""
+                  onCommit={commitApiKey}
+                  maxLength={16384}
+                  placeholder={
+                    config.hasApiKey
+                      ? t("settings.ai.apiKeySavedPlaceholder")
+                      : "sk-…"
+                  }
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+              {config.hasApiKey && (
+                <Button variant="outline" onClick={() => commitApiKey("")}>
+                  {t("settings.ai.apiKeyClear")}
+                </Button>
+              )}
             </div>
-            {config.hasApiKey && (
-              <Button variant="outline" onClick={() => commitApiKey("")}>
-                {t("settings.ai.apiKeyClear")}
-              </Button>
-            )}
-          </div>
-        </Field>
+          </Field>
+        </div>
+      </SettingsGroup>
 
-        <SwitchField
-          fieldLabel={t("settings.ai.autonomousModeLabel")}
-          label={t("settings.ai.autonomousMode")}
-          hint={t("settings.ai.autonomousModeHint")}
-          description={t("settings.ai.autonomousModeWarning")}
-          descriptionClassName="text-danger"
-          checked={autoApprove}
-          onCheckedChange={changeAutoApprove}
-        />
-
-        <Field
-          label={t("settings.ai.maxHistoryTokensLabel")}
-          hint={t("settings.ai.maxHistoryTokensHint")}
-        >
-          <DraftInput
-            type="number"
-            min={0}
-            max={4294967295}
-            step={1000}
-            value={maxHistoryTokens?.toString() ?? ""}
-            onCommit={commitMaxHistoryTokens}
-            placeholder="200000"
-            autoComplete="off"
-            spellCheck={false}
+      <SettingsGroup title={t("settings.ai.behaviorTitle")}>
+        <div className="flex flex-col gap-4">
+          <SwitchField
+            fieldLabel={t("settings.ai.autonomousModeLabel")}
+            label={t("settings.ai.autonomousMode")}
+            hint={t("settings.ai.autonomousModeHint")}
+            description={t("settings.ai.autonomousModeWarning")}
+            descriptionClassName="text-danger"
+            checked={autoApprove}
+            onCheckedChange={changeAutoApprove}
           />
-        </Field>
-      </div>
 
-      <div className="flex flex-col gap-4">
-        <SectionHeader
-          title={t("settings.ai.tools.title")}
-          description={t("settings.ai.tools.description")}
-        />
+          <Field
+            label={t("settings.ai.maxHistoryTokensLabel")}
+            hint={t("settings.ai.maxHistoryTokensHint")}
+          >
+            <DraftInput
+              type="number"
+              min={0}
+              max={4294967295}
+              step={1000}
+              value={maxHistoryTokens?.toString() ?? ""}
+              onCommit={commitMaxHistoryTokens}
+              placeholder="200000"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </Field>
+        </div>
+      </SettingsGroup>
 
+      <SettingsGroup
+        title={t("settings.ai.tools.title")}
+        description={t("settings.ai.tools.description")}
+      >
         <div
           aria-label={t("settings.ai.tools.title")}
           className="overflow-hidden rounded-lg border border-border bg-card"
@@ -437,7 +434,7 @@ function AiForm({ config }: { config: AiConfig }) {
             />
           ))}
         </div>
-      </div>
+      </SettingsGroup>
     </div>
   );
 }

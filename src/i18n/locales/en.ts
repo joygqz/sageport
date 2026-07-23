@@ -955,6 +955,8 @@ export const en = {
     ai: {
       description:
         "Works with Anthropic and any OpenAI-compatible endpoint, including local ones like Ollama. Changes are saved automatically.",
+      modelProviderTitle: "Model provider",
+      behaviorTitle: "Assistant behavior",
       protocolLabel: "API format",
       protocol: {
         openai: "OpenAI-compatible",
