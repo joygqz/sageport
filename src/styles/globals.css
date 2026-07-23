@@ -60,6 +60,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --tab-active: color-mix(in oklch, var(--list-active) 65%, var(--surface));
   --elevation-sm:
     0 1px 2px color-mix(in oklch, black 34%, transparent),
@@ -141,6 +142,7 @@
 
   html {
     font-size: 93.75%;
+    color-scheme: light;
   }
 
   html,
@@ -154,6 +156,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow: hidden;
@@ -365,6 +368,57 @@
     background: none;
     animation: none;
     -webkit-text-fill-color: currentColor;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .panel-list-action {
+    pointer-events: auto;
+    margin-left: 0;
+    width: 2rem;
+    height: 2rem;
+    opacity: 0.8;
+  }
+
+  .panel-section-action {
+    pointer-events: auto;
+    margin-right: 0.25rem;
+    width: 2rem;
+    opacity: 1;
+  }
+
+  .workbench-tab-close-inactive {
+    pointer-events: auto;
+    opacity: 0.7;
+  }
+
+  .bookmark-action {
+    pointer-events: auto;
+    margin-left: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    opacity: 0.8;
+  }
+
+  .transfer-history-action {
+    pointer-events: auto;
+    margin-left: 0;
+    width: 2rem;
+    height: 2rem;
+    opacity: 0.8;
+  }
+
+  .host-list-actions {
+    pointer-events: auto;
+    margin-left: 0;
+    width: 4.25rem;
+    opacity: 1;
+  }
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
   }
 }
 

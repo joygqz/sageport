@@ -334,7 +334,7 @@ export const EditorArea = memo(function EditorArea() {
               <button
                 type="button"
                 onClick={() => openPalette("quick")}
-                className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+                className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
               >
                 <Plus className="size-4" />
               </button>
@@ -532,7 +532,7 @@ function TabItem({
     >
       <TabsTrigger
         value={tab.id}
-        className="flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+        className="flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
         onKeyDown={(e) => {
           if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) {
             return;

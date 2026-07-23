@@ -179,6 +179,7 @@ function TreeSelectItem({
       {node.hasChildren ? (
         <span
           role="button"
+          aria-label={node.label}
           aria-expanded={!collapsed}
           className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent"
           onPointerDown={(event) => {
@@ -191,7 +192,11 @@ function TreeSelectItem({
             event.stopPropagation();
           }}
         >
-          {collapsed ? <ChevronRight /> : <ChevronDown />}
+          {collapsed ? (
+            <ChevronRight aria-hidden="true" />
+          ) : (
+            <ChevronDown aria-hidden="true" />
+          )}
         </span>
       ) : (
         <span className="size-5 shrink-0" />

@@ -112,7 +112,7 @@ function LayoutToggle({
         onClick={onClick}
         aria-label={label}
         aria-pressed={active}
-        className="flex size-[var(--toolbar-control-size)] items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+        className="flex size-[var(--toolbar-control-size)] items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
       >
         {children}
       </button>

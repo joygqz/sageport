@@ -200,7 +200,7 @@ export function TransferHistoryDialog({
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="pointer-events-none -ml-3 h-6 w-0 shrink-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100"
+                        className="transfer-history-action pointer-events-none -ml-3 h-6 w-0 shrink-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100"
                         onClick={() => void onDeleteOne(e.id)}
                       >
                         <Trash2 className="size-3.5" />

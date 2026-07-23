@@ -63,7 +63,7 @@ export function AboutSection() {
             {t("settings.about.author")}{" "}
             <button
               type="button"
-              className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/35"
+              className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
               onClick={() => openExternal(AUTHOR_URL, t)}
             >
               {AUTHOR_NAME}
@@ -73,7 +73,7 @@ export function AboutSection() {
             {t("settings.about.license")}{" "}
             <button
               type="button"
-              className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/35"
+              className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
               onClick={() => openExternal(LICENSE_URL, t)}
             >
               {LICENSE_NAME}
@@ -223,6 +223,7 @@ function UpdateStatusCard({
           <div
             className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary"
             role="progressbar"
+            aria-label={title}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={progress ?? undefined}

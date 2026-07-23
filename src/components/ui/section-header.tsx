@@ -12,17 +12,21 @@ export function SectionHeader({
   actions,
 }: SectionHeaderProps) {
   return (
-    <div>
-      <div className="flex items-center gap-1.5">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
         <h3 className="text-base font-semibold tracking-tight text-foreground">
           {title}
         </h3>
-        {actions}
+        {description && (
+          <p className="mt-1.5 text-pretty text-xs leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+        )}
       </div>
-      {description && (
-        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-          {description}
-        </p>
+      {actions && (
+        <div className="flex shrink-0 items-center gap-1 text-muted-foreground">
+          {actions}
+        </div>
       )}
     </div>
   );

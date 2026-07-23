@@ -124,7 +124,7 @@ function SettingsPage({
                   aria-current={active ? "page" : undefined}
                   onClick={() => onSectionChange(item.id)}
                   className={cn(
-                    "flex h-[var(--control-height)] shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35 sm:w-full",
+                    "flex h-[var(--control-height)] shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60 sm:w-full",
                     active
                       ? "bg-list-active font-medium text-list-active-foreground"
                       : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
@@ -476,7 +476,7 @@ function ToolTreeGroup({
           <button
             type="button"
             aria-label={groupLabel}
-            className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+            className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             <ChevronRight
               className={cn(
@@ -496,7 +496,7 @@ function ToolTreeGroup({
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             <span className="min-w-0 flex-1 truncate text-xs font-medium">
               {groupLabel}

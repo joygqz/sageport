@@ -36,7 +36,7 @@ export function SegmentedControl<T extends string>({
           key={option.value}
           value={option.value}
           className={cn(
-            "min-h-8 rounded-md px-3 py-1.5 text-sm outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring/35",
+            "min-h-8 rounded-md px-3 py-1.5 text-sm outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring/60",
             "text-muted-foreground hover:bg-list-hover hover:text-foreground",
             "data-[state=checked]:bg-list-active data-[state=checked]:font-medium data-[state=checked]:text-list-active-foreground",
           )}

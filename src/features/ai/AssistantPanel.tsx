@@ -391,7 +391,7 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
 
           <div className="border-t border-border bg-surface/35 p-3">
-            <div className="overflow-hidden rounded-lg border border-input bg-surface transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+            <div className="overflow-hidden rounded-lg border border-input bg-surface transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/60">
               <Textarea
                 ref={inputRef}
                 rows={1}
@@ -724,7 +724,7 @@ function CodeBlock({ code }: { code: string }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-terminal-background">
       <div className="flex items-center justify-between border-b border-border px-2 py-1">
-        <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="text-2xs font-medium text-muted-foreground">
           {t("ai.commandLabel")}
         </span>
         <div className="flex gap-1">

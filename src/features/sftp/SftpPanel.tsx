@@ -225,7 +225,14 @@ function TransferStrip() {
                 {t(`sftp.phase.${tx.phase}`)}
               </span>
             ) : null}
-            <div className="h-1 min-w-16 flex-1 overflow-hidden rounded-full bg-muted">
+            <div
+              role="progressbar"
+              aria-label={tx.file}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={indeterminate ? undefined : pct}
+              className="h-1 min-w-16 flex-1 overflow-hidden rounded-full bg-muted"
+            >
               <div
                 className={cn(
                   "h-full rounded-full bg-primary transition-[width]",

@@ -702,7 +702,7 @@ function SftpTabItem({
     >
       <TabsTrigger
         value={tab.id}
-        className="flex min-w-0 flex-1 items-center justify-start gap-1.5 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+        className="flex min-w-0 flex-1 items-center justify-start gap-1.5 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
         onKeyDown={(event) => {
           if (
             event.altKey &&

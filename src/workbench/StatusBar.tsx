@@ -64,7 +64,7 @@ function StatusBarItem({
       title={title}
       className={cn(
         STATUS_BAR_ITEM_LAYOUT_CLASS,
-        "outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35",
+        "outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60",
         className,
       )}
     >

@@ -91,7 +91,7 @@ export function Toaster() {
                 type="button"
                 aria-label={translate("common.close")}
                 className={cn(
-                  "-mr-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+                  "-mr-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                   hasDetails && "-mt-1",
                 )}
               >

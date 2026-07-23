@@ -230,7 +230,7 @@ function Section({
         title={title}
         collapsed={isCollapsed}
         onToggle={() => setCollapsed((c) => !c)}
-        trailingClassName="pointer-events-none mr-0 w-0 min-w-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:mr-1 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:mr-1 group-focus-within:w-6 group-focus-within:opacity-100"
+        trailingClassName="panel-section-action pointer-events-none mr-0 w-0 min-w-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:mr-1 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:mr-1 group-focus-within:w-6 group-focus-within:opacity-100"
         trailing={
           <Tooltip content={addLabel}>
             <Button

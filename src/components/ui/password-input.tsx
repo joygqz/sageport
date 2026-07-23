@@ -48,7 +48,7 @@ export const PasswordInput = React.forwardRef<
         disabled={disabled || revealing}
         aria-label={t(visible ? "common.hidePassword" : "common.showPassword")}
         aria-pressed={visible}
-        className="absolute inset-y-px right-px flex w-9 items-center justify-center rounded-r-[calc(var(--radius)-1px)] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+        className="absolute inset-y-px right-px flex w-9 items-center justify-center rounded-r-[calc(var(--radius)-1px)] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
       >
         {revealing ? (
           <Loader2 className="size-4 animate-spin" />

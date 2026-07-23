@@ -341,7 +341,14 @@ function Meter({
         </span>
         <span className="tabular-nums">{percent}%</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted-foreground/15">
+      <div
+        role="progressbar"
+        aria-label={t(labelKey)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="h-1.5 overflow-hidden rounded-full bg-muted-foreground/15"
+      >
         <div
           className={cn(
             "h-full rounded-full transition-[width] duration-500",
