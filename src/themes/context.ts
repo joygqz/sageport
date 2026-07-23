@@ -5,6 +5,7 @@ import type { ThemeDefinition, ThemeMode, ThemePreference } from "./types";
 export interface ThemeContextValue {
   theme: ThemeDefinition;
   preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
   setTheme: (id: string) => void;
   setFamily: (id: string) => void;
   setMode: (mode: ThemeMode) => void;

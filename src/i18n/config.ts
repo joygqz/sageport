@@ -22,6 +22,10 @@ export function detectLocale(): Locale {
   const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
   if (isLocale(stored)) return stored;
 
+  return systemLocale();
+}
+
+export function systemLocale(): Locale {
   const nav = navigator.language.toLowerCase();
   if (nav.startsWith("zh")) return "zh-CN";
   return DEFAULT_LOCALE;

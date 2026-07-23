@@ -1,12 +1,14 @@
 import * as monaco from "monaco-editor/editor";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
+import JsonWorker from "monaco-editor/language/json/json.worker?worker";
 
 import "monaco-editor/basic-languages/monaco.contribution";
 
 import type { ThemeDefinition } from "@/themes";
 
 self.MonacoEnvironment = {
-  getWorker: () => new EditorWorker(),
+  getWorker: (_moduleId, label) =>
+    label === "json" ? new JsonWorker() : new EditorWorker(),
 };
 
 const EDITOR_THEME = "sageport";

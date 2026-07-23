@@ -87,15 +87,17 @@ export function CommandHistoryDialog({
       >
         <DialogToolbar
           actions={
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-muted-foreground hover:text-danger"
-              onClick={confirmClear}
-              disabled={clearHistory.isPending}
-            >
-              <Trash2 /> {t("snippets.history.clear")}
-            </Button>
+            entries.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-[var(--toolbar-control-size)] text-muted-foreground hover:text-danger"
+                onClick={confirmClear}
+                disabled={clearHistory.isPending}
+              >
+                <Trash2 /> {t("snippets.history.clear")}
+              </Button>
+            )
           }
         >
           {t("snippets.history.title")}
@@ -111,13 +113,14 @@ export function CommandHistoryDialog({
               maxLength={500}
               className="min-w-0 flex-1"
             />
-            <Select
-              value={hostFilter}
-              onValueChange={setHostFilter}
-              options={hostOptions}
-              aria-label={t("snippets.history.hostFilter")}
-              className="w-44"
-            />
+            <div className="w-44 shrink-0">
+              <Select
+                value={hostFilter}
+                onValueChange={setHostFilter}
+                options={hostOptions}
+                aria-label={t("snippets.history.hostFilter")}
+              />
+            </div>
           </div>
 
           {history.isLoading ? (

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Braces,
   ChevronRight,
   Info,
   RefreshCw,
@@ -21,6 +22,7 @@ import {
   ScrollArea,
   Select,
   SwitchField,
+  Tooltip,
 } from "@/components/ui";
 import { useI18n, type TKey } from "@/i18n";
 import { errorMessage, toast } from "@/lib/toast";
@@ -43,6 +45,7 @@ import { SyncSection } from "@/features/sync/SyncSection";
 import { AboutSection } from "./AboutSection";
 import { DraftInput } from "./DraftInput";
 import { GeneralSection } from "./GeneralSection";
+import { JsonSettingsSection } from "./JsonSettingsSection";
 import { SettingsGroup, SETTINGS_GROUP_STACK_CLASS } from "./SettingsGroup";
 
 const NAV: {
@@ -84,6 +87,10 @@ export function SettingsDialog({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const jsonActionLabel = t(
+    jsonOpen ? "settings.json.openVisual" : "settings.json.open",
+  );
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -92,10 +99,33 @@ export function SettingsDialog({
         scrollMode="content"
         className="flex h-[min(44rem,calc(100dvh-2rem))] w-[min(58rem,calc(100vw-2rem))] max-w-none flex-col gap-0 bg-background p-0 text-foreground sm:h-[min(44rem,calc(100dvh-4rem))] sm:w-[min(58rem,calc(100vw-4rem))] sm:p-0"
       >
-        <DialogToolbar className="bg-background">
+        <DialogToolbar
+          className="bg-background"
+          actions={
+            <Tooltip content={jsonActionLabel}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-[var(--toolbar-control-size)]"
+                aria-label={jsonActionLabel}
+                onClick={() => setJsonOpen((current) => !current)}
+              >
+                {jsonOpen ? (
+                  <Settings2 className="size-4" />
+                ) : (
+                  <Braces className="size-4" />
+                )}
+              </Button>
+            </Tooltip>
+          }
+        >
           {t("settings.title")}
         </DialogToolbar>
-        <SettingsPage section={section} onSectionChange={onSectionChange} />
+        <SettingsPage
+          section={section}
+          jsonOpen={jsonOpen}
+          onSectionChange={onSectionChange}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -103,12 +133,27 @@ export function SettingsDialog({
 
 function SettingsPage({
   section,
+  jsonOpen,
   onSectionChange,
 }: {
   section: SettingsSection;
+  jsonOpen: boolean;
   onSectionChange: (section: SettingsSection) => void;
 }) {
   const { t } = useI18n();
+
+  if (jsonOpen) {
+    return (
+      <div className="settings-page min-h-0 flex-1 overflow-hidden bg-background">
+        <ScrollArea className="h-full">
+          <main className="settings-content mx-auto flex w-full max-w-5xl flex-col px-5 py-6 sm:px-8 sm:py-8">
+            <JsonSettingsSection />
+          </main>
+        </ScrollArea>
+      </div>
+    );
+  }
+
   return (
     <div className="settings-page min-h-0 flex-1 overflow-hidden bg-background">
       <div className="flex h-full min-w-0 flex-col sm:flex-row">

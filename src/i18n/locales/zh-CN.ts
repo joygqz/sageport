@@ -895,6 +895,26 @@ export const zhCN: Dictionary = {
       sync: "同步",
       about: "关于",
     },
+    json: {
+      title: "JSON 设置",
+      description:
+        "通过 JSON 编辑外观、显示和 AI 设置。API 密钥与同步凭据不会包含在内。",
+      open: "打开 JSON 设置",
+      openVisual: "打开图形设置",
+      editorLabel: "JSON 设置编辑器",
+      save: "保存设置",
+      discard: "放弃更改",
+      unsaved: "有未保存的更改",
+      saved: "设置已保存",
+      saveError: "保存 JSON 设置失败",
+      hint: "这里只显示与默认值不同的设置。移除设置即可恢复默认值。",
+      error: {
+        syntax: "请修正 JSON 语法后再保存。",
+        root: "顶层内容必须是 JSON 对象。",
+        unknown: "不支持设置“{key}”。请将其移除后再保存。",
+        invalid: "请为“{key}”输入有效值后再保存。",
+      },
+    },
     general: {
       startup: "启动",
       autostart: {

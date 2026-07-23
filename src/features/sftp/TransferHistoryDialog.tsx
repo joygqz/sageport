@@ -107,7 +107,7 @@ export function TransferHistoryDialog({
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-muted-foreground hover:text-danger"
+                className="h-[var(--toolbar-control-size)] text-muted-foreground hover:text-danger"
                 onClick={confirmClear}
               >
                 <Trash2 /> {t("sftp.history.clear")}

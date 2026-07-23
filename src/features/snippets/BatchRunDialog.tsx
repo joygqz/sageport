@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
   ChevronRight,
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
 import type { BatchExecEvent, BatchExecStatus } from "@/types/models";
 import { useHosts } from "@/features/hosts/api";
+import { commandHistoryKey } from "./api";
 
 interface Result {
   status: BatchExecStatus;
@@ -71,6 +73,7 @@ function BatchBody({
     isError: hostsError,
     refetch: refetchHosts,
   } = useHosts();
+  const queryClient = useQueryClient();
   const [command, setCommand] = useState(initialCommand);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<Record<string, Result>>({});
@@ -133,6 +136,7 @@ function BatchBody({
         toast.error(t("snippets.batch.error"), errorMessage(err));
       }
     } finally {
+      void queryClient.invalidateQueries({ queryKey: commandHistoryKey });
       if (requestRef.current === requestId) {
         requestRef.current = null;
         setRunning(false);

@@ -926,6 +926,26 @@ export const en = {
       sync: "Sync",
       about: "About",
     },
+    json: {
+      title: "JSON settings",
+      description:
+        "JSON settings let you edit appearance, display, and AI options. API keys and sync credentials are not included.",
+      open: "Open settings file",
+      openVisual: "Open visual settings",
+      editorLabel: "JSON settings editor",
+      save: "Save settings",
+      discard: "Discard changes",
+      unsaved: "Unsaved changes",
+      saved: "Settings saved",
+      saveError: "Failed to save settings",
+      hint: "Only settings that differ from their defaults appear here. Remove a setting to restore its default.",
+      error: {
+        syntax: "Fix invalid syntax before saving.",
+        root: "Use an object at the top level.",
+        unknown: '"{key}" is not a supported setting. Remove it before saving.',
+        invalid: 'Enter a valid value for "{key}" before saving.',
+      },
+    },
     general: {
       startup: "Startup",
       autostart: {
