@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the single app window",
-  "windows": ["*"],
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "core:event:default",
@@ -12,11 +12,14 @@
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-is-maximized",
-    "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://*" }]
+    },
     "os:default",
     "dialog:default",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
-    "process:default"
+    "process:allow-restart"
   ]
 }

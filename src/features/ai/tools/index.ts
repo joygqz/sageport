@@ -23,6 +23,7 @@ export {
   TOOLS_ALWAYS_REQUIRING_APPROVAL,
   TOOLS_REQUIRING_APPROVAL,
   TOOLS_WITH_SENSITIVE_RESULTS,
+  TOOLS_WITH_UNTRUSTED_RESULTS,
   normalizeEnabledToolNames,
   resolveEnabledToolNames,
 } from "./registry";

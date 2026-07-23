@@ -288,6 +288,8 @@ export interface AiChatMessage {
   toolCallId?: string;
 
   toolError?: boolean;
+
+  untrustedSource?: boolean;
 }
 
 export interface AiToolSpec {

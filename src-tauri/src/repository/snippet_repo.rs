@@ -8,7 +8,7 @@ const MAX_NAME_CHARS: usize = 255;
 const MAX_COMMAND_CHARS: usize = 32 * 1024;
 const MAX_DESCRIPTION_CHARS: usize = 4 * 1024;
 
-fn normalize(mut input: SnippetInput) -> AppResult<SnippetInput> {
+pub(crate) fn normalize(mut input: SnippetInput) -> AppResult<SnippetInput> {
     input.name = input.name.trim().to_string();
     input.command = input.command.trim().to_string();
     input.description = input
@@ -22,7 +22,7 @@ fn normalize(mut input: SnippetInput) -> AppResult<SnippetInput> {
     if input.command.is_empty() {
         return Err(AppError::Invalid("snippet command is required".into()));
     }
-    if input.name.chars().count() > MAX_NAME_CHARS || input.name.contains('\0') {
+    if input.name.chars().count() > MAX_NAME_CHARS || input.name.chars().any(char::is_control) {
         return Err(AppError::Invalid(format!(
             "snippet name exceeds {MAX_NAME_CHARS} characters"
         )));

@@ -444,6 +444,9 @@ export const terminalTools: AiTool[] = [
     },
     icon: Eye,
     labelKey: "ai.tool.readTerminalOutput",
+    requiresApproval: true,
+    alwaysRequireApproval: true,
+    untrustedResult: true,
     execute: async (args) => readOutput(args),
   },
   {
@@ -479,6 +482,7 @@ export const terminalTools: AiTool[] = [
     icon: TerminalIcon,
     labelKey: "ai.tool.runTerminalCommand",
     requiresApproval: true,
+    untrustedResult: true,
     confirmKey: "ai.confirmRun",
     prepare: (args) => prepareTerminalTarget(args),
     execute: executeTerminalCommand,

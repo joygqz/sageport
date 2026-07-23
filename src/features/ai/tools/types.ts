@@ -35,6 +35,7 @@ export interface AiTool {
   requiresApproval?: boolean;
   alwaysRequireApproval?: boolean;
   sensitiveResult?: boolean;
+  untrustedResult?: boolean;
   confirmKey?: TKey;
   execute?: ToolExecute;
   prepare?: ToolPrepare;

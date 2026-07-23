@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TerminalTransport } from "./transport";
+import type { TerminalStatusUpdate, TerminalTransport } from "./transport";
 
 const terminal = vi.hoisted(() => ({
   rows: 24,
@@ -28,7 +28,11 @@ vi.mock("./xterm", () => ({
   attachWebglRenderer: vi.fn(),
 }));
 
-import { CONNECT_TIMEOUT_MS, TerminalSession } from "./session";
+import {
+  CONNECT_TIMEOUT_MS,
+  MAX_PENDING_INPUT_BYTES,
+  TerminalSession,
+} from "./session";
 
 function transport(
   overrides: Partial<TerminalTransport> = {},
@@ -132,6 +136,64 @@ describe("TerminalSession lifecycle", () => {
     await vi.advanceTimersByTimeAsync(CONNECT_TIMEOUT_MS);
 
     expect(events.at(-1)).toEqual({ status: "error", code: "timeout" });
+    expect(current.disconnect).toHaveBeenCalledTimes(1);
+    session.dispose();
+  });
+
+  it("reports a failed input write and closes the transport", async () => {
+    let statusHandler: ((event: TerminalStatusUpdate) => void) | undefined;
+    const current = transport({
+      send: vi.fn(() => Promise.reject(new Error("write failed"))),
+      onStatus: vi.fn((handler) => {
+        statusHandler = handler;
+        return Promise.resolve(() => {});
+      }),
+    });
+    const events: Array<{ status: string; message?: string }> = [];
+    const session = new TerminalSession({
+      id: "session-1",
+      connectionKey: "attempt-1",
+      transport: current,
+      fontFamily: "monospace",
+      fontSize: 13,
+      theme: {},
+      watchHostKey: false,
+      imagePaste: false,
+      onStatus: (event) => events.push(event),
+    });
+
+    session.attach({} as HTMLElement);
+    await vi.waitFor(() => expect(statusHandler).toBeTypeOf("function"));
+    statusHandler?.({ status: "connected" });
+    session.send("echo test\r");
+
+    await vi.waitFor(() => expect(events.at(-1)?.status).toBe("error"));
+    expect(events.at(-1)?.message).toContain("write failed");
+    expect(current.disconnect).toHaveBeenCalledTimes(1);
+    session.dispose();
+    expect(current.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects input when the pending queue reaches its byte limit", () => {
+    const current = transport();
+    const events: Array<{ status: string; message?: string }> = [];
+    const session = new TerminalSession({
+      id: "session-1",
+      connectionKey: "attempt-1",
+      transport: current,
+      fontFamily: "monospace",
+      fontSize: 13,
+      theme: {},
+      watchHostKey: false,
+      imagePaste: false,
+      onStatus: (event) => events.push(event),
+    });
+
+    session.send("x".repeat(MAX_PENDING_INPUT_BYTES + 1));
+
+    expect(events.at(-1)?.status).toBe("error");
+    expect(events.at(-1)?.message).toContain("queue limit");
+    expect(current.send).not.toHaveBeenCalled();
     expect(current.disconnect).toHaveBeenCalledTimes(1);
     session.dispose();
   });

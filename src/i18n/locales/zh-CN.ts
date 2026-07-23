@@ -780,7 +780,8 @@ export const zhCN: Dictionary = {
     promptTooLong: "消息过长，无法发送。",
     contextUsage: "上下文 {percent}% · {used} / {total} tokens",
     autonomousMode: "自动",
-    autonomousModeHint: "操作会自动获得审批。可在 AI 设置中关闭自动模式。",
+    autonomousModeHint:
+      "符合条件的操作会自动获得审批。读取内容及受不可信内容影响的操作仍需人工审批。",
     tool: {
       askUser: "请求你选择",
       listHosts: "列出主机",
@@ -933,7 +934,8 @@ export const zhCN: Dictionary = {
         anthropic: "Anthropic 兼容",
       },
       baseUrlLabel: "接口地址",
-      baseUrlHint: "OpenAI 兼容接口的地址通常以 /v1 结尾。",
+      baseUrlHint:
+        "远程接口请使用 HTTPS。OpenAI 兼容接口的地址通常以 /v1 结尾。",
       modelLabel: "模型",
       modelHint: "接口未提供模型列表时，请输入模型 ID。",
       apiKeyLabel: "API 密钥",
@@ -944,7 +946,7 @@ export const zhCN: Dictionary = {
       autonomousModeLabel: "助手模式",
       autonomousMode: "自动模式",
       autonomousModeHint:
-        "开启后，助手会自动审批命令、文件编辑和配置更改等操作。目标或意图不明确时，仍会向你询问。",
+        "自动审批符合条件的操作。读取终端或远程文件内容、受这些内容影响的操作，以及受保护主机上的操作仍需人工审批。",
       autonomousModeWarning:
         "此模式可能对系统造成不可逆更改，请仅在信任的主机和任务中开启。",
       maxHistoryTokensLabel: "历史 token 上限",
@@ -1004,7 +1006,7 @@ export const zhCN: Dictionary = {
         s3PathStyleHint: "MinIO 及多数自建服务需要开启。",
         passphraseLabel: "加密口令",
         passphraseHint:
-          "用于端到端加密所有备份。所有设备需使用相同口令。口令不会离开本设备。",
+          "用于端到端加密所有备份。所有设备需使用相同口令。口令会保存在本地数据库中，但不会发送给存储服务商。",
         connectButton: "连接",
         connectedTitle: "同步已连接",
         connectError: "连接失败",

@@ -66,6 +66,9 @@ pub struct ChatMessage {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_error: Option<bool>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub untrusted_source: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -10,6 +10,7 @@ import {
   TOOL_LABEL_KEYS,
   TOOLS_ALWAYS_REQUIRING_APPROVAL,
   TOOLS_REQUIRING_APPROVAL,
+  TOOLS_WITH_UNTRUSTED_RESULTS,
   getTool,
   enabledToolSpecs,
   normalizeEnabledToolNames,
@@ -45,6 +46,9 @@ describe("tool registry", () => {
         expect(tool.requiresApproval).toBe(true);
         expect(TOOLS_ALWAYS_REQUIRING_APPROVAL.has(name)).toBe(true);
       }
+      expect(TOOLS_WITH_UNTRUSTED_RESULTS.has(name)).toBe(
+        Boolean(tool.untrustedResult),
+      );
     }
   });
 

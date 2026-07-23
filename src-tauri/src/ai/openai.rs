@@ -332,6 +332,7 @@ mod tests {
                 tool_calls: vec![],
                 tool_call_id: Some("call-1".into()),
                 tool_error: Some(true),
+                untrusted_source: Some(true),
             }],
             &[],
             4096,
@@ -340,6 +341,7 @@ mod tests {
         let message = body["messages"].as_array().unwrap().last().unwrap();
         assert!(message.get("toolError").is_none());
         assert!(message.get("tool_error").is_none());
+        assert!(message.get("untrustedSource").is_none());
     }
 
     #[test]
@@ -354,6 +356,7 @@ mod tests {
                 tool_calls: vec![],
                 tool_call_id: None,
                 tool_error: None,
+                untrusted_source: None,
             }],
             &[],
             4096,

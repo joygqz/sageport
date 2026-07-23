@@ -7,10 +7,8 @@ use base64::Engine;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use zeroize::Zeroizing;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
-const SERVICE: &str = "com.sageport.desktop";
-const ACCOUNT: &str = "database-master-key-v1";
 const PREFIX: &str = "sageport:secret:v1:";
 const KEY_CHECK_SETTING: &str = "security.master_key_check";
 const KEY_LEN: usize = 32;
@@ -33,14 +31,18 @@ pub async fn decrypt_sealed_values(data_dir: &Path, pool: &SqlitePool) -> AppRes
         return Ok(());
     }
 
-    let key = load_key(data_dir);
-    let key = key.as_ref().map(|bytes| bytes.as_slice());
+    let key = load_key(data_dir).ok_or_else(|| {
+        AppError::Crypto(
+            "legacy encrypted credentials were preserved because their local key file is missing; restore .master-key or .database-master-key-v1 to the data directory and restart"
+                .into(),
+        )
+    })?;
     let mut tx = pool.begin().await?;
     for (table, column) in SEALED_COLUMNS {
-        decrypt_column(&mut tx, key, table, column).await?;
+        decrypt_column(&mut tx, &key, table, column).await?;
     }
     for setting in SEALED_SETTINGS {
-        decrypt_setting(&mut tx, key, setting).await?;
+        decrypt_setting(&mut tx, &key, setting).await?;
     }
     sqlx::query("DELETE FROM settings WHERE key = ?")
         .bind(KEY_CHECK_SETTING)
@@ -56,7 +58,7 @@ pub async fn decrypt_sealed_values(data_dir: &Path, pool: &SqlitePool) -> AppRes
 
 async fn decrypt_column(
     tx: &mut Transaction<'_, Sqlite>,
-    key: Option<&[u8]>,
+    key: &[u8],
     table: &'static str,
     column: &'static str,
 ) -> AppResult<()> {
@@ -65,7 +67,7 @@ async fn decrypt_column(
         .fetch_all(&mut **tx)
         .await?;
     for (id, value) in rows {
-        let plaintext = open(key, &format!("{table}:{id}:{column}"), &value);
+        let plaintext = open(key, &format!("{table}:{id}:{column}"), &value)?;
         let update = format!("UPDATE {table} SET {column} = ? WHERE id = ?");
         sqlx::query(sqlx::AssertSqlSafe(update))
             .bind(plaintext)
@@ -78,7 +80,7 @@ async fn decrypt_column(
 
 async fn decrypt_setting(
     tx: &mut Transaction<'_, Sqlite>,
-    key: Option<&[u8]>,
+    key: &[u8],
     setting: &'static str,
 ) -> AppResult<()> {
     let stored: Option<String> = sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
@@ -88,43 +90,34 @@ async fn decrypt_setting(
     let Some(value) = stored.filter(|value| value.starts_with(PREFIX)) else {
         return Ok(());
     };
-    match open(key, &format!("settings:{setting}"), &value) {
-        Some(plaintext) => {
-            sqlx::query("UPDATE settings SET value = ? WHERE key = ?")
-                .bind(plaintext)
-                .bind(setting)
-                .execute(&mut **tx)
-                .await?;
-        }
-        None => {
-            sqlx::query("DELETE FROM settings WHERE key = ?")
-                .bind(setting)
-                .execute(&mut **tx)
-                .await?;
-        }
-    }
+    let plaintext = open(key, &format!("settings:{setting}"), &value)?;
+    sqlx::query("UPDATE settings SET value = ? WHERE key = ?")
+        .bind(plaintext)
+        .bind(setting)
+        .execute(&mut **tx)
+        .await?;
     Ok(())
 }
 
-fn open(key: Option<&[u8]>, context: &str, value: &str) -> Option<String> {
-    let key = key?;
-    let encoded = value.strip_prefix(PREFIX)?;
-    let bytes = STANDARD.decode(encoded).ok()?;
+fn open(key: &[u8], context: &str, value: &str) -> AppResult<String> {
+    let invalid = || AppError::Crypto(format!("legacy encrypted value is unreadable: {context}"));
+    let encoded = value.strip_prefix(PREFIX).ok_or_else(&invalid)?;
+    let bytes = STANDARD.decode(encoded).map_err(|_| invalid())?;
     if bytes.len() < NONCE_LEN + 16 {
-        return None;
+        return Err(invalid());
     }
     let (nonce, ciphertext) = bytes.split_at(NONCE_LEN);
-    let cipher = Aes256Gcm::new_from_slice(key).ok()?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| invalid())?;
     let plaintext = cipher
         .decrypt(
-            &Nonce::try_from(nonce).ok()?,
+            &Nonce::try_from(nonce).map_err(|_| invalid())?,
             Payload {
                 msg: ciphertext,
                 aad: context.as_bytes(),
             },
         )
-        .ok()?;
-    String::from_utf8(plaintext).ok()
+        .map_err(|_| invalid())?;
+    String::from_utf8(plaintext).map_err(|_| invalid())
 }
 
 fn load_key(data_dir: &Path) -> Option<Zeroizing<Vec<u8>>> {
@@ -136,11 +129,7 @@ fn load_key(data_dir: &Path) -> Option<Zeroizing<Vec<u8>>> {
             }
         }
     }
-    keyring::Entry::new(SERVICE, ACCOUNT)
-        .and_then(|entry| entry.get_secret())
-        .ok()
-        .filter(|secret| secret.len() == KEY_LEN)
-        .map(Zeroizing::new)
+    None
 }
 
 #[cfg(test)]
@@ -232,25 +221,59 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unreadable_values_are_cleared_instead_of_blocking_startup() {
+    async fn missing_key_preserves_all_encrypted_values() {
         let dir =
             std::env::temp_dir().join(format!("sageport-legacy-lost-{}", uuid::Uuid::new_v4()));
         let pool = sealed_database(&dir, &[0x22u8; KEY_LEN]).await;
 
-        decrypt_sealed_values(&dir, &pool).await.unwrap();
+        let error = decrypt_sealed_values(&dir, &pool).await.unwrap_err();
+        assert_eq!(error.code(), "crypto");
 
-        let password: Option<String> =
-            sqlx::query_scalar("SELECT password FROM hosts WHERE id = 'h1'")
+        let password: String = sqlx::query_scalar("SELECT password FROM hosts WHERE id = 'h1'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert!(password.starts_with(PREFIX));
+        let api_key: String =
+            sqlx::query_scalar("SELECT value FROM settings WHERE key = 'ai.api_key'")
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(password, None);
-        let api_key: Option<String> =
-            sqlx::query_scalar("SELECT value FROM settings WHERE key = 'ai.api_key'")
-                .fetch_optional(&pool)
+        assert!(api_key.starts_with(PREFIX));
+        let marker_exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM settings WHERE key = ?)")
+                .bind(KEY_CHECK_SETTING)
+                .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(api_key, None);
+        assert!(marker_exists);
+
+        pool.close().await;
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn unreadable_value_rolls_back_the_entire_migration() {
+        let dir =
+            std::env::temp_dir().join(format!("sageport-legacy-corrupt-{}", uuid::Uuid::new_v4()));
+        let key = [0x33u8; KEY_LEN];
+        let pool = sealed_database(&dir, &key).await;
+        std::fs::write(dir.join(KEY_FILES[0]), key).unwrap();
+        sqlx::query("UPDATE settings SET value = ? WHERE key = 'ai.api_key'")
+            .bind(format!("{PREFIX}broken"))
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let error = decrypt_sealed_values(&dir, &pool).await.unwrap_err();
+        assert_eq!(error.code(), "crypto");
+
+        let password: String = sqlx::query_scalar("SELECT password FROM hosts WHERE id = 'h1'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert!(password.starts_with(PREFIX));
+        assert!(dir.join(KEY_FILES[0]).exists());
 
         pool.close().await;
         std::fs::remove_dir_all(dir).unwrap();

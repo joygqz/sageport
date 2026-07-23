@@ -107,6 +107,7 @@ fn validate_base_url(raw: &str) -> AppResult<String> {
             "base URL must not contain a query or fragment".into(),
         ));
     }
+    crate::network::require_secure_transport(&parsed, "base URL")?;
     Ok(value)
 }
 
@@ -650,6 +651,8 @@ mod tests {
             validate_base_url(" http://localhost:11434/v1/ ").unwrap(),
             "http://localhost:11434/v1"
         );
+        assert!(validate_base_url("http://example.com/v1").is_err());
+        assert!(validate_base_url("http://192.168.1.8/v1").is_err());
         assert!(validate_base_url("file:///tmp/provider").is_err());
         assert!(validate_base_url("https://user:secret@example.com").is_err());
         assert!(validate_base_url("https://example.com/v1?key=secret").is_err());
@@ -664,6 +667,7 @@ mod tests {
                 tool_calls: vec![],
                 tool_call_id: None,
                 tool_error: None,
+                untrusted_source: None,
             }],
             false,
             false,
@@ -676,6 +680,7 @@ mod tests {
                 tool_calls: vec![],
                 tool_call_id: None,
                 tool_error: None,
+                untrusted_source: None,
             }],
             false,
             false,
@@ -695,6 +700,7 @@ mod tests {
             }],
             tool_call_id: None,
             tool_error: None,
+            untrusted_source: None,
         };
         assert!(validate_messages(std::slice::from_ref(&assistant), false, true).is_ok());
         assert!(validate_messages(std::slice::from_ref(&assistant), false, false).is_err());
@@ -705,6 +711,7 @@ mod tests {
             tool_calls: vec![],
             tool_call_id: Some("call-1".into()),
             tool_error: Some(false),
+            untrusted_source: Some(true),
         };
         assert!(validate_messages(&[assistant, tool], false, false).is_ok());
     }

@@ -7,6 +7,7 @@ use crate::repository::none_if_empty;
 const MAX_NAME_LEN: usize = 255;
 const MAX_USERNAME_LEN: usize = 255;
 const MAX_PASSWORD_LEN: usize = 64 * 1024;
+const MAX_KEY_ID_LEN: usize = 128;
 
 fn clean_optional(value: &mut Option<String>) {
     *value = value
@@ -15,7 +16,7 @@ fn clean_optional(value: &mut Option<String>) {
         .filter(|v| !v.is_empty());
 }
 
-fn normalize(mut input: IdentityInput) -> AppResult<IdentityInput> {
+pub(crate) fn normalize(mut input: IdentityInput) -> AppResult<IdentityInput> {
     input.name = input.name.trim().to_string();
     input.username = input.username.trim().to_string();
     input.auth_type = input.auth_type.trim().to_string();
@@ -24,7 +25,7 @@ fn normalize(mut input: IdentityInput) -> AppResult<IdentityInput> {
     if input.name.is_empty() {
         return Err(AppError::Invalid("identity name is required".into()));
     }
-    if input.name.len() > MAX_NAME_LEN {
+    if input.name.len() > MAX_NAME_LEN || input.name.chars().any(char::is_control) {
         return Err(AppError::Invalid(format!(
             "identity name exceeds {MAX_NAME_LEN} bytes"
         )));
@@ -32,7 +33,7 @@ fn normalize(mut input: IdentityInput) -> AppResult<IdentityInput> {
     if input.username.is_empty() {
         return Err(AppError::Invalid("username is required".into()));
     }
-    if input.username.len() > MAX_USERNAME_LEN {
+    if input.username.len() > MAX_USERNAME_LEN || input.username.chars().any(char::is_control) {
         return Err(AppError::Invalid(format!(
             "username exceeds {MAX_USERNAME_LEN} bytes"
         )));
@@ -45,6 +46,13 @@ fn normalize(mut input: IdentityInput) -> AppResult<IdentityInput> {
         return Err(AppError::Invalid(format!(
             "password exceeds {MAX_PASSWORD_LEN} bytes"
         )));
+    }
+    if input
+        .key_id
+        .as_deref()
+        .is_some_and(|value| value.len() > MAX_KEY_ID_LEN || value.chars().any(char::is_control))
+    {
+        return Err(AppError::Invalid("invalid identity key id".into()));
     }
     if !matches!(
         input.auth_type.as_str(),

@@ -5,7 +5,10 @@ use sqlx::{SqliteConnection, SqlitePool};
 use crate::domain::{new_id, now, Group, GroupInput};
 use crate::error::{AppError, AppResult};
 
-fn normalize(mut input: GroupInput) -> AppResult<GroupInput> {
+const MAX_NAME_BYTES: usize = 255;
+const MAX_PARENT_ID_BYTES: usize = 128;
+
+pub(crate) fn normalize(mut input: GroupInput) -> AppResult<GroupInput> {
     input.name = input.name.trim().to_string();
     input.parent_id = input
         .parent_id
@@ -14,6 +17,14 @@ fn normalize(mut input: GroupInput) -> AppResult<GroupInput> {
         .filter(|v| !v.is_empty());
     if input.name.is_empty() {
         return Err(AppError::Invalid("group name is required".into()));
+    }
+    if input.name.len() > MAX_NAME_BYTES || input.name.chars().any(char::is_control) {
+        return Err(AppError::Invalid("invalid or oversized group name".into()));
+    }
+    if input.parent_id.as_deref().is_some_and(|value| {
+        value.len() > MAX_PARENT_ID_BYTES || value.chars().any(char::is_control)
+    }) {
+        return Err(AppError::Invalid("invalid group parent id".into()));
     }
     Ok(input)
 }

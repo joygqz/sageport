@@ -44,6 +44,7 @@ impl WebdavStore {
                 "WebDAV URL must have a host and no credentials, query, or fragment".into(),
             ));
         }
+        crate::network::require_secure_transport(&base, "WebDAV URL")?;
         Ok(Self {
             http: http_client()?,
             base,
@@ -288,6 +289,18 @@ mod tests {
             String::new()
         )
         .is_err());
+        assert!(WebdavStore::new(
+            "http://example.com/vault".into(),
+            String::new(),
+            String::new()
+        )
+        .is_err());
+        assert!(WebdavStore::new(
+            "http://localhost:8080/vault".into(),
+            String::new(),
+            String::new()
+        )
+        .is_ok());
     }
 
     #[test]

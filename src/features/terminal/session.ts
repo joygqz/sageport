@@ -12,6 +12,7 @@ import type { TerminalStatusUpdate, TerminalTransport } from "./transport";
 import { attachWebglRenderer, createTerminal } from "./xterm";
 
 export const CONNECT_TIMEOUT_MS = 45_000;
+export const MAX_PENDING_INPUT_BYTES = 1024 * 1024;
 const COLUMN_RESIZE_DEBOUNCE_MS = 100;
 
 export interface SessionStatusEvent {
@@ -53,7 +54,9 @@ export class TerminalSession {
   private connectSettled = false;
   private inputReady = false;
   private pendingInput = "";
+  private pendingInputBytes = 0;
   private sendingInput = false;
+  private disconnectRequested = false;
 
   private watchdog: ReturnType<typeof setTimeout> | undefined;
   private colsTimer: ReturnType<typeof setTimeout> | undefined;
@@ -164,8 +167,19 @@ export class TerminalSession {
   }
 
   send(data: string) {
+    if (this.disposed || this.ended || data.length === 0) return;
+    const dataBytes = new TextEncoder().encode(data).byteLength;
+    if (this.pendingInputBytes + dataBytes > MAX_PENDING_INPUT_BYTES) {
+      this.failInput(
+        new Error(
+          `terminal input exceeds the ${MAX_PENDING_INPUT_BYTES}-byte queue limit`,
+        ),
+      );
+      return;
+    }
     this.commands.noteInput(data);
     this.pendingInput += data;
+    this.pendingInputBytes += dataBytes;
     this.flushInput();
   }
 
@@ -220,12 +234,13 @@ export class TerminalSession {
     if (this.disposed) return;
     this.disposed = true;
     this.pendingInput = "";
+    this.pendingInputBytes = 0;
     this.clearWatchdog();
     clearTimeout(this.colsTimer);
     this.observer?.disconnect();
     this.observer = null;
     for (const dispose of this.disposables.splice(0)) dispose();
-    void this.transport.disconnect().catch(() => {});
+    this.disconnectTransport();
     try {
       this.opts.onDispose?.();
     } finally {
@@ -248,6 +263,7 @@ export class TerminalSession {
       if (!this.disposed) {
         this.ended = true;
         this.pendingInput = "";
+        this.pendingInputBytes = 0;
         this.emitStatus({
           status: "error",
           code: errorCode(err),
@@ -277,6 +293,7 @@ export class TerminalSession {
       this.settleConnect();
       this.ended = true;
       this.pendingInput = "";
+      this.pendingInputBytes = 0;
       if (!this.disposed) {
         this.emitStatus({
           status: "error",
@@ -300,6 +317,7 @@ export class TerminalSession {
       this.ended = true;
       this.inputReady = false;
       this.pendingInput = "";
+      this.pendingInputBytes = 0;
     }
     this.emitStatus(e);
   }
@@ -319,15 +337,42 @@ export class TerminalSession {
       return;
     }
     const data = this.pendingInput;
+    const dataBytes = new TextEncoder().encode(data).byteLength;
     this.pendingInput = "";
     this.sendingInput = true;
     void this.transport
       .send(data)
-      .catch(() => {})
+      .then(() => {
+        this.pendingInputBytes = Math.max(
+          0,
+          this.pendingInputBytes - dataBytes,
+        );
+      })
+      .catch((error) => this.failInput(error))
       .finally(() => {
         this.sendingInput = false;
         this.flushInput();
       });
+  }
+
+  private failInput(error: unknown) {
+    if (this.disposed || this.ended) return;
+    this.ended = true;
+    this.inputReady = false;
+    this.pendingInput = "";
+    this.pendingInputBytes = 0;
+    this.emitStatus({
+      status: "error",
+      code: errorCode(error),
+      message: errorMessage(error),
+    });
+    this.disconnectTransport();
+  }
+
+  private disconnectTransport() {
+    if (this.disconnectRequested) return;
+    this.disconnectRequested = true;
+    void this.transport.disconnect().catch(() => {});
   }
 
   private armWatchdog() {
@@ -337,8 +382,9 @@ export class TerminalSession {
       if (this.disposed || this.connectSettled) return;
       this.ended = true;
       this.pendingInput = "";
+      this.pendingInputBytes = 0;
       this.emitStatus({ status: "error", code: "timeout" });
-      void this.transport.disconnect().catch(() => {});
+      this.disconnectTransport();
     }, CONNECT_TIMEOUT_MS);
   }
 

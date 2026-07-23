@@ -9,6 +9,14 @@ use crate::ssh::JUMP_DEPTH_LIMIT;
 
 const MIN_PORT: i64 = 1;
 const MAX_PORT: i64 = u16::MAX as i64;
+const MAX_LABEL_BYTES: usize = 255;
+const MAX_ADDRESS_BYTES: usize = 255;
+const MAX_USERNAME_BYTES: usize = 255;
+const MAX_REFERENCE_BYTES: usize = 128;
+const MAX_OS_HINT_BYTES: usize = 64;
+const MAX_NOTES_BYTES: usize = 64 * 1024;
+const MAX_STARTUP_COMMAND_BYTES: usize = 32 * 1024;
+const MAX_PASSWORD_BYTES: usize = 64 * 1024;
 
 fn clean_optional(value: &mut Option<String>) {
     *value = value
@@ -17,7 +25,7 @@ fn clean_optional(value: &mut Option<String>) {
         .filter(|v| !v.is_empty());
 }
 
-fn normalize(mut input: HostInput) -> AppResult<HostInput> {
+pub(crate) fn normalize(mut input: HostInput) -> AppResult<HostInput> {
     input.label = input.label.trim().to_string();
     input.address = input.address.trim().to_string();
     clean_optional(&mut input.group_id);
@@ -35,6 +43,63 @@ fn normalize(mut input: HostInput) -> AppResult<HostInput> {
     }
     if input.address.is_empty() {
         return Err(AppError::Invalid("host address is required".into()));
+    }
+    for (value, label, max_bytes) in [
+        (input.label.as_str(), "host label", MAX_LABEL_BYTES),
+        (input.address.as_str(), "host address", MAX_ADDRESS_BYTES),
+    ] {
+        if value.len() > max_bytes || value.chars().any(char::is_control) {
+            return Err(AppError::Invalid(format!("invalid or oversized {label}")));
+        }
+    }
+    for (value, label) in [
+        (input.group_id.as_deref(), "group id"),
+        (input.identity_id.as_deref(), "identity id"),
+        (input.key_id.as_deref(), "key id"),
+        (input.jump_host_id.as_deref(), "jump host id"),
+    ] {
+        if value.is_some_and(|value| {
+            value.len() > MAX_REFERENCE_BYTES || value.chars().any(char::is_control)
+        }) {
+            return Err(AppError::Invalid(format!("invalid {label}")));
+        }
+    }
+    if input.username.as_deref().is_some_and(|value| {
+        value.len() > MAX_USERNAME_BYTES || value.chars().any(char::is_control)
+    }) {
+        return Err(AppError::Invalid("invalid or oversized username".into()));
+    }
+    if input
+        .os_hint
+        .as_deref()
+        .is_some_and(|value| value.len() > MAX_OS_HINT_BYTES || value.chars().any(char::is_control))
+    {
+        return Err(AppError::Invalid("invalid OS hint".into()));
+    }
+    if input
+        .notes
+        .as_deref()
+        .is_some_and(|value| value.len() > MAX_NOTES_BYTES || value.contains('\0'))
+    {
+        return Err(AppError::Invalid("invalid or oversized host notes".into()));
+    }
+    if input
+        .startup_command
+        .as_deref()
+        .is_some_and(|value| value.len() > MAX_STARTUP_COMMAND_BYTES || value.contains('\0'))
+    {
+        return Err(AppError::Invalid(
+            "invalid or oversized startup command".into(),
+        ));
+    }
+    if input
+        .password
+        .as_deref()
+        .is_some_and(|value| value.len() > MAX_PASSWORD_BYTES)
+    {
+        return Err(AppError::Invalid(format!(
+            "password exceeds {MAX_PASSWORD_BYTES} bytes"
+        )));
     }
     if !(MIN_PORT..=MAX_PORT).contains(&input.port) {
         return Err(AppError::Invalid(format!(
@@ -286,6 +351,11 @@ pub async fn move_to_group(
     let group_id = group_id
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty());
+    if group_id.as_deref().is_some_and(|value| {
+        value.len() > MAX_REFERENCE_BYTES || value.chars().any(char::is_control)
+    }) {
+        return Err(AppError::Invalid("invalid group id".into()));
+    }
     let mut tx = pool.begin().await?;
     if let Some(gid) = group_id.as_deref() {
         let active: bool = sqlx::query_scalar(
@@ -325,6 +395,9 @@ pub async fn set_os_hint(pool: &SqlitePool, id: &str, os_hint: String) -> AppRes
     let os_hint = os_hint.trim();
     if os_hint.is_empty() {
         return Err(AppError::Invalid("host system is required".into()));
+    }
+    if os_hint.len() > MAX_OS_HINT_BYTES || os_hint.chars().any(char::is_control) {
+        return Err(AppError::Invalid("invalid OS hint".into()));
     }
 
     let ts = now();
@@ -475,6 +548,27 @@ mod tests {
             startup_command: host.startup_command.clone(),
             password,
         }
+    }
+
+    #[test]
+    fn rejects_oversized_and_control_character_fields() {
+        let mut oversized = input("host");
+        oversized.label = "x".repeat(MAX_LABEL_BYTES + 1);
+        assert!(matches!(normalize(oversized), Err(AppError::Invalid(_))));
+
+        let mut unsafe_address = input("host");
+        unsafe_address.address = "example.com\nspoofed".into();
+        assert!(matches!(
+            normalize(unsafe_address),
+            Err(AppError::Invalid(_))
+        ));
+
+        let mut oversized_notes = input("host");
+        oversized_notes.notes = Some("x".repeat(MAX_NOTES_BYTES + 1));
+        assert!(matches!(
+            normalize(oversized_notes),
+            Err(AppError::Invalid(_))
+        ));
     }
 
     #[tokio::test]

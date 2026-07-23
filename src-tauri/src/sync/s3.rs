@@ -52,6 +52,7 @@ impl S3Store {
                     .into(),
             ));
         }
+        crate::network::require_secure_transport(&endpoint_url, "S3 endpoint")?;
         let style = if path_style {
             UrlStyle::Path
         } else {
@@ -249,6 +250,9 @@ mod tests {
         assert!(store("file:///tmp/s3").is_err());
         assert!(store("https://user:secret@example.com").is_err());
         assert!(store("https://example.com?token=secret").is_err());
+        assert!(store("http://example.com").is_err());
+        assert!(store("http://192.168.1.8").is_err());
+        assert!(store("http://localhost:9000").is_ok());
 
         let store = S3Store::new(
             "https://example.com".into(),

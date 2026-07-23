@@ -814,7 +814,7 @@ export const en = {
     contextUsage: "Context {percent}% · {used} / {total} tokens",
     autonomousMode: "Autonomous",
     autonomousModeHint:
-      "Operations are approved automatically. Turn off autonomous mode in AI settings.",
+      "Eligible operations are approved automatically. Reads and operations influenced by untrusted content still need approval.",
     tool: {
       askUser: "Ask for your choice",
       listHosts: "List hosts",
@@ -967,7 +967,8 @@ export const en = {
         anthropic: "Anthropic-compatible",
       },
       baseUrlLabel: "Base URL",
-      baseUrlHint: "OpenAI-compatible endpoints usually end with /v1.",
+      baseUrlHint:
+        "Remote endpoints must use https://. OpenAI-compatible endpoints usually end with /v1.",
       modelLabel: "Model",
       modelHint:
         "Enter a model ID if the endpoint doesn't provide a model list.",
@@ -979,7 +980,7 @@ export const en = {
       autonomousModeLabel: "Assistant mode",
       autonomousMode: "Autonomous mode",
       autonomousModeHint:
-        "When enabled, the assistant automatically approves operations such as commands, file edits, and configuration changes. It will still ask when your intent or target is ambiguous.",
+        "Automatically approves eligible operations. Reading terminal or remote file content, operations influenced by that content, and protected hosts still require approval.",
       autonomousModeWarning:
         "This can make irreversible changes to your systems. Enable it only for hosts and tasks you trust.",
       maxHistoryTokensLabel: "Max history tokens",
@@ -1043,7 +1044,7 @@ export const en = {
         s3PathStyleHint: "Required by MinIO and most self-hosted services.",
         passphraseLabel: "Encryption passphrase",
         passphraseHint:
-          "Encrypts every backup end to end. Use the same passphrase on every device. It never leaves this device.",
+          "Encrypts every backup end to end. Use the same passphrase on every device. It is saved in the local database and never sent to the storage provider.",
         connectButton: "Connect",
         connectedTitle: "Sync connected",
         connectError: "Failed to connect",

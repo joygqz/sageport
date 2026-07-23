@@ -19,10 +19,14 @@ use sqlx::{Executor, Sqlite, SqlitePool};
 
 use crate::crypto::{self, EncryptedEnvelope};
 use crate::domain::{
-    now, Group, Host, Identity, PortForward, PortForwardInput, SftpBookmark, Snippet, SshKey,
+    now, Group, GroupInput, Host, HostInput, Identity, IdentityInput, PortForward,
+    PortForwardInput, SftpBookmark, SftpBookmarkInput, Snippet, SnippetInput, SshKey, SshKeyInput,
 };
 use crate::error::{AppError, AppResult};
-use crate::repository::{forward_repo, settings_repo};
+use crate::repository::{
+    bookmark_repo, forward_repo, group_repo, host_repo, identity_repo, key_repo, settings_repo,
+    snippet_repo,
+};
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["security.", "sync.", "update."];
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -385,6 +389,12 @@ pub fn read_envelope_file(path: &Path) -> AppResult<EncryptedEnvelope> {
 }
 
 fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
+    if serde_json::to_vec(snapshot)?.len() > MAX_SNAPSHOT_BYTES {
+        return Err(AppError::Invalid(format!(
+            "vault snapshot exceeds the {} MiB backup limit",
+            MAX_SNAPSHOT_BYTES / 1024 / 1024
+        )));
+    }
     validate_timestamp(&snapshot.exported_at, "snapshot export time")?;
     for (label, len) in [
         ("groups", snapshot.groups.len()),
@@ -419,15 +429,96 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
         };
     }
     records!(&snapshot.groups, "group");
+    for group in &snapshot.groups {
+        group_repo::normalize(GroupInput {
+            name: group.name.clone(),
+            parent_id: group.parent_id.clone(),
+            sort_order: group.sort_order,
+        })?;
+    }
     records!(&snapshot.hosts, "host");
+    for host in &snapshot.hosts {
+        host_repo::normalize(HostInput {
+            label: host.label.clone(),
+            address: host.address.clone(),
+            port: host.port,
+            group_id: host.group_id.clone(),
+            identity_id: host.identity_id.clone(),
+            username: host.username.clone(),
+            auth_type: host.auth_type.clone(),
+            key_id: host.key_id.clone(),
+            os_hint: host.os_hint.clone(),
+            requires_approval: host.requires_approval,
+            notes: host.notes.clone(),
+            jump_host_id: host.jump_host_id.clone(),
+            startup_command: host.startup_command.clone(),
+            password: host.password.clone(),
+        })?;
+        if host
+            .color
+            .as_deref()
+            .is_some_and(|value| value.len() > 64 || value.chars().any(char::is_control))
+        {
+            return Err(AppError::Invalid("invalid host color in backup".into()));
+        }
+        if let Some(last_used_at) = host.last_used_at.as_deref() {
+            validate_timestamp(last_used_at, "host last-used time")?;
+        }
+    }
     records!(&snapshot.identities, "identity");
+    for identity in &snapshot.identities {
+        identity_repo::normalize(IdentityInput {
+            name: identity.name.clone(),
+            username: identity.username.clone(),
+            auth_type: identity.auth_type.clone(),
+            key_id: identity.key_id.clone(),
+            password: identity.password.clone(),
+        })?;
+    }
     records!(&snapshot.keys, "key");
+    for key in &snapshot.keys {
+        key_repo::normalize(SshKeyInput {
+            name: key.name.clone(),
+            public_key: key.public_key.clone(),
+            private_key: key.private_key.clone(),
+            passphrase: key.passphrase.clone(),
+        })?;
+    }
     records!(&snapshot.snippets, "snippet");
+    for snippet in &snapshot.snippets {
+        snippet_repo::normalize(SnippetInput {
+            name: snippet.name.clone(),
+            command: snippet.command.clone(),
+            description: snippet.description.clone(),
+        })?;
+    }
     records!(&snapshot.port_forwards, "port forward");
     for forward in &snapshot.port_forwards {
         normalized_forward(forward)?;
     }
     records!(&snapshot.sftp_bookmarks, "SFTP bookmark");
+    for bookmark in &snapshot.sftp_bookmarks {
+        bookmark_repo::normalize(SftpBookmarkInput {
+            host_id: bookmark.host_id.clone(),
+            label: bookmark.label.clone(),
+            path: bookmark.path.clone(),
+        })?;
+    }
+    ids.clear();
+    for setting in &snapshot.settings {
+        if setting.key.is_empty()
+            || setting.key.len() > MAX_SYNC_ID_BYTES
+            || setting.key.chars().any(char::is_control)
+            || !ids.insert(setting.key.clone())
+        {
+            return Err(AppError::Invalid(
+                "invalid or duplicate setting in backup".into(),
+            ));
+        }
+        if settings_compat::sanitize(setting).is_some() {
+            validate_timestamp(&setting.updated_at, "setting update time")?;
+        }
+    }
     Ok(())
 }
 
@@ -981,6 +1072,26 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn rejects_oversized_entity_fields_before_import() {
+        let mut snapshot = empty_snapshot(Vec::new());
+        snapshot.groups.push(Group {
+            id: "group-1".into(),
+            name: "x".repeat(256),
+            parent_id: None,
+            sort_order: 0,
+            created_at: BACKUP_TIMESTAMP.into(),
+            updated_at: BACKUP_TIMESTAMP.into(),
+            deleted_at: None,
+            revision: 1,
+        });
+
+        assert!(matches!(
+            validate_snapshot(&snapshot),
+            Err(AppError::Invalid(_))
+        ));
     }
 
     #[test]

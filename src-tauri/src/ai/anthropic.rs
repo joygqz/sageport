@@ -455,6 +455,7 @@ mod tests {
                 tool_calls: vec![],
                 tool_call_id: Some("call-1".into()),
                 tool_error: Some(true),
+                untrusted_source: Some(true),
             }],
             &[],
             4096,
@@ -463,6 +464,7 @@ mod tests {
         let serialized = body["messages"].to_string();
         assert!(!serialized.contains("toolError"));
         assert!(!serialized.contains("tool_error"));
+        assert!(!serialized.contains("untrustedSource"));
         assert_eq!(body["messages"][0]["content"][0]["is_error"], true);
     }
 
@@ -478,6 +480,7 @@ mod tests {
                 tool_calls: vec![],
                 tool_call_id: None,
                 tool_error: None,
+                untrusted_source: None,
             }],
             &[],
             4096,

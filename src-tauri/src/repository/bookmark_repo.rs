@@ -7,7 +7,7 @@ const MAX_LABEL_BYTES: usize = 255;
 const MAX_PATH_BYTES: usize = 32 * 1024;
 const MAX_HOST_ID_BYTES: usize = 128;
 
-fn normalize(mut input: SftpBookmarkInput) -> AppResult<SftpBookmarkInput> {
+pub(crate) fn normalize(mut input: SftpBookmarkInput) -> AppResult<SftpBookmarkInput> {
     input.label = input.label.trim().to_string();
     input.path = input.path.trim().to_string();
     input.host_id = input
@@ -20,7 +20,7 @@ fn normalize(mut input: SftpBookmarkInput) -> AppResult<SftpBookmarkInput> {
     if input.path.is_empty() {
         return Err(AppError::Invalid("bookmark path is required".into()));
     }
-    if input.label.len() > MAX_LABEL_BYTES {
+    if input.label.len() > MAX_LABEL_BYTES || input.label.chars().any(char::is_control) {
         return Err(AppError::Invalid(format!(
             "bookmark label exceeds {MAX_LABEL_BYTES} bytes"
         )));
@@ -28,11 +28,9 @@ fn normalize(mut input: SftpBookmarkInput) -> AppResult<SftpBookmarkInput> {
     if input.path.len() > MAX_PATH_BYTES || input.path.contains('\0') {
         return Err(AppError::Invalid("invalid bookmark path".into()));
     }
-    if input
-        .host_id
-        .as_ref()
-        .is_some_and(|host_id| host_id.len() > MAX_HOST_ID_BYTES)
-    {
+    if input.host_id.as_ref().is_some_and(|host_id| {
+        host_id.len() > MAX_HOST_ID_BYTES || host_id.chars().any(char::is_control)
+    }) {
         return Err(AppError::Invalid("invalid bookmark host id".into()));
     }
     Ok(input)

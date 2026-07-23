@@ -7,9 +7,10 @@ use crate::sshkey;
 
 const MAX_NAME_LEN: usize = 255;
 const MAX_PRIVATE_KEY_LEN: usize = 1024 * 1024;
+const MAX_PUBLIC_KEY_LEN: usize = 1024 * 1024;
 const MAX_PASSPHRASE_LEN: usize = 64 * 1024;
 
-fn normalize(mut input: SshKeyInput) -> AppResult<SshKeyInput> {
+pub(crate) fn normalize(mut input: SshKeyInput) -> AppResult<SshKeyInput> {
     input.name = input.name.trim().to_string();
     input.public_key = input.public_key.take().map(|v| v.trim().to_string());
     input.private_key = input.private_key.take().map(|v| v.trim().to_string());
@@ -17,16 +18,21 @@ fn normalize(mut input: SshKeyInput) -> AppResult<SshKeyInput> {
     if input.name.is_empty() {
         return Err(AppError::Invalid("key name is required".into()));
     }
-    if input.name.len() > MAX_NAME_LEN {
+    if input.name.len() > MAX_NAME_LEN || input.name.chars().any(char::is_control) {
         return Err(AppError::Invalid(format!(
             "key name exceeds {MAX_NAME_LEN} bytes"
         )));
     }
-    if input
-        .private_key
-        .as_deref()
-        .is_some_and(|private_key| private_key.len() > MAX_PRIVATE_KEY_LEN)
-    {
+    if input.public_key.as_deref().is_some_and(|public_key| {
+        public_key.len() > MAX_PUBLIC_KEY_LEN || public_key.contains('\0')
+    }) {
+        return Err(AppError::Invalid(format!(
+            "public key exceeds {MAX_PUBLIC_KEY_LEN} bytes"
+        )));
+    }
+    if input.private_key.as_deref().is_some_and(|private_key| {
+        private_key.len() > MAX_PRIVATE_KEY_LEN || private_key.contains('\0')
+    }) {
         return Err(AppError::Invalid(format!(
             "private key exceeds {MAX_PRIVATE_KEY_LEN} bytes"
         )));

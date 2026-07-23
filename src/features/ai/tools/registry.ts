@@ -39,7 +39,6 @@ export const ALL_TOOLS: AiTool[] = [
 export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "ask_user",
   "list_terminal_sessions",
-  "read_terminal_output",
   "run_terminal_command",
 ]);
 
@@ -275,6 +274,12 @@ export const TOOLS_ALWAYS_REQUIRING_APPROVAL: ReadonlySet<string> = new Set(
 
 export const TOOLS_WITH_SENSITIVE_RESULTS: ReadonlySet<string> = new Set(
   ALL_TOOLS.filter((tool) => tool.sensitiveResult).map(
+    (tool) => tool.spec.name,
+  ),
+);
+
+export const TOOLS_WITH_UNTRUSTED_RESULTS: ReadonlySet<string> = new Set(
+  ALL_TOOLS.filter((tool) => tool.untrustedResult).map(
     (tool) => tool.spec.name,
   ),
 );

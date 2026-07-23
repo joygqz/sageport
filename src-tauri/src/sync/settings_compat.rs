@@ -85,7 +85,8 @@ fn sanitize_base_url(value: &str) -> Option<String> {
         && parsed.username().is_empty()
         && parsed.password().is_none()
         && parsed.query().is_none()
-        && parsed.fragment().is_none())
+        && parsed.fragment().is_none()
+        && crate::network::secure_transport(&parsed))
     .then(|| value.to_string())
 }
 

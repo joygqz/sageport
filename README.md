@@ -30,7 +30,7 @@ Sageport replaces the usual pile of terminal windows, transfer tools, key manage
 - **All your hosts, organized.** Groups, shared logins, jump hosts for servers behind a bastion, and one-click import of your existing SSH hosts.
 - **Repeat without retyping.** Save commands as snippets with fill-in variables, then run them across many servers with per-host results.
 - **Private services, one click away.** Port forwarding you can start, stop, and auto-launch from the app — including through jump hosts.
-- **An AI assistant that asks first.** Bring your own AI provider; the assistant can see your workbench and suggest or run commands, but every action waits for your approval unless you opt out.
+- **An AI assistant that asks first.** Bring your own AI provider; the assistant can see your workbench and suggest or run commands. Reading terminal or remote file contents always needs approval, and other operations wait for approval unless you enable autonomous mode.
 - **Take it everywhere.** Optional encrypted sync through GitHub, Google Drive, OneDrive, WebDAV, or S3 — or a simple encrypted backup file.
 
 It all lives in a familiar VS Code-style workspace with a command palette, keyboard shortcuts, light and dark themes, and an English or 简体中文 interface.
@@ -64,8 +64,8 @@ On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd
 - Everything is stored on your device. There is no Sageport cloud service and no account.
 - Passwords and keys are stored in a local database on your device, in plain text. Anything that can read your user account's files can read them, so protect the device itself.
 - Backups and sync are encrypted with a passphrase before they ever leave your device.
-- The sync passphrase is known only to you. Sageport cannot read your backups and cannot recover a lost passphrase, so keep it safe.
-- Connecting to an unfamiliar server always asks you to verify it first, and AI actions never run without your say-so unless you explicitly allow it.
+- The sync passphrase is saved in Sageport's local database so connected devices can decrypt backups automatically. It is never sent to the storage provider, and the developer cannot recover it if you lose the local database, so keep a separate copy.
+- Connecting to an unfamiliar server always asks you to verify it first. Autonomous AI operations pause again after reading untrusted terminal or file content.
 
 ## License
 
