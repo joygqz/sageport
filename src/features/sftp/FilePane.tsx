@@ -55,6 +55,7 @@ import {
 } from "@/workbench/tab-styles";
 import { FileList } from "./FileList";
 import { BookmarkMenu } from "./BookmarkMenu";
+import { DEFAULT_FILE_SORT, type FileSort } from "./file-list-layout";
 import { PermissionsDialog } from "./PermissionsDialog";
 import {
   joinPath,
@@ -106,6 +107,7 @@ export function FilePane({ side }: { side: PaneSide }) {
     tab: SftpTab;
     entry: FileEntry;
   } | null>(null);
+  const [sort, setSort] = useState<FileSort>(DEFAULT_FILE_SORT);
   const active = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
   const activeReady =
     !!active?.cwd &&
@@ -534,6 +536,7 @@ export function FilePane({ side }: { side: PaneSide }) {
             </div>
 
             <FileList
+              key={`${active.id}:${active.cwd}`}
               side={side}
               tab={active}
               creating={creating}
@@ -542,6 +545,8 @@ export function FilePane({ side }: { side: PaneSide }) {
               onRename={(entry, name) => onRename(active, entry, name)}
               onDelete={(entries) => confirmDelete(active, entries)}
               onPermissions={(entry) => setPermTarget({ tab: active, entry })}
+              sort={sort}
+              onSortChange={setSort}
             />
           </TabsContent>
         ) : (

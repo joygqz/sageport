@@ -1,5 +1,6 @@
 import type * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { MENU_ITEM_CLASS, POPOVER_CONTENT_CLASS } from "./styles";
@@ -67,6 +68,40 @@ function DropdownMenuItem({
   );
 }
 
+function DropdownMenuRadioGroup(
+  props: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>,
+) {
+  return (
+    <DropdownMenuPrimitive.RadioGroup
+      data-slot="dropdown-menu-radio-group"
+      {...props}
+    />
+  );
+}
+
+function DropdownMenuRadioItem({
+  className,
+  children,
+  ref,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem> & {
+  ref?: React.Ref<React.ComponentRef<typeof DropdownMenuPrimitive.RadioItem>>;
+}) {
+  return (
+    <DropdownMenuPrimitive.RadioItem
+      ref={ref}
+      data-slot="dropdown-menu-radio-item"
+      className={cn(MENU_ITEM_CLASS, "justify-between gap-4", className)}
+      {...props}
+    >
+      {children}
+      <DropdownMenuPrimitive.ItemIndicator>
+        <Check aria-hidden="true" className="size-3.5 shrink-0 text-link" />
+      </DropdownMenuPrimitive.ItemIndicator>
+    </DropdownMenuPrimitive.RadioItem>
+  );
+}
+
 function DropdownMenuSeparator({
   className,
   ref,
@@ -89,5 +124,7 @@ export {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
 };

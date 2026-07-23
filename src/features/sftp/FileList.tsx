@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -8,6 +9,7 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUpDown,
   AudioLines,
   CircleAlert,
   Database,
@@ -26,6 +28,7 @@ import {
   FolderSymlink,
   Lock,
   Package,
+  Search,
   SquarePen,
   TextCursorInput,
   Trash2,
@@ -40,9 +43,17 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
   EmptyState,
+  Input,
   LoadingState,
   ScrollArea,
+  Tooltip,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { layoutDragPreview } from "@/lib/dragPreview";
@@ -53,8 +64,13 @@ import type { FileEntry } from "@/types/models";
 import { useTabsStore } from "@/workbench/tabs";
 import { fileIconKind, type FileIconKind } from "./file-icon";
 import {
+  DEFAULT_FILE_SORT,
   inlineCreateBlurAction,
   inlineCreateRowIndex,
+  visibleFileEntries,
+  type FileSort,
+  type FileSortDirection,
+  type FileSortKey,
 } from "./file-list-layout";
 import { nextFileSelection } from "./selection";
 import {
@@ -71,6 +87,10 @@ interface FileDragState {
   clientY: number;
   rect: DOMRect;
 }
+
+type FileListRow =
+  | { type: "entry"; entry: FileEntry }
+  | { type: "create"; kind: "file" | "folder" };
 
 function formatTime(secs: number | null): string {
   if (!secs) return "";
@@ -126,6 +146,8 @@ export function FileList({
   onRename,
   onDelete,
   onPermissions,
+  sort,
+  onSortChange,
 }: {
   side: PaneSide;
   tab: SftpTab;
@@ -135,6 +157,8 @@ export function FileList({
   onRename: (entry: FileEntry, name: string) => Promise<boolean>;
   onDelete: (entries: FileEntry[]) => void;
   onPermissions: (entry: FileEntry) => void;
+  sort: FileSort;
+  onSortChange: (sort: FileSort) => void;
 }) {
   const { t } = useI18n();
   const navigate = useSftpStore((s) => s.navigate);
@@ -144,6 +168,7 @@ export function FileList({
   const showHidden = useSftpStore((s) => s.showHidden);
   const openFile = useTabsStore((s) => s.openFile);
   const [dragState, setDragState] = useState<FileDragState | null>(null);
+  const [filterQuery, setFilterQuery] = useState("");
   const [renameTarget, setRenameTarget] = useState<{
     tabId: string;
     cwd: string;
@@ -165,26 +190,31 @@ export function FileList({
   const suppressClickRef = useRef<string | null>(null);
   const selectionAnchorRef = useRef<string | null>(null);
 
-  const entries = showHidden
-    ? tab.entries
-    : tab.entries.filter(
-        (entry) => !(entry.hidden ?? entry.name.startsWith(".")),
-      );
-  const visiblePaths = entries.map((entry) => entry.path);
+  const entries = useMemo(
+    () => visibleFileEntries(tab.entries, showHidden, filterQuery, sort),
+    [filterQuery, showHidden, sort, tab.entries],
+  );
+  const visiblePaths = useMemo(
+    () => entries.map((entry) => entry.path),
+    [entries],
+  );
   const renamingPath =
     renameTarget?.tabId === tab.id && renameTarget.cwd === tab.cwd
       ? renameTarget.path
       : null;
-  const inlineCreateIndex = creating
-    ? inlineCreateRowIndex(entries, creating)
-    : 0;
-  const rows: Array<
-    | { type: "entry"; entry: FileEntry }
-    | { type: "create"; kind: "file" | "folder" }
-  > = entries.map((entry) => ({ type: "entry", entry }));
-  if (creating) {
-    rows.splice(inlineCreateIndex, 0, { type: "create", kind: creating });
-  }
+  const rows = useMemo<FileListRow[]>(() => {
+    const next: FileListRow[] = entries.map((entry) => ({
+      type: "entry",
+      entry,
+    }));
+    if (creating) {
+      next.splice(inlineCreateRowIndex(entries, creating), 0, {
+        type: "create",
+        kind: creating,
+      });
+    }
+    return next;
+  }, [creating, entries]);
 
   useEffect(() => {
     selectionAnchorRef.current = null;
@@ -335,6 +365,20 @@ export function FileList({
 
   return (
     <ScrollArea className="min-h-0 flex-1">
+      <div className="sticky top-0 z-10 flex h-9 items-center gap-1 border-b border-border bg-surface px-1.5">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={filterQuery}
+            onChange={(event) => setFilterQuery(event.target.value)}
+            placeholder={t("sftp.filterPlaceholder")}
+            aria-label={t("sftp.filterPlaceholder")}
+            className="h-7 w-full rounded-lg bg-background/70 pl-7 pr-2 text-xs"
+          />
+        </div>
+        <FileSortMenu sort={sort} onSortChange={onSortChange} />
+      </div>
       <table
         tabIndex={0}
         aria-label={t("sftp.fileList")}
@@ -382,7 +426,11 @@ export function FileList({
                 <EmptyState
                   className="py-8"
                   icon={Folder}
-                  title={t("sftp.emptyDir")}
+                  title={
+                    filterQuery.trim()
+                      ? t("sftp.noMatches")
+                      : t("sftp.emptyDir")
+                  }
                 />
               </td>
             </tr>
@@ -545,6 +593,71 @@ export function FileList({
       </table>
       {dragState && <FileDragGhost dragState={dragState} />}
     </ScrollArea>
+  );
+}
+
+const SORT_KEYS: FileSortKey[] = ["name", "size", "modified"];
+const SORT_DIRECTIONS: FileSortDirection[] = ["ascending", "descending"];
+
+function FileSortMenu({
+  sort,
+  onSortChange,
+}: {
+  sort: FileSort;
+  onSortChange: (sort: FileSort) => void;
+}) {
+  const { t } = useI18n();
+  const customized =
+    sort.key !== DEFAULT_FILE_SORT.key ||
+    sort.direction !== DEFAULT_FILE_SORT.direction;
+
+  return (
+    <DropdownMenu>
+      <Tooltip content={t("sftp.sort.title")}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className={cn(
+              "size-7 shrink-0",
+              customized && "bg-accent text-accent-foreground",
+            )}
+          >
+            <ArrowUpDown className="size-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+      </Tooltip>
+      <DropdownMenuContent align="end" className="min-w-40">
+        <DropdownMenuRadioGroup
+          value={sort.key}
+          onValueChange={(key) =>
+            onSortChange({ ...sort, key: key as FileSortKey })
+          }
+        >
+          {SORT_KEYS.map((key) => (
+            <DropdownMenuRadioItem key={key} value={key}>
+              <span>{t(`sftp.sort.${key}`)}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={sort.direction}
+          onValueChange={(direction) =>
+            onSortChange({
+              ...sort,
+              direction: direction as FileSortDirection,
+            })
+          }
+        >
+          {SORT_DIRECTIONS.map((direction) => (
+            <DropdownMenuRadioItem key={direction} value={direction}>
+              <span>{t(`sftp.sort.${direction}`)}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
