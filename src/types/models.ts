@@ -491,8 +491,10 @@ export interface TransferHistoryEntry {
   sourceLabel: string;
   sourcePath: string;
   sourceConnectionId: string | null;
+  sourceHostLabel: string | null;
   destPath: string;
   destConnectionId: string | null;
+  destHostLabel: string | null;
   totalBytes: number;
   transferredBytes: number;
   status: TransferStatus;

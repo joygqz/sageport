@@ -244,6 +244,10 @@ function TransferStrip() {
             {!indeterminate && (
               <>
                 <span className="shrink-0 tabular-nums text-muted-foreground">
+                  {formatBytes(tx.transferred)}
+                  {tx.total > 0 && ` / ${formatBytes(tx.total)}`}
+                </span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
                   {pct}%
                 </span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">

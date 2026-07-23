@@ -81,8 +81,10 @@ pub struct TransferHistoryEntry {
     pub source_label: String,
     pub source_path: String,
     pub source_connection_id: Option<String>,
+    pub source_host_label: Option<String>,
     pub dest_path: String,
     pub dest_connection_id: Option<String>,
+    pub dest_host_label: Option<String>,
     pub total_bytes: i64,
     pub transferred_bytes: i64,
     pub status: String,
@@ -98,8 +100,10 @@ impl From<TransferRow> for TransferHistoryEntry {
             source_label: row.source_label,
             source_path: row.source_path,
             source_connection_id: row.source_connection_id,
+            source_host_label: row.source_host_label,
             dest_path: row.dest_path,
             dest_connection_id: row.dest_connection_id,
+            dest_host_label: row.dest_host_label,
             total_bytes: row.total_bytes,
             transferred_bytes: row.transferred_bytes,
             status: row.status,
@@ -130,6 +134,7 @@ pub async fn fs_connect(
         state.connection_prompts.clone(),
         SftpConnectParams {
             connection_id,
+            host_label: host.label,
             hops,
         },
     );
@@ -326,14 +331,24 @@ pub async fn fs_transfer(
     let pool = state.db.clone();
     let source: Endpoint = source.into();
     let dest: Endpoint = dest.into();
+    let source_host_label = source
+        .connection_id
+        .as_deref()
+        .and_then(|id| mgr.host_label(id).ok());
+    let dest_host_label = dest
+        .connection_id
+        .as_deref()
+        .and_then(|id| mgr.host_label(id).ok());
     transfer_repo::create(
         &pool,
         &transfer_id,
         &sftp::base_name(&source.path),
         &source.path,
         source.connection_id.as_deref(),
+        source_host_label.as_deref(),
         &dest.path,
         dest.connection_id.as_deref(),
+        dest_host_label.as_deref(),
     )
     .await?;
 

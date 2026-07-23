@@ -106,12 +106,14 @@ impl TransferCancel {
 
 pub struct SftpConnectParams {
     pub connection_id: String,
+    pub host_label: String,
     pub hops: Vec<Hop>,
 }
 
 pub struct Conn {
     ssh: SshConnection,
     session: SftpSession,
+    host_label: String,
     tar_available: OnceCell<bool>,
 }
 
@@ -279,6 +281,10 @@ impl SftpManager {
             .ok_or_else(|| AppError::NotFound(format!("sftp connection {id}")))
     }
 
+    pub fn host_label(&self, id: &str) -> AppResult<String> {
+        Ok(self.get(id)?.host_label.clone())
+    }
+
     pub async fn list(&self, id: &str, path: &str) -> AppResult<Vec<FileEntry>> {
         ops::remote_list(&self.get(id)?.session, path).await
     }
@@ -345,6 +351,7 @@ async fn open(
     Ok(Conn {
         ssh,
         session,
+        host_label: params.host_label.clone(),
         tar_available: OnceCell::new(),
     })
 }

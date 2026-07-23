@@ -14,8 +14,14 @@ vi.mock("@/lib/ipc", () => ({
 vi.stubGlobal("localStorage", { getItem: vi.fn(() => "en") });
 
 import { ipc } from "@/lib/ipc";
+import { queryClient } from "@/lib/query";
 import { useToastStore } from "@/lib/toast";
-import type { FileEntry, TransferEvent } from "@/types/models";
+import type {
+  FileEntry,
+  TransferEvent,
+  TransferHistoryEntry,
+} from "@/types/models";
+import { transferHistoryKey } from "./api";
 import {
   isValidEntryName,
   MAX_SFTP_TABS,
@@ -46,6 +52,7 @@ const loadedTab = (): SftpTab => ({
 describe("SFTP navigation state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.removeQueries({ queryKey: transferHistoryKey });
     useSftpStore.setState({
       panes: {
         left: { tabs: [loadedTab()], activeTabId: "local-tab" },
@@ -304,5 +311,41 @@ describe("SFTP transfer refresh", () => {
 
     expect(refresh).toHaveBeenCalledOnce();
     expect(refresh).toHaveBeenCalledWith("left", "left-target");
+  });
+
+  it("updates active transfer byte counts in the history cache", () => {
+    const entry: TransferHistoryEntry = {
+      id: "transfer-1",
+      sourceLabel: "report.pdf",
+      sourcePath: "/uploads/report.pdf",
+      sourceConnectionId: "remote-1",
+      sourceHostLabel: "Production",
+      destPath: "/downloads",
+      destConnectionId: null,
+      destHostLabel: null,
+      totalBytes: 0,
+      transferredBytes: 0,
+      status: "active",
+      startedAt: "2026-07-23T08:00:00Z",
+      finishedAt: null,
+    };
+    queryClient.setQueryData(transferHistoryKey, [entry]);
+
+    useSftpStore.getState().applyTransfer({
+      transferId: entry.id,
+      transferred: 512,
+      total: 1024,
+      file: entry.sourceLabel,
+      status: "active",
+      phase: "transferring",
+    });
+
+    expect(
+      queryClient.getQueryData<TransferHistoryEntry[]>(transferHistoryKey)?.[0],
+    ).toMatchObject({
+      transferredBytes: 512,
+      totalBytes: 1024,
+      status: "active",
+    });
   });
 });

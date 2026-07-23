@@ -9,8 +9,10 @@ pub struct TransferRow {
     pub source_label: String,
     pub source_path: String,
     pub source_connection_id: Option<String>,
+    pub source_host_label: Option<String>,
     pub dest_path: String,
     pub dest_connection_id: Option<String>,
+    pub dest_host_label: Option<String>,
     pub total_bytes: i64,
     pub transferred_bytes: i64,
     pub status: String,
@@ -26,22 +28,27 @@ pub async fn create(
     source_label: &str,
     source_path: &str,
     source_connection_id: Option<&str>,
+    source_host_label: Option<&str>,
     dest_path: &str,
     dest_connection_id: Option<&str>,
+    dest_host_label: Option<&str>,
 ) -> AppResult<()> {
     let ts = now();
     sqlx::query(
         "INSERT INTO sftp_transfers
-            (id, source_label, source_path, source_connection_id, dest_path,
-             dest_connection_id, total_bytes, transferred_bytes, status, started_at)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'active', ?)",
+            (id, source_label, source_path, source_connection_id, source_host_label,
+             dest_path, dest_connection_id, dest_host_label, total_bytes,
+             transferred_bytes, status, started_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 'active', ?)",
     )
     .bind(id)
     .bind(source_label)
     .bind(source_path)
     .bind(source_connection_id)
+    .bind(source_host_label)
     .bind(dest_path)
     .bind(dest_connection_id)
+    .bind(dest_host_label)
     .bind(&ts)
     .execute(pool)
     .await?;
@@ -79,9 +86,9 @@ pub async fn finish(
 
 pub async fn list(pool: &SqlitePool, limit: i64) -> AppResult<Vec<TransferRow>> {
     let rows = sqlx::query_as::<_, TransferRow>(
-        "SELECT id, source_label, source_path, source_connection_id, dest_path,
-                dest_connection_id, total_bytes, transferred_bytes, status, message,
-                started_at, finished_at
+        "SELECT id, source_label, source_path, source_connection_id, source_host_label,
+                dest_path, dest_connection_id, dest_host_label, total_bytes,
+                transferred_bytes, status, message, started_at, finished_at
          FROM sftp_transfers
          ORDER BY started_at DESC
          LIMIT ?",
@@ -152,8 +159,10 @@ mod tests {
                 source_label TEXT NOT NULL,
                 source_path TEXT NOT NULL,
                 source_connection_id TEXT,
+                source_host_label TEXT,
                 dest_path TEXT NOT NULL,
                 dest_connection_id TEXT,
+                dest_host_label TEXT,
                 total_bytes INTEGER NOT NULL DEFAULT 0,
                 transferred_bytes INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'active',
@@ -171,15 +180,36 @@ mod tests {
     #[tokio::test]
     async fn protects_active_history_and_recovers_interrupted_transfers() {
         let pool = pool().await;
-        create(&pool, "active", "a", "/a", None, "/dest", None)
+        create(&pool, "active", "a", "/a", None, None, "/dest", None, None)
             .await
             .expect("create active transfer");
-        create(&pool, "done", "b", "/b", None, "/dest", None)
-            .await
-            .expect("create finished transfer");
+        create(
+            &pool,
+            "done",
+            "b",
+            "/b",
+            Some("source-connection"),
+            Some("Source host"),
+            "/dest",
+            Some("dest-connection"),
+            Some("Destination host"),
+        )
+        .await
+        .expect("create finished transfer");
         finish(&pool, "done", 2, 2, "done", None)
             .await
             .expect("finish transfer");
+
+        let rows = list(&pool, 10).await.expect("list history");
+        let finished = rows
+            .iter()
+            .find(|row| row.id == "done")
+            .expect("find finished transfer");
+        assert_eq!(finished.source_host_label.as_deref(), Some("Source host"));
+        assert_eq!(
+            finished.dest_host_label.as_deref(),
+            Some("Destination host")
+        );
 
         assert!(matches!(
             delete(&pool, "active").await,

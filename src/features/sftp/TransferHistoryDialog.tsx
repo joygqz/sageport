@@ -159,6 +159,14 @@ export function TransferHistoryDialog({
                         ) : (
                           <HardDrive className="size-3 shrink-0" />
                         )}
+                        {e.sourceHostLabel && (
+                          <span
+                            className="shrink-0 text-foreground"
+                            title={e.sourceHostLabel}
+                          >
+                            {e.sourceHostLabel}:
+                          </span>
+                        )}
                         <span className="truncate" title={e.sourcePath}>
                           {e.sourcePath}
                         </span>
@@ -167,6 +175,14 @@ export function TransferHistoryDialog({
                           <Server className="size-3 shrink-0" />
                         ) : (
                           <HardDrive className="size-3 shrink-0" />
+                        )}
+                        {e.destHostLabel && (
+                          <span
+                            className="shrink-0 text-foreground"
+                            title={e.destHostLabel}
+                          >
+                            {e.destHostLabel}:
+                          </span>
                         )}
                         <span className="truncate" title={e.destPath}>
                           {e.destPath}

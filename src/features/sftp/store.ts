@@ -5,13 +5,16 @@ import { usePasswordPromptStore } from "@/features/terminal/password-prompt";
 import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
+import { queryClient } from "@/lib/query";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type {
   FileEntry,
   Host,
   SftpStatusKind,
   TransferEvent,
+  TransferHistoryEntry,
 } from "@/types/models";
+import { transferHistoryKey } from "./api";
 import {
   pendingTransfer,
   updateTransferProgress,
@@ -185,6 +188,40 @@ const emptyPane = (): PaneState => ({ tabs: [], activeTabId: null });
 
 let eventsBridged = false;
 let eventBridgePromise: Promise<void> | null = null;
+
+function syncTransferHistory(event: TransferEvent): void {
+  const entries =
+    queryClient.getQueryData<TransferHistoryEntry[]>(transferHistoryKey);
+  if (!entries) return;
+
+  const index = entries.findIndex((entry) => entry.id === event.transferId);
+  if (index < 0) {
+    if (event.status === "active" && event.phase === "preparing") {
+      void queryClient.invalidateQueries({ queryKey: transferHistoryKey });
+    }
+    return;
+  }
+
+  queryClient.setQueryData<TransferHistoryEntry[]>(
+    transferHistoryKey,
+    entries.map((entry, entryIndex) =>
+      entryIndex === index
+        ? {
+            ...entry,
+            transferredBytes: event.transferred,
+            totalBytes: event.total,
+            status: event.status,
+            message: event.message,
+            finishedAt:
+              event.status === "active"
+                ? null
+                : (entry.finishedAt ?? new Date().toISOString()),
+          }
+        : entry,
+    ),
+  );
+}
+
 export function bridgeSftpEvents(): Promise<void> {
   if (eventsBridged) return Promise.resolve();
   const { applyStatus, applyTransfer } = useSftpStore.getState();
@@ -539,6 +576,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
     },
 
     applyTransfer: (e) => {
+      syncTransferHistory(e);
       if (e.status === "active") {
         set((s) => ({
           transfers: {
@@ -698,22 +736,23 @@ export const useSftpStore = create<SftpState>((set, get) => {
             },
           },
         }));
-        await ipc.sftp
-          .transfer(
+        try {
+          await ipc.sftp.transfer(
             transferId,
             { connectionId: srcTab.connectionId, path: item.path },
             { connectionId: dstTab.connectionId, path: dstTab.cwd },
             targetName,
             overwrite,
-          )
-          .catch((err) => {
-            set((s) => {
-              const rest = { ...s.transfers };
-              delete rest[transferId];
-              return { transfers: rest };
-            });
-            toast.error(t("sftp.transferError"), errorMessage(err));
+          );
+          void queryClient.invalidateQueries({ queryKey: transferHistoryKey });
+        } catch (err) {
+          set((s) => {
+            const rest = { ...s.transfers };
+            delete rest[transferId];
+            return { transfers: rest };
           });
+          toast.error(t("sftp.transferError"), errorMessage(err));
+        }
       }
     },
   };
