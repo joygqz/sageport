@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { jsonDefaults } from "monaco-editor/language/json/monaco.contribution";
 
 import { useI18n } from "@/i18n";
 import { useTheme } from "@/themes";
@@ -9,10 +8,10 @@ import { applyEditorTheme, monaco } from "@/features/sftp/monaco";
 import { jsonSettingsSchema } from "./jsonSettings";
 
 const FONT_BASE = 13;
-const SETTINGS_MODEL_URI = "inmemory://settings/settings.json";
+const SETTINGS_MODEL_URI = "inmemory://settings/sageport.settings.json";
 const SETTINGS_SCHEMA_URI = "sageport://schemas/settings.json";
 
-jsonDefaults.setDiagnosticsOptions({
+monaco.json.jsonDefaults.setDiagnosticsOptions({
   validate: true,
   allowComments: false,
   enableSchemaRequest: false,
@@ -22,7 +21,7 @@ jsonDefaults.setDiagnosticsOptions({
   schemas: [
     {
       uri: SETTINGS_SCHEMA_URI,
-      fileMatch: [SETTINGS_MODEL_URI],
+      fileMatch: ["*sageport.settings.json"],
       schema: jsonSettingsSchema(),
     },
   ],
@@ -79,10 +78,17 @@ export function JsonSettingsEditor({
       formatOnType: true,
       lineNumbersMinChars: 3,
       minimap: { enabled: false },
+      quickSuggestions: {
+        other: true,
+        comments: false,
+        strings: true,
+      },
       renderWhitespace: "boundary",
       renderValidationDecorations: "on",
       scrollBeyondLastLine: false,
+      suggestOnTriggerCharacters: true,
       tabSize: 2,
+      wordBasedSuggestions: "off",
     });
     editorRef.current = editor;
 
