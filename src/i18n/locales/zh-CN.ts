@@ -662,6 +662,8 @@ export const zhCN: Dictionary = {
     connectionLost: "远程连接已中断，请检查网络后重新连接。",
     notConnected: "连接后即可传输文件",
     toggleHidden: "显示隐藏文件",
+    showSearchToolbar: "显示搜索和排序栏",
+    hideSearchToolbar: "隐藏搜索和排序栏",
     bookmarks: {
       title: "书签",
       add: "添加文件夹书签",

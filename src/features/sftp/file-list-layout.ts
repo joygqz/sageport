@@ -13,20 +13,6 @@ export const DEFAULT_FILE_SORT: FileSort = {
   direction: "ascending",
 };
 
-export interface ScrollVisibilityState {
-  position: number;
-  direction: "up" | "down" | null;
-  distance: number;
-  visible: boolean;
-}
-
-export const INITIAL_SCROLL_VISIBILITY: ScrollVisibilityState = {
-  position: 0,
-  direction: null,
-  distance: 0,
-  visible: true,
-};
-
 const fileNameCollator = new Intl.Collator(undefined, {
   numeric: true,
   sensitivity: "base",
@@ -96,34 +82,4 @@ export function inlineCreateRowIndex(
     if (entries[index]?.kind === "dir") return index + 1;
   }
   return 0;
-}
-
-export function updateScrollVisibility(
-  state: ScrollVisibilityState,
-  scrollTop: number,
-  hideOffset: number,
-  directionThreshold = 6,
-): ScrollVisibilityState {
-  const position = Math.max(0, scrollTop);
-  if (position === 0) return INITIAL_SCROLL_VISIBILITY;
-
-  const delta = position - state.position;
-  if (delta === 0) return state;
-
-  const direction = delta > 0 ? "down" : "up";
-  const distance =
-    state.direction === direction
-      ? state.distance + Math.abs(delta)
-      : Math.abs(delta);
-  const crossedThreshold = distance >= directionThreshold;
-  const visible = crossedThreshold
-    ? direction === "up" || position < hideOffset
-    : state.visible;
-
-  return {
-    position,
-    direction,
-    distance: crossedThreshold ? 0 : distance,
-    visible,
-  };
 }

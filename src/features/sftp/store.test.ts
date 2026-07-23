@@ -130,6 +130,19 @@ describe("SFTP path and name helpers", () => {
   });
 });
 
+describe("SFTP file toolbar visibility", () => {
+  it("starts hidden and toggles from the panel header", () => {
+    expect(useSftpStore.getInitialState().showFileToolbar).toBe(false);
+    useSftpStore.setState({ showFileToolbar: false });
+
+    useSftpStore.getState().toggleFileToolbar();
+    expect(useSftpStore.getState().showFileToolbar).toBe(true);
+
+    useSftpStore.getState().toggleFileToolbar();
+    expect(useSftpStore.getState().showFileToolbar).toBe(false);
+  });
+});
+
 describe("SFTP tab ordering", () => {
   beforeEach(() => {
     const leftTabs = [

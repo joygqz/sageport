@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, History, Loader2, X } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  History,
+  Loader2,
+  Search,
+  SearchX,
+  X,
+} from "lucide-react";
 
 import {
   Button,
@@ -30,6 +38,8 @@ export function SftpPanel({ height }: { height: number }) {
   const ensureLocalTab = useSftpStore((s) => s.ensureLocalTab);
   const showHidden = useSftpStore((s) => s.showHidden);
   const toggleHidden = useSftpStore((s) => s.toggleHidden);
+  const showFileToolbar = useSftpStore((s) => s.showFileToolbar);
+  const toggleFileToolbar = useSftpStore((s) => s.toggleFileToolbar);
   const setPanelVisible = useLayoutStore((s) => s.setPanelVisible);
   const [historyOpen, setHistoryOpen] = useState(false);
   const pendingConflict = useSftpStore((s) => s.pendingConflict);
@@ -85,6 +95,35 @@ export function SftpPanel({ height }: { height: number }) {
                   <Eye className="size-4" />
                 ) : (
                   <EyeOff className="size-4" />
+                )}
+              </Button>
+            </Tooltip>
+            <Tooltip
+              content={t(
+                showFileToolbar
+                  ? "sftp.hideSearchToolbar"
+                  : "sftp.showSearchToolbar",
+              )}
+            >
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  PANEL_HEADER_ACTION_CLASS,
+                  showFileToolbar && "text-foreground",
+                )}
+                aria-label={t(
+                  showFileToolbar
+                    ? "sftp.hideSearchToolbar"
+                    : "sftp.showSearchToolbar",
+                )}
+                aria-pressed={showFileToolbar}
+                onClick={toggleFileToolbar}
+              >
+                {showFileToolbar ? (
+                  <Search className="size-4" />
+                ) : (
+                  <SearchX className="size-4" />
                 )}
               </Button>
             </Tooltip>

@@ -684,6 +684,8 @@ export const en = {
       "The remote connection was interrupted. Check your network and reconnect.",
     notConnected: "Connect before transferring files",
     toggleHidden: "Show hidden files",
+    showSearchToolbar: "Show search and sort",
+    hideSearchToolbar: "Hide search and sort",
     bookmarks: {
       title: "Bookmarks",
       add: "Bookmark this folder",

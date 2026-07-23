@@ -84,6 +84,7 @@ interface SftpState {
   transfers: Record<string, ActiveTransfer>;
 
   showHidden: boolean;
+  showFileToolbar: boolean;
   pendingConflict: {
     name: string;
     remaining: number;
@@ -92,6 +93,7 @@ interface SftpState {
 
   setRatio: (r: number) => void;
   toggleHidden: () => void;
+  toggleFileToolbar: () => void;
   setConflictApplyToRemaining: (value: boolean) => void;
   resolveConflict: (decision: ConflictAction) => void;
 
@@ -343,10 +345,13 @@ export const useSftpStore = create<SftpState>((set, get) => {
     transfers: {},
     pendingConflict: null,
     showHidden: false,
+    showFileToolbar: false,
 
     setRatio: (r) => set({ ratio: Math.max(0, Math.min(r, 1)) }),
 
     toggleHidden: () => set((s) => ({ showHidden: !s.showHidden })),
+    toggleFileToolbar: () =>
+      set((state) => ({ showFileToolbar: !state.showFileToolbar })),
     setConflictApplyToRemaining: (applyToRemaining) =>
       set((state) => ({
         pendingConflict: state.pendingConflict
