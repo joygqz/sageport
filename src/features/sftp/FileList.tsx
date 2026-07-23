@@ -65,8 +65,10 @@ import { useTabsStore } from "@/workbench/tabs";
 import { fileIconKind, type FileIconKind } from "./file-icon";
 import {
   DEFAULT_FILE_SORT,
+  INITIAL_SCROLL_VISIBILITY,
   inlineCreateBlurAction,
   inlineCreateRowIndex,
+  updateScrollVisibility,
   visibleFileEntries,
   type FileSort,
   type FileSortDirection,
@@ -169,6 +171,7 @@ export function FileList({
   const openFile = useTabsStore((s) => s.openFile);
   const [dragState, setDragState] = useState<FileDragState | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
+  const [toolbarVisible, setToolbarVisible] = useState(true);
   const [renameTarget, setRenameTarget] = useState<{
     tabId: string;
     cwd: string;
@@ -189,6 +192,8 @@ export function FileList({
   } | null>(null);
   const suppressClickRef = useRef<string | null>(null);
   const selectionAnchorRef = useRef<string | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const scrollVisibilityRef = useRef(INITIAL_SCROLL_VISIBILITY);
 
   const entries = useMemo(
     () => visibleFileEntries(tab.entries, showHidden, filterQuery, sort),
@@ -364,8 +369,36 @@ export function FileList({
   const SendIcon = side === "left" ? ArrowRight : ArrowLeft;
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
-      <div className="sticky top-0 z-10 flex h-9 items-center gap-1 border-b border-border bg-surface px-1.5">
+    <ScrollArea
+      className="min-h-0 flex-1"
+      onViewportScroll={(event) => {
+        const next = updateScrollVisibility(
+          scrollVisibilityRef.current,
+          event.currentTarget.scrollTop,
+          36,
+        );
+        const hasFocus = toolbarRef.current?.contains(document.activeElement);
+        scrollVisibilityRef.current =
+          hasFocus && !next.visible ? { ...next, visible: true } : next;
+        setToolbarVisible(scrollVisibilityRef.current.visible);
+      }}
+    >
+      <div
+        ref={toolbarRef}
+        onFocusCapture={() => {
+          scrollVisibilityRef.current = {
+            ...scrollVisibilityRef.current,
+            visible: true,
+          };
+          setToolbarVisible(true);
+        }}
+        className={cn(
+          "sticky top-0 z-10 flex h-9 items-center gap-1 border-b border-border bg-surface px-1.5 transition-transform duration-200 ease-out motion-reduce:transition-none",
+          toolbarVisible
+            ? "translate-y-0"
+            : "pointer-events-none -translate-y-full",
+        )}
+      >
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input

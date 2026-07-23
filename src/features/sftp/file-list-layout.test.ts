@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { FileEntry } from "@/types/models";
 import {
   DEFAULT_FILE_SORT,
+  INITIAL_SCROLL_VISIBILITY,
   inlineCreateBlurAction,
   inlineCreateRowIndex,
+  updateScrollVisibility,
   visibleFileEntries,
 } from "./file-list-layout";
 
@@ -101,5 +103,34 @@ describe("visibleFileEntries", () => {
         direction: "ascending",
       }).map((item) => item.name),
     ).toEqual(["report-10.txt", "report-2.txt"]);
+  });
+});
+
+describe("updateScrollVisibility", () => {
+  it("hides after scrolling down past the toolbar and shows when scrolling up", () => {
+    const belowToolbar = updateScrollVisibility(
+      INITIAL_SCROLL_VISIBILITY,
+      40,
+      36,
+    );
+    expect(belowToolbar.visible).toBe(false);
+
+    const scrollingUp = updateScrollVisibility(belowToolbar, 32, 36);
+    expect(scrollingUp.visible).toBe(true);
+  });
+
+  it("keeps the toolbar visible near the top", () => {
+    const state = updateScrollVisibility(INITIAL_SCROLL_VISIBILITY, 20, 36);
+    expect(state.visible).toBe(true);
+  });
+
+  it("ignores small direction changes and always shows at the top", () => {
+    const hidden = updateScrollVisibility(INITIAL_SCROLL_VISIBILITY, 50, 36);
+    const smallChange = updateScrollVisibility(hidden, 47, 36);
+    expect(smallChange.visible).toBe(false);
+
+    expect(updateScrollVisibility(smallChange, 0, 36)).toEqual(
+      INITIAL_SCROLL_VISIBILITY,
+    );
   });
 });
