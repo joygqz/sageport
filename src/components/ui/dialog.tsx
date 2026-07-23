@@ -129,7 +129,7 @@ function DialogContent({
       >
         {children}
         {showClose && (
-          <DialogPrimitive.Close className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-lg text-muted-foreground opacity-70 transition-[background-color,opacity] hover:bg-accent hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+          <DialogPrimitive.Close className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
             <X aria-hidden="true" className="size-4" />
             <span className="sr-only">{t("common.close")}</span>
           </DialogPrimitive.Close>
@@ -167,7 +167,7 @@ function DialogToolbar({
     >
       <DialogTitle className="min-w-0 flex-1 truncate">{children}</DialogTitle>
       {actions}
-      <DialogPrimitive.Close className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-70 transition-[background-color,opacity] hover:bg-accent hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+      <DialogPrimitive.Close className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
         <X aria-hidden="true" className="size-4" />
         <span className="sr-only">{t("common.close")}</span>
       </DialogPrimitive.Close>
