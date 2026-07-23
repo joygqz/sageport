@@ -13,7 +13,6 @@ import {
   PasswordInput,
   Select,
   TreeSelect,
-  SwitchField,
   Textarea,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
@@ -43,7 +42,6 @@ interface FormValues {
   jumpHostId: string;
   startupCommand: string;
   notes: string;
-  requiresApproval: boolean;
 }
 
 const emptyValues: FormValues = {
@@ -59,7 +57,6 @@ const emptyValues: FormValues = {
   jumpHostId: "",
   startupCommand: "",
   notes: "",
-  requiresApproval: false,
 };
 
 export function HostFormDialog({
@@ -153,7 +150,6 @@ function HostFormBody({
         jumpHostId: host.jumpHostId ?? "",
         startupCommand: host.startupCommand ?? "",
         notes: host.notes ?? "",
-        requiresApproval: host.requiresApproval,
       });
       setClearSavedPassword(false);
       setPasswordEdited(false);
@@ -188,7 +184,6 @@ function HostFormBody({
       osHint: host?.osHint ?? null,
       startupCommand: values.startupCommand.trim() || null,
       notes: values.notes.trim() || null,
-      requiresApproval: values.requiresApproval,
     };
 
     const input: HostInput = values.identityId
@@ -497,20 +492,6 @@ function HostFormBody({
           {...register("notes")}
         />
       </Field>
-
-      <Controller
-        control={control}
-        name="requiresApproval"
-        render={({ field }) => (
-          <SwitchField
-            fieldLabel={t("hostForm.approval")}
-            label={t("hostForm.approvalToggle")}
-            description={t("hostForm.approvalHint")}
-            checked={field.value}
-            onCheckedChange={field.onChange}
-          />
-        )}
-      />
     </FormBody>
   );
 }

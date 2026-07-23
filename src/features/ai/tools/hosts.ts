@@ -30,7 +30,6 @@ import {
 import { invalidateHosts } from "./cache";
 import { sleep } from "./terminal";
 import {
-  bool,
   num,
   nullableStr,
   optionalStr,
@@ -105,7 +104,6 @@ async function listHosts(): Promise<ToolExecutionResult> {
           jumpHostId: h.jumpHostId ?? undefined,
           startupCommand: h.startupCommand ?? undefined,
           hasPassword: h.hasPassword,
-          requiresApproval: h.requiresApproval,
           osHint: h.osHint ?? undefined,
           notes: notes ? notes.slice(0, 200) : undefined,
         };
@@ -304,10 +302,6 @@ function inputFromArgs(args: Record<string, unknown>, base?: Host): HostInput {
       null,
     keyId: keyId === undefined ? (base?.keyId ?? null) : keyId,
     osHint: base?.osHint ?? null,
-    requiresApproval:
-      "requiresApproval" in args
-        ? bool(args, "requiresApproval")
-        : (base?.requiresApproval ?? false),
     notes: notes === undefined ? (base?.notes ?? null) : notes,
     jumpHostId:
       jumpHostId === undefined ? (base?.jumpHostId ?? null) : jumpHostId,
@@ -478,11 +472,6 @@ const HOST_FIELDS = {
   notes: {
     type: ["string", "null"],
     description: "Free-form notes. Set null to clear it.",
-  },
-  requiresApproval: {
-    type: "boolean",
-    description:
-      "Require manual approval for sensitive AI operations on this host, even in autonomous mode.",
   },
 } as const;
 

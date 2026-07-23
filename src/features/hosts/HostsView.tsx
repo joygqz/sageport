@@ -18,7 +18,6 @@ import {
   Plus,
   RefreshCw,
   Server,
-  ShieldUser,
   Trash2,
 } from "lucide-react";
 
@@ -1007,16 +1006,6 @@ function HostRow({
               <p className="truncate text-sm font-medium text-foreground">
                 {host.label}
               </p>
-              {host.requiresApproval && (
-                <Tooltip content={t("hosts.approvalRequired")}>
-                  <span
-                    role="img"
-                    className="flex size-5 shrink-0 items-center justify-center rounded-md bg-warning/15 text-warning"
-                  >
-                    <ShieldUser className="size-3.5" />
-                  </span>
-                </Tooltip>
-              )}
             </div>
             <p className="truncate font-mono text-2xs text-muted-foreground">
               {host.username ? `${host.username}@` : ""}

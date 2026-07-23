@@ -354,7 +354,6 @@ mod tests {
                 auth_type: None,
                 key_id: None,
                 os_hint: None,
-                requires_approval: false,
                 notes: None,
                 jump_host_id: None,
                 startup_command: None,

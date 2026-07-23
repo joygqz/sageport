@@ -308,7 +308,6 @@ export const zhCN: Dictionary = {
     newHost: "新建主机",
     newGroup: "新建分组",
     noMatches: "没有匹配的主机",
-    approvalRequired: "AI 对此主机执行敏感操作时需要人工审批",
     import: {
       action: "从 SSH 配置导入",
       title: "从 SSH 配置导入",
@@ -427,9 +426,6 @@ export const zhCN: Dictionary = {
     startupCommandHint: "每次打开会话时自动执行。",
     notes: "备注",
     notesPlaceholder: "关于此主机的备注，选填",
-    approval: "AI 操作审批",
-    approvalHint: "开启后，AI 对此主机执行敏感操作时始终需要人工审批。",
-    approvalToggle: "需要人工审批",
     create: "创建主机",
     saveError: "保存主机失败",
   },
@@ -946,7 +942,7 @@ export const zhCN: Dictionary = {
       autonomousModeLabel: "助手模式",
       autonomousMode: "自动模式",
       autonomousModeHint:
-        "自动审批符合条件的操作。读取终端或远程文件内容、受这些内容影响的操作，以及受保护主机上的操作仍需人工审批。",
+        "自动审批符合条件的操作。读取终端或远程文件内容，以及受这些内容影响的操作仍需人工审批。",
       autonomousModeWarning:
         "此模式可能对系统造成不可逆更改，请仅在信任的主机和任务中开启。",
       maxHistoryTokensLabel: "历史 token 上限",

@@ -315,8 +315,6 @@ export const en = {
     newHost: "New host",
     newGroup: "New group",
     noMatches: "No matching hosts",
-    approvalRequired:
-      "Sensitive AI operations on this host require manual approval",
     import: {
       action: "Import from SSH config",
       title: "Import from SSH config",
@@ -442,10 +440,6 @@ export const en = {
     startupCommandHint: "Runs automatically each time the session opens.",
     notes: "Notes",
     notesPlaceholder: "Optional notes about this host",
-    approval: "AI operation approval",
-    approvalHint:
-      "When enabled, sensitive AI operations on this host always require manual approval.",
-    approvalToggle: "Require manual approval",
     create: "Create host",
     saveError: "Failed to save host",
   },
@@ -980,7 +974,7 @@ export const en = {
       autonomousModeLabel: "Assistant mode",
       autonomousMode: "Autonomous mode",
       autonomousModeHint:
-        "Automatically approves eligible operations. Reading terminal or remote file content, operations influenced by that content, and protected hosts still require approval.",
+        "Automatically approves eligible operations. Reading terminal or remote file content and operations influenced by that content still require approval.",
       autonomousModeWarning:
         "This can make irreversible changes to your systems. Enable it only for hosts and tasks you trust.",
       maxHistoryTokensLabel: "Max history tokens",

@@ -259,9 +259,9 @@ async fn create_normalized_in(
     sqlx::query(
         "INSERT INTO hosts
            (id, label, address, port, group_id, identity_id, username, auth_type, key_id,
-            os_hint, requires_approval, color, notes, jump_host_id, startup_command, password,
+            os_hint, notes, jump_host_id, startup_command, password,
             created_at, updated_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 1)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
     )
     .bind(&id)
     .bind(&input.label)
@@ -273,7 +273,6 @@ async fn create_normalized_in(
     .bind(&input.auth_type)
     .bind(&input.key_id)
     .bind(&input.os_hint)
-    .bind(input.requires_approval)
     .bind(&input.notes)
     .bind(&input.jump_host_id)
     .bind(&input.startup_command)
@@ -299,7 +298,7 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
     let affected = sqlx::query(
         "UPDATE hosts SET
            label = ?, address = ?, port = ?, group_id = ?, identity_id = ?, username = ?,
-           auth_type = ?, key_id = ?, os_hint = ?, requires_approval = ?, color = NULL, notes = ?,
+           auth_type = ?, key_id = ?, os_hint = ?, notes = ?,
            jump_host_id = ?, startup_command = ?,
            updated_at = ?, revision = revision + 1
          WHERE id = ? AND deleted_at IS NULL",
@@ -313,7 +312,6 @@ pub async fn update(pool: &SqlitePool, id: &str, input: HostInput) -> AppResult<
     .bind(&input.auth_type)
     .bind(&input.key_id)
     .bind(&input.os_hint)
-    .bind(input.requires_approval)
     .bind(&input.notes)
     .bind(&input.jump_host_id)
     .bind(&input.startup_command)
@@ -523,7 +521,6 @@ mod tests {
             auth_type: Some(auth::AGENT.to_string()),
             key_id: None,
             os_hint: None,
-            requires_approval: false,
             notes: None,
             jump_host_id: None,
             startup_command: None,
@@ -542,7 +539,6 @@ mod tests {
             auth_type: host.auth_type.clone(),
             key_id: host.key_id.clone(),
             os_hint: host.os_hint.clone(),
-            requires_approval: host.requires_approval,
             notes: host.notes.clone(),
             jump_host_id: host.jump_host_id.clone(),
             startup_command: host.startup_command.clone(),
@@ -597,20 +593,6 @@ mod tests {
             .await
             .unwrap();
         assert!(cleared.password.is_none());
-    }
-
-    #[tokio::test]
-    async fn approval_requirement_round_trips_through_create_and_update() {
-        let pool = test_pool().await;
-        let mut create_input = input("protected");
-        create_input.requires_approval = true;
-        let host = create(&pool, create_input).await.unwrap();
-        assert!(host.requires_approval);
-
-        let mut update = update_input(&host, None);
-        update.requires_approval = false;
-        let host = super::update(&pool, &host.id, update).await.unwrap();
-        assert!(!host.requires_approval);
     }
 
     #[tokio::test]

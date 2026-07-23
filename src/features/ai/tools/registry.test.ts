@@ -125,6 +125,15 @@ describe("tool registry", () => {
     ).toBeUndefined();
   });
 
+  it("does not expose retired host-level approval controls", () => {
+    for (const name of ["create_host", "update_host"]) {
+      const properties = getTool(name)?.spec.parameters as {
+        properties?: Record<string, unknown>;
+      };
+      expect(properties.properties).not.toHaveProperty("requiresApproval");
+    }
+  });
+
   it("rejects oversized commands and out-of-range execution options", () => {
     expect(
       validateToolArguments("run_terminal_command", {

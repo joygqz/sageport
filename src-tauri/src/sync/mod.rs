@@ -448,19 +448,11 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
             auth_type: host.auth_type.clone(),
             key_id: host.key_id.clone(),
             os_hint: host.os_hint.clone(),
-            requires_approval: host.requires_approval,
             notes: host.notes.clone(),
             jump_host_id: host.jump_host_id.clone(),
             startup_command: host.startup_command.clone(),
             password: host.password.clone(),
         })?;
-        if host
-            .color
-            .as_deref()
-            .is_some_and(|value| value.len() > 64 || value.chars().any(char::is_control))
-        {
-            return Err(AppError::Invalid("invalid host color in backup".into()));
-        }
         if let Some(last_used_at) = host.last_used_at.as_deref() {
             validate_timestamp(last_used_at, "host last-used time")?;
         }
@@ -793,26 +785,25 @@ async fn merge_host<'e, E>(executor: E, h: &Host) -> AppResult<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let requires_approval = h.requires_approval || h.color.as_deref() == Some("#ef4444");
     sqlx::query(
         "INSERT INTO hosts
            (id, label, address, port, group_id, identity_id, username, auth_type, key_id,
-            os_hint, requires_approval, color, notes, jump_host_id, startup_command, password,
+            os_hint, notes, jump_host_id, startup_command, password,
             last_used_at, created_at, updated_at, deleted_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            label = excluded.label, address = excluded.address, port = excluded.port,
            group_id = excluded.group_id, identity_id = excluded.identity_id, username = excluded.username,
            auth_type = excluded.auth_type, key_id = excluded.key_id, os_hint = excluded.os_hint,
-           requires_approval = excluded.requires_approval, color = NULL, notes = excluded.notes,
-           jump_host_id = excluded.jump_host_id, startup_command = excluded.startup_command,
+           notes = excluded.notes, jump_host_id = excluded.jump_host_id,
+           startup_command = excluded.startup_command,
            password = excluded.password, last_used_at = excluded.last_used_at,
            updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, revision = excluded.revision
          WHERE excluded.updated_at > hosts.updated_at",
     )
     .bind(&h.id).bind(&h.label).bind(&h.address).bind(h.port).bind(&h.group_id)
     .bind(&h.identity_id).bind(&h.username).bind(&h.auth_type).bind(&h.key_id)
-    .bind(&h.os_hint).bind(requires_approval).bind(&h.notes)
+    .bind(&h.os_hint).bind(&h.notes)
     .bind(&h.jump_host_id).bind(&h.startup_command)
     .bind(&h.password).bind(&h.last_used_at)
     .bind(&h.created_at).bind(&h.updated_at).bind(&h.deleted_at).bind(h.revision)

@@ -15,10 +15,6 @@ pub struct Host {
     pub auth_type: Option<String>,
     pub key_id: Option<String>,
     pub os_hint: Option<String>,
-    #[serde(default)]
-    pub requires_approval: bool,
-    // Kept in the sync record for backwards compatibility with older vaults.
-    pub color: Option<String>,
     pub notes: Option<String>,
 
     pub password: Option<String>,
@@ -44,7 +40,6 @@ pub struct HostView {
     pub auth_type: Option<String>,
     pub key_id: Option<String>,
     pub os_hint: Option<String>,
-    pub requires_approval: bool,
     pub notes: Option<String>,
     pub has_password: bool,
     pub jump_host_id: Option<String>,
@@ -69,7 +64,6 @@ impl From<Host> for HostView {
             auth_type: host.auth_type,
             key_id: host.key_id,
             os_hint: host.os_hint,
-            requires_approval: host.requires_approval,
             notes: host.notes,
             has_password: host
                 .password
@@ -105,8 +99,6 @@ pub struct HostInput {
     pub key_id: Option<String>,
     #[serde(default)]
     pub os_hint: Option<String>,
-    #[serde(default)]
-    pub requires_approval: bool,
     #[serde(default)]
     pub notes: Option<String>,
     #[serde(default)]

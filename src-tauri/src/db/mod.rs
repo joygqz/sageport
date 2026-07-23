@@ -90,6 +90,11 @@ mod tests {
                 .fetch_all(&pool)
                 .await
                 .unwrap();
+        let host_columns: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_table_info('hosts')")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         pool.close().await;
 
         assert_eq!(count, 0);
@@ -110,9 +115,58 @@ mod tests {
         ] {
             assert!(tables.iter().any(|name| name == table), "missing {table}");
         }
+        assert!(!host_columns.iter().any(|name| name == "requires_approval"));
+        assert!(!host_columns.iter().any(|name| name == "color"));
         assert!(violations.is_empty());
         assert!(path.exists());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn removing_host_approval_columns_preserves_host_rows() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE hosts (
+                id TEXT PRIMARY KEY NOT NULL,
+                label TEXT NOT NULL,
+                requires_approval INTEGER NOT NULL DEFAULT 0,
+                color TEXT
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO hosts (id, label, requires_approval, color)
+             VALUES ('host-1', 'Production', 1, '#ef4444')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::raw_sql(include_str!(
+            "../../migrations/0010_remove_host_ai_approval.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let host: (String, String) = sqlx::query_as("SELECT id, label FROM hosts")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let columns: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_table_info('hosts')")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(host, ("host-1".into(), "Production".into()));
+        assert!(!columns.iter().any(|name| name == "requires_approval"));
+        assert!(!columns.iter().any(|name| name == "color"));
     }
 
     #[test]

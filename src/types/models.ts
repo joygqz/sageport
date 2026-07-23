@@ -22,7 +22,6 @@ export interface Host {
   authType: AuthType | null;
   keyId: string | null;
   osHint: string | null;
-  requiresApproval: boolean;
   notes: string | null;
   jumpHostId: string | null;
   startupCommand: string | null;
@@ -208,7 +207,6 @@ export interface HostInput {
   authType?: AuthType | null;
   keyId?: string | null;
   osHint?: string | null;
-  requiresApproval?: boolean;
   notes?: string | null;
   jumpHostId?: string | null;
   startupCommand?: string | null;

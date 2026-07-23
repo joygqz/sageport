@@ -229,7 +229,6 @@ mod tests {
             auth_type: Some(auth::AGENT.to_string()),
             key_id: None,
             os_hint: None,
-            requires_approval: false,
             notes: None,
             jump_host_id: None,
             startup_command: None,

@@ -264,8 +264,6 @@ mod tests {
             auth_type: Some("agent".to_string()),
             key_id: None,
             os_hint: None,
-            requires_approval: false,
-            color: None,
             notes: None,
             password: None,
             jump_host_id: None,
