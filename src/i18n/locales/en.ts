@@ -743,8 +743,7 @@ export const en = {
     hidePanel: "Hide panel",
     setup: {
       title: "Set up the assistant",
-      description:
-        "Add an OpenAI-compatible or Anthropic-compatible endpoint to start chatting.",
+      description: "Add a model provider to start chatting.",
       action: "Open settings",
     },
     empty: {

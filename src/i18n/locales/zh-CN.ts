@@ -722,7 +722,7 @@ export const zhCN: Dictionary = {
     hidePanel: "隐藏面板",
     setup: {
       title: "配置助手",
-      description: "添加 OpenAI 或 Anthropic 兼容接口后即可开始对话。",
+      description: "添加模型服务后即可开始对话。",
       action: "打开设置",
     },
     empty: {
