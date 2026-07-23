@@ -1,3 +1,4 @@
+pub mod delete;
 pub mod ops;
 pub mod path;
 pub mod transfer;
@@ -20,12 +21,14 @@ use crate::ssh::{establish, exec_capture, ConnectionPrompts, Hop, SshConnection}
 pub use path::base_name;
 pub use transfer::{transfer, Endpoint, TransferRequest};
 
+pub const EVENT_DELETE: &str = "sftp://delete";
 pub const EVENT_STATUS: &str = "sftp://status";
 pub const EVENT_TRANSFER: &str = "sftp://transfer";
 
 pub const MAX_EDIT_BYTES: u64 = 2 * 1024 * 1024;
 const SUBSYSTEM_OPEN_TIMEOUT: Duration = Duration::from_secs(15);
-const MAX_CONCURRENT_TRANSFERS: usize = 4;
+const MAX_CONCURRENT_DELETE_REQUESTS: usize = 8;
+const MAX_CONCURRENT_OPERATIONS: usize = 4;
 
 pub fn edit_too_large_error() -> AppError {
     AppError::Invalid("file is too large to edit (2 MB max)".into())
@@ -64,6 +67,22 @@ pub struct TransferEvent {
     pub file: String,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteEvent {
+    pub operation_id: String,
+    pub connection_id: Option<String>,
+    pub completed: u64,
+    pub total: u64,
+    pub current_path: String,
+    pub status: String,
     pub phase: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -115,6 +134,7 @@ pub struct Conn {
     session: SftpSession,
     host_label: String,
     tar_available: OnceCell<bool>,
+    delete_slots: Arc<Semaphore>,
 }
 
 impl Conn {
@@ -154,8 +174,8 @@ impl Conn {
 pub struct SftpManager {
     conns: Arc<Mutex<HashMap<String, Arc<Conn>>>>,
     connect_cancels: Arc<Mutex<HashMap<String, Arc<TransferCancel>>>>,
-    cancel_flags: Mutex<HashMap<String, Arc<TransferCancel>>>,
-    transfer_slots: Arc<Semaphore>,
+    operation_cancels: Mutex<HashMap<String, Arc<TransferCancel>>>,
+    operation_slots: Arc<Semaphore>,
 }
 
 impl Default for SftpManager {
@@ -163,8 +183,8 @@ impl Default for SftpManager {
         Self {
             conns: Arc::new(Mutex::new(HashMap::new())),
             connect_cancels: Arc::new(Mutex::new(HashMap::new())),
-            cancel_flags: Mutex::new(HashMap::new()),
-            transfer_slots: Arc::new(Semaphore::new(MAX_CONCURRENT_TRANSFERS)),
+            operation_cancels: Mutex::new(HashMap::new()),
+            operation_slots: Arc::new(Semaphore::new(MAX_CONCURRENT_OPERATIONS)),
         }
     }
 }
@@ -174,26 +194,26 @@ impl SftpManager {
         Self::default()
     }
 
-    pub fn register_transfer(&self, transfer_id: &str) -> Arc<TransferCancel> {
+    pub fn register_operation(&self, operation_id: &str) -> Arc<TransferCancel> {
         let flag = Arc::new(TransferCancel::new());
-        self.cancel_flags
+        self.operation_cancels
             .lock()
-            .insert(transfer_id.to_string(), flag.clone());
+            .insert(operation_id.to_string(), flag.clone());
         flag
     }
 
-    pub fn cancel_transfer(&self, transfer_id: &str) {
-        if let Some(flag) = self.cancel_flags.lock().get(transfer_id) {
+    pub fn cancel_operation(&self, operation_id: &str) {
+        if let Some(flag) = self.operation_cancels.lock().get(operation_id) {
             flag.cancel();
         }
     }
 
-    pub fn unregister_transfer(&self, transfer_id: &str) {
-        self.cancel_flags.lock().remove(transfer_id);
+    pub fn unregister_operation(&self, operation_id: &str) {
+        self.operation_cancels.lock().remove(operation_id);
     }
 
-    pub async fn acquire_transfer_slot(&self) -> OwnedSemaphorePermit {
-        self.transfer_slots
+    pub async fn acquire_operation_slot(&self) -> OwnedSemaphorePermit {
+        self.operation_slots
             .clone()
             .acquire_owned()
             .await
@@ -264,7 +284,7 @@ impl SftpManager {
     }
 
     pub fn disconnect_all(&self) {
-        for (_, flag) in self.cancel_flags.lock().drain() {
+        for (_, flag) in self.operation_cancels.lock().drain() {
             flag.cancel();
         }
         for (_, cancel) in self.connect_cancels.lock().drain() {
@@ -353,6 +373,7 @@ async fn open(
         session,
         host_label: params.host_label.clone(),
         tar_available: OnceCell::new(),
+        delete_slots: Arc::new(Semaphore::new(MAX_CONCURRENT_DELETE_REQUESTS)),
     })
 }
 
@@ -395,9 +416,38 @@ pub(crate) fn emit_transfer_event(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn emit_delete_event(
+    app: &AppHandle,
+    operation_id: &str,
+    connection_id: Option<&str>,
+    completed: u64,
+    total: u64,
+    current_path: &str,
+    status: &str,
+    phase: Option<String>,
+    message: Option<String>,
+    code: Option<String>,
+) {
+    let _ = app.emit(
+        EVENT_DELETE,
+        DeleteEvent {
+            operation_id: operation_id.to_string(),
+            connection_id: connection_id.map(str::to_string),
+            completed,
+            total,
+            current_path: current_path.to_string(),
+            status: status.to_string(),
+            phase,
+            message,
+            code,
+        },
+    );
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{SftpManager, TransferCancel, MAX_CONCURRENT_TRANSFERS};
+    use super::{SftpManager, TransferCancel, MAX_CONCURRENT_OPERATIONS};
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -416,28 +466,29 @@ mod tests {
     }
 
     #[test]
-    fn disconnect_all_cancels_and_releases_registered_transfers() {
+    fn disconnect_all_cancels_and_releases_registered_operations() {
         let manager = SftpManager::new();
-        let cancel = manager.register_transfer("transfer-1");
+        let cancel = manager.register_operation("transfer-1");
 
         manager.disconnect_all();
 
         assert!(cancel.is_cancelled());
-        assert!(manager.cancel_flags.lock().is_empty());
+        assert!(manager.operation_cancels.lock().is_empty());
     }
 
     #[tokio::test]
-    async fn transfer_slots_bound_concurrent_file_io() {
+    async fn operation_slots_bound_concurrent_file_io() {
         let manager = SftpManager::new();
         let mut permits = Vec::new();
-        for _ in 0..MAX_CONCURRENT_TRANSFERS {
-            permits.push(manager.acquire_transfer_slot().await);
+        for _ in 0..MAX_CONCURRENT_OPERATIONS {
+            permits.push(manager.acquire_operation_slot().await);
         }
 
-        assert!(manager.transfer_slots.clone().try_acquire_owned().is_err());
+        assert!(manager.operation_slots.clone().try_acquire_owned().is_err());
         permits.pop();
-        let _permit = tokio::time::timeout(Duration::from_secs(1), manager.acquire_transfer_slot())
-            .await
-            .expect("released transfer slot should wake the queue");
+        let _permit =
+            tokio::time::timeout(Duration::from_secs(1), manager.acquire_operation_slot())
+                .await
+                .expect("released operation slot should wake the queue");
     }
 }

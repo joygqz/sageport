@@ -70,20 +70,34 @@ pub async fn remote_rename(session: &SftpSession, from: &str, to: &str) -> AppRe
 }
 
 pub async fn remote_remove(session: &SftpSession, path: &str, _is_dir: bool) -> AppResult<()> {
-    let meta = session.symlink_metadata(path).await?;
-    if !meta.file_type().is_dir() || meta.file_type().is_symlink() {
-        session.remove_file(path).await?;
-        return Ok(());
-    }
-    for entry in session.read_dir(path).await? {
-        let name = entry.file_name();
-        if name.is_empty() || name == "." || name == ".." {
-            continue;
+    remote_remove_node(session, path, None).await
+}
+
+fn remote_remove_node<'a>(
+    session: &'a SftpSession,
+    path: &'a str,
+    known_metadata: Option<Metadata>,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = AppResult<()>> + Send + 'a>> {
+    Box::pin(async move {
+        let meta = match known_metadata {
+            Some(meta) if meta.file_type().is_file() || meta.file_type().is_symlink() => meta,
+            _ => session.symlink_metadata(path).await?,
+        };
+        if !meta.file_type().is_dir() || meta.file_type().is_symlink() {
+            session.remove_file(path).await?;
+            return Ok(());
         }
-        Box::pin(remote_remove(session, &entry.path(), false)).await?;
-    }
-    session.remove_dir(path).await?;
-    Ok(())
+        for entry in session.read_dir(path).await? {
+            let name = entry.file_name();
+            if name.is_empty() || name == "." || name == ".." {
+                continue;
+            }
+            let entry_path = entry.path();
+            remote_remove_node(session, &entry_path, Some(entry.metadata())).await?;
+        }
+        session.remove_dir(path).await?;
+        Ok(())
+    })
 }
 
 pub async fn remote_read(session: &SftpSession, path: &str) -> AppResult<Vec<u8>> {

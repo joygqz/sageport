@@ -7,6 +7,8 @@ vi.mock("@/lib/ipc", () => ({
       list: vi.fn(() => Promise.resolve([])),
       transfer: vi.fn(() => Promise.resolve()),
       cancelTransfer: vi.fn(() => Promise.resolve()),
+      deleteBatch: vi.fn(() => Promise.resolve()),
+      cancelDelete: vi.fn(() => Promise.resolve()),
     },
   },
 }));
@@ -59,6 +61,7 @@ describe("SFTP navigation state", () => {
         right: { tabs: [], activeTabId: null },
       },
       transfers: {},
+      deletions: {},
       refresh: refreshDirectory,
     });
   });
@@ -159,6 +162,7 @@ describe("SFTP tab ordering", () => {
         },
       },
       transfers: {},
+      deletions: {},
     });
   });
 
@@ -209,6 +213,7 @@ describe("SFTP tab limit", () => {
         },
       },
       transfers: {},
+      deletions: {},
     });
   });
 
@@ -290,6 +295,7 @@ describe("SFTP transfer refresh", () => {
         },
       },
       transfers: {},
+      deletions: {},
       refresh: refreshDirectory,
     });
   });
@@ -360,5 +366,126 @@ describe("SFTP transfer refresh", () => {
       totalBytes: 1024,
       status: "active",
     });
+  });
+});
+
+describe("SFTP delete operations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useToastStore.setState({ toasts: [] });
+    useSftpStore.setState({
+      panes: {
+        left: {
+          tabs: [transferTab("left-source", "remote-1", "/uploads")],
+          activeTabId: "left-source",
+        },
+        right: { tabs: [], activeTabId: null },
+      },
+      transfers: {},
+      deletions: {},
+      refresh: refreshDirectory,
+    });
+  });
+
+  it("starts one background operation for a batch and tracks item progress", async () => {
+    const entries: FileEntry[] = [
+      {
+        name: "logs",
+        path: "/uploads/logs",
+        kind: "dir",
+        size: 0,
+        modified: null,
+        permissions: null,
+        isSymlink: false,
+      },
+      {
+        name: "report.txt",
+        path: "/uploads/report.txt",
+        kind: "file",
+        size: 42,
+        modified: null,
+        permissions: null,
+        isSymlink: false,
+      },
+    ];
+
+    await useSftpStore.getState().deleteEntries("left", "left-source", entries);
+
+    expect(ipc.sftp.deleteBatch).toHaveBeenCalledOnce();
+    const [operationId, connectionId, requested] = vi.mocked(
+      ipc.sftp.deleteBatch,
+    ).mock.calls[0];
+    expect(connectionId).toBe("remote-1");
+    expect(requested).toEqual(entries.map(({ path }) => ({ path })));
+    expect(useSftpStore.getState().deletions[operationId]).toMatchObject({
+      label: "2 items",
+      phase: "scanning",
+      completed: 0,
+    });
+
+    useSftpStore.getState().applyDelete({
+      operationId,
+      connectionId,
+      completed: 3,
+      total: 8,
+      currentPath: "/uploads/logs/app.log",
+      status: "active",
+      phase: "deleting",
+    });
+
+    expect(useSftpStore.getState().deletions[operationId]).toMatchObject({
+      completed: 3,
+      total: 8,
+      phase: "deleting",
+    });
+  });
+
+  it("refreshes the original tab when deletion finishes", async () => {
+    const entry: FileEntry = {
+      name: "logs",
+      path: "/uploads/logs",
+      kind: "dir",
+      size: 0,
+      modified: null,
+      permissions: null,
+      isSymlink: false,
+    };
+    await useSftpStore.getState().deleteEntries("left", "left-source", [entry]);
+    const [operationId] = vi.mocked(ipc.sftp.deleteBatch).mock.calls[0];
+    const refresh = vi.fn(() => Promise.resolve());
+    useSftpStore.setState({ refresh });
+
+    useSftpStore.getState().applyDelete({
+      operationId,
+      connectionId: "remote-1",
+      completed: 4,
+      total: 4,
+      currentPath: entry.path,
+      status: "done",
+    });
+
+    expect(useSftpStore.getState().deletions[operationId]).toBeUndefined();
+    expect(refresh).toHaveBeenCalledWith("left", "left-source");
+  });
+
+  it("marks deletion as cancelling before requesting cancellation", async () => {
+    const entry: FileEntry = {
+      name: "report.txt",
+      path: "/uploads/report.txt",
+      kind: "file",
+      size: 42,
+      modified: null,
+      permissions: null,
+      isSymlink: false,
+    };
+    await useSftpStore.getState().deleteEntries("left", "left-source", [entry]);
+    const [operationId] = vi.mocked(ipc.sftp.deleteBatch).mock.calls[0];
+
+    useSftpStore.getState().cancelDelete(operationId);
+
+    expect(
+      useSftpStore.getState().deletions[operationId]?.cancelRequested,
+    ).toBe(true);
+    expect(ipc.sftp.cancelDelete).toHaveBeenCalledWith(operationId);
   });
 });

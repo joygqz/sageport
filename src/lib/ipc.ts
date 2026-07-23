@@ -12,6 +12,7 @@ import type {
   AiToolSpec,
   BatchExecEvent,
   CommandHistoryEntry,
+  DeleteEvent,
   FileEntry,
   FsEndpoint,
   GeneratedSshKey,
@@ -237,6 +238,18 @@ export const ipc = {
       invoke<void>("fs_rename", { connectionId, from, to }),
     remove: (connectionId: string | null, path: string, isDir: boolean) =>
       invoke<void>("fs_delete", { connectionId, path, isDir }),
+    deleteBatch: (
+      operationId: string,
+      connectionId: string | null,
+      entries: Array<{ path: string }>,
+    ) =>
+      invoke<void>("fs_delete_batch", {
+        operationId,
+        connectionId,
+        entries,
+      }),
+    cancelDelete: (operationId: string) =>
+      invoke<void>("fs_delete_cancel", { operationId }),
     readText: (connectionId: string | null, path: string) =>
       invoke<string>("fs_read_text", { connectionId, path }),
     writeText: (
@@ -281,6 +294,8 @@ export const ipc = {
       listen<TransferEvent>("sftp://transfer", (event) =>
         handler(event.payload),
       ),
+    onDelete: (handler: (e: DeleteEvent) => void): Promise<UnlistenFn> =>
+      listen<DeleteEvent>("sftp://delete", (event) => handler(event.payload)),
   },
   sync: {
     status: () => invoke<SyncStatus>("sync_get_status"),

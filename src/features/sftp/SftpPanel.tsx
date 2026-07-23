@@ -18,6 +18,7 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn, formatBytes } from "@/lib/utils";
+import type { DeletePhase, TransferPhase } from "@/types/models";
 import { useLayoutStore } from "@/workbench/layout";
 import {
   PanelHeader,
@@ -166,7 +167,7 @@ export function SftpPanel({ height }: { height: number }) {
         </div>
       </div>
 
-      <TransferStrip />
+      <OperationStrip />
 
       <TransferHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <ConfirmDialog
@@ -220,53 +221,99 @@ export function SftpPanel({ height }: { height: number }) {
   );
 }
 
-function TransferStrip() {
+interface DisplayOperation {
+  id: string;
+  kind: "transfer" | "delete";
+  label: string;
+  currentPath?: string;
+  completed: number;
+  total: number;
+  phase?: DeletePhase | TransferPhase;
+  cancelRequested: boolean;
+  speedBps: number;
+  etaSeconds: number | null;
+  onCancel: () => void;
+}
+
+function OperationStrip() {
   const { t } = useI18n();
   const transfers = useSftpStore((s) => s.transfers);
+  const deletions = useSftpStore((s) => s.deletions);
   const cancelTransfer = useSftpStore((s) => s.cancelTransfer);
+  const cancelDelete = useSftpStore((s) => s.cancelDelete);
 
-  const active = Object.values(transfers);
+  const active: DisplayOperation[] = [
+    ...Object.values(transfers).map((operation) => ({
+      id: operation.transferId,
+      kind: "transfer" as const,
+      label: operation.file,
+      completed: operation.transferred,
+      total: operation.total,
+      phase: operation.phase,
+      cancelRequested: operation.cancelRequested,
+      speedBps: operation.speedBps,
+      etaSeconds: operation.etaSeconds,
+      onCancel: () => cancelTransfer(operation.transferId),
+    })),
+    ...Object.values(deletions).map((operation) => ({
+      id: operation.operationId,
+      kind: "delete" as const,
+      label: operation.label,
+      currentPath: operation.currentPath,
+      completed: operation.completed,
+      total: operation.total,
+      phase: operation.phase,
+      cancelRequested: operation.cancelRequested,
+      speedBps: 0,
+      etaSeconds: null,
+      onCancel: () => cancelDelete(operation.operationId),
+    })),
+  ];
   if (active.length === 0) return null;
 
   return (
-    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border bg-surface px-2.5 py-1">
-      {active.map((tx) => {
+    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border bg-surface px-2.5">
+      {active.map((item) => {
         const pct =
-          tx.total > 0
+          item.total > 0
             ? Math.max(
                 0,
-                Math.min(100, Math.round((tx.transferred / tx.total) * 100)),
+                Math.min(100, Math.round((item.completed / item.total) * 100)),
               )
             : 0;
 
         const indeterminate =
-          tx.phase === "preparing" ||
-          tx.phase === "compressing" ||
-          tx.phase === "extracting";
+          item.kind === "delete"
+            ? item.phase === "scanning" || item.total === 0
+            : item.phase === "preparing" ||
+              item.phase === "compressing" ||
+              item.phase === "extracting";
         const speed =
-          tx.phase === "transferring" && tx.speedBps > 0
-            ? `${formatBytes(tx.speedBps)}/s`
+          item.kind === "transfer" &&
+          item.phase === "transferring" &&
+          item.speedBps > 0
+            ? `${formatBytes(item.speedBps)}/s`
             : "—";
         return (
-          <div
-            key={tx.transferId}
-            className="flex h-8 items-center gap-2 rounded-md px-1 text-xs hover:bg-list-hover"
-          >
-            <span className="min-w-0 shrink truncate" title={tx.file}>
-              {tx.file}
+          <div key={item.id} className="flex h-8 items-center gap-2 text-xs">
+            <span
+              className="min-w-0 shrink truncate"
+              title={item.currentPath || item.label}
+            >
+              {item.label}
             </span>
-            {tx.cancelRequested ? (
+            {item.cancelRequested ? (
               <span className="shrink-0 text-2xs text-warning">
                 {t("sftp.cancelling")}
               </span>
-            ) : tx.phase ? (
+            ) : item.phase ? (
               <span className="shrink-0 text-2xs text-muted-foreground">
-                {t(`sftp.phase.${tx.phase}`)}
+                {t(`sftp.phase.${item.phase}`)}
               </span>
             ) : null}
             <div
               role="progressbar"
-              aria-label={tx.file}
+              aria-label={item.label}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={indeterminate ? undefined : pct}
@@ -280,11 +327,21 @@ function TransferStrip() {
                 style={{ width: `${indeterminate ? 100 : pct}%` }}
               />
             </div>
-            {!indeterminate && (
+            {item.kind === "delete" && (
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {item.phase === "scanning"
+                  ? t("sftp.operation.found", { count: item.completed })
+                  : t("sftp.operation.itemProgress", {
+                      completed: item.completed,
+                      total: item.total,
+                    })}
+              </span>
+            )}
+            {item.kind === "transfer" && !indeterminate && (
               <>
                 <span className="shrink-0 tabular-nums text-muted-foreground">
-                  {formatBytes(tx.transferred)}
-                  {tx.total > 0 && ` / ${formatBytes(tx.total)}`}
+                  {formatBytes(item.completed)}
+                  {item.total > 0 && ` / ${formatBytes(item.total)}`}
                 </span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">
                   {pct}%
@@ -293,22 +350,24 @@ function TransferStrip() {
                   {speed}
                 </span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">
-                  {tx.etaSeconds !== null && tx.speedBps > 0
-                    ? t("sftp.remaining", { time: formatEta(tx.etaSeconds) })
+                  {item.etaSeconds !== null && item.speedBps > 0
+                    ? t("sftp.remaining", {
+                        time: formatEta(item.etaSeconds),
+                      })
                     : ""}
                 </span>
               </>
             )}
-            <Tooltip content={t("sftp.cancelTransfer")}>
+            <Tooltip content={t("sftp.cancelOperation")}>
               <Button
                 size="icon"
                 variant="ghost"
-                className="size-5 shrink-0 text-muted-foreground hover:text-danger"
-                disabled={tx.cancelRequested}
-                aria-label={t("sftp.cancelTransfer")}
-                onClick={() => cancelTransfer(tx.transferId)}
+                className="size-5 shrink-0 rounded-md text-muted-foreground hover:text-danger"
+                disabled={item.cancelRequested}
+                aria-label={t("sftp.cancelOperation")}
+                onClick={item.onCancel}
               >
-                {tx.cancelRequested ? (
+                {item.cancelRequested ? (
                   <Loader2 className="size-3 animate-spin" />
                 ) : (
                   <X className="size-3" />

@@ -470,6 +470,8 @@ export type TransferStatus = "active" | "done" | "error" | "cancelled";
 export type TransferPhase =
   "preparing" | "compressing" | "transferring" | "extracting";
 
+export type DeletePhase = "scanning" | "deleting";
+
 export interface TransferEvent {
   transferId: string;
   transferred: number;
@@ -477,6 +479,18 @@ export interface TransferEvent {
   file: string;
   status: TransferStatus;
   phase?: TransferPhase;
+  message?: string;
+  code?: string;
+}
+
+export interface DeleteEvent {
+  operationId: string;
+  connectionId: string | null;
+  completed: number;
+  total: number;
+  currentPath: string;
+  status: TransferStatus;
+  phase?: DeletePhase;
   message?: string;
   code?: string;
 }

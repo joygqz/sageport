@@ -191,6 +191,8 @@ pub fn run() {
             commands::sftp::fs_mkdir,
             commands::sftp::fs_rename,
             commands::sftp::fs_delete,
+            commands::sftp::fs_delete_batch,
+            commands::sftp::fs_delete_cancel,
             commands::sftp::fs_chmod,
             commands::sftp::fs_read_text,
             commands::sftp::fs_write_text,

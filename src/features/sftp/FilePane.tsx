@@ -92,6 +92,7 @@ export function FilePane({ side }: { side: PaneSide }) {
   const restoreLoadedPath = useSftpStore((s) => s.restoreLoadedPath);
   const refresh = useSftpStore((s) => s.refresh);
   const applyStatus = useSftpStore((s) => s.applyStatus);
+  const deleteEntries = useSftpStore((s) => s.deleteEntries);
   const { data: hosts = [] } = useHosts();
 
   const tabStripRef = useRef<HTMLDivElement>(null);
@@ -268,24 +269,7 @@ export function FilePane({ side }: { side: PaneSide }) {
   };
 
   const onDelete = async (tab: SftpTab, entries: FileEntry[]) => {
-    let changed = false;
-    try {
-      for (const entry of entries) {
-        await ipc.sftp.remove(
-          tab.connectionId,
-          entry.path,
-          entry.kind === "dir",
-        );
-        changed = true;
-      }
-    } catch (err) {
-      if (tab.connectionId && errorCode(err) === "network") {
-        applyStatus(tab.connectionId, "error", errorMessage(err), "network");
-      }
-      toast.error(t("sftp.deleteError"), errorMessage(err));
-    } finally {
-      if (changed) await refresh(side, tab.id);
-    }
+    await deleteEntries(side, tab.id, entries);
   };
 
   const confirmDelete = (tab: SftpTab, entries: FileEntry[]) => {

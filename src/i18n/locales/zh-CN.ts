@@ -626,6 +626,8 @@ export const zhCN: Dictionary = {
       compressing: "压缩中",
       transferring: "传输中",
       extracting: "解压中",
+      scanning: "正在扫描",
+      deleting: "正在删除",
     },
     emptyDir: "此文件夹为空",
     fileList: "文件列表",
@@ -649,6 +651,7 @@ export const zhCN: Dictionary = {
     createFileError: "创建文件失败",
     renameError: "重命名失败",
     deleteError: "删除失败",
+    deleteFailed: "删除未完成",
     transferError: "启动传输失败",
     transferFailed: "传输失败",
     conflict: {
@@ -689,9 +692,16 @@ export const zhCN: Dictionary = {
       saveError: "保存文件失败",
     },
     cancelTransfer: "取消传输",
+    cancelOperation: "取消操作",
     cancelling: "正在取消…",
     cancelError: "取消传输失败",
+    cancelDeleteError: "取消删除失败",
     remaining: "剩余 {time}",
+    operation: {
+      items: "{count} 个项目",
+      found: "已发现 {count} 个",
+      itemProgress: "{completed} / {total} 个",
+    },
     history: {
       title: "传输历史",
       empty: "暂无传输记录",

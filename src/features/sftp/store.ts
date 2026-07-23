@@ -8,6 +8,7 @@ import { ipc } from "@/lib/ipc";
 import { queryClient } from "@/lib/query";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type {
+  DeleteEvent,
   FileEntry,
   Host,
   SftpStatusKind,
@@ -72,6 +73,13 @@ export interface SftpTab {
   error?: string;
 }
 
+export interface ActiveDeleteOperation extends DeleteEvent {
+  label: string;
+  side: PaneSide;
+  tabId: string;
+  cancelRequested: boolean;
+}
+
 interface PaneState {
   tabs: SftpTab[];
   activeTabId: string | null;
@@ -82,6 +90,7 @@ interface SftpState {
   panes: Record<PaneSide, PaneState>;
 
   transfers: Record<string, ActiveTransfer>;
+  deletions: Record<string, ActiveDeleteOperation>;
 
   showHidden: boolean;
   showFileToolbar: boolean;
@@ -123,10 +132,17 @@ interface SftpState {
   ) => void;
 
   applyTransfer: (e: TransferEvent) => void;
+  applyDelete: (e: DeleteEvent) => void;
 
   cancelTransfer: (transferId: string) => void;
+  cancelDelete: (operationId: string) => void;
 
   transfer: (fromSide: PaneSide, entries?: FileEntry[]) => Promise<void>;
+  deleteEntries: (
+    side: PaneSide,
+    tabId: string,
+    entries: FileEntry[],
+  ) => Promise<void>;
 }
 
 const otherSide = (side: PaneSide): PaneSide =>
@@ -226,15 +242,18 @@ function syncTransferHistory(event: TransferEvent): void {
 
 export function bridgeSftpEvents(): Promise<void> {
   if (eventsBridged) return Promise.resolve();
-  const { applyStatus, applyTransfer } = useSftpStore.getState();
+  const { applyStatus, applyTransfer, applyDelete } = useSftpStore.getState();
   eventBridgePromise ??= (async () => {
     const unlistenStatus = await ipc.sftp.onStatus((e) =>
       applyStatus(e.connectionId, e.status, e.message, e.code),
     );
+    let unlistenTransfer: (() => void) | undefined;
     try {
-      await ipc.sftp.onTransfer((e) => applyTransfer(e));
+      unlistenTransfer = await ipc.sftp.onTransfer((e) => applyTransfer(e));
+      await ipc.sftp.onDelete((e) => applyDelete(e));
       eventsBridged = true;
     } catch (error) {
+      unlistenTransfer?.();
       unlistenStatus();
       throw error;
     }
@@ -343,6 +362,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
     ratio: 0.5,
     panes: { left: emptyPane(), right: emptyPane() },
     transfers: {},
+    deletions: {},
     pendingConflict: null,
     showHidden: false,
     showFileToolbar: false,
@@ -643,6 +663,46 @@ export const useSftpStore = create<SftpState>((set, get) => {
       }
     },
 
+    applyDelete: (e) => {
+      if (e.status === "active") {
+        set((s) => {
+          const operation = s.deletions[e.operationId];
+          if (!operation) return s;
+          return {
+            deletions: {
+              ...s.deletions,
+              [e.operationId]: { ...operation, ...e },
+            },
+          };
+        });
+        return;
+      }
+
+      const completed = get().deletions[e.operationId];
+      set((s) => {
+        const rest = { ...s.deletions };
+        delete rest[e.operationId];
+        return { deletions: rest };
+      });
+      if (e.status === "error") {
+        toast.error(
+          t("sftp.deleteFailed"),
+          e.code === "network" ? t("sftp.connectionLost") : e.message,
+        );
+        if (e.code === "network" && e.connectionId) {
+          get().applyStatus(
+            e.connectionId,
+            "error",
+            t("sftp.connectionLost"),
+            "network",
+          );
+        }
+      }
+      if (completed) {
+        void get().refresh(completed.side, completed.tabId);
+      }
+    },
+
     cancelTransfer: (transferId) => {
       set((s) => {
         const transfer = s.transfers[transferId];
@@ -666,6 +726,32 @@ export const useSftpStore = create<SftpState>((set, get) => {
           };
         });
         toast.error(t("sftp.cancelError"), errorMessage(err));
+      });
+    },
+
+    cancelDelete: (operationId) => {
+      set((s) => {
+        const operation = s.deletions[operationId];
+        if (!operation) return s;
+        return {
+          deletions: {
+            ...s.deletions,
+            [operationId]: { ...operation, cancelRequested: true },
+          },
+        };
+      });
+      void ipc.sftp.cancelDelete(operationId).catch((err) => {
+        set((s) => {
+          const operation = s.deletions[operationId];
+          if (!operation) return s;
+          return {
+            deletions: {
+              ...s.deletions,
+              [operationId]: { ...operation, cancelRequested: false },
+            },
+          };
+        });
+        toast.error(t("sftp.cancelDeleteError"), errorMessage(err));
       });
     },
 
@@ -758,6 +844,55 @@ export const useSftpStore = create<SftpState>((set, get) => {
           });
           toast.error(t("sftp.transferError"), errorMessage(err));
         }
+      }
+    },
+
+    deleteEntries: async (side, tabId, entries) => {
+      const tab = get().panes[side].tabs.find(
+        (candidate) => candidate.id === tabId,
+      );
+      if (!tab || entries.length === 0) return;
+      if (tab.status !== "connected") {
+        toast.error(t("sftp.notConnected"));
+        return;
+      }
+
+      const operationId = crypto.randomUUID();
+      const label =
+        entries.length === 1
+          ? entries[0].name
+          : t("sftp.operation.items", { count: entries.length });
+      set((s) => ({
+        deletions: {
+          ...s.deletions,
+          [operationId]: {
+            operationId,
+            connectionId: tab.connectionId,
+            completed: 0,
+            total: 0,
+            currentPath: entries[0].path,
+            status: "active",
+            phase: "scanning",
+            label,
+            side,
+            tabId,
+            cancelRequested: false,
+          },
+        },
+      }));
+      try {
+        await ipc.sftp.deleteBatch(
+          operationId,
+          tab.connectionId,
+          entries.map((entry) => ({ path: entry.path })),
+        );
+      } catch (err) {
+        set((s) => {
+          const rest = { ...s.deletions };
+          delete rest[operationId];
+          return { deletions: rest };
+        });
+        toast.error(t("sftp.deleteError"), errorMessage(err));
       }
     },
   };

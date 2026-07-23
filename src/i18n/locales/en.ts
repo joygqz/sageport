@@ -646,6 +646,8 @@ export const en = {
       compressing: "Compressing",
       transferring: "Transferring",
       extracting: "Extracting",
+      scanning: "Scanning",
+      deleting: "Deleting",
     },
     emptyDir: "This folder is empty",
     fileList: "Files",
@@ -670,6 +672,7 @@ export const en = {
     createFileError: "Failed to create file",
     renameError: "Failed to rename",
     deleteError: "Failed to delete",
+    deleteFailed: "Deletion incomplete",
     transferError: "Failed to start transfer",
     transferFailed: "Transfer failed",
     conflict: {
@@ -711,9 +714,16 @@ export const en = {
       saveError: "Failed to save file",
     },
     cancelTransfer: "Cancel transfer",
+    cancelOperation: "Cancel operation",
     cancelling: "Canceling…",
     cancelError: "Failed to cancel transfer",
+    cancelDeleteError: "Failed to cancel deletion",
     remaining: "{time} left",
+    operation: {
+      items: "{count} items",
+      found: "{count} found",
+      itemProgress: "{completed} / {total} items",
+    },
     history: {
       title: "Transfer history",
       empty: "No transfers yet",

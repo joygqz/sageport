@@ -65,6 +65,12 @@ pub struct EndpointInput {
     pub path: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteEntryInput {
+    pub path: String,
+}
+
 impl From<EndpointInput> for Endpoint {
     fn from(input: EndpointInput) -> Self {
         Endpoint {
@@ -231,6 +237,61 @@ pub async fn fs_delete(
 }
 
 #[tauri::command]
+pub async fn fs_delete_batch(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    operation_id: String,
+    connection_id: Option<String>,
+    entries: Vec<DeleteEntryInput>,
+) -> AppResult<()> {
+    validate_transfer_id(&operation_id)?;
+    validate_optional_connection_id(connection_id.as_deref())?;
+    if entries.is_empty() || entries.len() > 10_000 {
+        return Err(AppError::Invalid(
+            "delete operation must contain between 1 and 10000 entries".into(),
+        ));
+    }
+    let mut paths = Vec::with_capacity(entries.len());
+    for entry in entries {
+        validate_path(&entry.path)?;
+        paths.push(entry.path);
+    }
+    let manager = state.sftp.clone();
+    if let Some(connection_id) = connection_id.as_deref() {
+        manager.get(connection_id)?;
+    }
+    let cancel = manager.register_operation(&operation_id);
+    tokio::spawn(async move {
+        let permit = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => None,
+            permit = manager.acquire_operation_slot() => Some(permit),
+        };
+        sftp::delete::delete(
+            &app,
+            &manager,
+            sftp::delete::DeleteRequest {
+                operation_id: operation_id.clone(),
+                connection_id,
+                paths,
+            },
+            cancel,
+        )
+        .await;
+        drop(permit);
+        manager.unregister_operation(&operation_id);
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn fs_delete_cancel(state: State<'_, AppState>, operation_id: String) -> AppResult<()> {
+    validate_transfer_id(&operation_id)?;
+    state.sftp.cancel_operation(&operation_id);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn fs_chmod(
     state: State<'_, AppState>,
     connection_id: Option<String>,
@@ -352,12 +413,12 @@ pub async fn fs_transfer(
     )
     .await?;
 
-    let cancel = mgr.register_transfer(&transfer_id);
+    let cancel = mgr.register_operation(&transfer_id);
     tokio::spawn(async move {
         let permit = tokio::select! {
             biased;
             _ = cancel.cancelled() => None,
-            permit = mgr.acquire_transfer_slot() => Some(permit),
+            permit = mgr.acquire_operation_slot() => Some(permit),
         };
         let outcome = sftp::transfer(
             &app,
@@ -373,7 +434,7 @@ pub async fn fs_transfer(
         )
         .await;
         drop(permit);
-        mgr.unregister_transfer(&transfer_id);
+        mgr.unregister_operation(&transfer_id);
         let _ = transfer_repo::finish(
             &pool,
             &transfer_id,
@@ -390,7 +451,7 @@ pub async fn fs_transfer(
 #[tauri::command]
 pub async fn fs_transfer_cancel(state: State<'_, AppState>, transfer_id: String) -> AppResult<()> {
     validate_transfer_id(&transfer_id)?;
-    state.sftp.cancel_transfer(&transfer_id);
+    state.sftp.cancel_operation(&transfer_id);
     Ok(())
 }
 
