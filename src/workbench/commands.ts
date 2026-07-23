@@ -113,7 +113,14 @@ export function useCommands(): WorkbenchCommand[] {
         run: () => layout().toggleAux(),
       },
       ...(
-        ["hosts", "credentials", "snippets", "forwards", "monitor"] as const
+        [
+          "hosts",
+          "credentials",
+          "snippets",
+          "tasks",
+          "forwards",
+          "monitor",
+        ] as const
       ).map((activity) => ({
         id: `view.${activity}`,
         categoryKey: "commands.category.view" as TKey,

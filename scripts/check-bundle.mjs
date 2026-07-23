@@ -15,8 +15,6 @@ const initialAssets = [
   ),
 ];
 
-// Keep enough headroom for routine shell changes without allowing optional
-// dialogs, notifications, or feature code to drift back into startup.
 const INITIAL_JS_BUDGET = 525 * 1024;
 const lazyOnlyPrefixes = [
   "AssistantPanel-",

@@ -36,13 +36,13 @@ export function CommandPalette({
       <DialogPrimitive.Portal>
         <DialogOverlay />
         <DialogPrimitive.Content
-          className="fixed left-1/2 top-12 z-50 w-[36rem] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-xl border border-border/90 bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2"
+          className="fixed left-1/2 top-12 z-50 w-[36rem] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-xl border border-border/90 bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2"
           aria-describedby={undefined}
         >
           <DialogPrimitive.Title className="sr-only">
             {t("palette.title")}
           </DialogPrimitive.Title>
-          {open && <PaletteBody initialMode={initialMode} onClose={onClose} />}
+          <PaletteBody initialMode={initialMode} onClose={onClose} />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

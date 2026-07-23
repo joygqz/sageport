@@ -23,13 +23,6 @@ interface SettingSyncOptions {
   onSaveError?: (error: unknown) => void;
 }
 
-/**
- * Keeps a validated UI preference synchronized with SQLite.
- *
- * Writes are serialized so rapid changes cannot finish out of order. Query
- * results carry the local revision they started with, preventing a slow first
- * read from overwriting a newer user action.
- */
 export function useSettingSync(
   key: string,
   current: string,

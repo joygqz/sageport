@@ -41,8 +41,6 @@ pub async fn settings_get(state: State<'_, AppState>, key: String) -> AppResult<
         return Ok(None);
     };
     let Some(sanitized) = sanitize_general_value(&key, &value) else {
-        // Treat a malformed legacy/local value as absent so the UI can restore
-        // its validated default instead of becoming stuck on a bad setting.
         return Ok(None);
     };
     if sanitized != value {

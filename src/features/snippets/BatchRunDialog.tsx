@@ -54,7 +54,7 @@ export function BatchRunDialog({
       width="w-[620px]"
       title={t("snippets.batch.title")}
     >
-      {open && <BatchBody initialCommand={initialCommand} onClose={onClose} />}
+      <BatchBody initialCommand={initialCommand} onClose={onClose} />
     </FormDialog>
   );
 }

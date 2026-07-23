@@ -21,11 +21,12 @@ use crate::crypto::{self, EncryptedEnvelope};
 use crate::domain::{
     now, Group, GroupInput, Host, HostInput, Identity, IdentityInput, PortForward,
     PortForwardInput, SftpBookmark, SftpBookmarkInput, Snippet, SnippetInput, SshKey, SshKeyInput,
+    Task, TaskInput,
 };
 use crate::error::{AppError, AppResult};
 use crate::repository::{
     bookmark_repo, forward_repo, group_repo, host_repo, identity_repo, key_repo, settings_repo,
-    snippet_repo,
+    snippet_repo, task_repo,
 };
 
 const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["security.", "sync.", "update."];
@@ -58,6 +59,8 @@ pub struct VaultSnapshot {
     #[serde(default)]
     pub snippets: Vec<Snippet>,
     #[serde(default)]
+    pub tasks: Vec<Task>,
+    #[serde(default)]
     pub settings: Vec<SettingEntry>,
     #[serde(default)]
     pub port_forwards: Vec<PortForward>,
@@ -73,18 +76,17 @@ impl VaultSnapshot {
                 + self.identities.len()
                 + self.keys.len()
                 + self.snippets.len()
+                + self.tasks.len()
                 + self.settings.len()
                 + self.port_forwards.len()
                 + self.sftp_bookmarks.len(),
         );
-        // A revision alone is not globally unique: two devices can both
-        // produce revision N with different content. Include the complete
-        // record so the winning last-write-wins value is uploaded.
         out.extend(self.groups.iter().map(|value| fingerprint("g", value)));
         out.extend(self.hosts.iter().map(|value| fingerprint("h", value)));
         out.extend(self.identities.iter().map(|value| fingerprint("i", value)));
         out.extend(self.keys.iter().map(|value| fingerprint("k", value)));
         out.extend(self.snippets.iter().map(|value| fingerprint("s", value)));
+        out.extend(self.tasks.iter().map(|value| fingerprint("t", value)));
         out.extend(self.settings.iter().map(|value| fingerprint("e", value)));
         out.extend(
             self.port_forwards
@@ -109,15 +111,13 @@ fn fingerprint<T: Serialize>(kind: &str, value: &T) -> String {
 }
 
 pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
-    // Keep every table in one SQLite read transaction. Reading through the
-    // pool independently can mix revisions from before and after a concurrent
-    // mutation, producing an encrypted backup that never existed locally.
     let mut tx = pool.begin().await?;
     let groups = fetch_all::<Group, _>(&mut *tx, "groups").await?;
     let hosts = fetch_all::<Host, _>(&mut *tx, "hosts").await?;
     let identities = fetch_all::<Identity, _>(&mut *tx, "identities").await?;
     let keys = fetch_all::<SshKey, _>(&mut *tx, "keys").await?;
     let snippets = fetch_all::<Snippet, _>(&mut *tx, "snippets").await?;
+    let tasks = fetch_all::<Task, _>(&mut *tx, "tasks").await?;
     let port_forwards = fetch_all::<PortForward, _>(&mut *tx, "port_forwards").await?;
     let sftp_bookmarks = fetch_all::<SftpBookmark, _>(&mut *tx, "sftp_bookmarks").await?;
     let settings = settings_repo::all_excluding_prefixes(&mut *tx, EXCLUDED_SETTINGS_PREFIXES)
@@ -140,6 +140,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
         identities,
         keys,
         snippets,
+        tasks,
         settings,
         port_forwards,
         sftp_bookmarks,
@@ -178,6 +179,9 @@ pub(crate) async fn import_snapshot_in(
     }
     for s in &snapshot.snippets {
         merge_snippet(&mut **tx, s).await?;
+    }
+    for t in &snapshot.tasks {
+        merge_task(&mut **tx, t).await?;
     }
     for f in &snapshot.port_forwards {
         merge_forward(&mut **tx, f).await?;
@@ -266,6 +270,7 @@ pub(crate) async fn restore_snapshot_in(
     sqlx::query("DELETE FROM snippets")
         .execute(&mut **tx)
         .await?;
+    sqlx::query("DELETE FROM tasks").execute(&mut **tx).await?;
 
     delete_settings_excluding_prefixes(&mut **tx, EXCLUDED_SETTINGS_PREFIXES).await?;
 
@@ -283,6 +288,9 @@ pub(crate) async fn restore_snapshot_in(
     }
     for s in &snapshot.snippets {
         merge_snippet(&mut **tx, s).await?;
+    }
+    for t in &snapshot.tasks {
+        merge_task(&mut **tx, t).await?;
     }
     for f in &snapshot.port_forwards {
         merge_forward(&mut **tx, f).await?;
@@ -402,6 +410,7 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
         ("identities", snapshot.identities.len()),
         ("keys", snapshot.keys.len()),
         ("snippets", snapshot.snippets.len()),
+        ("tasks", snapshot.tasks.len()),
         ("settings", snapshot.settings.len()),
         ("port forwards", snapshot.port_forwards.len()),
         ("SFTP bookmarks", snapshot.sftp_bookmarks.len()),
@@ -482,6 +491,18 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
             name: snippet.name.clone(),
             command: snippet.command.clone(),
             description: snippet.description.clone(),
+        })?;
+    }
+    records!(&snapshot.tasks, "task");
+    for task in &snapshot.tasks {
+        let steps = task
+            .parse_steps()
+            .map_err(|_| AppError::Invalid("invalid task steps in backup".into()))?;
+        task_repo::normalize(TaskInput {
+            name: task.name.clone(),
+            description: task.description.clone(),
+            host_id: task.host_id.clone(),
+            steps,
         })?;
     }
     records!(&snapshot.port_forwards, "port forward");
@@ -829,6 +850,25 @@ where
     Ok(())
 }
 
+async fn merge_task<'e, E>(executor: E, t: &Task) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO tasks (id, name, description, host_id, steps, created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name, description = excluded.description, host_id = excluded.host_id,
+           steps = excluded.steps, updated_at = excluded.updated_at,
+           deleted_at = excluded.deleted_at, revision = excluded.revision
+         WHERE excluded.updated_at > tasks.updated_at",
+    )
+    .bind(&t.id).bind(&t.name).bind(&t.description).bind(&t.host_id).bind(&t.steps)
+    .bind(&t.created_at).bind(&t.updated_at).bind(&t.deleted_at).bind(t.revision)
+    .execute(executor).await?;
+    Ok(())
+}
+
 async fn merge_setting<'e, E>(executor: E, entry: &SettingEntry) -> AppResult<()>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -902,6 +942,7 @@ mod tests {
             identities: Vec::new(),
             keys: Vec::new(),
             snippets: Vec::new(),
+            tasks: Vec::new(),
             settings,
             port_forwards: Vec::new(),
             sftp_bookmarks: Vec::new(),

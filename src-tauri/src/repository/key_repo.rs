@@ -81,8 +81,6 @@ fn with_validated_private_key(
                 sshkey::inspect(private_key, input.passphrase.as_deref())?.ok_or_else(|| {
                     AppError::Invalid("invalid or unsupported SSH private key".into())
                 })?;
-            // Never trust a separately supplied public key: derive it from the
-            // private material so copying it cannot advertise a different key.
             input.public_key = Some(insight.public_key);
             if !insight.encrypted {
                 input.passphrase = Some(String::new());

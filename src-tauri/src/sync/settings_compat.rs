@@ -14,8 +14,6 @@ pub(super) fn sanitize(entry: &SettingEntry) -> Option<SettingEntry> {
         return None;
     }
 
-    // Intentionally allow-list persisted settings. New settings must define
-    // their backup compatibility here before they can be restored or exported.
     let value = match entry.key.as_str() {
         "general.theme" => sanitize_general_value(&entry.key, &entry.value)?,
         "general.locale" => one_of(&entry.value, &["en", "zh-CN"])?,

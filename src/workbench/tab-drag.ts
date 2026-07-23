@@ -9,11 +9,6 @@ export interface TabDropTarget {
   indicatorX: number;
 }
 
-/**
- * Resolves a tab insertion point from the pointer position. The marker is
- * centered in the visual gap at that insertion point instead of overlapping a
- * neighboring tab edge.
- */
 export function getTabDropTarget({
   pointerX,
   stripRect,
@@ -51,7 +46,6 @@ export function getTabDropTarget({
   };
 }
 
-/** Keeps the two-pixel marker fully inside the visible tab strip. */
 function clampIndicatorToStrip(
   indicatorX: number,
   stripRect: HorizontalRect,

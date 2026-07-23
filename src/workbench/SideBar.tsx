@@ -33,6 +33,12 @@ const SnippetsView = lazy(() =>
   })),
 );
 
+const TasksView = lazy(() =>
+  import("@/features/tasks/TasksView").then((module) => ({
+    default: module.TasksView,
+  })),
+);
+
 export const SideBar = memo(function SideBar({ width }: { width: number }) {
   const activity = useLayoutStore((s) => s.activity);
 
@@ -51,6 +57,7 @@ export const SideBar = memo(function SideBar({ width }: { width: number }) {
         {activity === "hosts" && <HostsView />}
         {activity === "credentials" && <CredentialsView />}
         {activity === "snippets" && <SnippetsView />}
+        {activity === "tasks" && <TasksView />}
         {activity === "forwards" && <ForwardsView />}
         {activity === "monitor" && <MonitorView />}
       </Suspense>

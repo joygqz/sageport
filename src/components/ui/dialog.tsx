@@ -152,19 +152,25 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 function DialogToolbar({
   className,
   children,
+  leading,
   actions,
   ...props
-}: React.ComponentProps<"div"> & { actions?: React.ReactNode }) {
+}: React.ComponentProps<"div"> & {
+  leading?: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
   const { t } = useI18n();
   return (
     <div
       data-slot="dialog-toolbar"
       className={cn(
-        "flex h-[var(--workbench-bar-height)] shrink-0 items-center gap-2 border-b border-border bg-surface/45 pl-4 pr-2",
+        "flex h-[var(--workbench-bar-height)] shrink-0 items-center gap-2 border-b border-border bg-surface/45 pr-2",
+        leading ? "pl-2" : "pl-4",
         className,
       )}
       {...props}
     >
+      {leading}
       <DialogTitle className="min-w-0 flex-1 truncate">{children}</DialogTitle>
       {actions}
       <DialogPrimitive.Close className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">

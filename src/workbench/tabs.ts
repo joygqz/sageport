@@ -666,8 +666,6 @@ if (
     try {
       writeWorkspace(localStorage, state);
       previous = signature;
-    } catch {
-      // Storage can be disabled or temporarily full; terminal state remains live.
-    }
+    } catch {}
   });
 }

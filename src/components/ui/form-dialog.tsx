@@ -4,12 +4,14 @@ import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { Dialog, DialogContent, DialogToolbar } from "./dialog";
+import { useDialogSnapshot } from "./use-dialog-snapshot";
 import { Spinner } from "./spinner";
 
 interface FormDialogProps {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
+  leading?: ReactNode;
   width?: string;
   children: ReactNode;
 }
@@ -18,9 +20,14 @@ export function FormDialog({
   open,
   onClose,
   title,
+  leading,
   width = "w-[460px]",
   children,
 }: FormDialogProps) {
+  const shownTitle = useDialogSnapshot(open, title);
+  const shownLeading = useDialogSnapshot(open, leading);
+  const shownChildren = useDialogSnapshot(open, children);
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
@@ -28,8 +35,8 @@ export function FormDialog({
         scrollMode="content"
         className={cn("flex max-w-[92vw] flex-col gap-0 p-0 sm:p-0", width)}
       >
-        <DialogToolbar>{title}</DialogToolbar>
-        {open && children}
+        <DialogToolbar leading={shownLeading}>{shownTitle}</DialogToolbar>
+        {shownChildren}
       </DialogContent>
     </Dialog>
   );

@@ -6,6 +6,7 @@ mod host;
 mod identity;
 mod key;
 mod snippet;
+mod task;
 
 pub use bookmark::*;
 pub use forward::*;
@@ -15,6 +16,7 @@ pub use host::*;
 pub use identity::*;
 pub use key::*;
 pub use snippet::*;
+pub use task::*;
 
 use chrono::Utc;
 use uuid::Uuid;

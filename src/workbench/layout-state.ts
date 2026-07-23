@@ -16,6 +16,7 @@ const ACTIVITIES = [
   "hosts",
   "credentials",
   "snippets",
+  "tasks",
   "forwards",
   "monitor",
 ] as const;
@@ -68,10 +69,6 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
-/**
- * Recovers persisted layout state and keeps the editor's minimum work area
- * available even when two independently resized side panes become visible.
- */
 export function normalizeLayoutSnapshot(
   value: unknown,
   environment: LayoutEnvironment,

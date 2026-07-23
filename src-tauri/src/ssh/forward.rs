@@ -184,10 +184,6 @@ impl ForwardManager {
     }
 
     pub fn stop_all(&self) {
-        // Serialize cleanup with the point where a pending start becomes
-        // active. Otherwise a start waiting on an older retired task can
-        // insert itself after a page-reload cleanup has already drained the
-        // active map.
         let mut lifecycle = self.lifecycle.lock();
         *lifecycle = lifecycle.wrapping_add(1);
         let entries = self.active.lock().drain().collect::<Vec<_>>();

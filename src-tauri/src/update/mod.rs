@@ -53,8 +53,6 @@ pub enum UpdateOperation {
 pub struct UpdateManager {
     status: Mutex<UpdateStatus>,
     pending: Mutex<Option<Update>>,
-    /// Prevents a periodic check, a manual check, and repeated install clicks
-    /// from racing and replacing each other's status or pending package.
     operation: tokio::sync::Mutex<()>,
 }
 

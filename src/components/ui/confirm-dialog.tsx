@@ -9,13 +9,13 @@ import {
 } from "./alert-dialog";
 import { Button } from "./button";
 import { DialogFooter, DialogHeader } from "./dialog";
+import { useDialogSnapshot } from "./use-dialog-snapshot";
 
 export interface ConfirmAction {
   label: string;
   variant?: ButtonProps["variant"];
   loading?: boolean;
   disabled?: boolean;
-  /** Return false to keep the confirmation open after an unsuccessful action. */
   onSelect: () => void | boolean | Promise<void | boolean>;
 }
 
@@ -36,30 +36,31 @@ export function ConfirmDialog({
   onClose: () => void;
 }) {
   const busy = state?.actions.some((action) => action.loading) ?? false;
+  const shown = useDialogSnapshot(!!state, state);
 
   return (
     <AlertDialog
       open={!!state}
       onOpenChange={(open) => !open && !busy && onClose()}
     >
-      <AlertDialogContent className={state?.contentClassName ?? "max-w-sm"}>
-        {state && (
+      <AlertDialogContent className={shown?.contentClassName ?? "max-w-sm"}>
+        {shown && (
           <>
             <DialogHeader>
-              <AlertDialogTitle>{state.title}</AlertDialogTitle>
-              {state.description && (
+              <AlertDialogTitle>{shown.title}</AlertDialogTitle>
+              {shown.description && (
                 <AlertDialogDescription>
-                  {state.description}
+                  {shown.description}
                 </AlertDialogDescription>
               )}
             </DialogHeader>
             <DialogFooter>
               <AlertDialogCancel asChild>
                 <Button type="button" variant="ghost" disabled={busy}>
-                  {state.cancelLabel}
+                  {shown.cancelLabel}
                 </Button>
               </AlertDialogCancel>
-              {state.actions.map((action) => (
+              {shown.actions.map((action) => (
                 <AlertDialogAction key={action.label} asChild>
                   <Button
                     type="button"

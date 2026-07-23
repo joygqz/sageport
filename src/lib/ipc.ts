@@ -41,6 +41,9 @@ import type {
   Snippet,
   SnippetInput,
   SshConfigHost,
+  Task,
+  TaskInput,
+  TaskRunEvent,
   SshDataEvent,
   SshKey,
   SshKeyGenerateInput,
@@ -143,6 +146,32 @@ export const ipc = {
     update: (id: string, input: SnippetInput) =>
       invoke<Snippet>("snippets_update", { id, input }),
     remove: (id: string) => invoke<void>("snippets_delete", { id }),
+  },
+  tasks: {
+    list: () => invoke<Task[]>("tasks_list"),
+    create: (input: TaskInput) => invoke<Task>("tasks_create", { input }),
+    update: (id: string, input: TaskInput) =>
+      invoke<Task>("tasks_update", { id, input }),
+    remove: (id: string) => invoke<void>("tasks_delete", { id }),
+    run: (
+      id: string,
+      hostId: string,
+      variables: Record<string, string>,
+      onEvent: (e: TaskRunEvent) => void,
+      requestId = crypto.randomUUID(),
+    ) => {
+      const channel = new Channel<TaskRunEvent>();
+      channel.onmessage = onEvent;
+      return invoke<void>("tasks_run", {
+        id,
+        hostId,
+        variables,
+        requestId,
+        onEvent: channel,
+      });
+    },
+    cancelRun: (requestId: string) =>
+      invoke<void>("tasks_cancel", { requestId }),
   },
   settings: {
     get: (key: string) => invoke<string | null>("settings_get", { key }),

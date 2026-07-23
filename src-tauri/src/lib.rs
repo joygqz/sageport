@@ -35,6 +35,9 @@ fn cleanup_orphaned_sessions(state: &AppState) {
     state.connection_prompts.passwords.lock().clear();
     state.ai_cancels.lock().clear();
     state.batch_cancels.lock().clear();
+    for (_, cancel) in state.task_cancels.lock().drain() {
+        cancel.cancel();
+    }
     let mut oauth = state.sync_oauth.lock();
     oauth.generation = oauth.generation.wrapping_add(1);
     if let Some(cancel) = oauth.cancel.take() {
@@ -148,6 +151,12 @@ pub fn run() {
             commands::snippets::snippets_create,
             commands::snippets::snippets_update,
             commands::snippets::snippets_delete,
+            commands::tasks::tasks_list,
+            commands::tasks::tasks_create,
+            commands::tasks::tasks_update,
+            commands::tasks::tasks_delete,
+            commands::tasks::tasks_run,
+            commands::tasks::tasks_cancel,
             commands::settings::settings_get,
             commands::settings::settings_set,
             commands::settings::settings_apply_json,

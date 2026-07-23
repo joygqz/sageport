@@ -156,8 +156,6 @@ async fn apply_import(
         return Ok(0);
     }
 
-    // Reload and validate the local file so callers cannot bypass preview warnings
-    // or submit modified host data.
     let preview = preview_hosts(pool, home).await?;
     let selected = preview
         .into_iter()
@@ -205,7 +203,6 @@ async fn apply_import(
         }
     }
 
-    // Complete all filesystem reads before opening the database transaction.
     let mut key_contents_by_path = HashMap::new();
     for host in &selected {
         if let Some(identity) = &host.identity_file {

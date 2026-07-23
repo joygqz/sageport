@@ -23,13 +23,11 @@ export function SnippetFormDialog({
       width="w-[480px]"
       title={snippet ? t("snippets.editTitle") : t("snippets.newTitle")}
     >
-      {open && (
-        <SnippetFormBody
-          key={snippet?.id ?? "new"}
-          snippet={snippet}
-          onClose={onClose}
-        />
-      )}
+      <SnippetFormBody
+        key={snippet?.id ?? "new"}
+        snippet={snippet}
+        onClose={onClose}
+      />
     </FormDialog>
   );
 }

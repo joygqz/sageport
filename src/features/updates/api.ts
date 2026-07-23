@@ -11,8 +11,6 @@ export const RELEASES_URL =
 let canSelfUpdatePromise: Promise<boolean> | null = null;
 
 function fetchCanSelfUpdate(): Promise<boolean> {
-  // A failed capability probe must never expose an install action that the
-  // current package may not support (notably deb/rpm builds on Linux).
   canSelfUpdatePromise ??= probeSelfUpdate(ipc.update.canSelfUpdate);
   return canSelfUpdatePromise;
 }

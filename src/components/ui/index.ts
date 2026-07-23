@@ -7,6 +7,7 @@ export * from "./label";
 export * from "./field";
 export * from "./find-bar";
 export * from "./dialog";
+export * from "./use-dialog-snapshot";
 export * from "./alert-dialog";
 export * from "./form-dialog";
 export * from "./confirm-dialog";

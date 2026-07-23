@@ -6,7 +6,6 @@ export const SIDEBAR_DEFAULT = 260;
 export const PANEL_DEFAULT = 280;
 export const AUX_DEFAULT = 320;
 
-// Keep these base-pixel values aligned with the rem tokens in globals.css.
 export const ACTIVITY_BAR_W = 48.75;
 export const TITLE_BAR_H = 37.5;
 export const STATUS_BAR_H = 22.5;
