@@ -10,21 +10,25 @@ import {
   type Locale,
 } from "./config";
 import { I18nContext } from "./i18n-context";
-import { translate } from "./translate";
+import { loadLocale, translate } from "./translate";
 
 const LOCALE_SYNC_KEY = "general.locale";
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectLocale);
 
+  const applyLocale = useCallback((next: Locale) => {
+    void loadLocale(next).then(() => setLocaleState(next));
+  }, []);
+
   useEffect(() => {
     const update = (event: Event) => {
       const next = (event as CustomEvent<Locale>).detail;
-      if (isLocale(next)) setLocaleState(next);
+      if (isLocale(next)) applyLocale(next);
     };
     window.addEventListener(LOCALE_CHANGE_EVENT, update);
     return () => window.removeEventListener(LOCALE_CHANGE_EVENT, update);
-  }, []);
+  }, [applyLocale]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -35,7 +39,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     locale,
     (remote) => {
       if (!isLocale(remote)) return;
-      setLocaleState(remote);
+      applyLocale(remote);
       localStorage.setItem(LOCALE_STORAGE_KEY, remote);
     },
     {
@@ -54,11 +58,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = useCallback(
     (next: Locale) => {
-      setLocaleState(next);
+      applyLocale(next);
       localStorage.setItem(LOCALE_STORAGE_KEY, next);
       pushLocale(next);
     },
-    [pushLocale],
+    [applyLocale, pushLocale],
   );
 
   const t = useCallback(

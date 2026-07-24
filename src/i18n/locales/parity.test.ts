@@ -84,6 +84,7 @@ describe("locale parity", () => {
       "R2",
       "S3",
       "S3-compatible",
+      "SFTP",
       "SSH",
       "SOCKS",
       "Sageport",

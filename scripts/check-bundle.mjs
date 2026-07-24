@@ -29,6 +29,8 @@ const lazyOnlyPrefixes = [
   "SettingsPage-",
   "SshConfigImportDialog-",
   "TerminalEditor-",
+  "en-",
+  "zh-CN-",
   "notifier-",
   "confirm-dialog-",
   "dialog-",

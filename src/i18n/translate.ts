@@ -1,11 +1,26 @@
 import { DEFAULT_LOCALE, type Locale } from "./config";
-import { en, type Dictionary } from "./locales/en";
-import { zhCN } from "./locales/zh-CN";
+import type { Dictionary } from "./locales/en";
 
-const dictionaries: Record<Locale, Dictionary> = {
-  en,
-  "zh-CN": zhCN,
+const loaders: Record<Locale, () => Promise<Dictionary>> = {
+  en: () => import("./locales/en").then((module) => module.en),
+  "zh-CN": () => import("./locales/zh-CN").then((module) => module.zhCN),
 };
+
+const dictionaries = new Map<Locale, Dictionary>();
+const pending = new Map<Locale, Promise<void>>();
+
+export function loadLocale(locale: Locale): Promise<void> {
+  if (dictionaries.has(locale)) return Promise.resolve();
+
+  let task = pending.get(locale);
+  if (!task) {
+    task = loaders[locale]().then((dictionary) => {
+      dictionaries.set(locale, dictionary);
+    });
+    pending.set(locale, task);
+  }
+  return task;
+}
 
 export type TKey = LeafPaths<Dictionary>;
 
@@ -35,6 +50,10 @@ function interpolate(template: string, params?: TParams): string {
 }
 
 export function translate(locale: Locale, key: TKey, params?: TParams): string {
-  const dict = dictionaries[locale] ?? dictionaries[DEFAULT_LOCALE];
+  const dict =
+    dictionaries.get(locale) ??
+    dictionaries.get(DEFAULT_LOCALE) ??
+    dictionaries.values().next().value;
+  if (!dict) return key;
   return interpolate(resolve(dict, key), params);
 }
