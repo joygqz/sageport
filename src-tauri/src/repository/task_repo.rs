@@ -27,8 +27,14 @@ fn require_field(value: &str, empty_msg: &str, max: usize, too_long_msg: &str) -
     Ok(())
 }
 
-fn normalize_optional(value: Option<String>, max: usize, too_long_msg: &str) -> AppResult<Option<String>> {
-    let value = value.map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+fn normalize_optional(
+    value: Option<String>,
+    max: usize,
+    too_long_msg: &str,
+) -> AppResult<Option<String>> {
+    let value = value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
     if let Some(value) = &value {
         if value.chars().count() > max || value.contains('\0') {
             return Err(AppError::Invalid(too_long_msg.into()));
@@ -83,8 +89,18 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
         } => {
             let local_path = local_path.trim().to_string();
             let remote_path = remote_path.trim().to_string();
-            require_field(&local_path, "upload source is required", MAX_PATH_CHARS, "task path is too long")?;
-            require_field(&remote_path, "upload destination is required", MAX_PATH_CHARS, "task path is too long")?;
+            require_field(
+                &local_path,
+                "upload source is required",
+                MAX_PATH_CHARS,
+                "task path is too long",
+            )?;
+            require_field(
+                &remote_path,
+                "upload destination is required",
+                MAX_PATH_CHARS,
+                "task path is too long",
+            )?;
             TaskStep::Upload {
                 local_path,
                 remote_path,
@@ -99,8 +115,18 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
         } => {
             let remote_path = remote_path.trim().to_string();
             let local_path = local_path.trim().to_string();
-            require_field(&remote_path, "download source is required", MAX_PATH_CHARS, "task path is too long")?;
-            require_field(&local_path, "download destination is required", MAX_PATH_CHARS, "task path is too long")?;
+            require_field(
+                &remote_path,
+                "download source is required",
+                MAX_PATH_CHARS,
+                "task path is too long",
+            )?;
+            require_field(
+                &local_path,
+                "download destination is required",
+                MAX_PATH_CHARS,
+                "task path is too long",
+            )?;
             TaskStep::Download {
                 remote_path,
                 local_path,
@@ -289,8 +315,10 @@ mod tests {
         assert_eq!(normalized.description.as_deref(), Some("build and ship"));
         assert_eq!(normalized.host_id.as_deref(), Some("host-1"));
         let steps: Vec<TaskStep> = serde_json::from_str(&normalized.steps_json).unwrap();
-        assert!(matches!(&steps[0], TaskStep::LocalCommand { cwd, command, .. }
-            if cwd.as_deref() == Some("~/proj") && command == "pnpm build"));
+        assert!(
+            matches!(&steps[0], TaskStep::LocalCommand { cwd, command, .. }
+            if cwd.as_deref() == Some("~/proj") && command == "pnpm build")
+        );
 
         let mut empty_name = input("   ");
         assert!(normalize(std::mem::replace(&mut empty_name, input("x"))).is_err());

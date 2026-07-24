@@ -258,7 +258,12 @@ export interface SnippetInput {
 }
 
 export type TaskStep =
-  | { type: "localCommand"; cwd?: string; command: string; continueOnError?: boolean }
+  | {
+      type: "localCommand";
+      cwd?: string;
+      command: string;
+      continueOnError?: boolean;
+    }
   | {
       type: "upload";
       localPath: string;
@@ -266,8 +271,18 @@ export type TaskStep =
       incremental?: boolean;
       continueOnError?: boolean;
     }
-  | { type: "download"; remotePath: string; localPath: string; continueOnError?: boolean }
-  | { type: "remoteCommand"; cwd?: string; command: string; continueOnError?: boolean };
+  | {
+      type: "download";
+      remotePath: string;
+      localPath: string;
+      continueOnError?: boolean;
+    }
+  | {
+      type: "remoteCommand";
+      cwd?: string;
+      command: string;
+      continueOnError?: boolean;
+    };
 
 export type TaskStepType = TaskStep["type"];
 

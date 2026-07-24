@@ -1,6 +1,13 @@
 import { ChevronDown, ChevronUp, MonitorSmartphone, X } from "lucide-react";
 
-import { Button, Field, Input, Switch, Textarea, Tooltip } from "@/components/ui";
+import {
+  Button,
+  Field,
+  Input,
+  Switch,
+  Textarea,
+  Tooltip,
+} from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { TaskStep } from "@/types/models";
@@ -35,7 +42,10 @@ export function TaskStepCard({
         <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent/15 text-2xs font-semibold text-accent">
           {index + 1}
         </span>
-        <Icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} />
+        <Icon
+          className="size-4 shrink-0 text-muted-foreground"
+          strokeWidth={1.7}
+        />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">
           {t(meta.labelKey)}
         </span>
@@ -163,7 +173,9 @@ function StepFields({
               placeholder="/var/www/app"
               className={inputClass}
               maxLength={4 * 1024}
-              onChange={(e) => onChange({ ...step, remotePath: e.target.value })}
+              onChange={(e) =>
+                onChange({ ...step, remotePath: e.target.value })
+              }
             />
           </Field>
         </>
@@ -178,7 +190,9 @@ function StepFields({
               placeholder="/tmp/backup.tar.gz"
               className={inputClass}
               maxLength={4 * 1024}
-              onChange={(e) => onChange({ ...step, remotePath: e.target.value })}
+              onChange={(e) =>
+                onChange({ ...step, remotePath: e.target.value })
+              }
             />
           </Field>
           <Field label={t("tasks.form.localDest")} required>

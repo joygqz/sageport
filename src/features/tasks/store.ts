@@ -5,12 +5,7 @@ import { errorCode, errorMessage } from "@/lib/toast";
 import type { Task, TaskRunEvent, TaskStep } from "@/types/models";
 import { parseTaskSteps } from "./api";
 
-export type StepStatus =
-  | "pending"
-  | "running"
-  | "done"
-  | "error"
-  | "skipped";
+export type StepStatus = "pending" | "running" | "done" | "error" | "skipped";
 
 export type RunStatus = "running" | "done" | "error" | "cancelled";
 
@@ -66,7 +61,8 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
   const patchStep = (
     requestId: string,
     index: number,
-    patch: Partial<StepRunState> | ((step: StepRunState) => Partial<StepRunState>),
+    patch:
+      Partial<StepRunState> | ((step: StepRunState) => Partial<StepRunState>),
   ) =>
     set((state) => {
       const run = state.runs[requestId];
@@ -74,7 +70,10 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
       const current = run.stepStates[index];
       const stepStates = run.stepStates.map((step, i) =>
         i === index
-          ? { ...current, ...(typeof patch === "function" ? patch(current) : patch) }
+          ? {
+              ...current,
+              ...(typeof patch === "function" ? patch(current) : patch),
+            }
           : step,
       );
       return { runs: { ...state.runs, [requestId]: { ...run, stepStates } } };
@@ -137,7 +136,10 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
       for (const run of Object.values(runs)) {
         const prefix = `${run.requestId}-s`;
         if (!event.transferId.startsWith(prefix)) continue;
-        const index = Number.parseInt(event.transferId.slice(prefix.length), 10);
+        const index = Number.parseInt(
+          event.transferId.slice(prefix.length),
+          10,
+        );
         if (Number.isNaN(index)) continue;
         patchStep(run.requestId, index, {
           transferred: event.transferred,

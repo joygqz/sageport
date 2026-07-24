@@ -56,7 +56,11 @@ export function KeyFormDialog({
           : t("credentials.keys.formTitle")
       }
     >
-      <KeyFormBody key={sshKey?.id ?? "new"} sshKey={sshKey} onClose={onClose} />
+      <KeyFormBody
+        key={sshKey?.id ?? "new"}
+        sshKey={sshKey}
+        onClose={onClose}
+      />
     </FormDialog>
   );
 }

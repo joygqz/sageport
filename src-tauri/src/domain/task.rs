@@ -35,7 +35,11 @@ pub struct TaskInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum TaskStep {
     LocalCommand {
         #[serde(default)]
@@ -177,7 +181,11 @@ fn parse_placeholder(text: &str, start: usize) -> Option<(String, String, usize)
     {
         return None;
     }
-    Some((name_raw.to_string(), default.to_string(), start + 2 + close + 2))
+    Some((
+        name_raw.to_string(),
+        default.to_string(),
+        start + 2 + close + 2,
+    ))
 }
 
 fn utf8_char_len(first: u8) -> usize {
@@ -207,10 +215,7 @@ mod tests {
             substitute_variables("deploy {{env}} now", &vals),
             "deploy prod now"
         );
-        assert_eq!(
-            substitute_variables("scale {{count:3}}", &vals),
-            "scale 3"
-        );
+        assert_eq!(substitute_variables("scale {{count:3}}", &vals), "scale 3");
         assert_eq!(
             substitute_variables("{{blank:fallback}}", &vals),
             "fallback"
@@ -221,7 +226,10 @@ mod tests {
     #[test]
     fn leaves_malformed_and_unicode_intact() {
         let vals = values(&[]);
-        assert_eq!(substitute_variables("brace {{ only", &vals), "brace {{ only");
+        assert_eq!(
+            substitute_variables("brace {{ only", &vals),
+            "brace {{ only"
+        );
         assert_eq!(substitute_variables("{{bad name}}", &vals), "{{bad name}}");
         assert_eq!(
             substitute_variables("备份 {{env}} 完成", &values(&[("env", "生产")])),

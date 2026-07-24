@@ -9,12 +9,14 @@
 ## 1. 目标与非目标
 
 ### 目标
+
 - 用一个**通用原语**覆盖：发布部署、备份下载、日志采集、环境初始化、巡检等场景。
 - 复用现有能力：SFTP 传输、SSH 远程执行、snippets 变量系统、sync vault。
 - 交互对齐 snippets：列表 + 表单编辑 + 运行弹窗，用户零学习成本。
 - **暴露给 AI 助手**：作为一个工具组接入现有助手，让它能列出/运行/管理任务，并沿用既有审批与「结果不可信」防线（详见第 8 节）。
 
 ### 非目标（明确不做）
+
 - ❌ 条件分支 / 循环 / 并行 —— 一旦加就变成 CI 引擎。复杂逻辑外包给 shell。
 - ❌ YAML / DSL 脚本语法 —— 用表单排步骤。
 - ❌ 密钥托管、环境变量仓库、webhook 触发、日志留存/回滚编排。
@@ -28,12 +30,12 @@
 
 一个 **Task（任务）** = 绑定（或运行时选择）一个目标主机的**有序步骤列表**。每个步骤是四种固定类型之一：
 
-| 步骤类型 | 中文 | 作用 | 复用的现有能力 |
-|---|---|---|---|
-| `localCommand` | 本地命令 | 在本机跑 shell | 本地 spawn 已有（`pty/mod.rs`），补一次性捕获模式 |
-| `upload` | 上传 | 本地 → 远程 | 现成 SFTP（`src-tauri/src/sftp/transfer.rs`） |
-| `download` | 下载 | 远程 → 本地 | 现成 SFTP |
-| `remoteCommand` | 远程命令 | 目标主机跑 shell | 现成 SSH exec（`src-tauri/src/ssh/exec.rs`） |
+| 步骤类型        | 中文     | 作用             | 复用的现有能力                                    |
+| --------------- | -------- | ---------------- | ------------------------------------------------- |
+| `localCommand`  | 本地命令 | 在本机跑 shell   | 本地 spawn 已有（`pty/mod.rs`），补一次性捕获模式 |
+| `upload`        | 上传     | 本地 → 远程      | 现成 SFTP（`src-tauri/src/sftp/transfer.rs`）     |
+| `download`      | 下载     | 远程 → 本地      | 现成 SFTP                                         |
+| `remoteCommand` | 远程命令 | 目标主机跑 shell | 现成 SSH exec（`src-tauri/src/ssh/exec.rs`）      |
 
 **执行语义**：从上到下依次执行，任一步非零退出/失败即整体中止（除非该步显式勾选「失败继续」）。全程流式输出，可取消。
 
@@ -41,15 +43,15 @@
 
 **场景即组合**（下列全部由同一引擎跑，无一处特判）：
 
-| 场景 | 步骤组合 |
-|---|---|
-| **前端发版** | `本地 pnpm build` → `上传 dist/` → `远程 systemctl reload nginx` |
-| **线上数据库备份** | `远程 pg_dump/mysqldump 打包` → `下载到本地备份目录` |
-| **静态资源发布** | `本地构建` → `上传` → `远程 CDN 刷新脚本` |
-| **配置下发** | `上传配置文件` → `远程 reload 服务` |
-| **日志采集** | `远程 tar logs` → `下载` → `本地解压` |
-| **环境初始化** | `上传初始化脚本` → `远程执行安装` |
-| **产物归档** | `本地打包` → `上传到归档服务器` |
+| 场景               | 步骤组合                                                         |
+| ------------------ | ---------------------------------------------------------------- |
+| **前端发版**       | `本地 pnpm build` → `上传 dist/` → `远程 systemctl reload nginx` |
+| **线上数据库备份** | `远程 pg_dump/mysqldump 打包` → `下载到本地备份目录`             |
+| **静态资源发布**   | `本地构建` → `上传` → `远程 CDN 刷新脚本`                        |
+| **配置下发**       | `上传配置文件` → `远程 reload 服务`                              |
+| **日志采集**       | `远程 tar logs` → `下载` → `本地解压`                            |
+| **环境初始化**     | `上传初始化脚本` → `远程执行安装`                                |
+| **产物归档**       | `本地打包` → `上传到归档服务器`                                  |
 
 > 想覆盖表外的场景，用户在编辑器里自由排 4 种步骤即可；我们只负责把常用的做成一键模板。
 
@@ -230,10 +232,31 @@ pub enum TaskStep {
 
 ```ts
 export type TaskStep =
-  | { type: "localCommand"; cwd?: string; command: string; continueOnError?: boolean }
-  | { type: "upload"; localPath: string; remotePath: string; incremental?: boolean; continueOnError?: boolean }
-  | { type: "download"; remotePath: string; localPath: string; continueOnError?: boolean }
-  | { type: "remoteCommand"; cwd?: string; command: string; continueOnError?: boolean };
+  | {
+      type: "localCommand";
+      cwd?: string;
+      command: string;
+      continueOnError?: boolean;
+    }
+  | {
+      type: "upload";
+      localPath: string;
+      remotePath: string;
+      incremental?: boolean;
+      continueOnError?: boolean;
+    }
+  | {
+      type: "download";
+      remotePath: string;
+      localPath: string;
+      continueOnError?: boolean;
+    }
+  | {
+      type: "remoteCommand";
+      cwd?: string;
+      command: string;
+      continueOnError?: boolean;
+    };
 
 export interface TaskInput {
   name: string;
@@ -251,14 +274,15 @@ export interface TaskInput {
 
 好消息——四类步骤里三类的执行内核**已经存在**，Tasks 主要新增的是「编排层」，不是从零造轮子。
 
-| 步骤 | 后端现状 | 依据 |
-|---|---|---|
-| **远程命令** | ✅ 完全支持：流式输出 + 退出码 + 取消 | `ssh/exec.rs`、`commands/batch.rs::hosts_run_command` |
-| **上传（含递归目录）** | ✅ 完全支持，且比预期强 | `sftp/transfer.rs`（见下） |
-| **下载** | ✅ 同一引擎，双向（源/目的谁本地即定方向） | `commands/sftp.rs::fs_transfer` |
-| **本地命令** | ⚠️ 能力在、模式要补 | `pty/mod.rs`（portable_pty，已用于本地终端） |
+| 步骤                   | 后端现状                                   | 依据                                                  |
+| ---------------------- | ------------------------------------------ | ----------------------------------------------------- |
+| **远程命令**           | ✅ 完全支持：流式输出 + 退出码 + 取消      | `ssh/exec.rs`、`commands/batch.rs::hosts_run_command` |
+| **上传（含递归目录）** | ✅ 完全支持，且比预期强                    | `sftp/transfer.rs`（见下）                            |
+| **下载**               | ✅ 同一引擎，双向（源/目的谁本地即定方向） | `commands/sftp.rs::fs_transfer`                       |
+| **本地命令**           | ⚠️ 能力在、模式要补                        | `pty/mod.rs`（portable_pty，已用于本地终端）          |
 
 **上传引擎已白送的能力**（`sftp::transfer`）：
+
 - 递归整目录、保留权限、处理软链；
 - 跨网络自动压缩传输（`compress = crosses_network && source_is_dir`）；
 - **临时暂存 + 失败清理/回退**（`staged_name` / `cleanup_staged`）——即本方案 P2「原子切换」在传输层**已部分具备**。
@@ -268,15 +292,19 @@ export interface TaskInput {
 **真正的后端主体 = 编排层**：把上述原语串起来（顺序执行、失败即停、服务端变量替换、把各步输出/进度归一成一条 `TaskRunEvent` 流、`request_id` 统一取消）。这是本功能新增代码的重心，模式照 `batch.rs`。
 
 ### 5.1 Repository `src-tauri/src/repository/task_repo.rs`
+
 照抄 `snippet_repo.rs`：`normalize` / `validate_id` / `list` / `get` / `create` / `update` / `delete`（软删除）。额外做：
+
 - 序列化/反序列化 `steps`；
 - 逐字段长度上限校验（命令 ≤ 32KB，路径 ≤ 4KB，步骤数 ≤ 50 等）；
 - 至少 1 个步骤。
 
 ### 5.2 CRUD 命令 `src-tauri/src/commands/tasks.rs`
+
 镜像 `commands/snippets.rs`：`tasks_list / tasks_create / tasks_update / tasks_delete`，在 `src-tauri/src/lib.rs` 的 `generate_handler!` 注册。
 
 ### 5.3 运行命令（流式 + 可取消）
+
 复用 `commands/batch.rs` 的 `Channel<Event>` + `request_id` 取消模式：
 
 ```rust
@@ -309,6 +337,7 @@ pub async fn tasks_cancel(state: State<'_, AppState>, request_id: String) -> App
 ```
 
 **执行流程**：
+
 1. 载入 task，解析 `steps`，对每个命令/路径字段做变量替换（服务端替换，避免前端漏替）。
 2. 建立到 `host_id` 的 SSH 会话（复用 `ssh::establish` / `Hop`，含跳板机）。
 3. 逐步执行：
@@ -319,6 +348,7 @@ pub async fn tasks_cancel(state: State<'_, AppState>, request_id: String) -> App
 5. 取消：`request_id` 存入 state 的取消表（参照 `batch_cancels`），中断当前步骤。
 
 ### 5.4 命令超时
+
 每个命令步骤沿用 batch 的 5 分钟量级默认超时（可后续做成每步可配）。
 
 ---
@@ -343,6 +373,7 @@ src/features/tasks/
 - **变量系统直接复用** `src/features/snippets/variables.ts` 的 `parseVariables` / `substitute`（`{{name:default}}`），抽到 `src/lib/` 供两处共享。
 
 ### 接线点
+
 - `src/workbench/layout-state.ts`：`ACTIVITIES` 加 `"tasks"`。
 - `src/workbench/SideBar.tsx`：`{activity === "tasks" && <TasksView />}`（lazy）。
 - `src/workbench/ActivityBar.tsx`：加图标条目。
@@ -354,6 +385,7 @@ src/features/tasks/
 ## 7. Sync 集成
 
 任务应随 vault 同步（和 snippets 同级）。改 `src-tauri/src/sync/mod.rs`：
+
 - `VaultSnapshot` 加 `pub tasks: Vec<Task>`；
 - `export_snapshot` 加 `fetch_all::<Task, _>(tx, "tasks")`；
 - `count` / `fingerprint`（前缀 `"t"`）/ import upsert 循环各加一处。
@@ -368,13 +400,13 @@ src/features/tasks/
 
 ### 8.1 暴露的工具（镜像 snippets 的 6 个）
 
-| 工具 | 作用 | 审批 | 结果 |
-|---|---|---|---|
-| `list_tasks` | 列出任务：id、步骤摘要、变量、默认主机 | 否（只读） | — |
-| `run_task` | 运行指定任务（填变量 + 目标主机） | **是**（supervised），受本地命令总开关约束 | 不可信 |
-| `save_task` | 新建任务 | 是 | — |
-| `update_task` | 改任务 | 是 | — |
-| `delete_task` | 删任务 | 是 | — |
+| 工具          | 作用                                   | 审批                                       | 结果   |
+| ------------- | -------------------------------------- | ------------------------------------------ | ------ |
+| `list_tasks`  | 列出任务：id、步骤摘要、变量、默认主机 | 否（只读）                                 | —      |
+| `run_task`    | 运行指定任务（填变量 + 目标主机）      | **是**（supervised），受本地命令总开关约束 | 不可信 |
+| `save_task`   | 新建任务                               | 是                                         | —      |
+| `update_task` | 改任务                                 | 是                                         | —      |
+| `delete_task` | 删任务                                 | 是                                         | —      |
 
 新增文件 `src/features/ai/tools/tasks.ts`；在 `registry.ts` 的 `ALL_TOOLS` 与 `TOOL_GROUPS.automation` 各加一处；i18n 加 `ai.tool.listTasks` 等 labelKey。
 
@@ -403,14 +435,14 @@ src/features/tasks/
 
 ## 10. 分期落地
 
-| 阶段 | 内容 | 价值 |
-|---|---|---|
-| **P1** | 四类步骤 + 手动运行 + 流式输出 + CRUD + sync + 模板 | 通用引擎成型，前端发版/数据库备份等场景全部可跑 |
-| **P1 + AI** | 工具组 `list/run/save/update/delete_task` 接入助手 | 助手可触发已保存任务（随 P1 一起或紧随其后） |
-| **P1.5** | 上传「仅传变化文件」增量（按 mtime/size 或 hash diff） | 大目录发版体验的关键 |
-| **P2** | 强化原子切换（传输层已有暂存/回退，补显式「临时目录→切换」语义） | 发布可靠性；工作量比预期小 |
-| **P3** | watch 自动触发（**默认关**，建议仅限非生产目标） | 开发联调场景的「改完自动传」 |
-| **P4（可选）** | 多主机运行（复用广播）、每步超时可配、运行历史 | 运维批量场景 |
+| 阶段           | 内容                                                             | 价值                                            |
+| -------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
+| **P1**         | 四类步骤 + 手动运行 + 流式输出 + CRUD + sync + 模板              | 通用引擎成型，前端发版/数据库备份等场景全部可跑 |
+| **P1 + AI**    | 工具组 `list/run/save/update/delete_task` 接入助手               | 助手可触发已保存任务（随 P1 一起或紧随其后）    |
+| **P1.5**       | 上传「仅传变化文件」增量（按 mtime/size 或 hash diff）           | 大目录发版体验的关键                            |
+| **P2**         | 强化原子切换（传输层已有暂存/回退，补显式「临时目录→切换」语义） | 发布可靠性；工作量比预期小                      |
+| **P3**         | watch 自动触发（**默认关**，建议仅限非生产目标）                 | 开发联调场景的「改完自动传」                    |
+| **P4（可选）** | 多主机运行（复用广播）、每步超时可配、运行历史                   | 运维批量场景                                    |
 
 > watch（你最初的诉求）刻意放到最后且默认关：自动推生产太危险。中间形态可先做「有 N 个文件待部署」的提示徽标，点一下再走流程。
 
@@ -430,9 +462,9 @@ src/features/tasks/
 
 ## 附：与现有功能的边界
 
-| 已有 | 与 Tasks 的关系 |
-|---|---|
-| Snippets | 单条远程命令。Tasks 是其超集；变量语法共用。未来可考虑数据模型统一（snippet = 单步任务），但非必须。 |
-| SFTP 面板 | 交互式手动传输。Tasks 的 upload/download 复用同一传输内核，面向「可重复」场景。 |
-| 广播 | 一条命令发多机。Tasks 的 P4 多主机运行可复用其并发/取消基础。 |
-| AI 助手 | 现有工具体系。Tasks 以工具组接入（`automation` 组），照 `snippets.ts` 写；让助手触发已审阅的流水线，而非临场拼装 deploy。 |
+| 已有      | 与 Tasks 的关系                                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Snippets  | 单条远程命令。Tasks 是其超集；变量语法共用。未来可考虑数据模型统一（snippet = 单步任务），但非必须。                      |
+| SFTP 面板 | 交互式手动传输。Tasks 的 upload/download 复用同一传输内核，面向「可重复」场景。                                           |
+| 广播      | 一条命令发多机。Tasks 的 P4 多主机运行可复用其并发/取消基础。                                                             |
+| AI 助手   | 现有工具体系。Tasks 以工具组接入（`automation` 组），照 `snippets.ts` 写；让助手触发已审阅的流水线，而非临场拼装 deploy。 |

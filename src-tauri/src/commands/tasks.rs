@@ -81,10 +81,7 @@ impl TaskRunEvent {
 
 enum StepResult {
     Success(Option<i32>),
-    Failed {
-        exit: Option<i32>,
-        message: String,
-    },
+    Failed { exit: Option<i32>, message: String },
     Cancelled,
 }
 
@@ -208,7 +205,10 @@ async fn execute_steps(
         }
         let _ = on_event.send(TaskRunEvent::simple(index, "start"));
 
-        let result = run_step(app, state, conn_id, request_id, index, step, cancel, on_event).await;
+        let result = run_step(
+            app, state, conn_id, request_id, index, step, cancel, on_event,
+        )
+        .await;
         match result {
             StepResult::Success(exit) => {
                 let _ = on_event.send(TaskRunEvent {
@@ -265,14 +265,20 @@ async fn run_step(
     on_event: &Channel<TaskRunEvent>,
 ) -> StepResult {
     match step {
-        TaskStep::LocalCommand { cwd, command, .. } => {
-            command_result(
-                run_local_command(index, cwd.as_deref(), command, cancel, on_event).await,
-            )
-        }
+        TaskStep::LocalCommand { cwd, command, .. } => command_result(
+            run_local_command(index, cwd.as_deref(), command, cancel, on_event).await,
+        ),
         TaskStep::RemoteCommand { cwd, command, .. } => command_result(
-            run_remote_command(state, conn_id, index, cwd.as_deref(), command, cancel, on_event)
-                .await,
+            run_remote_command(
+                state,
+                conn_id,
+                index,
+                cwd.as_deref(),
+                command,
+                cancel,
+                on_event,
+            )
+            .await,
         ),
         TaskStep::Upload { .. } | TaskStep::Download { .. } => {
             match run_transfer(app, state, conn_id, request_id, index, step, cancel).await {
@@ -437,9 +443,11 @@ async fn run_remote_command(
         None => command.to_string(),
     };
     let channel = on_event.clone();
-    let stream = state.sftp.exec_stream(conn_id, &wrapped, STEP_OUTPUT_CAP, move |chunk| {
-        let _ = channel.send(TaskRunEvent::log(index, chunk));
-    });
+    let stream = state
+        .sftp
+        .exec_stream(conn_id, &wrapped, STEP_OUTPUT_CAP, move |chunk| {
+            let _ = channel.send(TaskRunEvent::log(index, chunk));
+        });
     tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(AppError::Cancelled),
@@ -517,9 +525,7 @@ async fn run_transfer(
         "done" => Ok(()),
         "cancelled" => Err(AppError::Cancelled),
         _ => Err(AppError::Other(
-            outcome
-                .message
-                .unwrap_or_else(|| "transfer failed".into()),
+            outcome.message.unwrap_or_else(|| "transfer failed".into()),
         )),
     }
 }

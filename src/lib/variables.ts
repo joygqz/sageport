@@ -20,9 +20,15 @@ export function parseVariables(...sources: string[]): TemplateVariable[] {
   return [...seen.values()];
 }
 
-export function substitute(text: string, values: Record<string, string>): string {
+export function substitute(
+  text: string,
+  values: Record<string, string>,
+): string {
   const defaults = new Map(
-    parseVariables(text).map((variable) => [variable.name, variable.defaultValue]),
+    parseVariables(text).map((variable) => [
+      variable.name,
+      variable.defaultValue,
+    ]),
   );
   return text.replace(PATTERN, (_, name: string, fallback?: string) => {
     const provided = values[name];

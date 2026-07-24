@@ -9,25 +9,20 @@ import {
   XCircle,
 } from "lucide-react";
 
-import {
-  Button,
-  Field,
-  FormDialog,
-  Input,
-  Select,
-} from "@/components/ui";
+import { Button, Field, FormDialog, Input, Select } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { substitute } from "@/lib/variables";
 import type { Task } from "@/types/models";
 import { parseTaskSteps } from "./api";
-import { STEP_META, stepSummary, taskNeedsRemote, taskVariables } from "./steps";
 import {
-  useTaskRunStore,
-  type StepRunState,
-  type TaskRun,
-} from "./store";
+  STEP_META,
+  stepSummary,
+  taskNeedsRemote,
+  taskVariables,
+} from "./steps";
+import { useTaskRunStore, type StepRunState, type TaskRun } from "./store";
 
 export function TaskRunDialog({
   task,
@@ -65,7 +60,9 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
     Object.fromEntries(variables.map((v) => [v.name, v.defaultValue])),
   );
   const [requestId, setRequestId] = useState<string | null>(null);
-  const run = useTaskRunStore((s) => (requestId ? s.runs[requestId] : undefined));
+  const run = useTaskRunStore((s) =>
+    requestId ? s.runs[requestId] : undefined,
+  );
   const running = run?.status === "running";
 
   const requestRef = useRef<string | null>(null);
@@ -284,13 +281,17 @@ function TransferProgress({ state }: { state: StepRunState }) {
 function StatusIcon({ status }: { status: StepRunState["status"] }) {
   switch (status) {
     case "running":
-      return <Loader2 className="size-3.5 shrink-0 animate-spin text-warning" />;
+      return (
+        <Loader2 className="size-3.5 shrink-0 animate-spin text-warning" />
+      );
     case "done":
       return <CheckCircle2 className="size-3.5 shrink-0 text-success" />;
     case "error":
       return <XCircle className="size-3.5 shrink-0 text-danger" />;
     case "skipped":
-      return <CircleSlash className="size-3.5 shrink-0 text-muted-foreground" />;
+      return (
+        <CircleSlash className="size-3.5 shrink-0 text-muted-foreground" />
+      );
     default:
       return <Clock3 className="size-3.5 shrink-0 text-muted-foreground" />;
   }

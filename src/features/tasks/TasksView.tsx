@@ -67,7 +67,9 @@ export function TasksView() {
         hostId: task.hostId,
         steps: parseTaskSteps(task),
       })
-      .catch((err) => toast.error(t("tasks.form.saveError"), errorMessage(err)));
+      .catch((err) =>
+        toast.error(t("tasks.form.saveError"), errorMessage(err)),
+      );
   };
 
   const requestDelete = (task: Task) => {
@@ -150,7 +152,8 @@ export function TasksView() {
                 <ContextMenuTrigger asChild>
                   <div
                     onDoubleClick={(event) => {
-                      if ((event.target as HTMLElement).closest("button")) return;
+                      if ((event.target as HTMLElement).closest("button"))
+                        return;
                       setForm({ open: true, task });
                     }}
                     className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
@@ -209,7 +212,10 @@ export function TasksView() {
         onClose={() => setForm((s) => ({ ...s, open: false }))}
       />
       <TaskRunDialog task={runTask} onClose={() => setRunTask(null)} />
-      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      <ConfirmDialog
+        state={confirmState}
+        onClose={() => setConfirmState(null)}
+      />
     </SideBarView>
   );
 }

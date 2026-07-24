@@ -19,7 +19,11 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     nameKey: "tasks.template.frontendDeploy.name",
     summaryKey: "tasks.template.frontendDeploy.summary",
     steps: [
-      { type: "localCommand", cwd: "{{projectDir:~/project}}", command: "pnpm build" },
+      {
+        type: "localCommand",
+        cwd: "{{projectDir:~/project}}",
+        command: "pnpm build",
+      },
       { type: "upload", localPath: "./dist", remotePath: "/var/www/{{app}}" },
       { type: "remoteCommand", command: "sudo systemctl reload nginx" },
     ],
