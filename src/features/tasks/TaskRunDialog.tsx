@@ -4,12 +4,10 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleSlash,
-  FileText,
   Loader2,
   Play,
   Server,
   Square,
-  Workflow,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -110,36 +108,31 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
       ? task.schedule
       : null;
 
+  const stepList = run?.steps ?? steps;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex flex-col gap-4 overflow-y-auto p-5">
-        <dl className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2.5 text-sm leading-6">
-          <InfoRow icon={Workflow} label={t("tasks.form.name")}>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h3 className="truncate text-base font-semibold leading-tight">
             {task.name}
-          </InfoRow>
-
+          </h3>
           {description && (
-            <InfoRow
-              icon={FileText}
-              label={t("tasks.form.description")}
-              multiline
-            >
+            <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">
               {description}
-            </InfoRow>
+            </p>
           )}
-
-          {needsHost && hostId && (
-            <InfoRow icon={Server} label={t("tasks.run.targetHost")}>
-              {hostLabel}
-            </InfoRow>
+          {((needsHost && hostId) || scheduleValue) && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {needsHost && hostId && (
+                <MetaChip icon={Server}>{hostLabel}</MetaChip>
+              )}
+              {scheduleValue && (
+                <MetaChip icon={CalendarClock}>{scheduleValue}</MetaChip>
+              )}
+            </div>
           )}
-
-          {scheduleValue && (
-            <InfoRow icon={CalendarClock} label={t("tasks.schedule.label")}>
-              {scheduleValue}
-            </InfoRow>
-          )}
-        </dl>
+        </div>
 
         {needsHost && !hostId && (
           <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-2xs text-danger">
@@ -153,16 +146,26 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
           </div>
         )}
 
-        {(run?.steps ?? steps).length > 0 && (
-          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
-            {(run?.steps ?? steps).map((step, index) => (
-              <StepRow
-                key={index}
-                index={index}
-                step={step}
-                state={run?.stepStates[index]}
-              />
-            ))}
+        {stepList.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 px-0.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t("tasks.form.steps")}
+              </span>
+              <span className="flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-2xs font-medium tabular-nums text-muted-foreground">
+                {stepList.length}
+              </span>
+            </div>
+            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+              {stepList.map((step, index) => (
+                <StepRow
+                  key={index}
+                  index={index}
+                  step={step}
+                  state={run?.stepStates[index]}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -191,34 +194,18 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
   );
 }
 
-/** One labelled detail row (icon + muted label + value). Rendered as a `dt`/`dd`
- * pair so every field's value lines up in a shared column via the parent grid. */
-function InfoRow({
+function MetaChip({
   icon: Icon,
-  label,
-  multiline,
   children,
 }: {
   icon: LucideIcon;
-  label: string;
-  multiline?: boolean;
   children: ReactNode;
 }) {
   return (
-    <>
-      <dt className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="size-4 shrink-0" />
-        <span>{label}</span>
-      </dt>
-      <dd
-        className={cn(
-          "min-w-0 font-medium",
-          multiline ? "whitespace-pre-wrap break-words" : "truncate",
-        )}
-      >
-        {children}
-      </dd>
-    </>
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-2xs">
+      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 truncate font-medium">{children}</span>
+    </span>
   );
 }
 

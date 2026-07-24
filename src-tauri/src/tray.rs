@@ -11,6 +11,10 @@ use crate::state::AppState;
 /// one reopens the app and asks the webview to focus that task.
 const TASK_ID_PREFIX: &str = "tray-task:";
 
+/// Menu id prefix for a running port-forward entry; the suffix is the forward id.
+/// Clicking one reopens the app and asks the webview to reveal the Forwards view.
+const FORWARD_ID_PREFIX: &str = "tray-forward:";
+
 /// Bundled PNG for the menu-bar icon. Embedded explicitly rather than reusing
 /// `default_window_icon()`, which is `None` in dev builds and would leave a
 /// zero-width, unclickable status item on macOS. macOS gets a monochrome
@@ -80,51 +84,82 @@ fn prefers_zh(app: &AppHandle) -> bool {
         .is_some_and(|value| value.starts_with("zh"))
 }
 
-/// The menu shown before the webview has pushed its task list — just Open and
-/// Quit, plus the empty-state row, in the persisted language.
+/// The menu shown before the webview has pushed its data — just Open and Quit, in
+/// the persisted language. The task and forward sections fill in once it loads.
 fn initial_data(app: &AppHandle) -> TrayMenuData {
-    let (open, quit, section, empty) = if prefers_zh(app) {
-        ("打开 Sageport", "退出", "定时任务", "暂无定时任务")
+    let (open, quit, section, forwards_section) = if prefers_zh(app) {
+        ("打开 Sageport", "退出", "定时任务", "端口转发")
     } else {
-        ("Open Sageport", "Quit", "Scheduled tasks", "No scheduled tasks")
+        (
+            "Open Sageport",
+            "Quit",
+            "Scheduled tasks",
+            "Port forwarding",
+        )
     };
     TrayMenuData {
         open_label: open.into(),
         quit_label: quit.into(),
         section_label: section.into(),
-        empty_label: empty.into(),
         tasks: Vec::new(),
+        forwards_section_label: forwards_section.into(),
+        forwards: Vec::new(),
     }
 }
 
-/// Lay out the tray menu: Open, a scheduled-task section (or an empty-state row),
-/// then Quit. The disabled section header / empty row act as inert labels.
+/// Lay out the tray menu: Open, then a scheduled-task section and a
+/// running-forwards section (each shown only when it has entries), then Quit. The
+/// disabled section headers act as inert labels. The separators that fence the
+/// sections are dropped entirely when both are empty, leaving a bare Open / Quit.
 fn build_menu(app: &AppHandle, data: &TrayMenuData) -> tauri::Result<Menu<Wry>> {
-    let mut builder = MenuBuilder::new(app)
-        .text("tray-show", &data.open_label)
-        .separator();
+    let has_content = !data.tasks.is_empty() || !data.forwards.is_empty();
 
-    // These disabled items must outlive `build()`; building both is harmless.
-    let section = MenuItem::with_id(app, "tray-section", &data.section_label, false, None::<&str>)?;
-    let empty = MenuItem::with_id(app, "tray-empty", &data.empty_label, false, None::<&str>)?;
+    let mut builder = MenuBuilder::new(app).text("tray-show", &data.open_label);
 
-    if data.tasks.is_empty() {
-        builder = builder.item(&empty);
-    } else {
+    // These disabled items must outlive `build()`; building them is harmless.
+    let section = MenuItem::with_id(
+        app,
+        "tray-section",
+        &data.section_label,
+        false,
+        None::<&str>,
+    )?;
+    let forwards_section = MenuItem::with_id(
+        app,
+        "tray-forwards-section",
+        &data.forwards_section_label,
+        false,
+        None::<&str>,
+    )?;
+
+    if has_content {
+        builder = builder.separator();
+    }
+
+    if !data.tasks.is_empty() {
         builder = builder.item(&section);
         for task in &data.tasks {
             builder = builder.text(format!("{TASK_ID_PREFIX}{}", task.id), &task.label);
         }
     }
 
-    builder
-        .separator()
-        .text("tray-quit", &data.quit_label)
-        .build()
+    if !data.forwards.is_empty() {
+        builder = builder.item(&forwards_section);
+        for forward in &data.forwards {
+            builder = builder.text(format!("{FORWARD_ID_PREFIX}{}", forward.id), &forward.label);
+        }
+    }
+
+    if has_content {
+        builder = builder.separator();
+    }
+
+    builder.text("tray-quit", &data.quit_label).build()
 }
 
 /// Dispatch a tray menu selection. Task rows reopen the app and hand the task id
-/// to the webview, which switches to the Tasks view and focuses it.
+/// to the webview, which switches to the Tasks view and focuses it; forward rows
+/// do the same for the Forwards view.
 fn on_menu_event(app: &AppHandle, id: &str) {
     match id {
         "tray-show" => show_main_window(app),
@@ -133,14 +168,17 @@ fn on_menu_event(app: &AppHandle, id: &str) {
             if let Some(task_id) = id.strip_prefix(TASK_ID_PREFIX) {
                 show_main_window(app);
                 let _ = app.emit("tray://open-task", task_id.to_string());
+            } else if let Some(forward_id) = id.strip_prefix(FORWARD_ID_PREFIX) {
+                show_main_window(app);
+                let _ = app.emit("tray://open-forward", forward_id.to_string());
             }
         }
     }
 }
 
-/// Rebuild the tray menu from the webview's current scheduled-task list. Called
-/// on every push so the entries and their next-run times stay current. Must run
-/// on the main thread (the caller ensures this).
+/// Rebuild the tray menu from the webview's current tasks and running forwards.
+/// Called on every push so the entries and their next-run times stay current. Must
+/// run on the main thread (the caller ensures this).
 pub fn update_menu(app: &AppHandle, data: TrayMenuData) -> tauri::Result<()> {
     let menu = build_menu(app, &data)?;
     if let Some(tray) = app.tray_by_id("main") {

@@ -79,7 +79,7 @@ export const en = {
     open: "Open Sageport",
     quit: "Quit",
     section: "Scheduled tasks",
-    empty: "No scheduled tasks",
+    forwards: "Port forwarding",
   },
 
   monitor: {

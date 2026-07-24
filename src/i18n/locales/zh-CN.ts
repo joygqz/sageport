@@ -76,7 +76,7 @@ export const zhCN: Dictionary = {
     open: "打开 Sageport",
     quit: "退出",
     section: "定时任务",
-    empty: "暂无定时任务",
+    forwards: "端口转发",
   },
 
   monitor: {

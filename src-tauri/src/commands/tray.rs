@@ -2,14 +2,21 @@ use serde::Deserialize;
 
 use crate::error::{AppError, AppResult};
 
-/// Cap the task list so a runaway push cannot build an unusable menu, and bound
-/// each label so an over-long name (or a hostile sync payload) stays readable.
-const MAX_TASKS: usize = 100;
+/// Cap each list so a runaway push cannot build an unusable menu, and bound each
+/// label so an over-long name (or a hostile sync payload) stays readable.
+const MAX_ROWS: usize = 100;
 const MAX_LABEL_CHARS: usize = 256;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrayTaskItem {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrayForwardItem {
     pub id: String,
     pub label: String,
 }
@@ -23,8 +30,9 @@ pub struct TrayMenuData {
     pub open_label: String,
     pub quit_label: String,
     pub section_label: String,
-    pub empty_label: String,
     pub tasks: Vec<TrayTaskItem>,
+    pub forwards_section_label: String,
+    pub forwards: Vec<TrayForwardItem>,
 }
 
 fn clamp_label(value: String) -> String {
@@ -38,10 +46,14 @@ fn sanitize(mut data: TrayMenuData) -> TrayMenuData {
     data.open_label = clamp_label(data.open_label);
     data.quit_label = clamp_label(data.quit_label);
     data.section_label = clamp_label(data.section_label);
-    data.empty_label = clamp_label(data.empty_label);
-    data.tasks.truncate(MAX_TASKS);
+    data.forwards_section_label = clamp_label(data.forwards_section_label);
+    data.tasks.truncate(MAX_ROWS);
     for task in &mut data.tasks {
         task.label = clamp_label(std::mem::take(&mut task.label));
+    }
+    data.forwards.truncate(MAX_ROWS);
+    for forward in &mut data.forwards {
+        forward.label = clamp_label(std::mem::take(&mut forward.label));
     }
     data
 }

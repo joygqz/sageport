@@ -522,6 +522,10 @@ export const ipc = {
     setTasks: (data: TrayMenuData) => invoke<void>("tray_set_tasks", { data }),
     onOpenTask: (handler: (taskId: string) => void): Promise<UnlistenFn> =>
       listen<string>("tray://open-task", (event) => handler(event.payload)),
+    onOpenForward: (
+      handler: (forwardId: string) => void,
+    ): Promise<UnlistenFn> =>
+      listen<string>("tray://open-forward", (event) => handler(event.payload)),
   },
   update: {
     status: () => invoke<UpdateStatus>("update_status"),

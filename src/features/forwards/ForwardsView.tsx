@@ -21,7 +21,7 @@ import {
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type { PortForward } from "@/types/models";
 import {
   PanelContent,
@@ -35,7 +35,7 @@ import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { useForwards, useDeleteForward } from "./api";
 import { ForwardFormDialog } from "./ForwardFormDialog";
-import { formatForwardEndpoint } from "./forwardForm";
+import { describeForward, formatForwardEndpoint } from "./forwardForm";
 import { bridgeForwardEvents, useForwardStore } from "./store";
 
 const PUBLIC_FORWARDING_ADMIN_COMMAND = `test "$(id -u)" = 0 && sageport_run= || sageport_run=sudo
@@ -150,6 +150,9 @@ export function ForwardsView() {
       try {
         await ipc.forwards.start(forward.id);
       } catch (err) {
+        // A start that was superseded (e.g. the forward was edited or stopped
+        // mid-connect) resolves as "cancelled" — not a failure worth a toast.
+        if (errorCode(err) === "cancelled") return;
         toast.error(t("forwards.startError"), errorMessage(err));
       }
     }
@@ -173,19 +176,11 @@ export function ForwardsView() {
     });
   };
 
-  const describe = (forward: PortForward) => {
-    if (forward.kind === "dynamic") {
-      return `SOCKS ${formatForwardEndpoint(forward.bindHost, forward.bindPort)}`;
-    }
-    const prefix = forward.kind === "remote" ? "R" : "L";
-    return `${prefix} ${formatForwardEndpoint(forward.bindHost, forward.bindPort)} → ${formatForwardEndpoint(forward.targetHost ?? "", forward.targetPort ?? 0)}`;
-  };
-
   const filteredForwards = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return forwards;
     return forwards.filter((forward) =>
-      [forward.label, forward.kind, describe(forward)].some((value) =>
+      [forward.label, forward.kind, describeForward(forward)].some((value) =>
         value.toLowerCase().includes(q),
       ),
     );
@@ -300,7 +295,7 @@ export function ForwardsView() {
                         {statusMessage ??
                           (runtime[forward.id]?.status === "starting"
                             ? t("forwards.starting")
-                            : describe(forward))}
+                            : describeForward(forward))}
                       </p>
                     </div>
                     <Tooltip

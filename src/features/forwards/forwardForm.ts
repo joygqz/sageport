@@ -1,4 +1,8 @@
-import type { ForwardKind, PortForwardInput } from "@/types/models";
+import type {
+  ForwardKind,
+  PortForward,
+  PortForwardInput,
+} from "@/types/models";
 
 export function formatForwardEndpoint(host: string, port: number): string {
   const displayHost =
@@ -6,6 +10,18 @@ export function formatForwardEndpoint(host: string, port: number): string {
       ? `[${host}]`
       : host;
   return `${displayHost}:${port}`;
+}
+
+/**
+ * One-line summary of a forward's route, e.g. `L 127.0.0.1:8080 → host:80` or
+ * `SOCKS 127.0.0.1:1080`. Shared by the Forwards view and the tray menu.
+ */
+export function describeForward(forward: PortForward): string {
+  if (forward.kind === "dynamic") {
+    return `SOCKS ${formatForwardEndpoint(forward.bindHost, forward.bindPort)}`;
+  }
+  const prefix = forward.kind === "remote" ? "R" : "L";
+  return `${prefix} ${formatForwardEndpoint(forward.bindHost, forward.bindPort)} → ${formatForwardEndpoint(forward.targetHost ?? "", forward.targetPort ?? 0)}`;
 }
 
 export function isLoopbackBindHost(host: string): boolean {

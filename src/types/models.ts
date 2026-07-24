@@ -355,13 +355,21 @@ export interface TrayTaskItem {
   label: string;
 }
 
+/** One running port-forward row in the system-tray menu. */
+export interface TrayForwardItem {
+  id: string;
+  /** Fully formatted label (forward name + endpoint). */
+  label: string;
+}
+
 /** Snapshot the webview pushes to rebuild the tray menu. */
 export interface TrayMenuData {
   openLabel: string;
   quitLabel: string;
   sectionLabel: string;
-  emptyLabel: string;
   tasks: TrayTaskItem[];
+  forwardsSectionLabel: string;
+  forwards: TrayForwardItem[];
 }
 
 export type AiProtocol = "openai" | "anthropic";
