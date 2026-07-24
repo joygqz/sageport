@@ -120,7 +120,6 @@ describe("layoutExtent", () => {
   });
 
   it("projects nested splits onto the grid axes", () => {
-    // row[a, column[b, row[d, e]], c] — visually 4 panes wide on the bottom band
     let layout = split(leafLayout("a"), "a", "b", "row");
     layout = split(layout, "b", "c", "row");
     layout = split(layout, "b", "d", "column");

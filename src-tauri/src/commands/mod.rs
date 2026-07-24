@@ -17,5 +17,6 @@ pub mod snippets;
 pub mod ssh;
 pub mod ssh_config;
 pub mod sync;
+pub mod tasks;
 pub mod update;
 pub mod window;

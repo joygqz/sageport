@@ -110,8 +110,6 @@ impl client::Handler for ClientHandler {
             return Ok(());
         };
         let Ok(permit) = sender.try_reserve_owned() else {
-            // Dropping the reply rejects excess connections without blocking
-            // the SSH handler (and therefore keepalives) under load.
             return Ok(());
         };
         reply.accept().await;

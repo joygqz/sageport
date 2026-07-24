@@ -2,6 +2,7 @@ import { credentialKeys } from "@/features/credentials/api";
 import { forwardKeys } from "@/features/forwards/api";
 import { hostKeys } from "@/features/hosts/api";
 import { snippetsKey } from "@/features/snippets/api";
+import { tasksKey } from "@/features/tasks/api";
 import { bookmarkKey } from "@/features/sftp/api";
 import { queryClient } from "@/lib/query";
 
@@ -16,6 +17,10 @@ export function invalidateGroups(): void {
 
 export function invalidateSnippets(): void {
   void queryClient.invalidateQueries({ queryKey: snippetsKey });
+}
+
+export function invalidateTasks(): void {
+  void queryClient.invalidateQueries({ queryKey: tasksKey });
 }
 
 export function invalidateForwards(): void {

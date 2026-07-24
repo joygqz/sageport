@@ -90,16 +90,13 @@ pub struct DeleteEvent {
     pub code: Option<String>,
 }
 
-/// A cancellation signal that can both be polled from blocking work and wake
-/// async I/O immediately. An atomic flag alone cannot interrupt a stalled
-/// network read, which made transfer cancellation appear unresponsive.
 pub struct TransferCancel {
     cancelled: AtomicBool,
     notify: Notify,
 }
 
 impl TransferCancel {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             cancelled: AtomicBool::new(false),
             notify: Notify::new(),
@@ -140,6 +137,18 @@ pub struct Conn {
 impl Conn {
     pub fn session(&self) -> &SftpSession {
         &self.session
+    }
+
+    pub async fn exec_stream<F>(
+        &self,
+        command: &str,
+        max_output_bytes: usize,
+        on_chunk: F,
+    ) -> AppResult<i32>
+    where
+        F: FnMut(String),
+    {
+        crate::ssh::exec::exec_stream(&self.ssh.handle, command, max_output_bytes, on_chunk).await
     }
 
     pub async fn exec(&self, command: &str) -> AppResult<String> {
@@ -355,6 +364,39 @@ impl SftpManager {
 
     pub async fn exec(&self, id: &str, command: &str) -> AppResult<String> {
         self.get(id)?.exec(command).await
+    }
+
+    pub async fn exec_stream<F>(
+        &self,
+        id: &str,
+        command: &str,
+        max_output_bytes: usize,
+        on_chunk: F,
+    ) -> AppResult<i32>
+    where
+        F: FnMut(String),
+    {
+        self.get(id)?
+            .exec_stream(command, max_output_bytes, on_chunk)
+            .await
+    }
+
+    pub async fn connect_now(
+        &self,
+        app: &AppHandle,
+        prompts: &ConnectionPrompts,
+        params: SftpConnectParams,
+        cancel: &TransferCancel,
+    ) -> AppResult<()> {
+        let id = params.connection_id.clone();
+        let conn = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Err(AppError::Cancelled),
+            result = open(app, prompts, &params) => result?,
+        };
+        self.conns.lock().insert(id.clone(), Arc::new(conn));
+        emit_status(app, &id, "connected", None);
+        Ok(())
     }
 
     pub async fn supports_tar(&self, id: &str) -> bool {

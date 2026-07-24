@@ -47,6 +47,67 @@ pub async fn exec_capture_limited(
     })
 }
 
+pub async fn exec_stream<F>(
+    handle: &Handle<ClientHandler>,
+    command: &str,
+    max_output_bytes: usize,
+    mut on_chunk: F,
+) -> AppResult<i32>
+where
+    F: FnMut(String),
+{
+    let channel = handle.channel_open_session().await?;
+    channel.exec(true, command).await?;
+
+    let mut code = 0i32;
+    let mut forwarded = 0usize;
+    let mut truncated = false;
+    let mut channel = channel;
+    loop {
+        match channel.wait().await {
+            Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, ext: 1 }) => {
+                forward_chunk(
+                    &mut on_chunk,
+                    &data,
+                    max_output_bytes,
+                    &mut forwarded,
+                    &mut truncated,
+                );
+            }
+            Some(ChannelMsg::ExitStatus { exit_status }) => code = exit_status as i32,
+            Some(ChannelMsg::Close) | None => break,
+            _ => {}
+        }
+    }
+    Ok(code)
+}
+
+fn forward_chunk<F>(
+    on_chunk: &mut F,
+    data: &[u8],
+    max_output_bytes: usize,
+    forwarded: &mut usize,
+    truncated: &mut bool,
+) where
+    F: FnMut(String),
+{
+    if *forwarded >= max_output_bytes {
+        if !*truncated {
+            *truncated = true;
+            on_chunk("\n…(output truncated)…\n".to_string());
+        }
+        return;
+    }
+    let remaining = max_output_bytes - *forwarded;
+    let slice = if data.len() > remaining {
+        &data[..remaining]
+    } else {
+        data
+    };
+    *forwarded += slice.len();
+    on_chunk(String::from_utf8_lossy(slice).into_owned());
+}
+
 fn append_limited(
     target: &mut Vec<u8>,
     other: &[u8],

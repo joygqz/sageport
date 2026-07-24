@@ -59,11 +59,6 @@ jobs:
           TAG="${{ needs.prepare.outputs.tag }}"
           FROM_ARGS=()
           if ! git tag --list 'v*.*.*' | grep -vFx "$TAG" | grep -q .; then
-            # First-ever release: changelogithub always excludes its "from"
-            # boundary commit, and with no prior tag it defaults that boundary
-            # to the repo's first commit - silently dropping it from the
-            # changelog. Diff against git's well-known empty-tree commit
-            # instead so the full history is included.
             EMPTY_TREE=4b825dc642cb6eb9a060e54bf8d69288fbee4904
             FROM=$(git commit-tree "$EMPTY_TREE" -m "empty")
             FROM_ARGS=(--from "$FROM")
@@ -168,9 +163,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Sync OAuth client ids (see docs/sync-oauth-setup.md) — compiled
-          # in via `option_env!`, so a missing secret just disables that
-          # provider's sign-in instead of failing the build.
           SAGEPORT_GITHUB_CLIENT_ID: ${{ secrets.SAGEPORT_GITHUB_CLIENT_ID }}
           SAGEPORT_GOOGLE_CLIENT_ID: ${{ secrets.SAGEPORT_GOOGLE_CLIENT_ID }}
           SAGEPORT_GOOGLE_CLIENT_SECRET: ${{ secrets.SAGEPORT_GOOGLE_CLIENT_SECRET }}

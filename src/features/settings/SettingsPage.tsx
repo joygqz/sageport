@@ -89,6 +89,13 @@ export function SettingsDialog({
 }) {
   const { t } = useI18n();
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [wasOpen, setWasOpen] = useState(open);
+
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setJsonOpen(false);
+  }
+
   const jsonActionLabel = t(
     jsonOpen ? "settings.json.openVisual" : "settings.json.open",
   );

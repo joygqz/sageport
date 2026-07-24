@@ -56,13 +56,11 @@ export function KeyFormDialog({
           : t("credentials.keys.formTitle")
       }
     >
-      {isOpen && (
-        <KeyFormBody
-          key={sshKey?.id ?? "new"}
-          sshKey={sshKey}
-          onClose={onClose}
-        />
-      )}
+      <KeyFormBody
+        key={sshKey?.id ?? "new"}
+        sshKey={sshKey}
+        onClose={onClose}
+      />
     </FormDialog>
   );
 }
@@ -140,8 +138,6 @@ function KeyFormBody({
               ? {
                   privateKey,
                   publicKey: publicKey || null,
-                  // An empty value explicitly clears an old passphrase when
-                  // the replacement key is unencrypted.
                   passphrase: passphrase || "",
                 }
               : {}),

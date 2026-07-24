@@ -1,6 +1,5 @@
 type Unlisten = () => void;
 
-/** Installs an async Tauri event listener without leaking it after unmount. */
 export function installWindowListener(
   register: () => Promise<Unlisten>,
   onError: (error: unknown) => void,

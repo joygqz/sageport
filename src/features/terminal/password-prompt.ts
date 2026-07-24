@@ -72,7 +72,6 @@ export async function listenPasswordPrompts(): Promise<() => void> {
       }
     }
   } catch {
-    // Live events remain authoritative if the recovery query is unavailable.
   } finally {
     syncing = false;
   }

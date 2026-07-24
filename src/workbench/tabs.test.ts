@@ -179,7 +179,6 @@ describe("splitPane", () => {
     const nested = useTabsStore.getState().splitPane(second, "down")!;
     expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(4);
 
-    // Splitting the nested pane sideways would make the bottom band 4 wide.
     expect(useTabsStore.getState().splitPane(nested, "right")).toBeNull();
     expect(terminalPanes(useTabsStore.getState().tabs)).toHaveLength(4);
   });

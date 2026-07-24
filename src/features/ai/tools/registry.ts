@@ -13,6 +13,7 @@ import { groupTools } from "./groups";
 import { hostTools } from "./hosts";
 import { monitorTools } from "./monitor";
 import { snippetTools } from "./snippets";
+import { taskTools } from "./tasks";
 import { terminalTools } from "./terminal";
 import {
   toolFailure,
@@ -28,6 +29,7 @@ export const ALL_TOOLS: AiTool[] = [
   ...hostTools,
   ...groupTools,
   ...snippetTools,
+  ...taskTools,
   ...forwardTools,
   ...fileTools,
   ...bookmarkTools,
@@ -60,7 +62,7 @@ export const TOOL_GROUPS = [
   },
   { id: "hosts", tools: [...hostTools, ...groupTools, ...monitorTools] },
   { id: "files", tools: [...fileTools, ...bookmarkTools] },
-  { id: "automation", tools: [...snippetTools, ...forwardTools] },
+  { id: "automation", tools: [...snippetTools, ...taskTools, ...forwardTools] },
   { id: "credentials", tools: credentialTools },
   { id: "administration", tools: administrationTools },
 ] as const;

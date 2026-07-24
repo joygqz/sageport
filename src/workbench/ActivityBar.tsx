@@ -5,6 +5,7 @@ import {
   Server,
   Settings,
   SquareTerminal,
+  Workflow,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { memo } from "react";
@@ -23,6 +24,7 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "hosts", icon: Server, labelKey: "activityBar.hosts" },
   { id: "credentials", icon: KeyRound, labelKey: "activityBar.credentials" },
   { id: "snippets", icon: SquareTerminal, labelKey: "activityBar.snippets" },
+  { id: "tasks", icon: Workflow, labelKey: "activityBar.tasks" },
   { id: "forwards", icon: Network, labelKey: "activityBar.forwards" },
   { id: "monitor", icon: Gauge, labelKey: "activityBar.monitor" },
 ];

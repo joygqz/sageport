@@ -7,7 +7,7 @@ use sqlx::SqlitePool;
 use tokio::sync::oneshot;
 
 use crate::pty::PtyManager;
-use crate::sftp::SftpManager;
+use crate::sftp::{SftpManager, TransferCancel};
 use crate::ssh::forward::ForwardManager;
 use crate::ssh::monitor::MonitorManager;
 use crate::ssh::{new_connection_prompts, ConnectionPrompts, SessionManager};
@@ -52,12 +52,12 @@ pub struct AppState {
 
     pub batch_cancels: Mutex<HashMap<String, CancelEntry>>,
 
+    pub task_cancels: Mutex<HashMap<String, Arc<TransferCancel>>>,
+
     request_generation: AtomicU64,
 
     pub sync_oauth: Mutex<SyncOAuthSlot>,
 
-    /// Serializes sync mutations so a late push/restore cannot resurrect a
-    /// disconnected provider or overwrite freshly refreshed credentials.
     pub sync_operation: tokio::sync::Mutex<()>,
     pub sync_runtime: Mutex<SyncRuntime>,
 }
@@ -75,6 +75,7 @@ impl AppState {
             update: UpdateManager::new(),
             ai_cancels: Mutex::new(HashMap::new()),
             batch_cancels: Mutex::new(HashMap::new()),
+            task_cancels: Mutex::new(HashMap::new()),
             request_generation: AtomicU64::new(0),
             sync_oauth: Mutex::new(SyncOAuthSlot::default()),
             sync_operation: tokio::sync::Mutex::new(()),

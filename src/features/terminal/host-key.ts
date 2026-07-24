@@ -65,7 +65,6 @@ export async function listenHostKeyEvents(): Promise<() => void> {
       }
     }
   } catch {
-    // Live events remain authoritative if the recovery query is unavailable.
   } finally {
     syncing = false;
   }

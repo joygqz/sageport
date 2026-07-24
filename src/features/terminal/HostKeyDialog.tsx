@@ -2,6 +2,7 @@ import { ShieldAlert, ShieldQuestion } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogToolbar } from "@/components/ui/dialog";
+import { useDialogSnapshot } from "@/components/ui/use-dialog-snapshot";
 import { useI18n } from "@/i18n";
 import type { HostKeyDecision } from "@/types/models";
 import { useHostKeyStore } from "./host-key";
@@ -18,7 +19,8 @@ export function HostKeyDialog() {
     respondTo(current.promptId, decision);
   };
 
-  const changed = current?.status === "changed";
+  const shown = useDialogSnapshot(Boolean(current), current);
+  const changed = shown?.status === "changed";
 
   return (
     <Dialog
@@ -29,7 +31,7 @@ export function HostKeyDialog() {
         showClose={false}
         className="flex w-[460px] max-w-[92vw] flex-col gap-0 p-0 sm:p-0"
       >
-        {current && (
+        {shown && (
           <>
             <DialogToolbar>
               {changed ? t("hostKey.changedTitle") : t("hostKey.unknownTitle")}
@@ -45,7 +47,7 @@ export function HostKeyDialog() {
                   changed
                     ? "hostKey.changedDescription"
                     : "hostKey.unknownDescription",
-                  { host: `${current.host}:${current.port}` },
+                  { host: `${shown.host}:${shown.port}` },
                 )}
               </p>
 
@@ -54,14 +56,14 @@ export function HostKeyDialog() {
                   <dt className="text-muted-foreground">
                     {t("hostKey.keyType")}
                   </dt>
-                  <dd className="select-text font-mono">{current.keyType}</dd>
+                  <dd className="select-text font-mono">{shown.keyType}</dd>
                 </div>
                 <div className="flex flex-col gap-1">
                   <dt className="text-muted-foreground">
                     {t("hostKey.fingerprint")}
                   </dt>
                   <dd className="select-text break-all font-mono">
-                    {current.fingerprint}
+                    {shown.fingerprint}
                   </dd>
                 </div>
               </dl>

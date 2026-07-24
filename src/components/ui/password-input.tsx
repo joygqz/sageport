@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { Input, type InputProps } from "./input";
 
 export type PasswordInputProps = Omit<InputProps, "type"> & {
-  /** Called before changing from hidden to visible. Return false to stay hidden. */
   onBeforeReveal?: () => boolean | Promise<boolean>;
 };
 

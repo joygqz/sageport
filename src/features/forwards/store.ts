@@ -74,7 +74,6 @@ export function bridgeForwardEvents(): Promise<void> {
       const snapshot = await ipc.forwards.runtime();
       useForwardStore.getState().hydrate(snapshot);
     } catch {
-      // Live events remain authoritative if the recovery query is unavailable.
     } finally {
       for (const event of queued) useForwardStore.getState().apply(event);
       syncing = false;

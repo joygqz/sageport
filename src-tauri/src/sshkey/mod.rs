@@ -183,8 +183,6 @@ pub fn read_file(path: &str) -> AppResult<KeyFile> {
             Some(public.algorithm().to_string()),
         )
     } else if let Ok(key) = PrivateKey::from_openssh(&private_key) {
-        // OpenSSH encrypted keys carry their public half in plaintext, so it
-        // can still be displayed before the user supplies the passphrase.
         let public = key.public_key();
         (
             public.to_openssh().ok(),

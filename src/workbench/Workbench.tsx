@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { ResizeHandle } from "@/components/ui/resize-handle";
+import { useDialogSnapshot } from "@/components/ui/use-dialog-snapshot";
 import { Spinner } from "@/components/ui/spinner";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -228,6 +229,10 @@ export function Workbench() {
   const hasHostKeyPrompt = useHostKeyStore((s) => s.queue.length > 0);
   const hasPasswordPrompt = usePasswordPromptStore((s) => s.queue.length > 0);
 
+  const shownOverlay = useDialogSnapshot(Boolean(overlay), overlay);
+  const hostKeyMounted = useKeepMounted(hasHostKeyPrompt);
+  const passwordMounted = useKeepMounted(hasPasswordPrompt);
+
   return (
     <div className="flex h-full flex-col bg-surface text-surface-foreground">
       <TitleBar />
@@ -309,51 +314,51 @@ export function Workbench() {
 
       <StatusBar />
 
-      {overlay?.type === "host-form" && (
+      {shownOverlay?.type === "host-form" && (
         <Suspense fallback={null}>
           <HostFormDialog
-            open
-            hostId={overlay.hostId}
-            initialGroupId={overlay.groupId}
+            open={overlay?.type === "host-form"}
+            hostId={shownOverlay.hostId}
+            initialGroupId={shownOverlay.groupId}
             onClose={closeOverlay}
           />
         </Suspense>
       )}
-      {overlay?.type === "group-form" && (
+      {shownOverlay?.type === "group-form" && (
         <Suspense fallback={null}>
           <GroupFormDialog
-            open
-            groupId={overlay.groupId}
-            initialParentId={overlay.parentId}
+            open={overlay?.type === "group-form"}
+            groupId={shownOverlay.groupId}
+            initialParentId={shownOverlay.parentId}
             onClose={closeOverlay}
           />
         </Suspense>
       )}
-      {overlay?.type === "palette" && (
+      {shownOverlay?.type === "palette" && (
         <Suspense fallback={null}>
           <CommandPalette
-            open
-            initialMode={overlay.mode}
+            open={overlay?.type === "palette"}
+            initialMode={shownOverlay.mode}
             onClose={closeOverlay}
           />
         </Suspense>
       )}
-      {overlay?.type === "settings" && (
+      {shownOverlay?.type === "settings" && (
         <Suspense fallback={null}>
           <SettingsDialog
-            open
-            section={overlay.section}
+            open={overlay?.type === "settings"}
+            section={shownOverlay.section}
             onSectionChange={setSettingsSection}
             onClose={closeOverlay}
           />
         </Suspense>
       )}
-      {hasHostKeyPrompt && (
+      {hostKeyMounted && (
         <Suspense fallback={null}>
           <HostKeyDialog />
         </Suspense>
       )}
-      {hasPasswordPrompt && (
+      {passwordMounted && (
         <Suspense fallback={null}>
           <PasswordPromptDialog />
         </Suspense>
@@ -364,6 +369,12 @@ export function Workbench() {
       <LazyToaster />
     </div>
   );
+}
+
+function useKeepMounted(active: boolean) {
+  const [mounted, setMounted] = useState(active);
+  if (active && !mounted) setMounted(true);
+  return mounted || active;
 }
 
 function LazyToaster() {

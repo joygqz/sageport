@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogToolbar } from "@/components/ui/dialog";
+import { useDialogSnapshot } from "@/components/ui/use-dialog-snapshot";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -12,6 +13,7 @@ export function PasswordPromptDialog() {
   const queue = usePasswordPromptStore((state) => state.queue);
   const respondTo = usePasswordPromptStore((state) => state.respond);
   const current = queue[0];
+  const shown = useDialogSnapshot(Boolean(current), current);
 
   return (
     <Dialog
@@ -24,16 +26,16 @@ export function PasswordPromptDialog() {
         showClose={false}
         className="flex w-[440px] max-w-[92vw] flex-col gap-0 p-0 sm:p-0"
       >
-        {current && (
+        {shown && (
           <PasswordPromptForm
-            key={current.promptId}
-            host={formatSshHost(current.host, current.port)}
-            username={current.username}
-            prompt={current.prompt}
-            instructions={current.instructions}
-            echo={current.echo}
-            allowEmpty={current.allowEmpty}
-            onRespond={(password) => respondTo(current.promptId, password)}
+            key={shown.promptId}
+            host={formatSshHost(shown.host, shown.port)}
+            username={shown.username}
+            prompt={shown.prompt}
+            instructions={shown.instructions}
+            echo={shown.echo}
+            allowEmpty={shown.allowEmpty}
+            onRespond={(password) => respondTo(shown.promptId, password)}
           />
         )}
       </DialogContent>

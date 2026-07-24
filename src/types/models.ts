@@ -257,6 +257,64 @@ export interface SnippetInput {
   description?: string | null;
 }
 
+export type TaskStep =
+  | {
+      type: "localCommand";
+      cwd?: string;
+      command: string;
+      continueOnError?: boolean;
+    }
+  | {
+      type: "upload";
+      localPath: string;
+      remotePath: string;
+      incremental?: boolean;
+      continueOnError?: boolean;
+    }
+  | {
+      type: "download";
+      remotePath: string;
+      localPath: string;
+      continueOnError?: boolean;
+    }
+  | {
+      type: "remoteCommand";
+      cwd?: string;
+      command: string;
+      continueOnError?: boolean;
+    };
+
+export type TaskStepType = TaskStep["type"];
+
+export interface Task {
+  id: string;
+  name: string;
+  description: string | null;
+  hostId: string | null;
+  steps: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  revision: number;
+}
+
+export interface TaskInput {
+  name: string;
+  description?: string | null;
+  hostId?: string | null;
+  steps: TaskStep[];
+}
+
+export type TaskRunStatus = "start" | "log" | "done" | "error" | "skipped";
+
+export interface TaskRunEvent {
+  stepIndex: number;
+  status: TaskRunStatus;
+  chunk?: string;
+  exitCode?: number;
+  message?: string;
+}
+
 export type AiProtocol = "openai" | "anthropic";
 
 export interface AiConfig {
