@@ -30,7 +30,11 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
         cwd: "{{projectDir:~/project}}",
         command: "pnpm build",
       },
-      { type: "upload", localPath: "./dist", remotePath: "/var/www/{{app}}" },
+      {
+        type: "upload",
+        localPath: "{{projectDir:~/project}}/dist",
+        remotePath: "/var/www/{{app}}",
+      },
       { type: "remoteCommand", command: "sudo systemctl reload nginx" },
     ],
   },
@@ -47,7 +51,7 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
       },
       {
         type: "upload",
-        localPath: "./target/{{app}}.jar",
+        localPath: "{{projectDir:~/project}}/target/{{app}}.jar",
         remotePath: "/opt/{{app}}/{{app}}.jar",
       },
       { type: "remoteCommand", command: "sudo systemctl restart {{service}}" },
@@ -76,7 +80,11 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     nameKey: "tasks.template.configDeploy.name",
     summaryKey: "tasks.template.configDeploy.summary",
     steps: [
-      { type: "upload", localPath: "./config", remotePath: "/etc/{{app}}" },
+      {
+        type: "upload",
+        localPath: "{{configDir:~/config}}",
+        remotePath: "/etc/{{app}}",
+      },
       { type: "remoteCommand", command: "sudo systemctl reload {{service}}" },
     ],
   },

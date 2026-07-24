@@ -332,7 +332,7 @@ async fn run_local_command(
 ) -> AppResult<i32> {
     let mut builder = shell_command(command);
     if let Some(dir) = cwd {
-        builder.current_dir(dir);
+        builder.current_dir(expand_local_tilde(dir));
     }
     builder
         .stdin(Stdio::null())
@@ -475,7 +475,7 @@ async fn run_transfer(
             let name = base_name(remote_path);
             let source = Endpoint {
                 connection_id: None,
-                path: local_path.clone(),
+                path: expand_local_tilde(local_path),
             };
             let dest_dir = Endpoint {
                 connection_id: Some(conn_id.to_string()),
@@ -488,7 +488,7 @@ async fn run_transfer(
             local_path,
             ..
         } => {
-            let (dir, name) = split_local_path(local_path)?;
+            let (dir, name) = split_local_path(&expand_local_tilde(local_path))?;
             let source = Endpoint {
                 connection_id: Some(conn_id.to_string()),
                 path: remote_path.clone(),
@@ -530,6 +530,32 @@ async fn run_transfer(
     }
 }
 
+fn home_dir() -> Option<std::ffi::OsString> {
+    #[cfg(windows)]
+    let key = "USERPROFILE";
+    #[cfg(not(windows))]
+    let key = "HOME";
+    std::env::var_os(key).filter(|value| !value.is_empty())
+}
+
+/// Expand a leading `~` / `~/` in a *local* path to the user's home directory.
+///
+/// Local command working directories and upload/download local paths are typed
+/// by hand — and shipped in templates — as `~/…`. Unlike a remote command, which
+/// runs through a shell that expands the tilde, these paths are handed straight
+/// to the OS (`chdir`, file open), which treats `~` as a literal directory name.
+/// Only a leading tilde is touched; `~user` and every other path pass through.
+fn expand_local_tilde(path: &str) -> String {
+    if path == "~" || path.starts_with("~/") {
+        if let Some(home) = home_dir() {
+            return crate::ssh::config_file::expand_tilde(path, std::path::Path::new(&home))
+                .to_string_lossy()
+                .into_owned();
+        }
+    }
+    path.to_string()
+}
+
 fn split_local_path(path: &str) -> AppResult<(String, String)> {
     let p = std::path::Path::new(path);
     let name = p
@@ -566,6 +592,22 @@ mod tests {
             split_local_path("db.sql").unwrap(),
             (".".into(), "db.sql".into())
         );
+    }
+
+    #[test]
+    fn expands_only_leading_local_tilde() {
+        let home = home_dir().map(|h| h.to_string_lossy().into_owned());
+        if let Some(home) = home {
+            assert_eq!(expand_local_tilde("~"), home);
+            assert_eq!(
+                expand_local_tilde("~/project/dist"),
+                format!("{home}/project/dist")
+            );
+        }
+        // Absolute, relative, and `~user` paths must pass through untouched.
+        assert_eq!(expand_local_tilde("/var/www/app"), "/var/www/app");
+        assert_eq!(expand_local_tilde("./dist"), "./dist");
+        assert_eq!(expand_local_tilde("~backup/x"), "~backup/x");
     }
 
     #[test]

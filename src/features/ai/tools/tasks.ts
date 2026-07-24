@@ -49,6 +49,14 @@ async function resolveRun(
   }
   const steps = parseTaskSteps(task);
   const values = record(args, "values");
+  const missing = taskVariables(steps)
+    .filter((v) => !v.defaultValue && (values[v.name] ?? "").trim() === "")
+    .map((v) => v.name);
+  if (missing.length > 0) {
+    return {
+      error: `Error: this task needs value(s) for ${missing.join(", ")}. Pass them in values.`,
+    };
+  }
   const hostId = optionalStr(args, "hostId") ?? task.hostId ?? "";
   let hostLabel: string | undefined;
   if (taskNeedsRemote(steps)) {
