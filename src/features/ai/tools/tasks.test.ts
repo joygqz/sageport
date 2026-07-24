@@ -112,7 +112,9 @@ describe("list_tasks", () => {
   });
 });
 
-function runEntry(overrides: Partial<TaskRunHistoryEntry>): TaskRunHistoryEntry {
+function runEntry(
+  overrides: Partial<TaskRunHistoryEntry>,
+): TaskRunHistoryEntry {
   return {
     id: "r1",
     taskId: "t1",

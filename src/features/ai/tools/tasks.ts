@@ -1,4 +1,11 @@
-import { History, ListChecks, Play, Save, SquarePen, Trash2 } from "lucide-react";
+import {
+  History,
+  ListChecks,
+  Play,
+  Save,
+  SquarePen,
+  Trash2,
+} from "lucide-react";
 
 import { parseTaskSteps } from "@/features/tasks/api";
 import { taskNeedsRemote } from "@/features/tasks/steps";
