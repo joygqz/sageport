@@ -1,7 +1,7 @@
 use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::domain::{auth, new_id, now, Identity, IdentityInput, SshKey};
-use crate::error::{AppError, AppResult};
+use crate::error::{in_use_kind, AppError, AppResult};
 use crate::repository::none_if_empty;
 
 const MAX_NAME_LEN: usize = 255;
@@ -209,10 +209,14 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     .fetch_one(&mut *tx)
     .await?;
     if in_use > 0 {
-        return Err(AppError::InUse(format!(
-            "this identity is still used by {in_use} host{}; reassign them before deleting it",
-            if in_use == 1 { "" } else { "s" }
-        )));
+        return Err(AppError::in_use(
+            in_use_kind::IDENTITY,
+            in_use,
+            format!(
+                "this identity is still used by {in_use} host{}; reassign them before deleting it",
+                if in_use == 1 { "" } else { "s" }
+            ),
+        ));
     }
 
     let ts = now();
@@ -327,7 +331,7 @@ mod tests {
         assert_eq!(identity.key_id.as_deref(), Some(key.id.as_str()));
         assert!(matches!(
             key_repo::delete(&pool, &key.id).await,
-            Err(AppError::InUse(_))
+            Err(AppError::InUse { .. })
         ));
 
         delete(&pool, &identity.id).await.unwrap();
@@ -365,7 +369,7 @@ mod tests {
 
         assert!(matches!(
             delete(&pool, &identity.id).await,
-            Err(AppError::InUse(_))
+            Err(AppError::InUse { .. })
         ));
     }
 }

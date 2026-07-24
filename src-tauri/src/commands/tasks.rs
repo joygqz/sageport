@@ -23,9 +23,6 @@ const CONNECT_ATTEMPTS: usize = 2;
 const CONNECT_RETRY_BACKOFF: Duration = Duration::from_millis(500);
 const STEP_RETRY_BACKOFF: Duration = Duration::from_secs(2);
 const STEP_OUTPUT_CAP: usize = 512 * 1024;
-/// Cap on a stored failure message. Step and run errors are short strings, but a
-/// remote command's stderr can leak into an error — bound it so history rows stay
-/// small.
 const MAX_MESSAGE_CHARS: usize = 2000;
 
 #[tauri::command]
@@ -52,9 +49,6 @@ pub async fn tasks_delete(state: State<'_, AppState>, id: String) -> AppResult<(
     task_repo::delete(&state.db, &id).await
 }
 
-/// A persisted task run, surfaced by the Tasks view's run-history dialog. `steps`
-/// is a JSON array of step definitions paired with their outcome, parsed on the
-/// client (see `TaskRunStepRecord`).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRunHistoryEntry {
@@ -150,9 +144,6 @@ enum StepResult {
     Cancelled,
 }
 
-/// The final result of one step, aggregated for the persisted run history. A step
-/// that never ran (the run was cancelled or an earlier step failed) stays
-/// `skipped`, matching the `skipped` events the client already receives.
 #[derive(Clone)]
 struct StepOutcome {
     status: &'static str,
@@ -186,8 +177,6 @@ impl StepOutcome {
     }
 }
 
-/// One entry in a run's persisted `steps` JSON: the step definition (a snapshot,
-/// so history survives task edits) paired with how it turned out.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TaskRunStepRecord<'a> {
@@ -203,9 +192,6 @@ fn all_skipped(len: usize) -> Vec<StepOutcome> {
     vec![StepOutcome::skipped(); len]
 }
 
-/// Serialize the step definitions with their outcomes. Steps without a recorded
-/// outcome (e.g. the initial row written before the run starts) render as
-/// `pending`.
 fn steps_json(steps: &[TaskStep], outcomes: &[StepOutcome]) -> String {
     let records: Vec<TaskRunStepRecord> = steps
         .iter()
@@ -230,8 +216,6 @@ fn truncate_message(message: String) -> String {
     message.chars().take(MAX_MESSAGE_CHARS).collect()
 }
 
-/// Best-effort lookup of a host's display label for the run record. A blank id
-/// (a local-only task) or a missing host just leaves the label empty.
 async fn resolve_host_label(state: &AppState, host_id: &str) -> Option<String> {
     let host_id = host_id.trim();
     if host_id.is_empty() {
@@ -276,9 +260,6 @@ pub async fn tasks_run(
         cancels.insert(request_id.clone(), cancel.clone());
     }
 
-    // Record the run as it starts so it survives an app crash mid-run: a leftover
-    // `running` row is flipped to `error` by `mark_interrupted` on next launch.
-    // Recording is best-effort — a history write must never block a real run.
     let host_label = resolve_host_label(&state, &host_id).await;
     let host_ref = Some(host_id.trim()).filter(|value| !value.is_empty());
     let _ = task_run_repo::create(
@@ -308,9 +289,6 @@ pub async fn tasks_run(
 
     state.task_cancels.lock().remove(&request_id);
 
-    // Resolve the run-level status from the same signals the client uses: a
-    // cancellation wins, then any step failure or a setup failure (host connection)
-    // is an error, otherwise the run succeeded.
     let (status, message) = match &outcome {
         Err(AppError::Cancelled) => ("cancelled", None),
         Err(err) => ("error", Some(truncate_message(err.to_string()))),
@@ -370,12 +348,6 @@ async fn run_all(
     result
 }
 
-/// Establish the task's SFTP session, retrying a transient connection failure once.
-/// SSH handshakes occasionally fail spuriously — a raced key-exchange extension, a
-/// dropped packet, a momentary auth rejection — and succeed right away on a retry.
-/// A small bounded retry absorbs that without masking a genuinely wrong credential
-/// or risking a lockout. Only automated task runs retry; interactive sessions still
-/// fail fast so the user is prompted immediately.
 async fn connect_task_session(
     app: &AppHandle,
     state: &AppState,
@@ -416,7 +388,7 @@ async fn connect_task_session(
 }
 
 fn is_retryable_connect(err: &AppError) -> bool {
-    matches!(err.code(), "network" | "timeout" | "ssh" | "dns" | "auth")
+    matches!(err.code(), "network" | "timeout" | "ssh" | "dns")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -469,8 +441,6 @@ async fn execute_steps(
                     exit_code: exit,
                     message: Some(message),
                 });
-                // A step that still fails after exhausting its retries stops the
-                // run; every later step is reported as skipped.
                 skip_from = Some(index + 1);
                 break;
             }
@@ -495,10 +465,6 @@ async fn execute_steps(
     }
 }
 
-/// Run a step, retrying it up to `step.retries()` extra times when it fails.
-/// A transient failure — a dropped transfer, a flaky remote command — often
-/// succeeds on a second attempt, so a bounded retry avoids aborting the whole
-/// run over a momentary hiccup. Cancellation and success short-circuit the loop.
 #[allow(clippy::too_many_arguments)]
 async fn run_step_with_retries(
     app: &AppHandle,
@@ -675,8 +641,6 @@ fn set_process_group(builder: &mut tokio::process::Command) {
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
-        // Group id 0 makes the child the leader of a fresh group whose id equals
-        // its pid, so `kill(-pid, …)` later reaches every descendant.
         builder.as_std_mut().process_group(0);
     }
     #[cfg(not(unix))]
@@ -685,14 +649,10 @@ fn set_process_group(builder: &mut tokio::process::Command) {
     }
 }
 
-/// Kill the local command and every process it spawned. Killing only the direct
-/// child leaves build-tool grandchildren holding the stdout/stderr pipes open,
-/// which would wedge the reader tasks — and the whole run — indefinitely.
 async fn kill_process_tree(child: &mut tokio::process::Child) {
     let pid = child.id();
     #[cfg(unix)]
     if let Some(pid) = pid {
-        // Negative target = the process group created by `set_process_group`.
         unsafe {
             libc::kill(-(pid as i32), libc::SIGKILL);
         }
@@ -710,9 +670,6 @@ async fn kill_process_tree(child: &mut tokio::process::Child) {
     let _ = child.start_kill();
 }
 
-/// Drain reader tasks without ever blocking forever. After a kill the pipes close
-/// promptly once descendants exit; the timeout is a safety net for a stray process
-/// that escaped the group (the JoinSet aborts leftovers when dropped).
 async fn drain_bounded(readers: &mut JoinSet<()>) {
     let _ = tokio::time::timeout(KILL_DRAIN_GRACE, drain(readers)).await;
 }
@@ -841,9 +798,6 @@ async fn run_transfer(
         return Err(AppError::Invalid("transfer path has no file name".into()));
     }
 
-    // The `task:` prefix marks this as an orchestrated transfer so the SFTP panel
-    // can ignore it — task runs show their own progress and are not file-manager
-    // transfers, so they stay out of that panel's status bar and history.
     let transfer_id = format!("task:{request_id}-s{index}");
     let outcome = sftp::transfer(
         app,
@@ -876,13 +830,6 @@ fn home_dir() -> Option<std::ffi::OsString> {
     std::env::var_os(key).filter(|value| !value.is_empty())
 }
 
-/// Expand a leading `~` / `~/` in a *local* path to the user's home directory.
-///
-/// Local command working directories and upload/download local paths are typed
-/// by hand — and shipped in templates — as `~/…`. Unlike a remote command, which
-/// runs through a shell that expands the tilde, these paths are handed straight
-/// to the OS (`chdir`, file open), which treats `~` as a literal directory name.
-/// Only a leading tilde is touched; `~user` and every other path pass through.
 fn expand_local_tilde(path: &str) -> String {
     if path == "~" || path.starts_with("~/") {
         if let Some(home) = home_dir() {
@@ -942,7 +889,6 @@ mod tests {
                 format!("{home}/project/dist")
             );
         }
-        // Absolute, relative, and `~user` paths must pass through untouched.
         assert_eq!(expand_local_tilde("/var/www/app"), "/var/www/app");
         assert_eq!(expand_local_tilde("./dist"), "./dist");
         assert_eq!(expand_local_tilde("~backup/x"), "~backup/x");

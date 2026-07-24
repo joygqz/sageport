@@ -1,7 +1,7 @@
 use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::domain::{new_id, now, SshKey, SshKeyInput};
-use crate::error::{AppError, AppResult};
+use crate::error::{in_use_kind, AppError, AppResult};
 use crate::repository::none_if_empty;
 use crate::sshkey;
 
@@ -219,10 +219,14 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
                 if identities == 1 { "y" } else { "ies" }
             ));
         }
-        return Err(AppError::InUse(format!(
-            "this key is still used by {}; reassign them before deleting it",
-            used_by.join(" and ")
-        )));
+        return Err(AppError::in_use(
+            in_use_kind::KEY,
+            hosts + identities,
+            format!(
+                "this key is still used by {}; reassign them before deleting it",
+                used_by.join(" and ")
+            ),
+        ));
     }
 
     let ts = now();

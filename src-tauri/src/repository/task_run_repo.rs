@@ -1,10 +1,8 @@
 use sqlx::SqlitePool;
 
 use crate::domain::now;
-use crate::error::{AppError, AppResult};
+use crate::error::{in_use_kind, AppError, AppResult};
 
-/// Upper bound on retained runs. History is device-local and grows one row per
-/// run, so the oldest rows are pruned on insert to keep the table bounded.
 const MAX_HISTORY_ENTRIES: i64 = 500;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -114,7 +112,11 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
         .fetch_one(pool)
         .await?;
         if running {
-            return Err(AppError::InUse(format!("task run {id} is still running")));
+            return Err(AppError::in_use(
+                in_use_kind::TASK_RUN,
+                1,
+                format!("task run {id} is still running"),
+            ));
         }
         return Err(AppError::NotFound(format!("task run {id}")));
     }
@@ -128,8 +130,6 @@ pub async fn clear(pool: &SqlitePool) -> AppResult<()> {
     Ok(())
 }
 
-/// Flip runs still marked `running` to `error` on startup — a leftover `running`
-/// row means the app closed mid-run, so the run never actually finished.
 pub async fn mark_interrupted(pool: &SqlitePool) -> AppResult<u64> {
     let ts = now();
     let result = sqlx::query(
@@ -200,7 +200,7 @@ mod tests {
 
         assert!(matches!(
             delete(&pool, "running").await,
-            Err(AppError::InUse(_))
+            Err(AppError::InUse { .. })
         ));
         assert!(matches!(
             delete(&pool, "missing").await,

@@ -7,27 +7,15 @@ use crate::commands::tray::TrayMenuData;
 use crate::repository::settings_repo;
 use crate::state::AppState;
 
-/// Menu id prefix for a scheduled-task entry; the suffix is the task id. Clicking
-/// one reopens the app and asks the webview to focus that task.
 const TASK_ID_PREFIX: &str = "tray-task:";
 
-/// Menu id prefix for a running port-forward entry; the suffix is the forward id.
-/// Clicking one reopens the app and asks the webview to reveal the Forwards view.
 const FORWARD_ID_PREFIX: &str = "tray-forward:";
 
-/// Bundled PNG for the menu-bar icon. Embedded explicitly rather than reusing
-/// `default_window_icon()`, which is `None` in dev builds and would leave a
-/// zero-width, unclickable status item on macOS. macOS gets a monochrome
-/// template image so the system tints it to match the menu bar; other
-/// platforms get the colored glyph without the background plate.
 #[cfg(target_os = "macos")]
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray-icon-template.png");
 #[cfg(not(target_os = "macos"))]
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray-icon.png");
 
-/// Bring the main window back to the foreground and, on macOS, restore the dock
-/// icon that hide-to-tray removed. Shared by the tray icon, the tray menu, and
-/// the single-instance relaunch handler so every "reopen" path behaves the same.
 pub fn show_main_window(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
@@ -42,10 +30,6 @@ pub fn show_main_window(app: &AppHandle) {
     }
 }
 
-/// Dev builds run a bare binary with no .app bundle, so coming back from
-/// Accessory re-creates the dock tile with the generic "exec" icon. Re-apply
-/// the bundled icon the same way Tauri does on startup. Packaged builds take
-/// the icon from the bundle and don't need this.
 #[cfg(all(debug_assertions, target_os = "macos"))]
 fn reapply_dev_dock_icon() {
     use objc2::{AllocAnyThread, MainThreadMarker};
@@ -62,9 +46,6 @@ fn reapply_dev_dock_icon() {
     }
 }
 
-/// Hide the main window instead of destroying it so the in-webview task
-/// scheduler keeps ticking in the background. On macOS also drop to Accessory so
-/// the app leaves the dock and lives only in the menu bar.
 pub fn hide_main_window(window: &tauri::Window) {
     let _ = window.hide();
     #[cfg(target_os = "macos")]
@@ -73,9 +54,6 @@ pub fn hide_main_window(window: &tauri::Window) {
         .set_activation_policy(tauri::ActivationPolicy::Accessory);
 }
 
-/// Pick tray labels from the persisted UI language. Used only for the menu the
-/// tray starts with; once the webview loads it pushes fully localized labels via
-/// [`update_menu`], so an in-app language switch relabels the tray live.
 fn prefers_zh(app: &AppHandle) -> bool {
     let state = app.state::<AppState>();
     tauri::async_runtime::block_on(settings_repo::get(&state.db, "general.locale"))
@@ -84,8 +62,6 @@ fn prefers_zh(app: &AppHandle) -> bool {
         .is_some_and(|value| value.starts_with("zh"))
 }
 
-/// The menu shown before the webview has pushed its data — just Open and Quit, in
-/// the persisted language. The task and forward sections fill in once it loads.
 fn initial_data(app: &AppHandle) -> TrayMenuData {
     let (open, quit, section, forwards_section) = if prefers_zh(app) {
         ("打开 Sageport", "退出", "定时任务", "端口转发")
@@ -107,16 +83,11 @@ fn initial_data(app: &AppHandle) -> TrayMenuData {
     }
 }
 
-/// Lay out the tray menu: Open, then a scheduled-task section and a
-/// running-forwards section (each shown only when it has entries), then Quit. The
-/// disabled section headers act as inert labels. The separators that fence the
-/// sections are dropped entirely when both are empty, leaving a bare Open / Quit.
 fn build_menu(app: &AppHandle, data: &TrayMenuData) -> tauri::Result<Menu<Wry>> {
     let has_content = !data.tasks.is_empty() || !data.forwards.is_empty();
 
     let mut builder = MenuBuilder::new(app).text("tray-show", &data.open_label);
 
-    // These disabled items must outlive `build()`; building them is harmless.
     let section = MenuItem::with_id(
         app,
         "tray-section",
@@ -157,9 +128,6 @@ fn build_menu(app: &AppHandle, data: &TrayMenuData) -> tauri::Result<Menu<Wry>> 
     builder.text("tray-quit", &data.quit_label).build()
 }
 
-/// Dispatch a tray menu selection. Task rows reopen the app and hand the task id
-/// to the webview, which switches to the Tasks view and focuses it; forward rows
-/// do the same for the Forwards view.
 fn on_menu_event(app: &AppHandle, id: &str) {
     match id {
         "tray-show" => show_main_window(app),
@@ -176,9 +144,6 @@ fn on_menu_event(app: &AppHandle, id: &str) {
     }
 }
 
-/// Rebuild the tray menu from the webview's current tasks and running forwards.
-/// Called on every push so the entries and their next-run times stay current. Must
-/// run on the main thread (the caller ensures this).
 pub fn update_menu(app: &AppHandle, data: TrayMenuData) -> tauri::Result<()> {
     let menu = build_menu(app, &data)?;
     if let Some(tray) = app.tray_by_id("main") {
@@ -187,9 +152,6 @@ pub fn update_menu(app: &AppHandle, data: TrayMenuData) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Install the menu-bar / system-tray icon: a click opens the menu, and
-/// double-click reveals the window. Quit is the only path that exits. The menu
-/// starts minimal and is refreshed by [`update_menu`] once the webview loads.
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let menu = build_menu(app, &initial_data(app))?;
 

@@ -131,9 +131,6 @@ export function Workbench() {
     const unlisten = installWindowListener(
       () =>
         getCurrentWindow().onCloseRequested((event) => {
-          // Closing the window hides it to the tray so the task scheduler keeps
-          // running; nothing is lost, so the dirty-file guard doesn't apply.
-          // Without preventDefault the JS API would destroy the webview.
           event.preventDefault();
           void ipc.window.hideToTray();
         }),

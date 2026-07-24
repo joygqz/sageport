@@ -515,7 +515,6 @@ export const zhCN: Dictionary = {
         title: "删除 SSH 密钥？",
         action: "删除 SSH 密钥",
         error: "删除密钥失败",
-        inUse: "该密钥仍被主机或身份使用，请先为它们改用其他凭据再删除。",
       },
     },
     identities: {
@@ -541,7 +540,6 @@ export const zhCN: Dictionary = {
         title: "删除身份？",
         action: "删除身份",
         error: "删除身份失败",
-        inUse: "该身份仍被主机使用，请先为这些主机改用其他凭据再删除。",
       },
     },
   },
@@ -850,6 +848,7 @@ export const zhCN: Dictionary = {
       retry: "重试传输",
       retryError: "重试传输失败",
       delete: "删除传输记录",
+      deleteError: "删除传输记录失败",
       status: {
         active: "进行中",
         done: "已完成",
@@ -1281,6 +1280,19 @@ export const zhCN: Dictionary = {
         installError: "安装更新失败",
         restartError: "重启 Sageport 失败",
       },
+    },
+  },
+
+  errors: {
+    inUse: {
+      hostJump:
+        "该主机仍是 {count} 台主机的跳板机，请先为这些主机改用其他跳板机。",
+      hostForward: "该主机仍被 {count} 个端口转发使用，请先删除这些端口转发。",
+      hostTask: "该主机仍被 {count} 个任务使用，请先调整或删除这些任务。",
+      key: "该密钥仍被 {count} 个主机或身份使用，请先为它们改用其他凭据。",
+      identity: "该身份仍被 {count} 台主机使用，请先为这些主机改用其他凭据。",
+      taskRun: "该次运行尚未结束，请等待完成或先取消。",
+      transfer: "该传输仍在进行中，请等待完成或先取消。",
     },
   },
 };

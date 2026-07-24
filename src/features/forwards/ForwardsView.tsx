@@ -150,8 +150,6 @@ export function ForwardsView() {
       try {
         await ipc.forwards.start(forward.id);
       } catch (err) {
-        // A start that was superseded (e.g. the forward was edited or stopped
-        // mid-connect) resolves as "cancelled" — not a failure worth a toast.
         if (errorCode(err) === "cancelled") return;
         toast.error(t("forwards.startError"), errorMessage(err));
       }

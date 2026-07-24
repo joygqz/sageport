@@ -24,7 +24,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorDescription, errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type {
   TaskRunHistoryEntry,
@@ -70,7 +70,7 @@ export function TaskRunHistoryDialog({
     try {
       await deleteOne.mutateAsync(id);
     } catch (err) {
-      toast.error(t("tasks.history.deleteError"), errorMessage(err));
+      toast.error(t("tasks.history.deleteError"), errorDescription(err));
     }
   };
 
@@ -122,7 +122,7 @@ export function TaskRunHistoryDialog({
         <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
           {isLoading && (
             <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-              <Spinner /> …
+              <Spinner /> {t("common.loading")}
             </div>
           )}
 
@@ -296,7 +296,6 @@ function StepStatusIcon({ status }: { status: TaskRunStepStatus }) {
   }
 }
 
-/** Human-readable run duration, or null when it never finished. */
 function runDuration(entry: TaskRunHistoryEntry): string | null {
   if (!entry.finishedAt) return null;
   const ms =

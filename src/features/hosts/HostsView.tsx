@@ -39,7 +39,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { useDragCursor } from "@/lib/pointerDrag";
 import { cn } from "@/lib/utils";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorDescription, errorMessage, toast } from "@/lib/toast";
 import type { Group, Host, HostHealthCheck } from "@/types/models";
 import { useLayoutStore } from "@/workbench/layout";
 import { useOverlayStore } from "@/workbench/overlays";
@@ -392,7 +392,7 @@ export function HostsView() {
           variant: "destructive",
           onSelect: () =>
             void deleteHost.mutateAsync(host.id).catch((err) => {
-              toast.error(t("hosts.deleteHost.error"), errorMessage(err));
+              toast.error(t("hosts.deleteHost.error"), errorDescription(err));
             }),
         },
       ],

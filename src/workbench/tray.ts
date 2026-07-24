@@ -15,25 +15,14 @@ import type { Activity } from "@/workbench/layout";
 import { useLayoutStore } from "@/workbench/layout";
 import type { TrayMenuData } from "@/types/models";
 
-// Match the scheduler's cadence so tray next-run times refresh shortly after a
-// task fires and its baseline advances.
 const TICK_MS = 30 * 1000;
 
-/** Reveal an activity without the same-activity toggle hiding the sidebar. */
 function revealActivity(activity: Activity): void {
   const layout = useLayoutStore.getState();
   if (layout.activity !== activity) layout.selectActivity(activity);
   else if (!layout.sidebarVisible) layout.toggleSidebar();
 }
 
-/**
- * Keep the system-tray menu in sync with the two things worth surfacing while the
- * window is hidden — scheduled tasks and running port forwards — and route tray
- * clicks back into the app. The webview is the only place that has the task list,
- * cron next-run times, forward runtime state, and current UI language together, so
- * it computes the whole menu payload and pushes it to the Rust tray, which just
- * lays it out.
- */
 export function useTrayMenu(): void {
   const { t, locale } = useI18n();
   const { data: tasks = [] } = useTasks();
@@ -41,13 +30,8 @@ export function useTrayMenu(): void {
   const runtime = useForwardStore((s) => s.runtime);
   const lastPushed = useRef<string | null>(null);
 
-  // Forward runtime is normally bridged by the Forwards view, but the tray needs
-  // it even when that view was never opened (e.g. forwards auto-started on
-  // launch). The bridge is idempotent, so establishing it here is safe.
   useEffect(() => {
-    void bridgeForwardEvents().catch(() => {
-      // A failed bridge just leaves the forwards section empty; not fatal.
-    });
+    void bridgeForwardEvents().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -64,7 +48,6 @@ export function useTrayMenu(): void {
       if (sig === lastPushed.current) return;
       lastPushed.current = sig;
       void ipc.tray.setTasks(data).catch(() => {
-        // A failed push only leaves the tray one tick stale; the next tick retries.
         lastPushed.current = null;
       });
     };

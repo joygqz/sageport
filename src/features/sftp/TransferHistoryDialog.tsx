@@ -15,7 +15,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { errorMessage, toast } from "@/lib/toast";
+import { errorDescription, errorMessage, toast } from "@/lib/toast";
 import { formatBytes } from "@/lib/utils";
 import type { TransferStatus } from "@/types/models";
 import {
@@ -61,7 +61,7 @@ export function TransferHistoryDialog({
     try {
       await deleteOne.mutateAsync(id);
     } catch (err) {
-      toast.error(t("sftp.history.clearError"), errorMessage(err));
+      toast.error(t("sftp.history.deleteError"), errorDescription(err));
     }
   };
 

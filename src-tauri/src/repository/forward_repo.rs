@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(forward.host_id, host.id);
         assert!(matches!(
             host_repo::delete(&pool, &host.id).await,
-            Err(AppError::InUse(_))
+            Err(AppError::InUse { .. })
         ));
 
         delete(&pool, &forward.id).await.unwrap();

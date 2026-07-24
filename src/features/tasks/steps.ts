@@ -11,7 +11,6 @@ export const STEP_TYPES: TaskStepType[] = [
   "remoteCommand",
 ];
 
-/** Upper bound on per-step retry attempts; mirrors the backend `MAX_RETRIES`. */
 export const MAX_STEP_RETRIES = 10;
 
 export const STEP_META: Record<

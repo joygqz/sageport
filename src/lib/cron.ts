@@ -35,15 +35,13 @@ function parseField(field: string, range: FieldRange): Set<number> | null {
 
     let start = range.min;
     let end = range.max;
-    if (rangePart === "*") {
-      // full range with optional step
-    } else if (rangePart.includes("-")) {
+    if (rangePart.includes("-")) {
       const [a, b] = rangePart.split("-");
       if (!/^\d+$/.test(a) || !/^\d+$/.test(b)) return null;
       start = Number(a);
       end = Number(b);
       if (start < range.min || end > range.max || start > end) return null;
-    } else {
+    } else if (rangePart !== "*") {
       if (stepPart !== undefined) return null;
       if (!/^\d+$/.test(rangePart)) return null;
       const value = Number(rangePart);
@@ -65,7 +63,6 @@ export function parseCron(expr: string): CronFields | null {
   if (parsed.some((set) => set === null)) return null;
   const [minute, hour, dom, month, dow] = parsed as Set<number>[];
 
-  // Cron treats both 0 and 7 as Sunday; collapse to 0 for getDay() comparison.
   const normalizedDow = new Set<number>();
   for (const value of dow) normalizedDow.add(value === 7 ? 0 : value);
 
@@ -93,10 +90,6 @@ function dayMatches(fields: CronFields, date: Date): boolean {
   return true;
 }
 
-/**
- * The first time a cron expression fires strictly after `from`, in local time,
- * or null when it never fires within a bounded horizon (e.g. Feb 30).
- */
 export function nextCronTime(
   expr: string | CronFields,
   from: Date,

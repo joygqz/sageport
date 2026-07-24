@@ -69,12 +69,10 @@ describe("nextCronTime", () => {
   });
 
   it("picks the next matching weekday", () => {
-    // 2026-01-01 is a Thursday; next weekday-9am run is the same day at 09:00.
     const from = new Date(2026, 0, 1, 8, 0, 0);
     expect(nextCronTime("0 9 * * 1-5", from)).toEqual(
       new Date(2026, 0, 1, 9, 0, 0),
     );
-    // Saturday 2026-01-03 rolls to Monday 2026-01-05.
     const weekend = new Date(2026, 0, 3, 10, 0, 0);
     expect(nextCronTime("0 9 * * 1-5", weekend)).toEqual(
       new Date(2026, 0, 5, 9, 0, 0),
@@ -82,10 +80,9 @@ describe("nextCronTime", () => {
   });
 
   it("unions day-of-month and day-of-week when both are restricted", () => {
-    // Fires on the 15th OR any Monday.
-    const from = new Date(2026, 0, 1, 0, 0, 0); // Thursday
+    const from = new Date(2026, 0, 1, 0, 0, 0);
     expect(nextCronTime("0 0 15 * 1", from)).toEqual(
-      new Date(2026, 0, 5, 0, 0, 0), // first Monday
+      new Date(2026, 0, 5, 0, 0, 0),
     );
   });
 

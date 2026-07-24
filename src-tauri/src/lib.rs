@@ -85,14 +85,6 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::Builder::new().build());
     let app = builder
         .on_window_event(|window, event| {
-            // Closing the window hides it to the tray so the in-webview task
-            // scheduler keeps running; quitting is only reachable from the tray
-            // menu. The frontend owns the hide (Workbench's onCloseRequested
-            // must preventDefault, or the JS API destroys the webview); this is
-            // a safety net for close requests the frontend cannot answer.
-            // prevent_close() must stay the only synchronous action: hiding or
-            // switching activation policy inside the native close cycle lets
-            // macOS destroy the window despite the prevent signal.
             #[cfg(desktop)]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
@@ -275,9 +267,6 @@ pub fn run() {
 
     app.run(|handle, event| match event {
         tauri::RunEvent::ExitRequested { code, api, .. } => {
-            // `None` = user interaction (last window closed / OS quit): stay alive
-            // in the tray so the task scheduler keeps running. `Some` = explicit
-            // `app.exit()`/`restart()` (tray Quit, updater): let it proceed.
             if code.is_none() {
                 api.prevent_exit();
             }

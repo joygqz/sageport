@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { detectLocale } from "@/i18n/config";
-import { translate } from "@/i18n/translate";
+import { translate, type TKey } from "@/i18n/translate";
 
 export type ToastKind = "info" | "success" | "warning" | "error";
 
@@ -67,4 +67,34 @@ export function errorCode(err: unknown): string | null {
     return String((err as { code: unknown }).code);
   }
   return null;
+}
+
+const IN_USE_DESCRIPTIONS: Record<string, TKey> = {
+  hostJump: "errors.inUse.hostJump",
+  hostForward: "errors.inUse.hostForward",
+  hostTask: "errors.inUse.hostTask",
+  key: "errors.inUse.key",
+  identity: "errors.inUse.identity",
+  taskRun: "errors.inUse.taskRun",
+  transfer: "errors.inUse.transfer",
+};
+
+function errorDetails(err: unknown): { kind: string; count: number } | null {
+  if (!err || typeof err !== "object" || !("details" in err)) return null;
+  const details = (err as { details: unknown }).details;
+  if (!details || typeof details !== "object") return null;
+  const { kind, count } = details as { kind?: unknown; count?: unknown };
+  if (typeof kind !== "string") return null;
+  return { kind, count: typeof count === "number" ? count : 0 };
+}
+
+export function errorDescription(err: unknown): string {
+  if (errorCode(err) === "in_use") {
+    const details = errorDetails(err);
+    const key = details ? IN_USE_DESCRIPTIONS[details.kind] : undefined;
+    if (details && key) {
+      return translate(detectLocale(), key, { count: details.count });
+    }
+  }
+  return errorMessage(err);
 }

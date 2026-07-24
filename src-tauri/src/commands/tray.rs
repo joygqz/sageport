@@ -2,8 +2,6 @@ use serde::Deserialize;
 
 use crate::error::{AppError, AppResult};
 
-/// Cap each list so a runaway push cannot build an unusable menu, and bound each
-/// label so an over-long name (or a hostile sync payload) stays readable.
 const MAX_ROWS: usize = 100;
 const MAX_LABEL_CHARS: usize = 256;
 
@@ -21,9 +19,6 @@ pub struct TrayForwardItem {
     pub label: String,
 }
 
-/// Everything the tray menu needs, computed in the webview where the task list,
-/// cron next-run times, and UI language all live. The Rust side only lays it out
-/// so it never has to duplicate scheduling or i18n logic.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrayMenuData {
@@ -58,14 +53,12 @@ fn sanitize(mut data: TrayMenuData) -> TrayMenuData {
     data
 }
 
-/// Rebuild the tray menu from the webview's current view of scheduled tasks.
 #[tauri::command]
 pub fn tray_set_tasks(app: tauri::AppHandle, data: TrayMenuData) -> AppResult<()> {
     #[cfg(desktop)]
     {
         let data = sanitize(data);
         let handle = app.clone();
-        // Menu mutation must happen on the main thread (macOS AppKit requirement).
         app.run_on_main_thread(move || {
             if let Err(err) = crate::tray::update_menu(&handle, data) {
                 eprintln!("failed to update tray menu: {err}");

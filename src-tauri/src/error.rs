@@ -32,8 +32,12 @@ pub enum AppError {
     #[error("invalid input: {0}")]
     Invalid(String),
 
-    #[error("in use: {0}")]
-    InUse(String),
+    #[error("in use: {message}")]
+    InUse {
+        kind: &'static str,
+        count: i64,
+        message: String,
+    },
 
     #[error("conflict: {0}")]
     Conflict(String),
@@ -57,7 +61,25 @@ pub enum AppError {
     Other(String),
 }
 
+pub mod in_use_kind {
+    pub const HOST_JUMP: &str = "hostJump";
+    pub const HOST_FORWARD: &str = "hostForward";
+    pub const HOST_TASK: &str = "hostTask";
+    pub const KEY: &str = "key";
+    pub const IDENTITY: &str = "identity";
+    pub const TASK_RUN: &str = "taskRun";
+    pub const TRANSFER: &str = "transfer";
+}
+
 impl AppError {
+    pub fn in_use(kind: &'static str, count: i64, message: impl Into<String>) -> Self {
+        AppError::InUse {
+            kind,
+            count,
+            message: message.into(),
+        }
+    }
+
     pub fn code(&self) -> &'static str {
         match self {
             AppError::Database(_) | AppError::Migration(_) => "database",
@@ -106,7 +128,7 @@ impl AppError {
             AppError::Crypto(_) => "crypto",
             AppError::NotFound(_) => "not_found",
             AppError::Invalid(_) => "invalid",
-            AppError::InUse(_) => "in_use",
+            AppError::InUse { .. } => "in_use",
             AppError::Conflict(_) => "conflict",
             AppError::Network(_) => "network",
             AppError::Dns(_) => "dns",
@@ -122,15 +144,32 @@ pub fn connection_lost(e: impl std::fmt::Display) -> AppError {
     AppError::Network(format!("connection lost: {e}"))
 }
 
+#[derive(Serialize)]
+struct InUseDetails<'a> {
+    kind: &'a str,
+    count: i64,
+}
+
 impl Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("AppError", 2)?;
+        let mut state = serializer.serialize_struct("AppError", 3)?;
         state.serialize_field("code", self.code())?;
         state.serialize_field("message", &self.to_string())?;
+        if let AppError::InUse { kind, count, .. } = self {
+            state.serialize_field(
+                "details",
+                &InUseDetails {
+                    kind,
+                    count: *count,
+                },
+            )?;
+        } else {
+            state.skip_field("details")?;
+        }
         state.end()
     }
 }
@@ -158,6 +197,19 @@ mod tests {
             AppError::Sftp(russh_sftp::client::error::Error::Timeout).code(),
             "network"
         );
+    }
+
+    #[test]
+    fn serializes_in_use_errors_with_structured_details() {
+        let err = AppError::in_use(in_use_kind::HOST_FORWARD, 2, "this host is still in use");
+        let json = serde_json::to_value(&err).unwrap();
+        assert_eq!(json["code"], "in_use");
+        assert_eq!(json["message"], "in use: this host is still in use");
+        assert_eq!(json["details"]["kind"], "hostForward");
+        assert_eq!(json["details"]["count"], 2);
+
+        let plain = serde_json::to_value(AppError::NotFound("host x".into())).unwrap();
+        assert!(plain.get("details").is_none());
     }
 
     #[test]

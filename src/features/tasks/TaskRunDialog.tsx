@@ -59,8 +59,6 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
   const steps = useMemo(() => parseTaskSteps(task), [task]);
   const needsHost = useMemo(() => taskNeedsRemote(steps), [steps]);
 
-  // A run for this task may still be executing in the background — reattach to it
-  // so reopening the dialog resumes watching its progress instead of starting over.
   const existing = useMemo(
     () => selectRunningRunForTask(useTaskRunStore.getState().runs, task.id),
     [task.id],
@@ -76,9 +74,6 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
   );
   const running = run?.status === "running";
 
-  // While the dialog shows a run, mark it attached so a background completion
-  // doesn't toast and dismiss it out from under us. On close, keep a still-running
-  // run alive (it continues in the background) and clean up a finished one.
   useEffect(() => {
     if (!requestId) return;
     attach(requestId);

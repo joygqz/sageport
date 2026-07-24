@@ -25,7 +25,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
-import { errorCode, errorMessage, toast } from "@/lib/toast";
+import { errorDescription, errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { Identity, SshKey } from "@/types/models";
 import {
@@ -280,9 +280,7 @@ function KeyList({
             void deleteKey.mutateAsync(key.id).catch((err) => {
               toast.error(
                 t("credentials.keys.delete.error"),
-                errorCode(err) === "in_use"
-                  ? t("credentials.keys.delete.inUse")
-                  : errorMessage(err),
+                errorDescription(err),
               );
             }),
         },
@@ -438,9 +436,7 @@ function IdentityList({
             void deleteIdentity.mutateAsync(identity.id).catch((err) => {
               toast.error(
                 t("credentials.identities.delete.error"),
-                errorCode(err) === "in_use"
-                  ? t("credentials.identities.delete.inUse")
-                  : errorMessage(err),
+                errorDescription(err),
               );
             }),
         },

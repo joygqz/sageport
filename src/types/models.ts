@@ -318,13 +318,10 @@ export interface TaskRunEvent {
   message?: string;
 }
 
-/** Overall outcome of a persisted task run. */
 export type TaskRunResultStatus = "running" | "done" | "error" | "cancelled";
 
-/** Per-step outcome inside a persisted run. */
 export type TaskRunStepStatus = "pending" | "done" | "error" | "skipped";
 
-/** One entry in a run's `steps` JSON: the step snapshot plus how it turned out. */
 export interface TaskRunStepRecord {
   step: TaskStep;
   status: TaskRunStepStatus;
@@ -332,14 +329,12 @@ export interface TaskRunStepRecord {
   message?: string;
 }
 
-/** A persisted task run, shown in the Tasks view's run-history dialog. */
 export interface TaskRunHistoryEntry {
   id: string;
   taskId: string;
   taskName: string;
   hostId: string | null;
   hostLabel: string | null;
-  /** JSON string of {@link TaskRunStepRecord}[]; parse with `JSON.parse`. */
   steps: string;
   totalSteps: number;
   status: TaskRunResultStatus;
@@ -348,21 +343,16 @@ export interface TaskRunHistoryEntry {
   finishedAt: string | null;
 }
 
-/** One scheduled-task row in the system-tray menu. */
 export interface TrayTaskItem {
   id: string;
-  /** Fully formatted, localized label (task name + next-run time). */
   label: string;
 }
 
-/** One running port-forward row in the system-tray menu. */
 export interface TrayForwardItem {
   id: string;
-  /** Fully formatted label (forward name + endpoint). */
   label: string;
 }
 
-/** Snapshot the webview pushes to rebuild the tray menu. */
 export interface TrayMenuData {
   openLabel: string;
   quitLabel: string;

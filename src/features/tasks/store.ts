@@ -36,7 +36,6 @@ export interface TaskRun {
   steps: TaskStep[];
   stepStates: StepRunState[];
   status: RunStatus;
-  /** Run-level failure (e.g. the host connection) that is not any one step's fault. */
   error?: string;
   startedAt: number;
   finishedAt?: number;
@@ -58,7 +57,6 @@ export interface StartedRun {
 
 interface TaskRunState {
   runs: Record<string, TaskRun>;
-  /** requestId of the run currently shown in an open run dialog, if any. */
   attachedId: string | null;
   startRun: (task: Task, hostId: string) => StartedRun;
   cancelRun: (requestId: string) => void;
@@ -67,7 +65,6 @@ interface TaskRunState {
   detach: (requestId: string) => void;
 }
 
-/** The in-flight run for a task, if one is currently executing. */
 export function selectRunningRunForTask(
   runs: Record<string, TaskRun>,
   taskId: string,
@@ -150,9 +147,6 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
       };
     });
 
-  // Record a run-level failure and mark the steps that never got to run as
-  // skipped — a connection failure happens before any step, so pinning it to the
-  // first step would wrongly blame it (e.g. a local build command).
   const failRun = (requestId: string, message: string) =>
     set((state) => {
       const run = state.runs[requestId];
@@ -170,10 +164,6 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
       };
     });
 
-  // A run that finished while no dialog was watching it (backgrounded) reports
-  // its outcome via a toast and is then dropped, so the store never accumulates
-  // stale finished runs. When a dialog is attached it shows the result inline and
-  // owns cleanup on close, so stay quiet here.
   const reportBackgroundCompletion = (requestId: string) => {
     const state = get();
     if (state.attachedId === requestId) return;
@@ -240,14 +230,9 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           finalize(requestId, "done");
         } catch (err) {
           const cancelled = errorCode(err) === "cancelled";
-          // Only connection/setup failures (before any step) and cancellation reject
-          // here — a failing step reports itself over the event channel and resolves
-          // normally, so this error belongs to the run, not to a step.
           if (!cancelled) failRun(requestId, errorMessage(err));
           finalize(requestId, cancelled ? "cancelled" : "error");
         }
-        // The backend persisted this run's final state before the call settled;
-        // refresh the run-history query so an open history dialog updates.
         void queryClient.invalidateQueries({ queryKey: taskRunsKey });
         reportBackgroundCompletion(requestId);
         return get().runs[requestId];

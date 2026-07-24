@@ -64,20 +64,15 @@ export function TasksView() {
   const [query, setQuery] = useState("");
   const searching = query.trim().length > 0;
 
-  // A tray-menu click asks to run a specific task: derive the run dialog from the
-  // focus request (rather than syncing into `runTask` from an effect) so it opens
-  // even on the first render after the Tasks view mounts.
   const focusId = useTaskFocusStore((s) => s.taskId);
   const clearFocus = useTaskFocusStore((s) => s.clear);
   const focusTask = useMemo(
     () => (focusId ? (tasks.find((tk) => tk.id === focusId) ?? null) : null),
     [focusId, tasks],
   );
-  // Drop a focus request whose task no longer exists so it can't wedge open.
   useEffect(() => {
     if (focusId && !focusTask) clearFocus();
   }, [focusId, focusTask, clearFocus]);
-  // A manually opened run takes precedence; a tray click opens the same run panel.
   const runDialogTask = runTask ?? focusTask;
   const closeRun = () => {
     if (runTask) setRunTask(null);
@@ -101,6 +96,8 @@ export function TasksView() {
         description: task.description,
         hostId: task.hostId,
         steps: parseTaskSteps(task),
+        schedule: task.schedule,
+        scheduleEnabled: false,
       })
       .catch((err) =>
         toast.error(t("tasks.form.saveError"), errorMessage(err)),
@@ -284,12 +281,6 @@ function ScheduleBadge({ task }: { task: Task }) {
   );
 }
 
-/**
- * Trailing control for a task row. When a run for the task is executing it shows
- * an always-visible progress badge (a run keeps going after its dialog closes);
- * otherwise it falls back to the hover-revealed run button. Both reopen the run
- * dialog, which reattaches to the in-flight run so it can be watched or cancelled.
- */
 function TaskRowAction({ task, onOpen }: { task: Task; onOpen: () => void }) {
   const { t } = useI18n();
   const run = useTaskRunStore((s) => selectRunningRunForTask(s.runs, task.id));

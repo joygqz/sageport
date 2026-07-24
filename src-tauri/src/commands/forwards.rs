@@ -115,10 +115,6 @@ pub async fn forwards_update(
             Err(error) => state.forwards.report_error(&app, &id, &error),
         }
     } else {
-        // The forward stays stopped after this edit. Emit an authoritative
-        // status so the UI clears any stale runtime (e.g. a previous error)
-        // through the normal event path instead of the frontend racing to
-        // remove it while the backend re-emits fresh events.
         state.forwards.report_stopped(&app, &id);
     }
     Ok(forward)

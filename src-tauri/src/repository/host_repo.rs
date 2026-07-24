@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::domain::{auth, new_id, now, Host, HostInput};
-use crate::error::{AppError, AppResult};
+use crate::error::{in_use_kind, AppError, AppResult};
 use crate::repository::none_if_empty;
 use crate::ssh::JUMP_DEPTH_LIMIT;
 
@@ -435,10 +435,14 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     .fetch_one(&mut *tx)
     .await?;
     if dependents > 0 {
-        return Err(AppError::InUse(format!(
-            "this host is still used as a jump host by {dependents} host{}; reassign them before deleting it",
-            if dependents == 1 { "" } else { "s" }
-        )));
+        return Err(AppError::in_use(
+            in_use_kind::HOST_JUMP,
+            dependents,
+            format!(
+                "this host is still used as a jump host by {dependents} host{}; reassign them before deleting it",
+                if dependents == 1 { "" } else { "s" }
+            ),
+        ));
     }
     let forwards: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM port_forwards
@@ -448,10 +452,31 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     .fetch_one(&mut *tx)
     .await?;
     if forwards > 0 {
-        return Err(AppError::InUse(format!(
-            "this host is still used by {forwards} port forward{}; delete them before deleting it",
-            if forwards == 1 { "" } else { "s" }
-        )));
+        return Err(AppError::in_use(
+            in_use_kind::HOST_FORWARD,
+            forwards,
+            format!(
+                "this host is still used by {forwards} port forward{}; delete them before deleting it",
+                if forwards == 1 { "" } else { "s" }
+            ),
+        ));
+    }
+    let tasks: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM tasks
+         WHERE host_id = ? AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if tasks > 0 {
+        return Err(AppError::in_use(
+            in_use_kind::HOST_TASK,
+            tasks,
+            format!(
+                "this host is still used by {tasks} task{}; reassign or delete them before deleting it",
+                if tasks == 1 { "" } else { "s" }
+            ),
+        ));
     }
     let ts = now();
     sqlx::query(
@@ -497,8 +522,8 @@ mod tests {
     use sqlx::sqlite::SqlitePoolOptions;
 
     use super::*;
-    use crate::domain::{HostView, SftpBookmarkInput};
-    use crate::repository::bookmark_repo;
+    use crate::domain::{HostView, SftpBookmarkInput, TaskInput, TaskStep};
+    use crate::repository::{bookmark_repo, task_repo};
 
     async fn test_pool() -> SqlitePool {
         let pool = SqlitePoolOptions::new()
@@ -629,8 +654,39 @@ mod tests {
         ));
         assert!(matches!(
             delete(&pool, &first.id).await,
-            Err(AppError::InUse(_))
+            Err(AppError::InUse { kind, .. }) if kind == in_use_kind::HOST_JUMP
         ));
+    }
+
+    #[tokio::test]
+    async fn host_used_by_a_task_cannot_be_deleted() {
+        let pool = test_pool().await;
+        let host = create(&pool, input("tasked")).await.unwrap();
+        let task = task_repo::create(
+            &pool,
+            TaskInput {
+                name: "Deploy".into(),
+                description: None,
+                host_id: Some(host.id.clone()),
+                steps: vec![TaskStep::LocalCommand {
+                    cwd: None,
+                    command: "echo ready".into(),
+                    retries: 0,
+                }],
+                schedule: None,
+                schedule_enabled: false,
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(
+            delete(&pool, &host.id).await,
+            Err(AppError::InUse { kind, .. }) if kind == in_use_kind::HOST_TASK
+        ));
+
+        task_repo::delete(&pool, &task.id).await.unwrap();
+        delete(&pool, &host.id).await.unwrap();
     }
 
     #[tokio::test]

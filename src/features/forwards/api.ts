@@ -25,10 +25,6 @@ export function useUpdateForward() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: PortForwardInput }) =>
       ipc.forwards.update(id, input),
-    // Runtime status is owned by the backend: forwards_update emits an
-    // authoritative status after saving (restart events for an active forward,
-    // otherwise "stopped"). Don't clear it here — doing so raced those events
-    // and could leave the UI closed/stuck while the forward is really running.
     onSuccess: () => qc.invalidateQueries({ queryKey: forwardKeys.list }),
   });
 }

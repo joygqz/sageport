@@ -531,8 +531,6 @@ export const en = {
         title: "Delete SSH key?",
         action: "Delete SSH key",
         error: "Failed to delete key",
-        inUse:
-          "This key is still used by hosts or identities. Reassign them before deleting it.",
       },
     },
     identities: {
@@ -558,8 +556,6 @@ export const en = {
         title: "Delete identity?",
         action: "Delete identity",
         error: "Failed to delete identity",
-        inUse:
-          "This identity is still used by hosts. Reassign them before deleting it.",
       },
     },
   },
@@ -874,6 +870,7 @@ export const en = {
       retry: "Retry transfer",
       retryError: "Failed to retry transfer",
       delete: "Delete transfer record",
+      deleteError: "Failed to delete transfer record",
       status: {
         active: "In progress",
         done: "Done",
@@ -1321,6 +1318,24 @@ export const en = {
         installError: "Failed to install update",
         restartError: "Failed to restart Sageport",
       },
+    },
+  },
+
+  errors: {
+    inUse: {
+      hostJump:
+        "This host is still the jump host for {count} hosts. Reassign them before deleting it.",
+      hostForward:
+        "This host is still used by {count} port forwards. Delete those forwards first.",
+      hostTask:
+        "This host is still used by {count} tasks. Reassign or delete those tasks first.",
+      key: "This key is still used by {count} hosts or identities. Reassign them before deleting it.",
+      identity:
+        "This identity is still used by {count} hosts. Reassign them before deleting it.",
+      taskRun:
+        "This run has not finished yet. Wait for it to finish or cancel it first.",
+      transfer:
+        "This transfer is still in progress. Wait for it to finish or cancel it first.",
     },
   },
 } as const;

@@ -1,7 +1,7 @@
 use sqlx::SqlitePool;
 
 use crate::domain::now;
-use crate::error::{AppError, AppResult};
+use crate::error::{in_use_kind, AppError, AppResult};
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct TransferRow {
@@ -113,7 +113,11 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
         .fetch_one(pool)
         .await?;
         if active {
-            return Err(AppError::InUse(format!("transfer {id} is still active")));
+            return Err(AppError::in_use(
+                in_use_kind::TRANSFER,
+                1,
+                format!("transfer {id} is still active"),
+            ));
         }
         return Err(AppError::NotFound(format!("transfer {id}")));
     }
@@ -213,7 +217,7 @@ mod tests {
 
         assert!(matches!(
             delete(&pool, "active").await,
-            Err(AppError::InUse(_))
+            Err(AppError::InUse { .. })
         ));
         clear(&pool).await.expect("clear finished history");
         assert_eq!(list(&pool, 10).await.expect("list history").len(), 1);

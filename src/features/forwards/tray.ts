@@ -5,11 +5,6 @@ import type {
 } from "@/types/models";
 import { describeForward } from "./forwardForm";
 
-/**
- * Build the tray rows for forwards that are currently running — active, or still
- * in the middle of starting — each labeled with its route and sorted by name.
- * `runtime` is the same status map the Forwards view renders from.
- */
 export function activeForwardItems(
   forwards: PortForward[],
   runtime: Record<string, { status: ForwardStatusKind }>,

@@ -51,10 +51,7 @@ export function TaskScheduleField({
           label={t("tasks.schedule.enable")}
           description={t("tasks.schedule.enableHint")}
           checked={enabled}
-          onCheckedChange={(next) => {
-            onEnabledChange(next);
-            if (!next) onScheduleChange("");
-          }}
+          onCheckedChange={onEnabledChange}
         />
         {enabled && (
           <div className="flex flex-col gap-2">

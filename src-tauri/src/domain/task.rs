@@ -76,8 +76,6 @@ pub enum TaskStep {
 }
 
 impl TaskStep {
-    /// How many extra attempts to make when this step fails. `0` means fail-fast:
-    /// the first failure stops the whole task.
     pub fn retries(&self) -> u32 {
         match self {
             TaskStep::LocalCommand { retries, .. }

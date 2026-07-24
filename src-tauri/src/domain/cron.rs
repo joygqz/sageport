@@ -36,10 +36,6 @@ const FIELDS: [FieldSpec; 5] = [
     },
 ];
 
-/// Validate a 5-field cron expression (minute hour day-of-month month day-of-week)
-/// and return it trimmed. This is the trust boundary for stored and synced schedules;
-/// the frontend computes the actual next run times. Supports `*`, `*/step`, ranges
-/// `a-b`, `a-b/step`, and comma lists of those.
 pub fn validate_cron(expr: &str) -> AppResult<String> {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
@@ -95,7 +91,6 @@ fn validate_part(part: &str, spec: &FieldSpec) -> AppResult<()> {
             }
         }
         None => {
-            // A bare number with a step (`5/10`) is not valid cron.
             if step.is_some() {
                 return Err(invalid(spec, part));
             }

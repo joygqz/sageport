@@ -9,12 +9,6 @@ const NEXT_RUN_FORMAT: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
 };
 
-/**
- * Build the ordered tray rows for tasks that run on a schedule, each labeled with
- * its next run time and sorted soonest-first. Tasks whose cron never fires again
- * are dropped. The webview owns this because it has the cron next-run times and
- * the current UI language together.
- */
 export function scheduledTaskItems(
   tasks: Task[],
   now: Date,

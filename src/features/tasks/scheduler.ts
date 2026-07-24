@@ -32,13 +32,6 @@ function preflightSkip(task: Task): SkipReason | null {
   return null;
 }
 
-/**
- * Decide which scheduled tasks are due at `now`, given the last-run baseline for
- * each. Pure so the catch-up, baseline-reset, and skip rules stay testable. The
- * returned `state` is the next baseline map: a task first seen (or whose cron
- * changed) is baselined to `now` without firing, and a fired or skipped task is
- * advanced to `now` so missed occurrences collapse into a single catch-up run.
- */
 export function dueTasks(
   now: Date,
   tasks: Task[],
@@ -115,9 +108,7 @@ function loadState(): ScheduleState {
 function saveState(state: ScheduleState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // A full or unavailable localStorage only costs catch-up precision.
-  }
+  } catch {}
 }
 
 function t(
@@ -127,11 +118,6 @@ function t(
   return translate(detectLocale(), key, params);
 }
 
-/**
- * Fire saved tasks on their cron schedule while the app is running. Reuses the
- * task run store so scheduled runs share the exact run, retry, and background
- * completion behavior of manual and assistant-driven runs.
- */
 export function useTaskScheduler(): void {
   const { data: tasks = [] } = useTasks();
   const tasksRef = useRef(tasks);

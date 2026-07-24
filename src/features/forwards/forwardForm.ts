@@ -12,10 +12,6 @@ export function formatForwardEndpoint(host: string, port: number): string {
   return `${displayHost}:${port}`;
 }
 
-/**
- * One-line summary of a forward's route, e.g. `L 127.0.0.1:8080 → host:80` or
- * `SOCKS 127.0.0.1:1080`. Shared by the Forwards view and the tray menu.
- */
 export function describeForward(forward: PortForward): string {
   if (forward.kind === "dynamic") {
     return `SOCKS ${formatForwardEndpoint(forward.bindHost, forward.bindPort)}`;
