@@ -1,22 +1,27 @@
-import {
-  ChevronDown,
-  ChevronUp,
-  Minus,
-  MonitorSmartphone,
-  Plus,
-  X,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronUp, Minus, Plus, X } from "lucide-react";
 
-import { Button, Field, Input, Textarea, Tooltip } from "@/components/ui";
+import {
+  Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Field,
+  Input,
+  INTERACTIVE_FOCUS_CLASS,
+  Textarea,
+  Tooltip,
+} from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { TaskStep } from "@/types/models";
-import { MAX_STEP_RETRIES, STEP_META } from "./steps";
+import { MAX_STEP_RETRIES, STEP_META, stepSummary } from "./steps";
 
 interface TaskStepCardProps {
   step: TaskStep;
   index: number;
   total: number;
+  defaultOpen?: boolean;
   disabled?: boolean;
   onChange: (step: TaskStep) => void;
   onRemove: () => void;
@@ -27,83 +32,112 @@ export function TaskStepCard({
   step,
   index,
   total,
+  defaultOpen = false,
   disabled,
   onChange,
   onRemove,
   onMove,
 }: TaskStepCardProps) {
   const { t } = useI18n();
+  const [open, setOpen] = useState(defaultOpen);
+  const cardRef = useRef<HTMLDivElement>(null);
   const meta = STEP_META[step.type];
   const Icon = meta.icon;
+  const summary = stepSummary(step);
+
+  useEffect(() => {
+    if (defaultOpen) {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [defaultOpen]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
-      <div className="flex items-center gap-2 border-b border-border bg-surface/40 px-3 py-2">
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent/15 text-2xs font-semibold text-accent">
-          {index + 1}
-        </span>
-        <Icon
-          className="size-4 shrink-0 text-muted-foreground"
-          strokeWidth={1.7}
-        />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-          {t(meta.labelKey)}
-        </span>
-        <Tooltip content={t("tasks.form.moveUp")}>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-6"
-            disabled={disabled || index === 0}
-            onClick={() => onMove(-1)}
-          >
-            <ChevronUp className="size-3.5" />
-          </Button>
-        </Tooltip>
-        <Tooltip content={t("tasks.form.moveDown")}>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-6"
-            disabled={disabled || index === total - 1}
-            onClick={() => onMove(1)}
-          >
-            <ChevronDown className="size-3.5" />
-          </Button>
-        </Tooltip>
-        <Tooltip content={t("tasks.form.removeStep")}>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-6 text-muted-foreground hover:text-danger"
+    <Collapsible ref={cardRef} open={open} onOpenChange={setOpen}>
+      <div className="group flex items-center gap-1 px-2 py-1.5">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
             disabled={disabled}
-            onClick={onRemove}
+            className={cn(
+              INTERACTIVE_FOCUS_CLASS,
+              "flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1",
+            )}
           >
-            <X className="size-3.5" />
-          </Button>
-        </Tooltip>
-      </div>
-
-      <div className="flex flex-col gap-3 p-3">
-        {step.type === "localCommand" && (
-          <div className="flex items-center gap-1.5 rounded-md bg-warning/10 px-2 py-1 text-2xs text-warning">
-            <MonitorSmartphone className="size-3.5 shrink-0" />
-            {t("tasks.step.localHint")}
-          </div>
-        )}
-
-        <StepFields step={step} disabled={disabled} onChange={onChange} />
-
-        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{t("tasks.form.retries")}</span>
-          <RetryStepper
-            value={step.retries ?? 0}
-            disabled={disabled}
-            onChange={(retries) => onChange({ ...step, retries })}
-          />
+            <ChevronDown
+              className={cn(
+                "size-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
+                !open && "-rotate-90",
+              )}
+            />
+            <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border text-2xs font-semibold text-muted-foreground">
+              {index + 1}
+            </span>
+            <Icon
+              className="size-4 shrink-0 text-muted-foreground"
+              strokeWidth={1.7}
+            />
+            <span className="shrink-0 text-sm font-medium">
+              {t(meta.labelKey)}
+            </span>
+            {!open && (
+              <span className="min-w-0 flex-1 truncate text-left font-mono text-2xs text-muted-foreground">
+                {summary}
+              </span>
+            )}
+          </button>
+        </CollapsibleTrigger>
+        <div className="flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          <Tooltip content={t("tasks.form.moveUp")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              disabled={disabled || index === 0}
+              onClick={() => onMove(-1)}
+            >
+              <ChevronUp className="size-3.5" />
+            </Button>
+          </Tooltip>
+          <Tooltip content={t("tasks.form.moveDown")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              disabled={disabled || index === total - 1}
+              onClick={() => onMove(1)}
+            >
+              <ChevronDown className="size-3.5" />
+            </Button>
+          </Tooltip>
+          <Tooltip content={t("tasks.form.removeStep")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6 text-muted-foreground hover:text-danger"
+              disabled={disabled}
+              onClick={onRemove}
+            >
+              <X className="size-3.5" />
+            </Button>
+          </Tooltip>
         </div>
       </div>
-    </div>
+
+      <CollapsibleContent>
+        <div className="flex flex-col gap-3 border-t border-border p-3">
+          <StepFields step={step} disabled={disabled} onChange={onChange} />
+
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>{t("tasks.form.retries")}</span>
+            <RetryStepper
+              value={step.retries ?? 0}
+              disabled={disabled}
+              onChange={(retries) => onChange({ ...step, retries })}
+            />
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

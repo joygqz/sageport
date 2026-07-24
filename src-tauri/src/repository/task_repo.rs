@@ -88,7 +88,6 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
         TaskStep::Upload {
             local_path,
             remote_path,
-            incremental,
             retries,
         } => {
             let local_path = local_path.trim().to_string();
@@ -108,7 +107,6 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
             TaskStep::Upload {
                 local_path,
                 remote_path,
-                incremental,
                 retries: retries.min(MAX_RETRIES),
             }
         }
@@ -313,7 +311,6 @@ mod tests {
                 TaskStep::Upload {
                     local_path: "  ./dist  ".into(),
                     remote_path: "  /var/www/app  ".into(),
-                    incremental: true,
                     retries: 0,
                 },
             ],

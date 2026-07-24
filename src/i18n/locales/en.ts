@@ -643,7 +643,6 @@ export const en = {
       remoteCommand: "Remote command",
       upload: "Upload",
       download: "Download",
-      localHint: "Runs on this machine",
     },
     template: {
       frontendDeploy: {
@@ -1004,6 +1003,7 @@ export const en = {
       updateSnippet: "Update snippet",
       deleteSnippet: "Delete snippet",
       listTasks: "List tasks",
+      listTaskRuns: "List task runs",
       runTask: "Run task",
       saveTask: "Save task",
       updateTask: "Update task",

@@ -268,7 +268,6 @@ export type TaskStep =
       type: "upload";
       localPath: string;
       remotePath: string;
-      incremental?: boolean;
       retries?: number;
     }
   | {

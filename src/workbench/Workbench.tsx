@@ -6,6 +6,7 @@ import { useDialogSnapshot } from "@/components/ui/use-dialog-snapshot";
 import { Spinner } from "@/components/ui/spinner";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { ipc } from "@/lib/ipc";
 import { errorMessage, toast, useToastStore } from "@/lib/toast";
 import { useSettingSync } from "@/lib/settingSync";
 import { IS_MACOS } from "@/lib/platform";
@@ -128,9 +129,11 @@ export function Workbench() {
     const unlisten = installWindowListener(
       () =>
         getCurrentWindow().onCloseRequested((event) => {
-          if (useTabsStore.getState().requestWindowClose()) {
-            event.preventDefault();
-          }
+          // Closing the window hides it to the tray so the task scheduler keeps
+          // running; nothing is lost, so the dirty-file guard doesn't apply.
+          // Without preventDefault the JS API would destroy the webview.
+          event.preventDefault();
+          void ipc.window.hideToTray();
         }),
       (error) =>
         toast.error(t("windowControls.listenerError"), errorMessage(error)),

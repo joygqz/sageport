@@ -42,51 +42,59 @@ export function TaskScheduleField({
   }, [schedule, t]);
 
   return (
-    <div className="flex flex-col gap-2">
-      <SwitchField
-        label={t("tasks.schedule.enable")}
-        description={t("tasks.schedule.enableHint")}
-        checked={enabled}
-        onCheckedChange={onEnabledChange}
-      />
-      {enabled && (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-1.5">
-            {CRON_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => onScheduleChange(preset.expr)}
-                data-active={schedule.trim() === preset.expr}
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-foreground">
+        {t("tasks.schedule.label")}
+      </span>
+      <div className="flex flex-col gap-2">
+        <SwitchField
+          label={t("tasks.schedule.enable")}
+          description={t("tasks.schedule.enableHint")}
+          checked={enabled}
+          onCheckedChange={(next) => {
+            onEnabledChange(next);
+            if (!next) onScheduleChange("");
+          }}
+        />
+        {enabled && (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              {CRON_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => onScheduleChange(preset.expr)}
+                  data-active={schedule.trim() === preset.expr}
+                  className={cn(
+                    INTERACTIVE_FOCUS_CLASS,
+                    "rounded-md border border-border bg-surface px-2 py-1 text-2xs text-muted-foreground transition-colors hover:border-ring/60 hover:bg-list-hover data-[active=true]:border-primary/40 data-[active=true]:bg-primary/10 data-[active=true]:text-link",
+                  )}
+                >
+                  {t(PRESET_LABELS[preset.id])}
+                </button>
+              ))}
+            </div>
+            <Input
+              value={schedule}
+              onChange={(e) => onScheduleChange(e.target.value)}
+              placeholder={t("tasks.schedule.cronPlaceholder")}
+              spellCheck={false}
+              className="font-mono"
+              maxLength={256}
+            />
+            {hint && (
+              <span
                 className={cn(
-                  INTERACTIVE_FOCUS_CLASS,
-                  "rounded-md border border-border bg-surface px-2 py-1 text-2xs text-muted-foreground transition-colors hover:border-ring/60 hover:bg-list-hover data-[active=true]:border-primary/40 data-[active=true]:bg-primary/10 data-[active=true]:text-link",
+                  "text-2xs",
+                  hint.error ? "text-danger" : "text-muted-foreground",
                 )}
               >
-                {t(PRESET_LABELS[preset.id])}
-              </button>
-            ))}
+                {hint.text}
+              </span>
+            )}
           </div>
-          <Input
-            value={schedule}
-            onChange={(e) => onScheduleChange(e.target.value)}
-            placeholder={t("tasks.schedule.cronPlaceholder")}
-            spellCheck={false}
-            className="font-mono"
-            maxLength={256}
-          />
-          {hint && (
-            <span
-              className={cn(
-                "text-2xs",
-                hint.error ? "text-danger" : "text-muted-foreground",
-              )}
-            >
-              {hint.text}
-            </span>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

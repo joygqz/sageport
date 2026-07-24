@@ -1,14 +1,21 @@
-import { ListChecks, Play, Save, SquarePen, Trash2 } from "lucide-react";
+import { History, ListChecks, Play, Save, SquarePen, Trash2 } from "lucide-react";
 
 import { parseTaskSteps } from "@/features/tasks/api";
 import { taskNeedsRemote } from "@/features/tasks/steps";
 import { useTaskRunStore, type TaskRun } from "@/features/tasks/store";
 import { isValidCron, nextCronTime } from "@/lib/cron";
 import { ipc } from "@/lib/ipc";
-import type { Task, TaskInput, TaskStep } from "@/types/models";
+import type {
+  Task,
+  TaskInput,
+  TaskRunHistoryEntry,
+  TaskRunStepRecord,
+  TaskStep,
+} from "@/types/models";
 import { invalidateTasks } from "./cache";
 import {
   bool,
+  num,
   nullableStr,
   optionalStr,
   str,
@@ -137,6 +144,61 @@ async function listTasks(): Promise<ToolExecutionResult> {
         };
       }),
     ),
+  );
+}
+
+function parseRunSteps(steps: string): TaskRunStepRecord[] {
+  try {
+    const parsed = JSON.parse(steps);
+    return Array.isArray(parsed) ? (parsed as TaskRunStepRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function summarizeRunEntry(entry: TaskRunHistoryEntry) {
+  const steps = parseRunSteps(entry.steps).map((record, index) => {
+    const exit =
+      record.exitCode !== undefined && record.exitCode !== 0
+        ? ` (exit ${record.exitCode})`
+        : "";
+    return `${index + 1}. ${STEP_LABEL[record.step.type]} — ${record.status}${exit}`;
+  });
+  return {
+    id: entry.id,
+    taskId: entry.taskId,
+    taskName: entry.taskName,
+    host: entry.hostLabel ?? undefined,
+    status: entry.status,
+    startedAt: entry.startedAt,
+    finishedAt: entry.finishedAt ?? undefined,
+    message: entry.message ?? undefined,
+    steps,
+  };
+}
+
+async function listTaskRuns(
+  args: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  const taskId = optionalStr(args, "taskId");
+  const requested = num(args, "limit");
+  const limit =
+    requested !== undefined
+      ? Math.min(Math.max(1, Math.trunc(requested)), 100)
+      : 20;
+  const entries = await ipc.tasks.runsList();
+  const filtered = taskId
+    ? entries.filter((entry) => entry.taskId === taskId)
+    : entries;
+  if (filtered.length === 0) {
+    return toolSuccess(
+      taskId
+        ? `No runs recorded for task "${taskId}" yet.`
+        : "No task runs recorded yet.",
+    );
+  }
+  return toolSuccess(
+    JSON.stringify(filtered.slice(0, limit).map(summarizeRunEntry)),
   );
 }
 
@@ -273,6 +335,7 @@ const STEP_SCHEMA = {
     "{type:'upload', localPath, remotePath, retries?}; " +
     "{type:'download', remotePath, localPath, retries?}. " +
     "retries (default 0, max 10) is how many extra attempts to make if the step fails. " +
+    "Commands are limited to 32000 characters and paths to 4000. " +
     "All commands and paths are literal; there are no runtime variables.",
 } as const;
 
@@ -301,9 +364,33 @@ export const taskTools: AiTool[] = [
   },
   {
     spec: {
+      name: "list_task_runs",
+      description:
+        "List the history of past task runs, most recent first, with each run's overall status, host, start/finish times, any failure message, and per-step outcomes. Pass taskId to see only one task's runs.",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: {
+            type: "string",
+            description: "Only list runs of this task id (from list_tasks).",
+          },
+          limit: {
+            type: "number",
+            description: "Max runs to return (default 20, max 100).",
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    icon: History,
+    labelKey: "ai.tool.listTaskRuns",
+    execute: async (args) => listTaskRuns(args),
+  },
+  {
+    spec: {
       name: "run_task",
       description:
-        "Run a saved task on its fixed host: it executes its ordered steps (local commands, uploads, downloads, remote commands), retrying a step up to its configured retries, and stops the run once a step still fails after its retries. A task with remote steps must already have a fixed host. Always requires user approval.",
+        "Run a saved task: it executes its ordered steps (local commands, uploads, downloads, remote commands), retrying a step up to its configured retries, and stops the run once a step still fails after its retries. A task with remote steps runs on its fixed host and must already have one set; a local-only task runs on this machine. Always requires user approval.",
       parameters: {
         type: "object",
         properties: {
@@ -330,8 +417,14 @@ export const taskTools: AiTool[] = [
       parameters: {
         type: "object",
         properties: {
-          name: { type: "string", description: "Task name." },
-          description: { type: "string", description: "Optional description." },
+          name: {
+            type: "string",
+            description: "Task name (up to 255 characters).",
+          },
+          description: {
+            type: "string",
+            description: "Optional description (up to 4000 characters).",
+          },
           hostId: {
             type: "string",
             description:

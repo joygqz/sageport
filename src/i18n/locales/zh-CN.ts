@@ -624,7 +624,6 @@ export const zhCN: Dictionary = {
       remoteCommand: "远程命令",
       upload: "上传",
       download: "下载",
-      localHint: "在本机运行",
     },
     template: {
       frontendDeploy: {
@@ -973,6 +972,7 @@ export const zhCN: Dictionary = {
       updateSnippet: "更新命令片段",
       deleteSnippet: "删除命令片段",
       listTasks: "列出任务",
+      listTaskRuns: "列出运行记录",
       runTask: "运行任务",
       saveTask: "保存任务",
       updateTask: "更新任务",

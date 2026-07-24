@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   list: vi.fn(),
+  runsList: vi.fn(),
 }));
 
 vi.mock("@/lib/ipc", () => ({
@@ -12,13 +13,14 @@ vi.mock("@/lib/ipc", () => ({
       create: mocks.create,
       update: mocks.update,
       list: mocks.list,
+      runsList: mocks.runsList,
     },
   },
 }));
 
 vi.mock("./cache", () => ({ invalidateTasks: vi.fn() }));
 
-import type { Task, TaskInput } from "@/types/models";
+import type { Task, TaskInput, TaskRunHistoryEntry } from "@/types/models";
 import { taskTools } from "./tasks";
 
 function tool(name: string) {
@@ -107,5 +109,57 @@ describe("list_tasks", () => {
     expect(parsed[0].schedule).toBe("0 3 * * *");
     expect(parsed[0].scheduleEnabled).toBe(true);
     expect(typeof parsed[0].nextRun).toBe("string");
+  });
+});
+
+function runEntry(overrides: Partial<TaskRunHistoryEntry>): TaskRunHistoryEntry {
+  return {
+    id: "r1",
+    taskId: "t1",
+    taskName: "Backup",
+    hostId: null,
+    hostLabel: null,
+    steps: JSON.stringify([
+      { step: { type: "localCommand", command: "echo hi" }, status: "done" },
+    ]),
+    totalSteps: 1,
+    status: "done",
+    message: null,
+    startedAt: "2026-07-24T03:00:00.000Z",
+    finishedAt: "2026-07-24T03:00:01.000Z",
+    ...overrides,
+  };
+}
+
+describe("list_task_runs", () => {
+  it("summarizes runs with per-step outcomes", async () => {
+    mocks.runsList.mockResolvedValue([runEntry({})]);
+    const result = await tool("list_task_runs")({}, {});
+    const parsed = JSON.parse(result.content) as Array<{
+      id: string;
+      status: string;
+      steps: string[];
+    }>;
+    expect(parsed[0].id).toBe("r1");
+    expect(parsed[0].status).toBe("done");
+    expect(parsed[0].steps[0]).toContain("done");
+  });
+
+  it("filters by taskId and respects the limit", async () => {
+    mocks.runsList.mockResolvedValue([
+      runEntry({ id: "r1", taskId: "t1" }),
+      runEntry({ id: "r2", taskId: "t2" }),
+      runEntry({ id: "r3", taskId: "t1" }),
+    ]);
+    const result = await tool("list_task_runs")({ taskId: "t1", limit: 1 }, {});
+    const parsed = JSON.parse(result.content) as Array<{ id: string }>;
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("r1");
+  });
+
+  it("reports when a task has no runs", async () => {
+    mocks.runsList.mockResolvedValue([runEntry({ taskId: "other" })]);
+    const result = await tool("list_task_runs")({ taskId: "t1" }, {});
+    expect(result.content).toContain("No runs recorded");
   });
 });
