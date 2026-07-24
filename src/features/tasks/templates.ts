@@ -1,4 +1,10 @@
-import { DatabaseBackup, FileCog, Rocket, ScrollText } from "lucide-react";
+import {
+  DatabaseBackup,
+  FileCog,
+  Rocket,
+  ScrollText,
+  Server,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import type { TKey } from "@/i18n";
@@ -26,6 +32,25 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
       },
       { type: "upload", localPath: "./dist", remotePath: "/var/www/{{app}}" },
       { type: "remoteCommand", command: "sudo systemctl reload nginx" },
+    ],
+  },
+  {
+    id: "backendDeploy",
+    icon: Server,
+    nameKey: "tasks.template.backendDeploy.name",
+    summaryKey: "tasks.template.backendDeploy.summary",
+    steps: [
+      {
+        type: "localCommand",
+        cwd: "{{projectDir:~/project}}",
+        command: "mvn clean package -DskipTests",
+      },
+      {
+        type: "upload",
+        localPath: "./target/{{app}}.jar",
+        remotePath: "/opt/{{app}}/{{app}}.jar",
+      },
+      { type: "remoteCommand", command: "sudo systemctl restart {{service}}" },
     ],
   },
   {

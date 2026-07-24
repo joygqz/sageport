@@ -650,6 +650,10 @@ export const en = {
         name: "Frontend release",
         summary: "Local build → upload artifacts → remote reload",
       },
+      backendDeploy: {
+        name: "Backend release",
+        summary: "Local build → upload artifacts → remote restart",
+      },
       databaseBackup: {
         name: "Database backup",
         summary: "Remote dump → download to this machine",

@@ -631,6 +631,10 @@ export const zhCN: Dictionary = {
         name: "前端发版",
         summary: "本地构建 → 上传产物 → 远程 reload",
       },
+      backendDeploy: {
+        name: "后端发版",
+        summary: "本地构建 → 上传产物 → 远程重启",
+      },
       databaseBackup: {
         name: "数据库备份",
         summary: "远程 dump → 下载到本机",
