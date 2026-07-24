@@ -75,6 +75,13 @@ export const en = {
     settings: "Settings",
   },
 
+  tray: {
+    open: "Open Sageport",
+    quit: "Quit",
+    section: "Scheduled tasks",
+    empty: "No scheduled tasks",
+  },
+
   monitor: {
     viewTitle: "Monitor",
     filterPlaceholder: "Filter active hosts",
@@ -695,7 +702,7 @@ export const en = {
       saveError: "Failed to save task",
     },
     run: {
-      title: "Run: {name}",
+      title: "Run task",
       targetHost: "Target host",
       run: "Run",
       runAgain: "Run again",

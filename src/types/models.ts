@@ -348,6 +348,22 @@ export interface TaskRunHistoryEntry {
   finishedAt: string | null;
 }
 
+/** One scheduled-task row in the system-tray menu. */
+export interface TrayTaskItem {
+  id: string;
+  /** Fully formatted, localized label (task name + next-run time). */
+  label: string;
+}
+
+/** Snapshot the webview pushes to rebuild the tray menu. */
+export interface TrayMenuData {
+  openLabel: string;
+  quitLabel: string;
+  sectionLabel: string;
+  emptyLabel: string;
+  tasks: TrayTaskItem[];
+}
+
 export type AiProtocol = "openai" | "anthropic";
 
 export interface AiConfig {

@@ -18,5 +18,6 @@ pub mod ssh;
 pub mod ssh_config;
 pub mod sync;
 pub mod tasks;
+pub mod tray;
 pub mod update;
 pub mod window;

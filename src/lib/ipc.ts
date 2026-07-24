@@ -60,6 +60,7 @@ import type {
   SyncVersion,
   TransferEvent,
   TransferHistoryEntry,
+  TrayMenuData,
   UpdateStatus,
 } from "@/types/models";
 
@@ -516,6 +517,11 @@ export const ipc = {
     setTrafficLightInset: (x: number, height: number) =>
       invoke<void>("window_set_traffic_light_inset", { x, height }),
     hideToTray: () => invoke<void>("window_hide_to_tray"),
+  },
+  tray: {
+    setTasks: (data: TrayMenuData) => invoke<void>("tray_set_tasks", { data }),
+    onOpenTask: (handler: (taskId: string) => void): Promise<UnlistenFn> =>
+      listen<string>("tray://open-task", (event) => handler(event.payload)),
   },
   update: {
     status: () => invoke<UpdateStatus>("update_status"),

@@ -12,6 +12,7 @@ import { useSettingSync } from "@/lib/settingSync";
 import { IS_MACOS } from "@/lib/platform";
 import { bridgeSftpEvents } from "@/features/sftp/store";
 import { useTaskScheduler } from "@/features/tasks/scheduler";
+import { useTrayMenu } from "@/features/tasks/tray";
 import {
   listenHostKeyEvents,
   useHostKeyStore,
@@ -102,6 +103,7 @@ export function Workbench() {
   const { t } = useI18n();
   useKeybindings();
   useTaskScheduler();
+  useTrayMenu();
 
   useEffect(() => {
     void bridgeSftpEvents().catch((error) =>

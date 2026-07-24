@@ -72,6 +72,13 @@ export const zhCN: Dictionary = {
     settings: "设置",
   },
 
+  tray: {
+    open: "打开 Sageport",
+    quit: "退出",
+    section: "定时任务",
+    empty: "暂无定时任务",
+  },
+
   monitor: {
     viewTitle: "监控",
     filterPlaceholder: "筛选活跃主机",
@@ -676,7 +683,7 @@ export const zhCN: Dictionary = {
       saveError: "保存任务失败",
     },
     run: {
-      title: "运行：{name}",
+      title: "运行任务",
       targetHost: "目标主机",
       run: "运行",
       runAgain: "再次运行",

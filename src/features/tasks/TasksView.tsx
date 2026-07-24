@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
   Copy,
@@ -41,6 +41,7 @@ import {
 import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { parseTaskSteps, useCreateTask, useDeleteTask, useTasks } from "./api";
+import { useTaskFocusStore } from "./focus";
 import { stepSummary } from "./steps";
 import { selectRunningRunForTask, useTaskRunStore } from "./store";
 import { TaskFormDialog } from "./TaskFormDialog";
@@ -62,6 +63,26 @@ export function TasksView() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [query, setQuery] = useState("");
   const searching = query.trim().length > 0;
+
+  // A tray-menu click asks to run a specific task: derive the run dialog from the
+  // focus request (rather than syncing into `runTask` from an effect) so it opens
+  // even on the first render after the Tasks view mounts.
+  const focusId = useTaskFocusStore((s) => s.taskId);
+  const clearFocus = useTaskFocusStore((s) => s.clear);
+  const focusTask = useMemo(
+    () => (focusId ? (tasks.find((tk) => tk.id === focusId) ?? null) : null),
+    [focusId, tasks],
+  );
+  // Drop a focus request whose task no longer exists so it can't wedge open.
+  useEffect(() => {
+    if (focusId && !focusTask) clearFocus();
+  }, [focusId, focusTask, clearFocus]);
+  // A manually opened run takes precedence; a tray click opens the same run panel.
+  const runDialogTask = runTask ?? focusTask;
+  const closeRun = () => {
+    if (runTask) setRunTask(null);
+    if (focusId) clearFocus();
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -188,15 +209,17 @@ export function TasksView() {
                       <Workflow className="size-4" strokeWidth={1.7} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {task.name}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {task.name}
+                        </p>
+                        <ScheduleBadge task={task} />
+                      </div>
                       <p className="truncate text-2xs text-muted-foreground">
                         {subtitle}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <ScheduleBadge task={task} />
                       <TaskRowAction
                         task={task}
                         onOpen={() => setRunTask(task)}
@@ -235,7 +258,7 @@ export function TasksView() {
         task={form.task}
         onClose={() => setForm((s) => ({ ...s, open: false }))}
       />
-      <TaskRunDialog task={runTask} onClose={() => setRunTask(null)} />
+      <TaskRunDialog task={runDialogTask} onClose={closeRun} />
       <TaskRunHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <ConfirmDialog
         state={confirmState}
@@ -244,13 +267,6 @@ export function TasksView() {
     </SideBarView>
   );
 }
-
-const NEXT_RUN_FORMAT: Intl.DateTimeFormatOptions = {
-  month: "short",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-};
 
 function ScheduleBadge({ task }: { task: Task }) {
   const { t } = useI18n();
@@ -261,11 +277,8 @@ function ScheduleBadge({ task }: { task: Task }) {
     <Tooltip
       content={t("tasks.schedule.nextRun", { time: next.toLocaleString() })}
     >
-      <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
-        <CalendarClock className="size-3" />
-        {t("tasks.schedule.nextShort", {
-          time: next.toLocaleString(undefined, NEXT_RUN_FORMAT),
-        })}
+      <span className="flex shrink-0 items-center text-muted-foreground">
+        <CalendarClock className="size-3.5" />
       </span>
     </Tooltip>
   );

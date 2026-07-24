@@ -251,6 +251,7 @@ pub fn run() {
             commands::app::app_is_portable,
             commands::window::window_set_traffic_light_inset,
             commands::window::window_hide_to_tray,
+            commands::tray::tray_set_tasks,
             commands::update::update_status,
             commands::update::update_can_self_update,
             commands::update::update_check,

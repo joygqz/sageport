@@ -1,18 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  CalendarClock,
   CheckCircle2,
   ChevronRight,
   CircleSlash,
+  FileText,
   Loader2,
   Play,
   Server,
   Square,
+  Workflow,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 import { Button, FormDialog } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
 import { useI18n } from "@/i18n";
+import { nextCronTime } from "@/lib/cron";
 import { cn } from "@/lib/utils";
 import type { Task, TaskStep } from "@/types/models";
 import { parseTaskSteps } from "./api";
@@ -37,7 +42,7 @@ export function TaskRunDialog({
       open={Boolean(task)}
       onClose={onClose}
       width="w-[620px]"
-      title={t("tasks.run.title", { name: task?.name ?? "" })}
+      title={t("tasks.run.title")}
     >
       {task && <RunBody task={task} onClose={onClose} />}
     </FormDialog>
@@ -94,23 +99,53 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
     setRequestId(started.requestId);
   };
 
+  const description = task.description?.trim();
+  const nextRun =
+    task.scheduleEnabled && task.schedule
+      ? nextCronTime(task.schedule, new Date())
+      : null;
+  const scheduleValue = nextRun
+    ? t("tasks.schedule.nextShort", { time: nextRun.toLocaleString() })
+    : task.scheduleEnabled && task.schedule
+      ? task.schedule
+      : null;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex flex-col gap-3 overflow-y-auto p-5">
-        {needsHost &&
-          (hostId ? (
-            <div className="flex items-center gap-2 px-1 text-sm">
-              <Server className="size-4 shrink-0 text-muted-foreground" />
-              <span className="text-muted-foreground">
-                {t("tasks.run.targetHost")}
-              </span>
-              <span className="font-medium">{hostLabel}</span>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-2xs text-danger">
-              {t("tasks.form.hostRequired")}
-            </div>
-          ))}
+      <div className="flex flex-col gap-4 overflow-y-auto p-5">
+        <dl className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2.5 text-sm leading-6">
+          <InfoRow icon={Workflow} label={t("tasks.form.name")}>
+            {task.name}
+          </InfoRow>
+
+          {description && (
+            <InfoRow
+              icon={FileText}
+              label={t("tasks.form.description")}
+              multiline
+            >
+              {description}
+            </InfoRow>
+          )}
+
+          {needsHost && hostId && (
+            <InfoRow icon={Server} label={t("tasks.run.targetHost")}>
+              {hostLabel}
+            </InfoRow>
+          )}
+
+          {scheduleValue && (
+            <InfoRow icon={CalendarClock} label={t("tasks.schedule.label")}>
+              {scheduleValue}
+            </InfoRow>
+          )}
+        </dl>
+
+        {needsHost && !hostId && (
+          <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-2xs text-danger">
+            {t("tasks.form.hostRequired")}
+          </div>
+        )}
 
         {run?.error && (
           <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-2xs text-danger">
@@ -153,6 +188,37 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** One labelled detail row (icon + muted label + value). Rendered as a `dt`/`dd`
+ * pair so every field's value lines up in a shared column via the parent grid. */
+function InfoRow({
+  icon: Icon,
+  label,
+  multiline,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  multiline?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <dt className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="size-4 shrink-0" />
+        <span>{label}</span>
+      </dt>
+      <dd
+        className={cn(
+          "min-w-0 font-medium",
+          multiline ? "whitespace-pre-wrap break-words" : "truncate",
+        )}
+      >
+        {children}
+      </dd>
+    </>
   );
 }
 
