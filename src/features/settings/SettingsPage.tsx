@@ -395,20 +395,6 @@ function AiForm({ config }: { config: AiConfig }) {
           </Field>
 
           <Field
-            label={t("settings.ai.modelLabel")}
-            hint={t("settings.ai.modelHint")}
-          >
-            <DraftInput
-              value={model}
-              onCommit={commitModel}
-              maxLength={1024}
-              placeholder="provider/model-id"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </Field>
-
-          <Field
             label={t("settings.ai.baseUrlLabel")}
             hint={t("settings.ai.baseUrlHint")}
           >
@@ -435,6 +421,20 @@ function AiForm({ config }: { config: AiConfig }) {
               autoComplete="off"
               spellCheck={false}
               onBeforeReveal={config.hasApiKey ? revealApiKey : undefined}
+            />
+          </Field>
+
+          <Field
+            label={t("settings.ai.modelLabel")}
+            hint={t("settings.ai.modelHint")}
+          >
+            <DraftInput
+              value={model}
+              onCommit={commitModel}
+              maxLength={1024}
+              placeholder="provider/model-id"
+              autoComplete="off"
+              spellCheck={false}
             />
           </Field>
         </div>

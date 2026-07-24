@@ -336,7 +336,7 @@ const SYNC_SETTINGS_SCHEMA = {
   additionalProperties: false,
 };
 
-export const administrationTools: AiTool[] = [
+export const settingsTools: AiTool[] = [
   {
     spec: {
       name: "get_application_settings",
@@ -424,6 +424,9 @@ export const administrationTools: AiTool[] = [
     alwaysRequireApproval: true,
     execute: async (args) => updateAiSettings(args),
   },
+];
+
+export const syncTools: AiTool[] = [
   {
     spec: {
       name: "get_sync_status",
@@ -593,6 +596,9 @@ export const administrationTools: AiTool[] = [
     alwaysRequireApproval: true,
     execute: async (args) => importSyncFile(args),
   },
+];
+
+export const updateTools: AiTool[] = [
   {
     spec: {
       name: "get_update_status",

@@ -34,11 +34,27 @@ export const SUGGESTION_POOL = [
     ],
   },
   {
-    group: "automation",
+    group: "snippets",
     keys: [
-      "ai.suggestion.automation.snippets",
-      "ai.suggestion.automation.forwards",
-      "ai.suggestion.automation.saveSnippet",
+      "ai.suggestion.snippets.inventory",
+      "ai.suggestion.snippets.save",
+      "ai.suggestion.snippets.runOnHosts",
+    ],
+  },
+  {
+    group: "tasks",
+    keys: [
+      "ai.suggestion.tasks.inventory",
+      "ai.suggestion.tasks.runs",
+      "ai.suggestion.tasks.create",
+    ],
+  },
+  {
+    group: "forwards",
+    keys: [
+      "ai.suggestion.forwards.inventory",
+      "ai.suggestion.forwards.start",
+      "ai.suggestion.forwards.create",
     ],
   },
   {
@@ -50,11 +66,27 @@ export const SUGGESTION_POOL = [
     ],
   },
   {
-    group: "administration",
+    group: "settings",
     keys: [
-      "ai.suggestion.administration.settings",
-      "ai.suggestion.administration.sync",
-      "ai.suggestion.administration.updates",
+      "ai.suggestion.settings.overview",
+      "ai.suggestion.settings.models",
+      "ai.suggestion.settings.limits",
+    ],
+  },
+  {
+    group: "sync",
+    keys: [
+      "ai.suggestion.sync.status",
+      "ai.suggestion.sync.push",
+      "ai.suggestion.sync.versions",
+    ],
+  },
+  {
+    group: "updates",
+    keys: [
+      "ai.suggestion.updates.check",
+      "ai.suggestion.updates.status",
+      "ai.suggestion.updates.install",
     ],
   },
 ] as const satisfies readonly {

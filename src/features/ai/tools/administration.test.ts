@@ -12,9 +12,9 @@ vi.mock("@/lib/ipc", () => ({
   },
 }));
 
-import { administrationTools } from "./administration";
+import { settingsTools } from "./administration";
 
-const updateAiSettings = administrationTools.find(
+const updateAiSettings = settingsTools.find(
   (tool) => tool.spec.name === "update_ai_settings",
 );
 

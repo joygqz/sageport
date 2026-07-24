@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 import type { TKey } from "@/i18n";
 import type { AiToolSpec } from "@/types/models";
-import { administrationTools } from "./administration";
+import { settingsTools, syncTools, updateTools } from "./administration";
 import { askTools } from "./ask";
 import { bookmarkTools } from "./bookmarks";
 import { setAiToolCatalog } from "./catalog";
@@ -35,7 +35,9 @@ export const ALL_TOOLS: AiTool[] = [
   ...bookmarkTools,
   ...credentialTools,
   ...monitorTools,
-  ...administrationTools,
+  ...settingsTools,
+  ...syncTools,
+  ...updateTools,
 ];
 
 export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -62,9 +64,13 @@ export const TOOL_GROUPS = [
   },
   { id: "hosts", tools: [...hostTools, ...groupTools, ...monitorTools] },
   { id: "files", tools: [...fileTools, ...bookmarkTools] },
-  { id: "automation", tools: [...snippetTools, ...taskTools, ...forwardTools] },
+  { id: "snippets", tools: snippetTools },
+  { id: "tasks", tools: taskTools },
+  { id: "forwards", tools: forwardTools },
   { id: "credentials", tools: credentialTools },
-  { id: "administration", tools: administrationTools },
+  { id: "settings", tools: settingsTools },
+  { id: "sync", tools: syncTools },
+  { id: "updates", tools: updateTools },
 ] as const;
 
 const TOOLS_BY_NAME = new Map(ALL_TOOLS.map((tool) => [tool.spec.name, tool]));

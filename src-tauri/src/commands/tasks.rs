@@ -588,6 +588,7 @@ async fn run_local_command(
     if let Some(dir) = cwd {
         builder.current_dir(expand_local_tilde(dir));
     }
+    crate::shell_env::apply(&mut builder).await;
     builder
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

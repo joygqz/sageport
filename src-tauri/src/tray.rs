@@ -1,6 +1,8 @@
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuBuilder, MenuItem};
-use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::TrayIconBuilder;
+#[cfg(target_os = "windows")]
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
 use crate::commands::tray::TrayMenuData;
@@ -46,15 +48,15 @@ fn reapply_dev_dock_icon() {
     }
 }
 
-pub fn hide_main_window(window: &tauri::Window) {
-    let _ = window.hide();
+pub fn hide_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
     #[cfg(target_os = "macos")]
-    let _ = window
-        .app_handle()
-        .set_activation_policy(tauri::ActivationPolicy::Accessory);
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 }
 
-fn prefers_zh(app: &AppHandle) -> bool {
+pub fn prefers_zh(app: &AppHandle) -> bool {
     let state = app.state::<AppState>();
     tauri::async_runtime::block_on(settings_repo::get(&state.db, "general.locale"))
         .ok()
@@ -155,23 +157,30 @@ pub fn update_menu(app: &AppHandle, data: TrayMenuData) -> tauri::Result<()> {
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let menu = build_menu(app, &initial_data(app))?;
 
-    TrayIconBuilder::with_id("main")
+    let builder = TrayIconBuilder::with_id("main")
         .icon(Image::from_bytes(TRAY_ICON)?)
-        .icon_as_template(true)
         .tooltip("Sageport")
         .menu(&menu)
-        .show_menu_on_left_click(true)
-        .on_menu_event(|app, event| on_menu_event(app, event.id.as_ref()))
+        .on_menu_event(|app, event| on_menu_event(app, event.id.as_ref()));
+
+    #[cfg(target_os = "macos")]
+    let builder = builder.icon_as_template(true).show_menu_on_left_click(true);
+
+    #[cfg(target_os = "windows")]
+    let builder = builder
+        .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::DoubleClick {
+            if let TrayIconEvent::Click {
                 button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
                 ..
             } = event
             {
                 show_main_window(tray.app_handle());
             }
-        })
-        .build(app)?;
+        });
+
+    builder.build(app)?;
 
     Ok(())
 }

@@ -49,11 +49,11 @@ pub fn window_set_traffic_light_inset(window: tauri::Window, x: f64, height: f64
 }
 
 #[tauri::command]
-pub fn window_hide_to_tray(window: tauri::Window) {
+pub fn window_hide_to_tray(app: tauri::AppHandle) {
     #[cfg(desktop)]
-    crate::tray::hide_main_window(&window);
+    crate::tray::hide_main_window(&app);
     #[cfg(not(desktop))]
-    let _ = window;
+    let _ = app;
 }
 
 #[cfg(test)]

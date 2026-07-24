@@ -5,11 +5,14 @@ mod db;
 mod domain;
 mod error;
 mod legacy;
+#[cfg(target_os = "macos")]
+mod menu;
 mod network;
 mod paths;
 mod pty;
 mod repository;
 mod sftp;
+mod shell_env;
 mod ssh;
 mod sshkey;
 mod state;
@@ -83,15 +86,19 @@ pub fn run() {
             tray::show_main_window(app);
         }))
         .plugin(tauri_plugin_autostart::Builder::new().build());
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .enable_macos_default_menu(false)
+        .on_menu_event(|app, event| menu::on_menu_event(app, event.id.as_ref()));
     let app = builder
         .on_window_event(|window, event| {
             #[cfg(desktop)]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                let window = window.clone();
+                let app = window.app_handle().clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                    tray::hide_main_window(&window);
+                    tray::hide_main_window(&app);
                 });
             }
             #[cfg(not(desktop))]
@@ -129,6 +136,11 @@ pub fn run() {
 
             #[cfg(desktop)]
             tray::build(app.handle())?;
+
+            #[cfg(target_os = "macos")]
+            menu::install(app.handle())?;
+
+            tauri::async_runtime::spawn(shell_env::prime());
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(update::run_periodic(handle));
