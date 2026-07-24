@@ -50,11 +50,7 @@ export function AboutSection() {
   return (
     <div className={SETTINGS_GROUP_STACK_CLASS}>
       <section className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <img
-          src="/app-icon.png"
-          alt=""
-          className="size-14 shrink-0 rounded-xl"
-        />
+        <img src="/app-icon.png" alt="" className="size-14 shrink-0" />
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-foreground">Sageport</h3>
           <p className="mt-0.5 text-sm text-muted-foreground">

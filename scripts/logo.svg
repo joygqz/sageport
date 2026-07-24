@@ -8,7 +8,7 @@
     <clipPath id="frontHalf"><rect x="0" y="512" width="512" height="512"/></clipPath>
   </defs>
 
-  <rect width="1024" height="1024" fill="#1B1E2E"/>
+  <rect id="bg" width="1024" height="1024" fill="#1B1E2E"/>
 
   <path d="M 288 756 C 528 678, 496 346, 736 268"
         stroke="url(#tunnel)" stroke-width="72" stroke-linecap="round"/>

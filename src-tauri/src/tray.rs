@@ -8,8 +8,13 @@ use crate::state::AppState;
 
 /// Bundled PNG for the menu-bar icon. Embedded explicitly rather than reusing
 /// `default_window_icon()`, which is `None` in dev builds and would leave a
-/// zero-width, unclickable status item on macOS.
-const TRAY_ICON: &[u8] = include_bytes!("../icons/32x32.png");
+/// zero-width, unclickable status item on macOS. macOS gets a monochrome
+/// template image so the system tints it to match the menu bar; other
+/// platforms get the colored glyph without the background plate.
+#[cfg(target_os = "macos")]
+const TRAY_ICON: &[u8] = include_bytes!("../icons/tray-icon-template.png");
+#[cfg(not(target_os = "macos"))]
+const TRAY_ICON: &[u8] = include_bytes!("../icons/tray-icon.png");
 
 /// Bring the main window back to the foreground and, on macOS, restore the dock
 /// icon that hide-to-tray removed. Shared by the tray icon, the tray menu, and
@@ -73,9 +78,9 @@ fn prefers_zh(app: &AppHandle) -> bool {
 /// Quit, and double-click reveals the window. Quit is the only path that exits.
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let (show_label, quit_label) = if prefers_zh(app) {
-        ("显示 Sageport", "退出 Sageport")
+        ("打开 Sageport", "退出")
     } else {
-        ("Show Sageport", "Quit Sageport")
+        ("Open Sageport", "Quit")
     };
     let show_item = MenuItem::with_id(app, "tray-show", show_label, true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "tray-quit", quit_label, true, None::<&str>)?;
@@ -83,6 +88,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("main")
         .icon(Image::from_bytes(TRAY_ICON)?)
+        .icon_as_template(true)
         .tooltip("Sageport")
         .menu(&menu)
         .show_menu_on_left_click(true)
