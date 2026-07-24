@@ -21,7 +21,7 @@ export const en = {
     showPassword: "Show password",
     hidePassword: "Hide password",
     deleteConfirm:
-      "This will permanently delete “{name}”. This action cannot be undone.",
+      'This will permanently delete "{name}". This action cannot be undone.',
     auth: {
       password: "Password",
       key: "SSH key",
@@ -224,7 +224,7 @@ export const en = {
     unsavedTitle: "Save changes?",
     unsavedIndicator: "Unsaved changes",
     unsavedDescription:
-      "Changes to “{name}” will be lost if you close it without saving.",
+      'Changes to "{name}" will be lost if you close it without saving.',
     unsavedWindowDescription:
       "Changes to {count} open files will be lost if you close Sageport without saving.",
     discard: "Don't save",
@@ -706,10 +706,10 @@ export const en = {
       progress: "Step {done} / {total}",
       succeeded: "Completed",
       failed: "Failed",
-      cancelled: "Cancelled",
+      cancelled: "Canceled",
       running: "Running…",
-      doneToast: "Task “{name}” completed",
-      errorToast: "Task “{name}” failed",
+      doneToast: 'Task "{name}" completed',
+      errorToast: 'Task "{name}" failed',
     },
   },
 
