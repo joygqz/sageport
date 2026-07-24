@@ -44,6 +44,7 @@ import type {
   Task,
   TaskInput,
   TaskRunEvent,
+  TaskRunHistoryEntry,
   SshDataEvent,
   SshKey,
   SshKeyGenerateInput,
@@ -156,7 +157,6 @@ export const ipc = {
     run: (
       id: string,
       hostId: string,
-      variables: Record<string, string>,
       onEvent: (e: TaskRunEvent) => void,
       requestId = crypto.randomUUID(),
     ) => {
@@ -165,13 +165,16 @@ export const ipc = {
       return invoke<void>("tasks_run", {
         id,
         hostId,
-        variables,
         requestId,
         onEvent: channel,
       });
     },
     cancelRun: (requestId: string) =>
       invoke<void>("tasks_cancel", { requestId }),
+    runsList: (limit?: number) =>
+      invoke<TaskRunHistoryEntry[]>("tasks_runs_list", { limit }),
+    runsDelete: (id: string) => invoke<void>("tasks_runs_delete", { id }),
+    runsClear: () => invoke<void>("tasks_runs_clear"),
   },
   settings: {
     get: (key: string) => invoke<string | null>("settings_get", { key }),

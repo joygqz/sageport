@@ -3,9 +3,10 @@ import { create } from "zustand";
 import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
+import { queryClient } from "@/lib/query";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type { Task, TaskRunEvent, TaskStep } from "@/types/models";
-import { parseTaskSteps } from "./api";
+import { parseTaskSteps, taskRunsKey } from "./api";
 
 function t(
   key: Parameters<typeof translate>[1],
@@ -32,7 +33,6 @@ export interface TaskRun {
   taskId: string;
   taskName: string;
   hostId: string;
-  variables: Record<string, string>;
   steps: TaskStep[];
   stepStates: StepRunState[];
   status: RunStatus;
@@ -60,11 +60,7 @@ interface TaskRunState {
   runs: Record<string, TaskRun>;
   /** requestId of the run currently shown in an open run dialog, if any. */
   attachedId: string | null;
-  startRun: (
-    task: Task,
-    hostId: string,
-    variables: Record<string, string>,
-  ) => StartedRun;
+  startRun: (task: Task, hostId: string) => StartedRun;
   cancelRun: (requestId: string) => void;
   dismissRun: (requestId: string) => void;
   attach: (requestId: string) => void;
@@ -217,7 +213,7 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
     runs: {},
     attachedId: null,
 
-    startRun: (task, hostId, variables) => {
+    startRun: (task, hostId) => {
       ensureTransferBridge();
       const requestId = crypto.randomUUID();
       const steps = parseTaskSteps(task);
@@ -226,7 +222,6 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
         taskId: task.id,
         taskName: task.name,
         hostId,
-        variables,
         steps,
         stepStates: steps.map(() => ({ status: "pending", log: "" })),
         status: "running",
@@ -239,7 +234,6 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           await ipc.tasks.run(
             task.id,
             hostId,
-            variables,
             (event) => applyEvent(requestId, event),
             requestId,
           );
@@ -252,6 +246,9 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           if (!cancelled) failRun(requestId, errorMessage(err));
           finalize(requestId, cancelled ? "cancelled" : "error");
         }
+        // The backend persisted this run's final state before the call settled;
+        // refresh the run-history query so an open history dialog updates.
+        void queryClient.invalidateQueries({ queryKey: taskRunsKey });
         reportBackgroundCompletion(requestId);
         return get().runs[requestId];
       })();

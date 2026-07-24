@@ -2,7 +2,6 @@ import { Download, ServerCog, SquareTerminal, Upload } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import type { TKey } from "@/i18n";
-import { parseVariables, type TemplateVariable } from "@/lib/variables";
 import type { TaskStep, TaskStepType } from "@/types/models";
 
 export const STEP_TYPES: TaskStepType[] = [
@@ -44,22 +43,6 @@ export function stepNeedsRemote(step: TaskStep): boolean {
 
 export function taskNeedsRemote(steps: TaskStep[]): boolean {
   return steps.some(stepNeedsRemote);
-}
-
-export function stepTextFields(step: TaskStep): string[] {
-  switch (step.type) {
-    case "localCommand":
-    case "remoteCommand":
-      return [step.command, step.cwd ?? ""];
-    case "upload":
-      return [step.localPath, step.remotePath];
-    case "download":
-      return [step.remotePath, step.localPath];
-  }
-}
-
-export function taskVariables(steps: TaskStep[]): TemplateVariable[] {
-  return parseVariables(...steps.flatMap(stepTextFields));
 }
 
 export function stepSummary(step: TaskStep): string {

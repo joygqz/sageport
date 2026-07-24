@@ -10,6 +10,7 @@ import { errorMessage, toast, useToastStore } from "@/lib/toast";
 import { useSettingSync } from "@/lib/settingSync";
 import { IS_MACOS } from "@/lib/platform";
 import { bridgeSftpEvents } from "@/features/sftp/store";
+import { useTaskScheduler } from "@/features/tasks/scheduler";
 import {
   listenHostKeyEvents,
   useHostKeyStore,
@@ -99,6 +100,7 @@ const UpdateNotifier = lazy(() =>
 export function Workbench() {
   const { t } = useI18n();
   useKeybindings();
+  useTaskScheduler();
 
   useEffect(() => {
     void bridgeSftpEvents().catch((error) =>

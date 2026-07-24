@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import {
+  CalendarClock,
   Copy,
+  History,
   Loader2,
   Pencil,
   Play,
@@ -24,6 +26,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { nextCronTime } from "@/lib/cron";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/types/models";
@@ -42,6 +45,7 @@ import { stepSummary } from "./steps";
 import { selectRunningRunForTask, useTaskRunStore } from "./store";
 import { TaskFormDialog } from "./TaskFormDialog";
 import { TaskRunDialog } from "./TaskRunDialog";
+import { TaskRunHistoryDialog } from "./TaskRunHistoryDialog";
 
 export function TasksView() {
   const { t } = useI18n();
@@ -54,6 +58,7 @@ export function TasksView() {
     task: null,
   });
   const [runTask, setRunTask] = useState<Task | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [query, setQuery] = useState("");
   const searching = query.trim().length > 0;
@@ -103,16 +108,28 @@ export function TasksView() {
     <SideBarView
       title={t("tasks.viewTitle")}
       actions={
-        <Tooltip content={t("tasks.new")}>
-          <Button
-            size="icon"
-            variant="ghost"
-            className={PANEL_HEADER_ACTION_CLASS}
-            onClick={() => setForm({ open: true, task: null })}
-          >
-            <Plus className="size-4" />
-          </Button>
-        </Tooltip>
+        <>
+          <Tooltip content={t("tasks.history.title")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={PANEL_HEADER_ACTION_CLASS}
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="size-4" />
+            </Button>
+          </Tooltip>
+          <Tooltip content={t("tasks.new")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={PANEL_HEADER_ACTION_CLASS}
+              onClick={() => setForm({ open: true, task: null })}
+            >
+              <Plus className="size-4" />
+            </Button>
+          </Tooltip>
+        </>
       }
       topContent={
         <SideBarFilter
@@ -178,10 +195,13 @@ export function TasksView() {
                         {subtitle}
                       </p>
                     </div>
-                    <TaskRowAction
-                      task={task}
-                      onOpen={() => setRunTask(task)}
-                    />
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <ScheduleBadge task={task} />
+                      <TaskRowAction
+                        task={task}
+                        onOpen={() => setRunTask(task)}
+                      />
+                    </div>
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
@@ -216,11 +236,38 @@ export function TasksView() {
         onClose={() => setForm((s) => ({ ...s, open: false }))}
       />
       <TaskRunDialog task={runTask} onClose={() => setRunTask(null)} />
+      <TaskRunHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <ConfirmDialog
         state={confirmState}
         onClose={() => setConfirmState(null)}
       />
     </SideBarView>
+  );
+}
+
+const NEXT_RUN_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+function ScheduleBadge({ task }: { task: Task }) {
+  const { t } = useI18n();
+  if (!task.scheduleEnabled || !task.schedule) return null;
+  const next = nextCronTime(task.schedule, new Date());
+  if (!next) return null;
+  return (
+    <Tooltip
+      content={t("tasks.schedule.nextRun", { time: next.toLocaleString() })}
+    >
+      <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+        <CalendarClock className="size-3" />
+        {t("tasks.schedule.nextShort", {
+          time: next.toLocaleString(undefined, NEXT_RUN_FORMAT),
+        })}
+      </span>
+    </Tooltip>
   );
 }
 

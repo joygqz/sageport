@@ -4,6 +4,7 @@ import { ipc } from "@/lib/ipc";
 import type { Task, TaskInput, TaskStep } from "@/types/models";
 
 export const tasksKey = ["tasks"] as const;
+export const taskRunsKey = ["tasks", "runs"] as const;
 
 export function parseTaskSteps(task: Task): TaskStep[] {
   try {
@@ -40,5 +41,30 @@ export function useDeleteTask() {
   return useMutation({
     mutationFn: (id: string) => ipc.tasks.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: tasksKey }),
+  });
+}
+
+export function useTaskRuns(enabled: boolean) {
+  return useQuery({
+    queryKey: taskRunsKey,
+    queryFn: () => ipc.tasks.runsList(),
+    enabled,
+    staleTime: 0,
+  });
+}
+
+export function useDeleteTaskRun() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ipc.tasks.runsDelete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskRunsKey }),
+  });
+}
+
+export function useClearTaskRuns() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => ipc.tasks.runsClear(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskRunsKey }),
   });
 }

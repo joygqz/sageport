@@ -27,13 +27,13 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     steps: [
       {
         type: "localCommand",
-        cwd: "{{projectDir:~/project}}",
+        cwd: "~/project",
         command: "pnpm build",
       },
       {
         type: "upload",
-        localPath: "{{projectDir:~/project}}/dist",
-        remotePath: "/var/www/{{app}}",
+        localPath: "~/project/dist",
+        remotePath: "/var/www/myapp",
       },
       { type: "remoteCommand", command: "sudo systemctl reload nginx" },
     ],
@@ -46,15 +46,15 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     steps: [
       {
         type: "localCommand",
-        cwd: "{{projectDir:~/project}}",
+        cwd: "~/project",
         command: "mvn clean package -DskipTests",
       },
       {
         type: "upload",
-        localPath: "{{projectDir:~/project}}/target/{{app}}.jar",
-        remotePath: "/opt/{{app}}/{{app}}.jar",
+        localPath: "~/project/target/myapp.jar",
+        remotePath: "/opt/myapp/myapp.jar",
       },
-      { type: "remoteCommand", command: "sudo systemctl restart {{service}}" },
+      { type: "remoteCommand", command: "sudo systemctl restart myapp" },
     ],
   },
   {
@@ -65,12 +65,12 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     steps: [
       {
         type: "remoteCommand",
-        command: "pg_dump {{database}} | gzip > /tmp/{{database}}.sql.gz",
+        command: "pg_dump mydb | gzip > /tmp/mydb.sql.gz",
       },
       {
         type: "download",
-        remotePath: "/tmp/{{database}}.sql.gz",
-        localPath: "~/backups/{{database}}.sql.gz",
+        remotePath: "/tmp/mydb.sql.gz",
+        localPath: "~/backups/mydb.sql.gz",
       },
     ],
   },
@@ -82,10 +82,10 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     steps: [
       {
         type: "upload",
-        localPath: "{{configDir:~/config}}",
-        remotePath: "/etc/{{app}}",
+        localPath: "~/config",
+        remotePath: "/etc/myapp",
       },
-      { type: "remoteCommand", command: "sudo systemctl reload {{service}}" },
+      { type: "remoteCommand", command: "sudo systemctl reload myapp" },
     ],
   },
   {
@@ -96,16 +96,16 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     steps: [
       {
         type: "remoteCommand",
-        command: "tar -czf /tmp/logs.tar.gz -C /var/log {{service}}",
+        command: "tar -czf /tmp/logs.tar.gz -C /var/log myapp",
       },
       {
         type: "download",
         remotePath: "/tmp/logs.tar.gz",
-        localPath: "~/logs/{{app}}-logs.tar.gz",
+        localPath: "~/logs/myapp-logs.tar.gz",
       },
       {
         type: "localCommand",
-        command: "tar -xzf ~/logs/{{app}}-logs.tar.gz -C ~/logs",
+        command: "tar -xzf ~/logs/myapp-logs.tar.gz -C ~/logs",
       },
     ],
   },

@@ -1,16 +1,16 @@
 import { ListChecks, Play, Save, SquarePen, Trash2 } from "lucide-react";
 
 import { parseTaskSteps } from "@/features/tasks/api";
-import { taskNeedsRemote, taskVariables } from "@/features/tasks/steps";
+import { taskNeedsRemote } from "@/features/tasks/steps";
 import { useTaskRunStore, type TaskRun } from "@/features/tasks/store";
+import { isValidCron, nextCronTime } from "@/lib/cron";
 import { ipc } from "@/lib/ipc";
-import { substitute } from "@/lib/variables";
 import type { Task, TaskInput, TaskStep } from "@/types/models";
 import { invalidateTasks } from "./cache";
 import {
+  bool,
   nullableStr,
   optionalStr,
-  record,
   str,
   toolFailure,
   toolSuccess,
@@ -31,7 +31,6 @@ interface ResolvedRun {
   task: Task;
   hostId: string;
   hostLabel?: string;
-  values: Record<string, string>;
   steps: TaskStep[];
 }
 
@@ -48,22 +47,13 @@ async function resolveRun(
     };
   }
   const steps = parseTaskSteps(task);
-  const values = record(args, "values");
-  const missing = taskVariables(steps)
-    .filter((v) => !v.defaultValue && (values[v.name] ?? "").trim() === "")
-    .map((v) => v.name);
-  if (missing.length > 0) {
-    return {
-      error: `Error: this task needs value(s) for ${missing.join(", ")}. Pass them in values.`,
-    };
-  }
-  const hostId = optionalStr(args, "hostId") ?? task.hostId ?? "";
+  const hostId = task.hostId ?? "";
   let hostLabel: string | undefined;
   if (taskNeedsRemote(steps)) {
     if (!hostId) {
       return {
         error:
-          "Error: this task has remote steps and needs a target host. Pass hostId (from list_hosts).",
+          "Error: this task has remote steps but no fixed host. Set its host with update_task before running it.",
       };
     }
     try {
@@ -72,21 +62,20 @@ async function resolveRun(
       return { error: `Error: no host with id "${hostId}".` };
     }
   }
-  return { task, hostId, hostLabel, values, steps };
+  return { task, hostId, hostLabel, steps };
 }
 
-function planLine(step: TaskStep, values: Record<string, string>): string {
-  const sub = (text: string) => substitute(text, values);
+function planLine(step: TaskStep): string {
   switch (step.type) {
     case "localCommand":
     case "remoteCommand": {
-      const cwd = step.cwd ? ` (in ${sub(step.cwd)})` : "";
-      return `${STEP_LABEL[step.type]}: ${sub(step.command)}${cwd}`;
+      const cwd = step.cwd ? ` (in ${step.cwd})` : "";
+      return `${STEP_LABEL[step.type]}: ${step.command}${cwd}`;
     }
     case "upload":
-      return `upload: ${sub(step.localPath)} → ${sub(step.remotePath)}`;
+      return `upload: ${step.localPath} → ${step.remotePath}`;
     case "download":
-      return `download: ${sub(step.remotePath)} → ${sub(step.localPath)}`;
+      return `download: ${step.remotePath} → ${step.localPath}`;
   }
 }
 
@@ -95,7 +84,7 @@ function buildPlan(resolved: ResolvedRun): string {
     ? `Target host: ${resolved.hostLabel ?? resolved.hostId}`
     : "Runs on this machine";
   const lines = resolved.steps.map(
-    (step, index) => `${index + 1}. ${planLine(step, resolved.values)}`,
+    (step, index) => `${index + 1}. ${planLine(step)}`,
   );
   return [header, ...lines].join("\n");
 }
@@ -128,14 +117,23 @@ async function listTasks(): Promise<ToolExecutionResult> {
     JSON.stringify(
       tasks.map((task) => {
         const steps = parseTaskSteps(task);
+        const scheduled =
+          task.scheduleEnabled && !!task.schedule && isValidCron(task.schedule);
         return {
           id: task.id,
           name: task.name,
           description: task.description || undefined,
-          defaultHostId: task.hostId ?? undefined,
+          hostId: task.hostId ?? undefined,
           needsHost: taskNeedsRemote(steps),
-          variables: taskVariables(steps).map((v) => v.name),
-          steps: steps.map((step) => planLine(step, {})),
+          steps: steps.map((step) => planLine(step)),
+          schedule: task.schedule ?? undefined,
+          scheduleEnabled: task.scheduleEnabled || undefined,
+          nextRun: scheduled
+            ? (nextCronTime(
+                task.schedule as string,
+                new Date(),
+              )?.toISOString() ?? undefined)
+            : undefined,
         };
       }),
     ),
@@ -164,7 +162,7 @@ async function runTask(
 
   const { requestId, completion } = useTaskRunStore
     .getState()
-    .startRun(resolved.task, resolved.hostId, resolved.values);
+    .startRun(resolved.task, resolved.hostId);
 
   let cancelInFlight = false;
   const timer = globalThis.setInterval(() => {
@@ -190,6 +188,7 @@ function taskInputFromArgs(
 ): TaskInput {
   const description = nullableStr(args, "description");
   const hostId = nullableStr(args, "hostId");
+  const schedule = nullableStr(args, "schedule");
   const rawSteps = args.steps;
   const steps = Array.isArray(rawSteps)
     ? (rawSteps as TaskStep[])
@@ -202,6 +201,11 @@ function taskInputFromArgs(
       description === undefined ? (base?.description ?? null) : description,
     hostId: hostId === undefined ? (base?.hostId ?? null) : hostId,
     steps,
+    schedule: schedule === undefined ? (base?.schedule ?? null) : schedule,
+    scheduleEnabled:
+      "scheduleEnabled" in args
+        ? bool(args, "scheduleEnabled")
+        : (base?.scheduleEnabled ?? false),
   };
 }
 
@@ -269,15 +273,22 @@ const STEP_SCHEMA = {
     "{type:'upload', localPath, remotePath, retries?}; " +
     "{type:'download', remotePath, localPath, retries?}. " +
     "retries (default 0, max 10) is how many extra attempts to make if the step fails. " +
-    "Any text field may use {{name}} or {{name:default}} placeholders.",
+    "All commands and paths are literal; there are no runtime variables.",
 } as const;
+
+const SCHEDULE_DESCRIPTION =
+  "5-field cron expression (minute hour day month weekday) to run the task " +
+  "automatically while the app is open, e.g. '0 3 * * *' daily at 03:00, " +
+  "'0 */6 * * *' every 6 hours, '0 9 * * 1-5' weekdays at 09:00. Scheduled runs " +
+  "use the task's fixed host with no prompts, so a scheduled task with remote " +
+  "steps needs a fixed host.";
 
 export const taskTools: AiTool[] = [
   {
     spec: {
       name: "list_tasks",
       description:
-        "List saved automation tasks with ids, an ordered step summary, the variables they use, and their default host.",
+        "List saved automation tasks with ids, an ordered step summary, their fixed host, and any cron schedule with its next run time.",
       parameters: {
         type: "object",
         properties: {},
@@ -292,21 +303,11 @@ export const taskTools: AiTool[] = [
     spec: {
       name: "run_task",
       description:
-        "Run a saved task: it executes its ordered steps (local commands, uploads, downloads, remote commands), retrying a step up to its configured retries, and stops the run once a step still fails after its retries. Fill any {{variable}} placeholders via values. Pass hostId to target a host when the task has remote steps and no fixed host. Always requires user approval.",
+        "Run a saved task on its fixed host: it executes its ordered steps (local commands, uploads, downloads, remote commands), retrying a step up to its configured retries, and stops the run once a step still fails after its retries. A task with remote steps must already have a fixed host. Always requires user approval.",
       parameters: {
         type: "object",
         properties: {
           taskId: { type: "string", description: "Task id from list_tasks." },
-          hostId: {
-            type: "string",
-            description:
-              "Target host id from list_hosts. Optional if the task has a fixed host.",
-          },
-          values: {
-            type: "object",
-            description: "Map of variable name to value for {{placeholders}}.",
-            additionalProperties: { type: "string" },
-          },
         },
         required: ["taskId"],
         additionalProperties: false,
@@ -325,7 +326,7 @@ export const taskTools: AiTool[] = [
     spec: {
       name: "save_task",
       description:
-        "Save a new automation task from an ordered list of steps. Use hostId for a fixed target, or omit it to choose a host at run time.",
+        "Save a new automation task from an ordered list of steps. A task with remote steps needs a fixed hostId; local-only tasks can omit it. Pass schedule with scheduleEnabled to run it automatically on a cron schedule.",
       parameters: {
         type: "object",
         properties: {
@@ -333,9 +334,16 @@ export const taskTools: AiTool[] = [
           description: { type: "string", description: "Optional description." },
           hostId: {
             type: "string",
-            description: "Default host id, or omit to choose at run time.",
+            description:
+              "Fixed host id from list_hosts. Required for tasks with remote steps; omit for local-only tasks.",
           },
           steps: STEP_SCHEMA,
+          schedule: { type: "string", description: SCHEDULE_DESCRIPTION },
+          scheduleEnabled: {
+            type: "boolean",
+            description:
+              "Whether the schedule is active (default false). Set true together with schedule to start running it.",
+          },
         },
         required: ["name", "steps"],
         additionalProperties: false,
@@ -362,9 +370,18 @@ export const taskTools: AiTool[] = [
           },
           hostId: {
             type: ["string", "null"],
-            description: "Set null to choose a host at run time.",
+            description:
+              "Fixed host id from list_hosts. Set null to clear it (local-only tasks).",
           },
           steps: { ...STEP_SCHEMA, minItems: 1 },
+          schedule: {
+            type: ["string", "null"],
+            description: `${SCHEDULE_DESCRIPTION} Set null to clear the schedule.`,
+          },
+          scheduleEnabled: {
+            type: "boolean",
+            description: "Set true to run on the schedule, false to pause it.",
+          },
         },
         required: ["id"],
         additionalProperties: false,

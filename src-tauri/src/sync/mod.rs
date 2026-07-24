@@ -503,6 +503,8 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
             description: task.description.clone(),
             host_id: task.host_id.clone(),
             steps,
+            schedule: task.schedule.clone(),
+            schedule_enabled: task.schedule_enabled,
         })?;
     }
     records!(&snapshot.port_forwards, "port forward");
@@ -855,15 +857,17 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query(
-        "INSERT INTO tasks (id, name, description, host_id, steps, created_at, updated_at, deleted_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "INSERT INTO tasks (id, name, description, host_id, steps, schedule, schedule_enabled, created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name, description = excluded.description, host_id = excluded.host_id,
-           steps = excluded.steps, updated_at = excluded.updated_at,
+           steps = excluded.steps, schedule = excluded.schedule, schedule_enabled = excluded.schedule_enabled,
+           updated_at = excluded.updated_at,
            deleted_at = excluded.deleted_at, revision = excluded.revision
          WHERE excluded.updated_at > tasks.updated_at",
     )
     .bind(&t.id).bind(&t.name).bind(&t.description).bind(&t.host_id).bind(&t.steps)
+    .bind(&t.schedule).bind(t.schedule_enabled)
     .bind(&t.created_at).bind(&t.updated_at).bind(&t.deleted_at).bind(t.revision)
     .execute(executor).await?;
     Ok(())

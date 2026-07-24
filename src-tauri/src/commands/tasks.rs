@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,6 +10,7 @@ use tokio::task::JoinSet;
 
 use crate::domain::{Task, TaskInput, TaskStep};
 use crate::error::{AppError, AppResult};
+use crate::repository::task_run_repo::{self, TaskRunRow};
 use crate::repository::task_repo;
 use crate::sftp::path::{parent_remote, sh_quote};
 use crate::sftp::{self, base_name, Endpoint, SftpConnectParams, TransferCancel, TransferRequest};
@@ -23,6 +23,10 @@ const CONNECT_ATTEMPTS: usize = 2;
 const CONNECT_RETRY_BACKOFF: Duration = Duration::from_millis(500);
 const STEP_RETRY_BACKOFF: Duration = Duration::from_secs(2);
 const STEP_OUTPUT_CAP: usize = 512 * 1024;
+/// Cap on a stored failure message. Step and run errors are short strings, but a
+/// remote command's stderr can leak into an error — bound it so history rows stay
+/// small.
+const MAX_MESSAGE_CHARS: usize = 2000;
 
 #[tauri::command]
 pub async fn tasks_list(state: State<'_, AppState>) -> AppResult<Vec<Task>> {
@@ -46,6 +50,63 @@ pub async fn tasks_update(
 #[tauri::command]
 pub async fn tasks_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
     task_repo::delete(&state.db, &id).await
+}
+
+/// A persisted task run, surfaced by the Tasks view's run-history dialog. `steps`
+/// is a JSON array of step definitions paired with their outcome, parsed on the
+/// client (see `TaskRunStepRecord`).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRunHistoryEntry {
+    pub id: String,
+    pub task_id: String,
+    pub task_name: String,
+    pub host_id: Option<String>,
+    pub host_label: Option<String>,
+    pub steps: String,
+    pub total_steps: i64,
+    pub status: String,
+    pub message: Option<String>,
+    pub started_at: String,
+    pub finished_at: Option<String>,
+}
+
+impl From<TaskRunRow> for TaskRunHistoryEntry {
+    fn from(row: TaskRunRow) -> Self {
+        Self {
+            id: row.id,
+            task_id: row.task_id,
+            task_name: row.task_name,
+            host_id: row.host_id,
+            host_label: row.host_label,
+            steps: row.steps,
+            total_steps: row.total_steps,
+            status: row.status,
+            message: row.message,
+            started_at: row.started_at,
+            finished_at: row.finished_at,
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn tasks_runs_list(
+    state: State<'_, AppState>,
+    limit: Option<i64>,
+) -> AppResult<Vec<TaskRunHistoryEntry>> {
+    let rows = task_run_repo::list(&state.db, limit.unwrap_or(200).clamp(1, 1000)).await?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+#[tauri::command]
+pub async fn tasks_runs_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    validate_id(&id, "task run")?;
+    task_run_repo::delete(&state.db, &id).await
+}
+
+#[tauri::command]
+pub async fn tasks_runs_clear(state: State<'_, AppState>) -> AppResult<()> {
+    task_run_repo::clear(&state.db).await
 }
 
 #[derive(Serialize, Clone)]
@@ -89,6 +150,99 @@ enum StepResult {
     Cancelled,
 }
 
+/// The final result of one step, aggregated for the persisted run history. A step
+/// that never ran (the run was cancelled or an earlier step failed) stays
+/// `skipped`, matching the `skipped` events the client already receives.
+#[derive(Clone)]
+struct StepOutcome {
+    status: &'static str,
+    exit_code: Option<i32>,
+    message: Option<String>,
+}
+
+impl StepOutcome {
+    fn skipped() -> Self {
+        Self {
+            status: "skipped",
+            exit_code: None,
+            message: None,
+        }
+    }
+
+    fn done(exit_code: Option<i32>) -> Self {
+        Self {
+            status: "done",
+            exit_code,
+            message: None,
+        }
+    }
+
+    fn error(exit_code: Option<i32>, message: String) -> Self {
+        Self {
+            status: "error",
+            exit_code,
+            message: Some(truncate_message(message)),
+        }
+    }
+}
+
+/// One entry in a run's persisted `steps` JSON: the step definition (a snapshot,
+/// so history survives task edits) paired with how it turned out.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TaskRunStepRecord<'a> {
+    step: &'a TaskStep,
+    status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exit_code: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+}
+
+fn all_skipped(len: usize) -> Vec<StepOutcome> {
+    vec![StepOutcome::skipped(); len]
+}
+
+/// Serialize the step definitions with their outcomes. Steps without a recorded
+/// outcome (e.g. the initial row written before the run starts) render as
+/// `pending`.
+fn steps_json(steps: &[TaskStep], outcomes: &[StepOutcome]) -> String {
+    let records: Vec<TaskRunStepRecord> = steps
+        .iter()
+        .enumerate()
+        .map(|(index, step)| {
+            let outcome = outcomes.get(index);
+            TaskRunStepRecord {
+                step,
+                status: outcome.map_or("pending", |o| o.status),
+                exit_code: outcome.and_then(|o| o.exit_code),
+                message: outcome.and_then(|o| o.message.clone()),
+            }
+        })
+        .collect();
+    serde_json::to_string(&records).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn truncate_message(message: String) -> String {
+    if message.chars().count() <= MAX_MESSAGE_CHARS {
+        return message;
+    }
+    message.chars().take(MAX_MESSAGE_CHARS).collect()
+}
+
+/// Best-effort lookup of a host's display label for the run record. A blank id
+/// (a local-only task) or a missing host just leaves the label empty.
+async fn resolve_host_label(state: &AppState, host_id: &str) -> Option<String> {
+    let host_id = host_id.trim();
+    if host_id.is_empty() {
+        return None;
+    }
+    crate::repository::host_repo::get(&state.db, host_id)
+        .await
+        .ok()
+        .map(|host| host.label)
+}
+
 fn validate_id(id: &str, label: &str) -> AppResult<()> {
     if id.trim().is_empty() || id.len() > MAX_ID_BYTES || id.contains('\0') {
         return Err(AppError::Invalid(format!("invalid {label} id")));
@@ -102,7 +256,6 @@ pub async fn tasks_run(
     state: State<'_, AppState>,
     id: String,
     host_id: String,
-    variables: HashMap<String, String>,
     request_id: String,
     on_event: Channel<TaskRunEvent>,
 ) -> AppResult<()> {
@@ -112,10 +265,7 @@ pub async fn tasks_run(
     let task = task_repo::get(&state.db, &id).await?;
     let steps: Vec<TaskStep> = task
         .parse_steps()
-        .map_err(|e| AppError::Invalid(format!("stored task steps are invalid: {e}")))?
-        .iter()
-        .map(|step| step.substitute(&variables))
-        .collect();
+        .map_err(|e| AppError::Invalid(format!("stored task steps are invalid: {e}")))?;
 
     let cancel = Arc::new(TransferCancel::new());
     {
@@ -126,6 +276,24 @@ pub async fn tasks_run(
         cancels.insert(request_id.clone(), cancel.clone());
     }
 
+    // Record the run as it starts so it survives an app crash mid-run: a leftover
+    // `running` row is flipped to `error` by `mark_interrupted` on next launch.
+    // Recording is best-effort — a history write must never block a real run.
+    let host_label = resolve_host_label(&state, &host_id).await;
+    let host_ref = Some(host_id.trim()).filter(|value| !value.is_empty());
+    let _ = task_run_repo::create(
+        &state.db,
+        &request_id,
+        &id,
+        &task.name,
+        host_ref,
+        host_label.as_deref(),
+        &steps_json(&steps, &[]),
+        steps.len() as i64,
+    )
+    .await;
+
+    let mut outcomes = all_skipped(steps.len());
     let outcome = run_all(
         &app,
         &state,
@@ -134,10 +302,30 @@ pub async fn tasks_run(
         &request_id,
         &cancel,
         &on_event,
+        &mut outcomes,
     )
     .await;
 
     state.task_cancels.lock().remove(&request_id);
+
+    // Resolve the run-level status from the same signals the client uses: a
+    // cancellation wins, then any step failure or a setup failure (host connection)
+    // is an error, otherwise the run succeeded.
+    let (status, message) = match &outcome {
+        Err(AppError::Cancelled) => ("cancelled", None),
+        Err(err) => ("error", Some(truncate_message(err.to_string()))),
+        Ok(()) if outcomes.iter().any(|o| o.status == "error") => ("error", None),
+        Ok(()) => ("done", None),
+    };
+    let _ = task_run_repo::finish(
+        &state.db,
+        &request_id,
+        status,
+        message.as_deref(),
+        &steps_json(&steps, &outcomes),
+    )
+    .await;
+
     outcome
 }
 
@@ -150,6 +338,7 @@ pub async fn tasks_cancel(state: State<'_, AppState>, request_id: String) -> App
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_all(
     app: &AppHandle,
     state: &AppState,
@@ -158,6 +347,7 @@ async fn run_all(
     request_id: &str,
     cancel: &Arc<TransferCancel>,
     on_event: &Channel<TaskRunEvent>,
+    outcomes: &mut [StepOutcome],
 ) -> AppResult<()> {
     let needs_remote = steps.iter().any(TaskStep::needs_remote);
     let conn_id = format!("task-run-{request_id}");
@@ -169,7 +359,8 @@ async fn run_all(
         connect_task_session(app, state, &conn_id, host.label, hops, cancel).await?;
     }
 
-    let result = execute_steps(app, state, &conn_id, steps, request_id, cancel, on_event).await;
+    let result =
+        execute_steps(app, state, &conn_id, steps, request_id, cancel, on_event, outcomes).await;
 
     if needs_remote {
         state.sftp.disconnect(app, &conn_id);
@@ -226,6 +417,7 @@ fn is_retryable_connect(err: &AppError) -> bool {
     matches!(err.code(), "network" | "timeout" | "ssh" | "dns" | "auth")
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn execute_steps(
     app: &AppHandle,
     state: &AppState,
@@ -234,6 +426,7 @@ async fn execute_steps(
     request_id: &str,
     cancel: &Arc<TransferCancel>,
     on_event: &Channel<TaskRunEvent>,
+    outcomes: &mut [StepOutcome],
 ) -> AppResult<()> {
     let mut cancelled = false;
     let mut skip_from: Option<usize> = None;
@@ -252,6 +445,9 @@ async fn execute_steps(
         .await;
         match result {
             StepResult::Success(exit) => {
+                if let Some(slot) = outcomes.get_mut(index) {
+                    *slot = StepOutcome::done(exit);
+                }
                 let _ = on_event.send(TaskRunEvent {
                     step_index: index,
                     status: "done".into(),
@@ -261,6 +457,9 @@ async fn execute_steps(
                 });
             }
             StepResult::Failed { exit, message } => {
+                if let Some(slot) = outcomes.get_mut(index) {
+                    *slot = StepOutcome::error(exit, message.clone());
+                }
                 let _ = on_event.send(TaskRunEvent {
                     step_index: index,
                     status: "error".into(),

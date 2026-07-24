@@ -1,5 +1,6 @@
 use sqlx::SqlitePool;
 
+use crate::domain::cron;
 use crate::domain::{new_id, now, Task, TaskInput, TaskStep};
 use crate::error::{AppError, AppResult};
 
@@ -16,6 +17,8 @@ pub struct NormalizedTask {
     pub description: Option<String>,
     pub host_id: Option<String>,
     pub steps_json: String,
+    pub schedule: Option<String>,
+    pub schedule_enabled: bool,
 }
 
 fn require_field(value: &str, empty_msg: &str, max: usize, too_long_msg: &str) -> AppResult<()> {
@@ -171,11 +174,25 @@ pub(crate) fn normalize(input: TaskInput) -> AppResult<NormalizedTask> {
     let steps_json = serde_json::to_string(&steps)
         .map_err(|e| AppError::Invalid(format!("task steps are not serializable: {e}")))?;
 
+    let schedule = input
+        .schedule
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| cron::validate_cron(&value))
+        .transpose()?;
+    if input.schedule_enabled && schedule.is_none() {
+        return Err(AppError::Invalid(
+            "a scheduled task needs a cron schedule".into(),
+        ));
+    }
+
     Ok(NormalizedTask {
         name,
         description,
         host_id,
         steps_json,
+        schedule,
+        schedule_enabled: input.schedule_enabled,
     })
 }
 
@@ -209,14 +226,16 @@ pub async fn create(pool: &SqlitePool, input: TaskInput) -> AppResult<Task> {
     let id = new_id();
     let ts = now();
     sqlx::query(
-        "INSERT INTO tasks (id, name, description, host_id, steps, created_at, updated_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+        "INSERT INTO tasks (id, name, description, host_id, steps, schedule, schedule_enabled, created_at, updated_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
     )
     .bind(&id)
     .bind(&task.name)
     .bind(&task.description)
     .bind(&task.host_id)
     .bind(&task.steps_json)
+    .bind(&task.schedule)
+    .bind(task.schedule_enabled)
     .bind(&ts)
     .bind(&ts)
     .execute(pool)
@@ -230,13 +249,15 @@ pub async fn update(pool: &SqlitePool, id: &str, input: TaskInput) -> AppResult<
     let ts = now();
     let affected = sqlx::query(
         "UPDATE tasks
-         SET name = ?, description = ?, host_id = ?, steps = ?, updated_at = ?, revision = revision + 1
+         SET name = ?, description = ?, host_id = ?, steps = ?, schedule = ?, schedule_enabled = ?, updated_at = ?, revision = revision + 1
          WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(&task.name)
     .bind(&task.description)
     .bind(&task.host_id)
     .bind(&task.steps_json)
+    .bind(&task.schedule)
+    .bind(task.schedule_enabled)
     .bind(&ts)
     .bind(id)
     .execute(pool)
@@ -296,6 +317,8 @@ mod tests {
                     retries: 0,
                 },
             ],
+            schedule: None,
+            schedule_enabled: false,
         }
     }
 
@@ -334,6 +357,33 @@ mod tests {
 
         assert!(validate_id("").is_err());
         assert!(validate_id(&"x".repeat(MAX_ID_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn normalizes_and_validates_schedule() {
+        let mut scheduled = input("Backup");
+        scheduled.schedule = Some("  0 3 * * *  ".into());
+        scheduled.schedule_enabled = true;
+        let normalized = normalize(scheduled).unwrap();
+        assert_eq!(normalized.schedule.as_deref(), Some("0 3 * * *"));
+        assert!(normalized.schedule_enabled);
+
+        let mut paused = input("Backup");
+        paused.schedule = Some("0 3 * * *".into());
+        paused.schedule_enabled = false;
+        assert_eq!(
+            normalize(paused).unwrap().schedule.as_deref(),
+            Some("0 3 * * *")
+        );
+
+        let mut enabled_without_cron = input("Backup");
+        enabled_without_cron.schedule = None;
+        enabled_without_cron.schedule_enabled = true;
+        assert!(normalize(enabled_without_cron).is_err());
+
+        let mut bad_cron = input("Backup");
+        bad_cron.schedule = Some("99 * * * *".into());
+        assert!(normalize(bad_cron).is_err());
     }
 
     #[tokio::test]

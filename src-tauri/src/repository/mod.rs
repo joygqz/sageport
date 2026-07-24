@@ -9,6 +9,7 @@ pub mod key_repo;
 pub mod settings_repo;
 pub mod snippet_repo;
 pub mod task_repo;
+pub mod task_run_repo;
 pub mod transfer_repo;
 
 pub(crate) fn none_if_empty(value: Option<&str>) -> Option<&str> {

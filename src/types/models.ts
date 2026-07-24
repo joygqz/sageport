@@ -292,6 +292,8 @@ export interface Task {
   description: string | null;
   hostId: string | null;
   steps: string;
+  schedule: string | null;
+  scheduleEnabled: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -303,6 +305,8 @@ export interface TaskInput {
   description?: string | null;
   hostId?: string | null;
   steps: TaskStep[];
+  schedule?: string | null;
+  scheduleEnabled?: boolean;
 }
 
 export type TaskRunStatus = "start" | "log" | "done" | "error" | "skipped";
@@ -313,6 +317,36 @@ export interface TaskRunEvent {
   chunk?: string;
   exitCode?: number;
   message?: string;
+}
+
+/** Overall outcome of a persisted task run. */
+export type TaskRunResultStatus = "running" | "done" | "error" | "cancelled";
+
+/** Per-step outcome inside a persisted run. */
+export type TaskRunStepStatus = "pending" | "done" | "error" | "skipped";
+
+/** One entry in a run's `steps` JSON: the step snapshot plus how it turned out. */
+export interface TaskRunStepRecord {
+  step: TaskStep;
+  status: TaskRunStepStatus;
+  exitCode?: number;
+  message?: string;
+}
+
+/** A persisted task run, shown in the Tasks view's run-history dialog. */
+export interface TaskRunHistoryEntry {
+  id: string;
+  taskId: string;
+  taskName: string;
+  hostId: string | null;
+  hostLabel: string | null;
+  /** JSON string of {@link TaskRunStepRecord}[]; parse with `JSON.parse`. */
+  steps: string;
+  totalSteps: number;
+  status: TaskRunResultStatus;
+  message: string | null;
+  startedAt: string;
+  finishedAt: string | null;
 }
 
 export type AiProtocol = "openai" | "anthropic";

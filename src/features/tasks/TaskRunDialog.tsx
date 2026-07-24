@@ -3,25 +3,20 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleSlash,
-  Clock3,
   Loader2,
   Play,
+  Server,
+  Square,
   XCircle,
 } from "lucide-react";
 
-import { Button, Field, FormDialog, Input, Select } from "@/components/ui";
+import { Button, FormDialog } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { substitute } from "@/lib/variables";
-import type { Task } from "@/types/models";
+import type { Task, TaskStep } from "@/types/models";
 import { parseTaskSteps } from "./api";
-import {
-  STEP_META,
-  stepSummary,
-  taskNeedsRemote,
-  taskVariables,
-} from "./steps";
+import { STEP_META, stepSummary, taskNeedsRemote } from "./steps";
 import {
   selectRunningRunForTask,
   useTaskRunStore,
@@ -59,7 +54,6 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
   const detach = useTaskRunStore((s) => s.detach);
 
   const steps = useMemo(() => parseTaskSteps(task), [task]);
-  const variables = useMemo(() => taskVariables(steps), [steps]);
   const needsHost = useMemo(() => taskNeedsRemote(steps), [steps]);
 
   // A run for this task may still be executing in the background — reattach to it
@@ -69,15 +63,8 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
     [task.id],
   );
 
-  const [hostId, setHostId] = useState(existing?.hostId ?? task.hostId ?? "");
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      variables.map((v) => [
-        v.name,
-        existing?.variables[v.name] ?? v.defaultValue,
-      ]),
-    ),
-  );
+  const hostId = existing?.hostId ?? task.hostId ?? "";
+  const hostLabel = hosts.find((host) => host.id === hostId)?.label ?? hostId;
   const [requestId, setRequestId] = useState<string | null>(
     existing?.requestId ?? null,
   );
@@ -99,55 +86,31 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
     };
   }, [requestId, attach, detach, dismissRun]);
 
-  const varsFilled = variables.every(
-    (v) => Boolean(v.defaultValue) || (values[v.name] ?? "").trim() !== "",
-  );
-  const canRun = varsFilled && (!needsHost || Boolean(hostId));
+  const canRun = !needsHost || Boolean(hostId);
 
   const onRun = () => {
     if (!canRun || running) return;
-    const started = startRun(task, hostId, values);
+    const started = startRun(task, hostId);
     setRequestId(started.requestId);
   };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex flex-col gap-3 overflow-y-auto p-5">
-        {needsHost && (
-          <Field label={t("tasks.run.targetHost")} required>
-            <Select
-              value={hostId}
-              onValueChange={setHostId}
-              disabled={running}
-              placeholder={t("tasks.form.selectHost")}
-              options={hosts.map((host) => ({
-                value: host.id,
-                label: host.label,
-              }))}
-            />
-          </Field>
-        )}
-
-        {variables.map((variable, index) => (
-          <Field
-            key={variable.name}
-            label={variable.name}
-            required={!variable.defaultValue}
-          >
-            <Input
-              autoFocus={index === 0 && !needsHost}
-              value={values[variable.name] ?? ""}
-              placeholder={variable.defaultValue}
-              disabled={running}
-              onChange={(e) =>
-                setValues((prev) => ({
-                  ...prev,
-                  [variable.name]: e.target.value,
-                }))
-              }
-            />
-          </Field>
-        ))}
+        {needsHost &&
+          (hostId ? (
+            <div className="flex items-center gap-2 px-1 text-sm">
+              <Server className="size-4 shrink-0 text-muted-foreground" />
+              <span className="text-muted-foreground">
+                {t("tasks.run.targetHost")}
+              </span>
+              <span className="font-medium">{hostLabel}</span>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-2xs text-danger">
+              {t("tasks.form.hostRequired")}
+            </div>
+          ))}
 
         {run?.error && (
           <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-2xs text-danger">
@@ -155,10 +118,15 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
           </div>
         )}
 
-        {run && (
-          <div className="flex flex-col gap-1.5">
-            {run.steps.map((_, index) => (
-              <StepRow key={index} run={run} values={values} index={index} />
+        {(run?.steps ?? steps).length > 0 && (
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+            {(run?.steps ?? steps).map((step, index) => (
+              <StepRow
+                key={index}
+                index={index}
+                step={step}
+                state={run?.stepStates[index]}
+              />
             ))}
           </div>
         )}
@@ -174,6 +142,7 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
             variant="destructive"
             onClick={() => requestId && cancelRun(requestId)}
           >
+            <Square className="size-4" />
             {t("tasks.run.cancel")}
           </Button>
         ) : (
@@ -216,28 +185,27 @@ function RunSummary({ run }: { run: TaskRun | undefined }) {
 }
 
 function StepRow({
-  run,
-  values,
   index,
+  step,
+  state,
 }: {
-  run: TaskRun;
-  values: Record<string, string>;
   index: number;
+  step: TaskStep;
+  state: StepRunState | undefined;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const step = run.steps[index];
-  const state = run.stepStates[index];
+  const status = state?.status ?? "pending";
   const meta = STEP_META[step.type];
   const Icon = meta.icon;
-  const summary = substitute(stepSummary(step), values);
+  const summary = stepSummary(step);
   const showProgress =
     (step.type === "upload" || step.type === "download") &&
-    state.status === "running";
-  const body = state.log.trimEnd();
+    status === "running";
+  const body = state?.log.trimEnd() ?? "";
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+    <div>
       <button
         type="button"
         onClick={() => body && setOpen((o) => !o)}
@@ -246,13 +214,13 @@ function StepRow({
           body ? "hover:bg-list-hover" : "cursor-default",
         )}
       >
-        <StatusIcon status={state.status} />
+        <StatusIcon status={status} index={index} />
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="shrink-0 text-xs font-medium">{t(meta.labelKey)}</span>
         <span className="min-w-0 flex-1 truncate font-mono text-2xs text-muted-foreground">
           {summary}
         </span>
-        {state.exitCode !== undefined && state.exitCode !== 0 && (
+        {state?.exitCode !== undefined && state.exitCode !== 0 && (
           <span className="shrink-0 font-mono text-2xs text-danger">
             exit {state.exitCode}
           </span>
@@ -267,14 +235,14 @@ function StepRow({
         )}
       </button>
 
-      {showProgress && <TransferProgress state={state} />}
+      {showProgress && state && <TransferProgress state={state} />}
 
       {open && body && (
         <pre className="max-h-48 overflow-auto border-t border-border bg-surface px-3 py-2 font-mono text-2xs">
           {body}
         </pre>
       )}
-      {state.status === "error" && state.message && !body && (
+      {status === "error" && state?.message && !body && (
         <p className="border-t border-border px-3 py-2 text-2xs text-danger">
           {state.message}
         </p>
@@ -291,7 +259,7 @@ function TransferProgress({ state }: { state: StepRunState }) {
     <div className="flex items-center gap-2 border-t border-border px-3 py-2">
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
         <div
-          className="h-full rounded-full bg-accent transition-[width]"
+          className="h-full rounded-full bg-primary transition-[width]"
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -303,7 +271,13 @@ function TransferProgress({ state }: { state: StepRunState }) {
   );
 }
 
-function StatusIcon({ status }: { status: StepRunState["status"] }) {
+function StatusIcon({
+  status,
+  index,
+}: {
+  status: StepRunState["status"];
+  index: number;
+}) {
   switch (status) {
     case "running":
       return (
@@ -318,7 +292,11 @@ function StatusIcon({ status }: { status: StepRunState["status"] }) {
         <CircleSlash className="size-3.5 shrink-0 text-muted-foreground" />
       );
     default:
-      return <Clock3 className="size-3.5 shrink-0 text-muted-foreground" />;
+      return (
+        <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-2xs font-medium text-muted-foreground">
+          {index + 1}
+        </span>
+      );
   }
 }
 

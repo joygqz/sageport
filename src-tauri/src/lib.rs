@@ -52,6 +52,7 @@ fn initialize_app(app: &mut tauri::App) -> AppResult<()> {
     let pool = tauri::async_runtime::block_on(db::init(&db_path))?;
     tauri::async_runtime::block_on(legacy::decrypt_sealed_values(&data_dir, &pool))?;
     tauri::async_runtime::block_on(repository::transfer_repo::mark_interrupted(&pool))?;
+    tauri::async_runtime::block_on(repository::task_run_repo::mark_interrupted(&pool))?;
     app.manage(AppState::new(pool));
     Ok(())
 }
@@ -157,6 +158,9 @@ pub fn run() {
             commands::tasks::tasks_delete,
             commands::tasks::tasks_run,
             commands::tasks::tasks_cancel,
+            commands::tasks::tasks_runs_list,
+            commands::tasks::tasks_runs_delete,
+            commands::tasks::tasks_runs_clear,
             commands::settings::settings_get,
             commands::settings::settings_set,
             commands::settings::settings_apply_json,

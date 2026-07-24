@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, Info, Plus } from "lucide-react";
+import { ArrowLeft, ChevronRight, Plus } from "lucide-react";
 
 import {
   Button,
@@ -12,17 +12,18 @@ import {
   FormDialog,
   Input,
   INTERACTIVE_FOCUS_CLASS,
-  SegmentedControl,
   Select,
+  SwitchField,
   Tooltip,
 } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
-import { useI18n } from "@/i18n";
+import { useI18n, type TKey } from "@/i18n";
+import { CRON_PRESETS, isValidCron, nextCronTime } from "@/lib/cron";
 import { cn } from "@/lib/utils";
 import { errorMessage, toast } from "@/lib/toast";
 import type { Task, TaskStep } from "@/types/models";
 import { parseTaskSteps, useCreateTask, useUpdateTask } from "./api";
-import { STEP_META, STEP_TYPES, newStep, taskVariables } from "./steps";
+import { STEP_META, STEP_TYPES, newStep, taskNeedsRemote } from "./steps";
 import { TaskStepCard } from "./TaskStepCard";
 import { TASK_TEMPLATES } from "./templates";
 
@@ -30,6 +31,15 @@ interface TaskDraft {
   name: string;
   steps: TaskStep[];
 }
+
+const SCHEDULE_PRESET_LABELS: Record<string, TKey> = {
+  hourly: "tasks.schedule.preset.hourly",
+  every6h: "tasks.schedule.preset.every6h",
+  daily: "tasks.schedule.preset.daily",
+  weekdays: "tasks.schedule.preset.weekdays",
+  weekly: "tasks.schedule.preset.weekly",
+  monthly: "tasks.schedule.preset.monthly",
+};
 
 export function TaskFormDialog({
   open,
@@ -172,13 +182,28 @@ function TaskFormBody({
 
   const [name, setName] = useState(draft.name);
   const [description, setDescription] = useState(task?.description ?? "");
-  const [target, setTarget] = useState<"fixed" | "runtime">(
-    task?.hostId ? "fixed" : "runtime",
-  );
   const [hostId, setHostId] = useState(task?.hostId ?? "");
   const [steps, setSteps] = useState<TaskStep[]>(draft.steps);
+  const [scheduleEnabled, setScheduleEnabled] = useState(
+    task?.scheduleEnabled ?? false,
+  );
+  const [schedule, setSchedule] = useState(task?.schedule ?? "");
 
-  const variables = useMemo(() => taskVariables(steps), [steps]);
+  const needsHost = useMemo(() => taskNeedsRemote(steps), [steps]);
+  const scheduleHint = useMemo(() => {
+    const trimmed = schedule.trim();
+    if (!trimmed) return null;
+    if (!isValidCron(trimmed)) {
+      return { error: true, text: t("tasks.schedule.invalidCron") };
+    }
+    const next = nextCronTime(trimmed, new Date());
+    return next
+      ? {
+          error: false,
+          text: t("tasks.schedule.nextRun", { time: next.toLocaleString() }),
+        }
+      : { error: true, text: t("tasks.schedule.never") };
+  }, [schedule, t]);
 
   const updateStep = (index: number, next: TaskStep) =>
     setSteps((prev) => prev.map((step, i) => (i === index ? next : step)));
@@ -201,12 +226,20 @@ function TaskFormBody({
   const submit = async () => {
     if (!name.trim()) return toast.error(t("tasks.form.nameRequired"));
     if (steps.length === 0) return toast.error(t("tasks.form.stepRequired"));
+    if (needsHost && !hostId) return toast.error(t("tasks.form.hostRequired"));
+
+    const trimmedSchedule = schedule.trim();
+    if (scheduleEnabled && !isValidCron(trimmedSchedule)) {
+      return toast.error(t("tasks.schedule.invalidCron"));
+    }
 
     const input = {
       name: name.trim(),
       description: description.trim() || null,
-      hostId: target === "fixed" ? hostId || null : null,
+      hostId: hostId || null,
       steps,
+      schedule: isValidCron(trimmedSchedule) ? trimmedSchedule : null,
+      scheduleEnabled,
     };
     try {
       if (task) {
@@ -245,26 +278,65 @@ function TaskFormBody({
         />
       </Field>
 
-      <Field label={t("tasks.form.target")}>
+      <Field label={t("tasks.form.host")} required={needsHost}>
+        <Select
+          value={hostId}
+          onValueChange={setHostId}
+          placeholder={t("tasks.form.selectHost")}
+          options={hosts.map((host) => ({
+            value: host.id,
+            label: host.label,
+          }))}
+        />
+      </Field>
+
+      <Field label={t("tasks.schedule.label")}>
         <div className="flex flex-col gap-2">
-          <SegmentedControl
-            value={target}
-            onChange={setTarget}
-            options={[
-              { value: "fixed", label: t("tasks.form.targetFixed") },
-              { value: "runtime", label: t("tasks.form.targetRuntime") },
-            ]}
+          <SwitchField
+            label={t("tasks.schedule.enable")}
+            description={t("tasks.schedule.enableHint")}
+            checked={scheduleEnabled}
+            onCheckedChange={setScheduleEnabled}
           />
-          {target === "fixed" && (
-            <Select
-              value={hostId}
-              onValueChange={setHostId}
-              placeholder={t("tasks.form.selectHost")}
-              options={hosts.map((host) => ({
-                value: host.id,
-                label: host.label,
-              }))}
-            />
+          {scheduleEnabled && (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-1.5">
+                {CRON_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setSchedule(preset.expr)}
+                    data-active={schedule.trim() === preset.expr}
+                    className={cn(
+                      INTERACTIVE_FOCUS_CLASS,
+                      "rounded-md border border-border bg-surface px-2 py-1 text-2xs text-muted-foreground transition-colors hover:border-ring/60 hover:bg-list-hover data-[active=true]:border-primary/40 data-[active=true]:bg-primary/10 data-[active=true]:text-link",
+                    )}
+                  >
+                    {t(SCHEDULE_PRESET_LABELS[preset.id])}
+                  </button>
+                ))}
+              </div>
+              <Input
+                value={schedule}
+                onChange={(e) => setSchedule(e.target.value)}
+                placeholder={t("tasks.schedule.cronPlaceholder")}
+                spellCheck={false}
+                className="font-mono"
+                maxLength={256}
+              />
+              {scheduleHint && (
+                <span
+                  className={cn(
+                    "text-2xs",
+                    scheduleHint.error
+                      ? "text-danger"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {scheduleHint.text}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </Field>
@@ -306,17 +378,6 @@ function TaskFormBody({
           />
         ))}
       </div>
-
-      {variables.length > 0 && (
-        <div className="flex items-start gap-1.5 text-2xs text-muted-foreground">
-          <Info className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            {t("tasks.form.variablesHint", {
-              names: variables.map((v) => v.name).join(", "),
-            })}
-          </span>
-        </div>
-      )}
     </FormBody>
   );
 }
