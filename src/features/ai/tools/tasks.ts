@@ -264,10 +264,11 @@ const STEP_SCHEMA = {
   items: { type: "object" },
   description:
     "Ordered steps. Each object is exactly one of: " +
-    "{type:'localCommand', command, cwd?, continueOnError?}; " +
-    "{type:'remoteCommand', command, cwd?, continueOnError?}; " +
-    "{type:'upload', localPath, remotePath, continueOnError?}; " +
-    "{type:'download', remotePath, localPath, continueOnError?}. " +
+    "{type:'localCommand', command, cwd?, retries?}; " +
+    "{type:'remoteCommand', command, cwd?, retries?}; " +
+    "{type:'upload', localPath, remotePath, retries?}; " +
+    "{type:'download', remotePath, localPath, retries?}. " +
+    "retries (default 0, max 10) is how many extra attempts to make if the step fails. " +
     "Any text field may use {{name}} or {{name:default}} placeholders.",
 } as const;
 
@@ -291,7 +292,7 @@ export const taskTools: AiTool[] = [
     spec: {
       name: "run_task",
       description:
-        "Run a saved task: it executes its ordered steps (local commands, uploads, downloads, remote commands) and stops on the first failing step. Fill any {{variable}} placeholders via values. Pass hostId to target a host when the task has remote steps and no fixed host. Always requires user approval.",
+        "Run a saved task: it executes its ordered steps (local commands, uploads, downloads, remote commands), retrying a step up to its configured retries, and stops the run once a step still fails after its retries. Fill any {{variable}} placeholders via values. Pass hostId to target a host when the task has remote steps and no fixed host. Always requires user approval.",
       parameters: {
         type: "object",
         properties: {

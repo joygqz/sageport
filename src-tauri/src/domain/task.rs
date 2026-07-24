@@ -46,7 +46,7 @@ pub enum TaskStep {
         cwd: Option<String>,
         command: String,
         #[serde(default)]
-        continue_on_error: bool,
+        retries: u32,
     },
     Upload {
         local_path: String,
@@ -54,38 +54,32 @@ pub enum TaskStep {
         #[serde(default)]
         incremental: bool,
         #[serde(default)]
-        continue_on_error: bool,
+        retries: u32,
     },
     Download {
         remote_path: String,
         local_path: String,
         #[serde(default)]
-        continue_on_error: bool,
+        retries: u32,
     },
     RemoteCommand {
         #[serde(default)]
         cwd: Option<String>,
         command: String,
         #[serde(default)]
-        continue_on_error: bool,
+        retries: u32,
     },
 }
 
 impl TaskStep {
-    pub fn continue_on_error(&self) -> bool {
+    /// How many extra attempts to make when this step fails. `0` means fail-fast:
+    /// the first failure stops the whole task.
+    pub fn retries(&self) -> u32 {
         match self {
-            TaskStep::LocalCommand {
-                continue_on_error, ..
-            }
-            | TaskStep::Upload {
-                continue_on_error, ..
-            }
-            | TaskStep::Download {
-                continue_on_error, ..
-            }
-            | TaskStep::RemoteCommand {
-                continue_on_error, ..
-            } => *continue_on_error,
+            TaskStep::LocalCommand { retries, .. }
+            | TaskStep::Upload { retries, .. }
+            | TaskStep::Download { retries, .. }
+            | TaskStep::RemoteCommand { retries, .. } => *retries,
         }
     }
 
@@ -100,40 +94,40 @@ impl TaskStep {
             TaskStep::LocalCommand {
                 cwd,
                 command,
-                continue_on_error,
+                retries,
             } => TaskStep::LocalCommand {
                 cwd: sub_opt(cwd),
                 command: sub(command),
-                continue_on_error: *continue_on_error,
+                retries: *retries,
             },
             TaskStep::Upload {
                 local_path,
                 remote_path,
                 incremental,
-                continue_on_error,
+                retries,
             } => TaskStep::Upload {
                 local_path: sub(local_path),
                 remote_path: sub(remote_path),
                 incremental: *incremental,
-                continue_on_error: *continue_on_error,
+                retries: *retries,
             },
             TaskStep::Download {
                 remote_path,
                 local_path,
-                continue_on_error,
+                retries,
             } => TaskStep::Download {
                 remote_path: sub(remote_path),
                 local_path: sub(local_path),
-                continue_on_error: *continue_on_error,
+                retries: *retries,
             },
             TaskStep::RemoteCommand {
                 cwd,
                 command,
-                continue_on_error,
+                retries,
             } => TaskStep::RemoteCommand {
                 cwd: sub_opt(cwd),
                 command: sub(command),
-                continue_on_error: *continue_on_error,
+                retries: *retries,
             },
         }
     }
@@ -242,11 +236,11 @@ mod tests {
         let step = TaskStep::RemoteCommand {
             cwd: Some("/srv".into()),
             command: "reload {{svc}}".into(),
-            continue_on_error: true,
+            retries: 3,
         };
         let json = serde_json::to_string(&step).unwrap();
         assert!(json.contains("\"type\":\"remoteCommand\""));
-        assert!(json.contains("\"continueOnError\":true"));
+        assert!(json.contains("\"retries\":3"));
         let parsed: TaskStep = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, step);
 

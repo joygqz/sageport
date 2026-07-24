@@ -9,6 +9,7 @@ const MAX_DESCRIPTION_CHARS: usize = 4 * 1024;
 const MAX_COMMAND_CHARS: usize = 32 * 1024;
 const MAX_PATH_CHARS: usize = 4 * 1024;
 const MAX_STEPS: usize = 50;
+const MAX_RETRIES: u32 = 10;
 
 pub struct NormalizedTask {
     pub name: String,
@@ -48,7 +49,7 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
         TaskStep::LocalCommand {
             cwd,
             command,
-            continue_on_error,
+            retries,
         } => {
             let command = command.trim().to_string();
             require_field(
@@ -60,13 +61,13 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
             TaskStep::LocalCommand {
                 cwd: normalize_optional(cwd, MAX_PATH_CHARS, "task working directory is too long")?,
                 command,
-                continue_on_error,
+                retries: retries.min(MAX_RETRIES),
             }
         }
         TaskStep::RemoteCommand {
             cwd,
             command,
-            continue_on_error,
+            retries,
         } => {
             let command = command.trim().to_string();
             require_field(
@@ -78,14 +79,14 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
             TaskStep::RemoteCommand {
                 cwd: normalize_optional(cwd, MAX_PATH_CHARS, "task working directory is too long")?,
                 command,
-                continue_on_error,
+                retries: retries.min(MAX_RETRIES),
             }
         }
         TaskStep::Upload {
             local_path,
             remote_path,
             incremental,
-            continue_on_error,
+            retries,
         } => {
             let local_path = local_path.trim().to_string();
             let remote_path = remote_path.trim().to_string();
@@ -105,13 +106,13 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
                 local_path,
                 remote_path,
                 incremental,
-                continue_on_error,
+                retries: retries.min(MAX_RETRIES),
             }
         }
         TaskStep::Download {
             remote_path,
             local_path,
-            continue_on_error,
+            retries,
         } => {
             let remote_path = remote_path.trim().to_string();
             let local_path = local_path.trim().to_string();
@@ -130,7 +131,7 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
             TaskStep::Download {
                 remote_path,
                 local_path,
-                continue_on_error,
+                retries: retries.min(MAX_RETRIES),
             }
         }
     };
@@ -277,7 +278,7 @@ mod tests {
         TaskStep::LocalCommand {
             cwd: Some("  ~/proj  ".into()),
             command: command.into(),
-            continue_on_error: false,
+            retries: 0,
         }
     }
 
@@ -292,7 +293,7 @@ mod tests {
                     local_path: "  ./dist  ".into(),
                     remote_path: "  /var/www/app  ".into(),
                     incremental: true,
-                    continue_on_error: false,
+                    retries: 0,
                 },
             ],
         }

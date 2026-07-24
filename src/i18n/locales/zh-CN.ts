@@ -662,7 +662,7 @@ export const zhCN: Dictionary = {
       moveUp: "上移",
       moveDown: "下移",
       removeStep: "移除步骤",
-      continueOnError: "失败继续",
+      retries: "失败重试次数",
       workingDir: "工作目录",
       workingDirPlaceholder: "~/project（可选）",
       command: "命令",
@@ -688,6 +688,9 @@ export const zhCN: Dictionary = {
       succeeded: "已完成",
       failed: "运行失败",
       cancelled: "已取消",
+      running: "运行中…",
+      doneToast: "任务“{name}”已完成",
+      errorToast: "任务“{name}”运行失败",
     },
   },
 

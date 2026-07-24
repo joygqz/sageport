@@ -18,6 +18,10 @@ use crate::state::AppState;
 
 const MAX_ID_BYTES: usize = 128;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const KILL_DRAIN_GRACE: Duration = Duration::from_secs(3);
+const CONNECT_ATTEMPTS: usize = 2;
+const CONNECT_RETRY_BACKOFF: Duration = Duration::from_millis(500);
+const STEP_RETRY_BACKOFF: Duration = Duration::from_secs(2);
 const STEP_OUTPUT_CAP: usize = 512 * 1024;
 
 #[tauri::command]
@@ -162,19 +166,7 @@ async fn run_all(
         validate_id(host_id, "host")?;
         let host = crate::repository::host_repo::get(&state.db, host_id).await?;
         let hops = super::ssh::build_hops(state, &host).await?;
-        state
-            .sftp
-            .connect_now(
-                app,
-                &state.connection_prompts,
-                SftpConnectParams {
-                    connection_id: conn_id.clone(),
-                    host_label: host.label,
-                    hops,
-                },
-                cancel,
-            )
-            .await?;
+        connect_task_session(app, state, &conn_id, host.label, hops, cancel).await?;
     }
 
     let result = execute_steps(app, state, &conn_id, steps, request_id, cancel, on_event).await;
@@ -183,6 +175,55 @@ async fn run_all(
         state.sftp.disconnect(app, &conn_id);
     }
     result
+}
+
+/// Establish the task's SFTP session, retrying a transient connection failure once.
+/// SSH handshakes occasionally fail spuriously — a raced key-exchange extension, a
+/// dropped packet, a momentary auth rejection — and succeed right away on a retry.
+/// A small bounded retry absorbs that without masking a genuinely wrong credential
+/// or risking a lockout. Only automated task runs retry; interactive sessions still
+/// fail fast so the user is prompted immediately.
+async fn connect_task_session(
+    app: &AppHandle,
+    state: &AppState,
+    conn_id: &str,
+    host_label: String,
+    hops: Vec<crate::ssh::Hop>,
+    cancel: &Arc<TransferCancel>,
+) -> AppResult<()> {
+    let mut attempt = 0;
+    loop {
+        attempt += 1;
+        let params = SftpConnectParams {
+            connection_id: conn_id.to_string(),
+            host_label: host_label.clone(),
+            hops: hops.clone(),
+        };
+        match state
+            .sftp
+            .connect_now(app, &state.connection_prompts, params, cancel)
+            .await
+        {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                if attempt >= CONNECT_ATTEMPTS
+                    || cancel.is_cancelled()
+                    || !is_retryable_connect(&err)
+                {
+                    return Err(err);
+                }
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return Err(AppError::Cancelled),
+                    _ = tokio::time::sleep(CONNECT_RETRY_BACKOFF) => {}
+                }
+            }
+        }
+    }
+}
+
+fn is_retryable_connect(err: &AppError) -> bool {
+    matches!(err.code(), "network" | "timeout" | "ssh" | "dns" | "auth")
 }
 
 async fn execute_steps(
@@ -205,7 +246,7 @@ async fn execute_steps(
         }
         let _ = on_event.send(TaskRunEvent::simple(index, "start"));
 
-        let result = run_step(
+        let result = run_step_with_retries(
             app, state, conn_id, request_id, index, step, cancel, on_event,
         )
         .await;
@@ -227,10 +268,10 @@ async fn execute_steps(
                     exit_code: exit,
                     message: Some(message),
                 });
-                if !step.continue_on_error() {
-                    skip_from = Some(index + 1);
-                    break;
-                }
+                // A step that still fails after exhausting its retries stops the
+                // run; every later step is reported as skipped.
+                skip_from = Some(index + 1);
+                break;
             }
             StepResult::Cancelled => {
                 cancelled = true;
@@ -250,6 +291,52 @@ async fn execute_steps(
         Err(AppError::Cancelled)
     } else {
         Ok(())
+    }
+}
+
+/// Run a step, retrying it up to `step.retries()` extra times when it fails.
+/// A transient failure — a dropped transfer, a flaky remote command — often
+/// succeeds on a second attempt, so a bounded retry avoids aborting the whole
+/// run over a momentary hiccup. Cancellation and success short-circuit the loop.
+#[allow(clippy::too_many_arguments)]
+async fn run_step_with_retries(
+    app: &AppHandle,
+    state: &AppState,
+    conn_id: &str,
+    request_id: &str,
+    index: usize,
+    step: &TaskStep,
+    cancel: &Arc<TransferCancel>,
+    on_event: &Channel<TaskRunEvent>,
+) -> StepResult {
+    let max_retries = step.retries();
+    let mut attempt: u32 = 0;
+    loop {
+        match run_step(
+            app, state, conn_id, request_id, index, step, cancel, on_event,
+        )
+        .await
+        {
+            StepResult::Failed { exit, message } => {
+                if attempt >= max_retries || cancel.is_cancelled() {
+                    return StepResult::Failed { exit, message };
+                }
+                attempt += 1;
+                let _ = on_event.send(TaskRunEvent::log(
+                    index,
+                    format!(
+                        "\n[retry {attempt}/{max_retries}] {message}; retrying in {}s\n",
+                        STEP_RETRY_BACKOFF.as_secs()
+                    ),
+                ));
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return StepResult::Cancelled,
+                    _ = tokio::time::sleep(STEP_RETRY_BACKOFF) => {}
+                }
+            }
+            other => return other,
+        }
     }
 }
 
@@ -338,6 +425,7 @@ async fn run_local_command(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    set_process_group(&mut builder);
     let mut child = builder
         .spawn()
         .map_err(|e| AppError::Other(format!("could not start local command: {e}")))?;
@@ -363,15 +451,15 @@ async fn run_local_command(
     };
     match outcome {
         Stop::Cancelled => {
-            let _ = child.start_kill();
+            kill_process_tree(&mut child).await;
             let _ = child.wait().await;
-            drain(&mut readers).await;
+            drain_bounded(&mut readers).await;
             Err(AppError::Cancelled)
         }
         Stop::TimedOut => {
-            let _ = child.start_kill();
+            kill_process_tree(&mut child).await;
             let _ = child.wait().await;
-            drain(&mut readers).await;
+            drain_bounded(&mut readers).await;
             Err(AppError::Timeout("local command timed out".into()))
         }
         Stop::Done(status) => {
@@ -380,6 +468,52 @@ async fn run_local_command(
             Ok(exit_code(status))
         }
     }
+}
+
+fn set_process_group(builder: &mut tokio::process::Command) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // Group id 0 makes the child the leader of a fresh group whose id equals
+        // its pid, so `kill(-pid, …)` later reaches every descendant.
+        builder.as_std_mut().process_group(0);
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = builder;
+    }
+}
+
+/// Kill the local command and every process it spawned. Killing only the direct
+/// child leaves build-tool grandchildren holding the stdout/stderr pipes open,
+/// which would wedge the reader tasks — and the whole run — indefinitely.
+async fn kill_process_tree(child: &mut tokio::process::Child) {
+    let pid = child.id();
+    #[cfg(unix)]
+    if let Some(pid) = pid {
+        // Negative target = the process group created by `set_process_group`.
+        unsafe {
+            libc::kill(-(pid as i32), libc::SIGKILL);
+        }
+    }
+    #[cfg(windows)]
+    if let Some(pid) = pid {
+        let _ = tokio::process::Command::new("taskkill")
+            .args(["/T", "/F", "/PID", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .await;
+    }
+    let _ = child.start_kill();
+}
+
+/// Drain reader tasks without ever blocking forever. After a kill the pipes close
+/// promptly once descendants exit; the timeout is a safety net for a stray process
+/// that escaped the group (the JoinSet aborts leftovers when dropped).
+async fn drain_bounded(readers: &mut JoinSet<()>) {
+    let _ = tokio::time::timeout(KILL_DRAIN_GRACE, drain(readers)).await;
 }
 
 fn exit_code(status: std::process::ExitStatus) -> i32 {
@@ -506,7 +640,10 @@ async fn run_transfer(
         return Err(AppError::Invalid("transfer path has no file name".into()));
     }
 
-    let transfer_id = format!("{request_id}-s{index}");
+    // The `task:` prefix marks this as an orchestrated transfer so the SFTP panel
+    // can ignore it — task runs show their own progress and are not file-manager
+    // transfers, so they stay out of that panel's status bar and history.
+    let transfer_id = format!("task:{request_id}-s{index}");
     let outcome = sftp::transfer(
         app,
         &state.sftp,

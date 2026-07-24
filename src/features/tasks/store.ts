@@ -1,9 +1,18 @@
 import { create } from "zustand";
 
+import { detectLocale } from "@/i18n/config";
+import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
-import { errorCode, errorMessage } from "@/lib/toast";
+import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type { Task, TaskRunEvent, TaskStep } from "@/types/models";
 import { parseTaskSteps } from "./api";
+
+function t(
+  key: Parameters<typeof translate>[1],
+  params?: Parameters<typeof translate>[2],
+): string {
+  return translate(detectLocale(), key, params);
+}
 
 export type StepStatus = "pending" | "running" | "done" | "error" | "skipped";
 
@@ -23,9 +32,12 @@ export interface TaskRun {
   taskId: string;
   taskName: string;
   hostId: string;
+  variables: Record<string, string>;
   steps: TaskStep[];
   stepStates: StepRunState[];
   status: RunStatus;
+  /** Run-level failure (e.g. the host connection) that is not any one step's fault. */
+  error?: string;
   startedAt: number;
   finishedAt?: number;
 }
@@ -46,6 +58,8 @@ export interface StartedRun {
 
 interface TaskRunState {
   runs: Record<string, TaskRun>;
+  /** requestId of the run currently shown in an open run dialog, if any. */
+  attachedId: string | null;
   startRun: (
     task: Task,
     hostId: string,
@@ -53,6 +67,18 @@ interface TaskRunState {
   ) => StartedRun;
   cancelRun: (requestId: string) => void;
   dismissRun: (requestId: string) => void;
+  attach: (requestId: string) => void;
+  detach: (requestId: string) => void;
+}
+
+/** The in-flight run for a task, if one is currently executing. */
+export function selectRunningRunForTask(
+  runs: Record<string, TaskRun>,
+  taskId: string,
+): TaskRun | undefined {
+  return Object.values(runs).find(
+    (run) => run.taskId === taskId && run.status === "running",
+  );
 }
 
 let transferBridged = false;
@@ -128,13 +154,50 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
       };
     });
 
+  // Record a run-level failure and mark the steps that never got to run as
+  // skipped — a connection failure happens before any step, so pinning it to the
+  // first step would wrongly blame it (e.g. a local build command).
+  const failRun = (requestId: string, message: string) =>
+    set((state) => {
+      const run = state.runs[requestId];
+      if (!run) return state;
+      const stepStates = run.stepStates.map((step) =>
+        step.status === "pending" || step.status === "running"
+          ? { ...step, status: "skipped" as const }
+          : step,
+      );
+      return {
+        runs: {
+          ...state.runs,
+          [requestId]: { ...run, stepStates, error: message },
+        },
+      };
+    });
+
+  // A run that finished while no dialog was watching it (backgrounded) reports
+  // its outcome via a toast and is then dropped, so the store never accumulates
+  // stale finished runs. When a dialog is attached it shows the result inline and
+  // owns cleanup on close, so stay quiet here.
+  const reportBackgroundCompletion = (requestId: string) => {
+    const state = get();
+    if (state.attachedId === requestId) return;
+    const run = state.runs[requestId];
+    if (!run) return;
+    if (run.status === "done") {
+      toast.success(t("tasks.run.doneToast", { name: run.taskName }));
+    } else if (run.status === "error") {
+      toast.error(t("tasks.run.errorToast", { name: run.taskName }), run.error);
+    }
+    get().dismissRun(requestId);
+  };
+
   const ensureTransferBridge = () => {
     if (transferBridged) return;
     transferBridged = true;
     void ipc.sftp.onTransfer((event) => {
       const runs = get().runs;
       for (const run of Object.values(runs)) {
-        const prefix = `${run.requestId}-s`;
+        const prefix = `task:${run.requestId}-s`;
         if (!event.transferId.startsWith(prefix)) continue;
         const index = Number.parseInt(
           event.transferId.slice(prefix.length),
@@ -152,6 +215,7 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
 
   return {
     runs: {},
+    attachedId: null,
 
     startRun: (task, hostId, variables) => {
       ensureTransferBridge();
@@ -162,6 +226,7 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
         taskId: task.id,
         taskName: task.name,
         hostId,
+        variables,
         steps,
         stepStates: steps.map(() => ({ status: "pending", log: "" })),
         status: "running",
@@ -180,23 +245,14 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           );
           finalize(requestId, "done");
         } catch (err) {
-          finalize(
-            requestId,
-            errorCode(err) === "cancelled" ? "cancelled" : "error",
-          );
-          const current = get().runs[requestId];
-          if (current && errorCode(err) !== "cancelled") {
-            const firstPending = current.stepStates.findIndex(
-              (step) => step.status === "pending" || step.status === "running",
-            );
-            if (firstPending >= 0) {
-              patchStep(requestId, firstPending, {
-                status: "error",
-                message: errorMessage(err),
-              });
-            }
-          }
+          const cancelled = errorCode(err) === "cancelled";
+          // Only connection/setup failures (before any step) and cancellation reject
+          // here — a failing step reports itself over the event channel and resolves
+          // normally, so this error belongs to the run, not to a step.
+          if (!cancelled) failRun(requestId, errorMessage(err));
+          finalize(requestId, cancelled ? "cancelled" : "error");
         }
+        reportBackgroundCompletion(requestId);
         return get().runs[requestId];
       })();
 
@@ -211,7 +267,17 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
       set((state) => {
         const rest = { ...state.runs };
         delete rest[requestId];
-        return { runs: rest };
+        return {
+          runs: rest,
+          attachedId: state.attachedId === requestId ? null : state.attachedId,
+        };
       }),
+
+    attach: (requestId) => set({ attachedId: requestId }),
+
+    detach: (requestId) =>
+      set((state) =>
+        state.attachedId === requestId ? { attachedId: null } : state,
+      ),
   };
 });

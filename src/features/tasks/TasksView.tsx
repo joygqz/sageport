@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { Copy, Pencil, Play, Plus, Trash2, Workflow } from "lucide-react";
+import {
+  Copy,
+  Loader2,
+  Pencil,
+  Play,
+  Plus,
+  Trash2,
+  Workflow,
+} from "lucide-react";
 
 import {
   Button,
@@ -31,6 +39,7 @@ import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { parseTaskSteps, useCreateTask, useDeleteTask, useTasks } from "./api";
 import { stepSummary } from "./steps";
+import { selectRunningRunForTask, useTaskRunStore } from "./store";
 import { TaskFormDialog } from "./TaskFormDialog";
 import { TaskRunDialog } from "./TaskRunDialog";
 
@@ -169,15 +178,10 @@ export function TasksView() {
                         {subtitle}
                       </p>
                     </div>
-                    <Tooltip content={t("tasks.run.run")}>
-                      <button
-                        type="button"
-                        onClick={() => setRunTask(task)}
-                        className={PANEL_LIST_ACTION_CLASS}
-                      >
-                        <Play className="size-3.5" />
-                      </button>
-                    </Tooltip>
+                    <TaskRowAction
+                      task={task}
+                      onOpen={() => setRunTask(task)}
+                    />
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
@@ -217,5 +221,46 @@ export function TasksView() {
         onClose={() => setConfirmState(null)}
       />
     </SideBarView>
+  );
+}
+
+/**
+ * Trailing control for a task row. When a run for the task is executing it shows
+ * an always-visible progress badge (a run keeps going after its dialog closes);
+ * otherwise it falls back to the hover-revealed run button. Both reopen the run
+ * dialog, which reattaches to the in-flight run so it can be watched or cancelled.
+ */
+function TaskRowAction({ task, onOpen }: { task: Task; onOpen: () => void }) {
+  const { t } = useI18n();
+  const run = useTaskRunStore((s) => selectRunningRunForTask(s.runs, task.id));
+
+  if (run) {
+    const done = run.stepStates.filter((step) =>
+      ["done", "error", "skipped"].includes(step.status),
+    ).length;
+    return (
+      <Tooltip content={t("tasks.run.running")}>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-2xs font-medium text-warning transition-colors hover:bg-list-hover"
+        >
+          <Loader2 className="size-3 animate-spin" />
+          {done}/{run.steps.length}
+        </button>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Tooltip content={t("tasks.run.run")}>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={PANEL_LIST_ACTION_CLASS}
+      >
+        <Play className="size-3.5" />
+      </button>
+    </Tooltip>
   );
 }

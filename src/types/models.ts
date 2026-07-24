@@ -262,26 +262,26 @@ export type TaskStep =
       type: "localCommand";
       cwd?: string;
       command: string;
-      continueOnError?: boolean;
+      retries?: number;
     }
   | {
       type: "upload";
       localPath: string;
       remotePath: string;
       incremental?: boolean;
-      continueOnError?: boolean;
+      retries?: number;
     }
   | {
       type: "download";
       remotePath: string;
       localPath: string;
-      continueOnError?: boolean;
+      retries?: number;
     }
   | {
       type: "remoteCommand";
       cwd?: string;
       command: string;
-      continueOnError?: boolean;
+      retries?: number;
     };
 
 export type TaskStepType = TaskStep["type"];

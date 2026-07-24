@@ -681,7 +681,7 @@ export const en = {
       moveUp: "Move up",
       moveDown: "Move down",
       removeStep: "Remove step",
-      continueOnError: "Continue on error",
+      retries: "Retry attempts",
       workingDir: "Working directory",
       workingDirPlaceholder: "~/project (optional)",
       command: "Command",
@@ -707,6 +707,9 @@ export const en = {
       succeeded: "Completed",
       failed: "Failed",
       cancelled: "Cancelled",
+      running: "Running…",
+      doneToast: "Task “{name}” completed",
+      errorToast: "Task “{name}” failed",
     },
   },
 

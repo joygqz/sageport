@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   ChevronRight,
@@ -22,7 +22,12 @@ import {
   taskNeedsRemote,
   taskVariables,
 } from "./steps";
-import { useTaskRunStore, type StepRunState, type TaskRun } from "./store";
+import {
+  selectRunningRunForTask,
+  useTaskRunStore,
+  type StepRunState,
+  type TaskRun,
+} from "./store";
 
 export function TaskRunDialog({
   task,
@@ -50,35 +55,49 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
   const startRun = useTaskRunStore((s) => s.startRun);
   const cancelRun = useTaskRunStore((s) => s.cancelRun);
   const dismissRun = useTaskRunStore((s) => s.dismissRun);
+  const attach = useTaskRunStore((s) => s.attach);
+  const detach = useTaskRunStore((s) => s.detach);
 
   const steps = useMemo(() => parseTaskSteps(task), [task]);
   const variables = useMemo(() => taskVariables(steps), [steps]);
   const needsHost = useMemo(() => taskNeedsRemote(steps), [steps]);
 
-  const [hostId, setHostId] = useState(task.hostId ?? "");
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(variables.map((v) => [v.name, v.defaultValue])),
+  // A run for this task may still be executing in the background — reattach to it
+  // so reopening the dialog resumes watching its progress instead of starting over.
+  const existing = useMemo(
+    () => selectRunningRunForTask(useTaskRunStore.getState().runs, task.id),
+    [task.id],
   );
-  const [requestId, setRequestId] = useState<string | null>(null);
+
+  const [hostId, setHostId] = useState(existing?.hostId ?? task.hostId ?? "");
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      variables.map((v) => [
+        v.name,
+        existing?.variables[v.name] ?? v.defaultValue,
+      ]),
+    ),
+  );
+  const [requestId, setRequestId] = useState<string | null>(
+    existing?.requestId ?? null,
+  );
   const run = useTaskRunStore((s) =>
     requestId ? s.runs[requestId] : undefined,
   );
   const running = run?.status === "running";
 
-  const requestRef = useRef<string | null>(null);
+  // While the dialog shows a run, mark it attached so a background completion
+  // doesn't toast and dismiss it out from under us. On close, keep a still-running
+  // run alive (it continues in the background) and clean up a finished one.
   useEffect(() => {
-    requestRef.current = requestId;
-  }, [requestId]);
-  useEffect(
-    () => () => {
-      const id = requestRef.current;
-      if (id) {
-        cancelRun(id);
-        dismissRun(id);
-      }
-    },
-    [cancelRun, dismissRun],
-  );
+    if (!requestId) return;
+    attach(requestId);
+    return () => {
+      detach(requestId);
+      const current = useTaskRunStore.getState().runs[requestId];
+      if (current && current.status !== "running") dismissRun(requestId);
+    };
+  }, [requestId, attach, detach, dismissRun]);
 
   const varsFilled = variables.every(
     (v) => Boolean(v.defaultValue) || (values[v.name] ?? "").trim() !== "",
@@ -129,6 +148,12 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
             />
           </Field>
         ))}
+
+        {run?.error && (
+          <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-2xs text-danger">
+            {run.error}
+          </div>
+        )}
 
         {run && (
           <div className="flex flex-col gap-1.5">

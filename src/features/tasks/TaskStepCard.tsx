@@ -1,17 +1,17 @@
-import { ChevronDown, ChevronUp, MonitorSmartphone, X } from "lucide-react";
-
 import {
-  Button,
-  Field,
-  Input,
-  Switch,
-  Textarea,
-  Tooltip,
-} from "@/components/ui";
+  ChevronDown,
+  ChevronUp,
+  Minus,
+  MonitorSmartphone,
+  Plus,
+  X,
+} from "lucide-react";
+
+import { Button, Field, Input, Textarea, Tooltip } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { TaskStep } from "@/types/models";
-import { STEP_META } from "./steps";
+import { MAX_STEP_RETRIES, STEP_META } from "./steps";
 
 interface TaskStepCardProps {
   step: TaskStep;
@@ -94,17 +94,53 @@ export function TaskStepCard({
 
         <StepFields step={step} disabled={disabled} onChange={onChange} />
 
-        <label className="flex cursor-pointer items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{t("tasks.form.continueOnError")}</span>
-          <Switch
-            checked={step.continueOnError ?? false}
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>{t("tasks.form.retries")}</span>
+          <RetryStepper
+            value={step.retries ?? 0}
             disabled={disabled}
-            onCheckedChange={(continueOnError) =>
-              onChange({ ...step, continueOnError })
-            }
+            onChange={(retries) => onChange({ ...step, retries })}
           />
-        </label>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function RetryStepper({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  const clamp = (next: number) =>
+    onChange(Math.min(MAX_STEP_RETRIES, Math.max(0, next)));
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-6"
+        disabled={disabled || value <= 0}
+        onClick={() => clamp(value - 1)}
+      >
+        <Minus className="size-3.5" />
+      </Button>
+      <span className="w-5 text-center font-mono text-sm tabular-nums text-foreground">
+        {value}
+      </span>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-6"
+        disabled={disabled || value >= MAX_STEP_RETRIES}
+        onClick={() => clamp(value + 1)}
+      >
+        <Plus className="size-3.5" />
+      </Button>
     </div>
   );
 }

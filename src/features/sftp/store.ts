@@ -601,6 +601,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
     },
 
     applyTransfer: (e) => {
+      if (e.transferId.startsWith("task:")) return;
       syncTransferHistory(e);
       if (e.status === "active") {
         set((s) => ({

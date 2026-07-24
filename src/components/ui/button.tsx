@@ -23,6 +23,7 @@ export function Button({
   loading,
   children,
   disabled,
+  type,
   ref,
   ...props
 }: ButtonProps) {
@@ -31,6 +32,10 @@ export function Button({
     <Comp
       ref={ref}
       data-slot="button"
+      // Default to a non-submitting button so instances inside a <form> (e.g.
+      // steppers or icon controls) don't accidentally submit it. Real submit
+      // buttons opt in with an explicit type="submit".
+      type={asChild ? type : (type ?? "button")}
       className={cn(buttonVariants({ variant, size, className }))}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
