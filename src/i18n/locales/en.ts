@@ -675,6 +675,7 @@ export const en = {
       host: "Host",
       selectHost: "Select a host",
       hostRequired: "Choose a host for the remote steps",
+      hostHint: "Uploads, downloads, and remote commands run on this host",
       steps: "Steps",
       addStep: "Add step",
       moveUp: "Move up",

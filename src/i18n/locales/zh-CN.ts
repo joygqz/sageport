@@ -656,6 +656,7 @@ export const zhCN: Dictionary = {
       host: "主机",
       selectHost: "选择主机",
       hostRequired: "为远程步骤选择一个主机",
+      hostHint: "上传、下载和远程命令将在此主机上运行",
       steps: "步骤",
       addStep: "添加步骤",
       moveUp: "上移",
