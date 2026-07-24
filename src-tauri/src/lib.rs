@@ -14,6 +14,8 @@ mod ssh;
 mod sshkey;
 mod state;
 mod sync;
+#[cfg(desktop)]
+mod tray;
 mod update;
 
 use tauri::webview::PageLoadEvent;
@@ -78,14 +80,31 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            tray::show_main_window(app);
         }))
         .plugin(tauri_plugin_autostart::Builder::new().build());
     let app = builder
+        .on_window_event(|window, event| {
+            // Closing the window hides it to the tray so the in-webview task
+            // scheduler keeps running; quitting is only reachable from the tray
+            // menu. The frontend owns the hide (Workbench's onCloseRequested
+            // must preventDefault, or the JS API destroys the webview); this is
+            // a safety net for close requests the frontend cannot answer.
+            // prevent_close() must stay the only synchronous action: hiding or
+            // switching activation policy inside the native close cycle lets
+            // macOS destroy the window despite the prevent signal.
+            #[cfg(desktop)]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let window = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    tray::hide_main_window(&window);
+                });
+            }
+            #[cfg(not(desktop))]
+            let _ = (window, event);
+        })
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Started {
                 if let Some(state) = webview.try_state::<AppState>() {
@@ -115,6 +134,9 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 commands::window::preset_traffic_light_inset(&window);
             }
+
+            #[cfg(desktop)]
+            tray::build(app.handle())?;
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(update::run_periodic(handle));
@@ -228,6 +250,7 @@ pub fn run() {
             commands::sync::sync_file_import,
             commands::app::app_is_portable,
             commands::window::window_set_traffic_light_inset,
+            commands::window::window_hide_to_tray,
             commands::update::update_status,
             commands::update::update_can_self_update,
             commands::update::update_check,
@@ -249,12 +272,21 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|handle, event| {
-        if matches!(event, tauri::RunEvent::Exit) {
+    app.run(|handle, event| match event {
+        tauri::RunEvent::ExitRequested { code, api, .. } => {
+            // `None` = user interaction (last window closed / OS quit): stay alive
+            // in the tray so the task scheduler keeps running. `Some` = explicit
+            // `app.exit()`/`restart()` (tray Quit, updater): let it proceed.
+            if code.is_none() {
+                api.prevent_exit();
+            }
+        }
+        tauri::RunEvent::Exit => {
             if let Some(state) = handle.try_state::<AppState>() {
                 cleanup_orphaned_sessions(&state);
             }
         }
+        _ => {}
     });
 }
 

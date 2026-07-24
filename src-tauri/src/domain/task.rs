@@ -58,8 +58,6 @@ pub enum TaskStep {
         local_path: String,
         remote_path: String,
         #[serde(default)]
-        incremental: bool,
-        #[serde(default)]
         retries: u32,
     },
     Download {

@@ -10,8 +10,8 @@ use tokio::task::JoinSet;
 
 use crate::domain::{Task, TaskInput, TaskStep};
 use crate::error::{AppError, AppResult};
-use crate::repository::task_run_repo::{self, TaskRunRow};
 use crate::repository::task_repo;
+use crate::repository::task_run_repo::{self, TaskRunRow};
 use crate::sftp::path::{parent_remote, sh_quote};
 use crate::sftp::{self, base_name, Endpoint, SftpConnectParams, TransferCancel, TransferRequest};
 use crate::state::AppState;
@@ -359,8 +359,10 @@ async fn run_all(
         connect_task_session(app, state, &conn_id, host.label, hops, cancel).await?;
     }
 
-    let result =
-        execute_steps(app, state, &conn_id, steps, request_id, cancel, on_event, outcomes).await;
+    let result = execute_steps(
+        app, state, &conn_id, steps, request_id, cancel, on_event, outcomes,
+    )
+    .await;
 
     if needs_remote {
         state.sftp.disconnect(app, &conn_id);

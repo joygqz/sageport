@@ -127,7 +127,9 @@ export function TaskRunHistoryDialog({
           )}
 
           {isError && (
-            <p className="text-sm text-danger">{t("tasks.history.loadError")}</p>
+            <p className="text-sm text-danger">
+              {t("tasks.history.loadError")}
+            </p>
           )}
 
           {!isLoading && !isError && entries?.length === 0 && (
@@ -210,12 +212,17 @@ function RunRow({
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
               {entry.hostLabel && (
-                <span className="flex items-center gap-1" title={entry.hostLabel}>
+                <span
+                  className="flex items-center gap-1"
+                  title={entry.hostLabel}
+                >
                   <Server className="size-3 shrink-0" />
                   {entry.hostLabel}
                 </span>
               )}
-              <span>{t("tasks.history.steps", { count: entry.totalSteps })}</span>
+              <span>
+                {t("tasks.history.steps", { count: entry.totalSteps })}
+              </span>
               <span>·</span>
               <span>{new Date(entry.startedAt).toLocaleString()}</span>
               {duration && (
@@ -281,7 +288,9 @@ function StepStatusIcon({ status }: { status: TaskRunStepStatus }) {
     case "error":
       return <XCircle className="size-3.5 shrink-0 text-danger" />;
     case "skipped":
-      return <CircleSlash className="size-3.5 shrink-0 text-muted-foreground" />;
+      return (
+        <CircleSlash className="size-3.5 shrink-0 text-muted-foreground" />
+      );
     default:
       return <Clock3 className="size-3.5 shrink-0 text-muted-foreground" />;
   }
@@ -290,7 +299,8 @@ function StepStatusIcon({ status }: { status: TaskRunStepStatus }) {
 /** Human-readable run duration, or null when it never finished. */
 function runDuration(entry: TaskRunHistoryEntry): string | null {
   if (!entry.finishedAt) return null;
-  const ms = new Date(entry.finishedAt).getTime() - new Date(entry.startedAt).getTime();
+  const ms =
+    new Date(entry.finishedAt).getTime() - new Date(entry.startedAt).getTime();
   if (!Number.isFinite(ms) || ms < 0) return null;
   if (ms < 1000) return `${Math.round(ms)}ms`;
   const seconds = ms / 1000;

@@ -163,9 +163,18 @@ mod tests {
     #[tokio::test]
     async fn records_finishes_and_prunes_history() {
         let pool = test_pool().await;
-        create(&pool, "run-1", "task-1", "Deploy", Some("host-1"), Some("web-01"), "[]", 2)
-            .await
-            .unwrap();
+        create(
+            &pool,
+            "run-1",
+            "task-1",
+            "Deploy",
+            Some("host-1"),
+            Some("web-01"),
+            "[]",
+            2,
+        )
+        .await
+        .unwrap();
         finish(&pool, "run-1", "done", None, "[{\"status\":\"done\"}]")
             .await
             .unwrap();

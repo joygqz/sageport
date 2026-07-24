@@ -18,7 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-dialog = "2"
@@ -73,14 +73,17 @@ objc2 = "0.6"
 block2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = [
   "std",
+  "NSApplication",
   "NSButton",
   "NSControl",
+  "NSImage",
   "NSResponder",
   "NSView",
   "NSWindow",
 ] }
 objc2-foundation = { version = "0.3", default-features = false, features = [
   "std",
+  "NSData",
   "NSNotification",
   "NSObject",
   "NSOperation",

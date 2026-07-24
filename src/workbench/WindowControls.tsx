@@ -3,6 +3,7 @@ import { Copy, Minus, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { useI18n } from "@/i18n";
+import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { installWindowListener } from "./window-listener";
@@ -79,7 +80,7 @@ export function WindowControls() {
           buttonClass,
           "hover:bg-destructive hover:text-destructive-foreground",
         )}
-        onClick={() => run(() => appWindow.close())}
+        onClick={() => run(() => ipc.window.hideToTray())}
       >
         <X className="size-4" />
       </button>

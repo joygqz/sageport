@@ -186,6 +186,7 @@ function TaskFormBody({
     task?.scheduleEnabled ?? false,
   );
   const [schedule, setSchedule] = useState(task?.schedule ?? "");
+  const [openStepIndex, setOpenStepIndex] = useState<number | null>(null);
 
   const needsHost = useMemo(() => taskNeedsRemote(steps), [steps]);
 
@@ -204,8 +205,10 @@ function TaskFormBody({
       return next;
     });
 
-  const addStep = (type: (typeof STEP_TYPES)[number]) =>
+  const addStep = (type: (typeof STEP_TYPES)[number]) => {
+    setOpenStepIndex(steps.length);
     setSteps((prev) => [...prev, newStep(type)]);
+  };
 
   const submit = async () => {
     if (!name.trim()) return toast.error(t("tasks.form.nameRequired"));
@@ -289,6 +292,7 @@ function TaskFormBody({
 
       <StepsSection
         steps={steps}
+        openIndex={openStepIndex}
         onAdd={addStep}
         onChange={updateStep}
         onRemove={removeStep}
@@ -300,12 +304,14 @@ function TaskFormBody({
 
 function StepsSection({
   steps,
+  openIndex,
   onAdd,
   onChange,
   onRemove,
   onMove,
 }: {
   steps: TaskStep[];
+  openIndex: number | null;
   onAdd: (type: TaskStepType) => void;
   onChange: (index: number, step: TaskStep) => void;
   onRemove: (index: number) => void;
@@ -314,10 +320,10 @@ function StepsSection({
   const { t } = useI18n();
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">
+          <span className="text-sm font-medium text-foreground">
             {t("tasks.form.steps")}
           </span>
           <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-2xs tabular-nums text-muted-foreground">
@@ -344,19 +350,22 @@ function StepsSection({
         </DropdownMenu>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {steps.map((step, index) => (
-          <TaskStepCard
-            key={index}
-            step={step}
-            index={index}
-            total={steps.length}
-            onChange={(next) => onChange(index, next)}
-            onRemove={() => onRemove(index)}
-            onMove={(direction) => onMove(index, direction)}
-          />
-        ))}
-      </div>
+      {steps.length > 0 && (
+        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+          {steps.map((step, index) => (
+            <TaskStepCard
+              key={index}
+              step={step}
+              index={index}
+              total={steps.length}
+              defaultOpen={index === openIndex}
+              onChange={(next) => onChange(index, next)}
+              onRemove={() => onRemove(index)}
+              onMove={(direction) => onMove(index, direction)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

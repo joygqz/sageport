@@ -515,6 +515,7 @@ export const ipc = {
   window: {
     setTrafficLightInset: (x: number, height: number) =>
       invoke<void>("window_set_traffic_light_inset", { x, height }),
+    hideToTray: () => invoke<void>("window_hide_to_tray"),
   },
   update: {
     status: () => invoke<UpdateStatus>("update_status"),

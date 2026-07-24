@@ -48,6 +48,17 @@ pub fn window_set_traffic_light_inset(window: tauri::Window, x: f64, height: f64
     Ok(())
 }
 
+/// Hide the window to the tray instead of closing it. The frontend close button
+/// calls this rather than `window.close()`, because destroying the only window
+/// would tear down the webview (and its task scheduler); hiding keeps it alive.
+#[tauri::command]
+pub fn window_hide_to_tray(window: tauri::Window) {
+    #[cfg(desktop)]
+    crate::tray::hide_main_window(&window);
+    #[cfg(not(desktop))]
+    let _ = window;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
