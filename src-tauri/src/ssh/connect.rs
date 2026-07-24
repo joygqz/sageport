@@ -301,6 +301,31 @@ fn is_partial(result: &AuthResult) -> bool {
     )
 }
 
+fn no_remaining_methods(result: &AuthResult) -> bool {
+    matches!(
+        result,
+        AuthResult::Failure {
+            remaining_methods,
+            partial_success: false,
+        } if remaining_methods.is_empty()
+    )
+}
+
+pub(super) fn dropped_during_auth(result: &AuthResult, handle: &Handle<ClientHandler>) -> bool {
+    handle.is_closed() && no_remaining_methods(result)
+}
+
+pub(super) fn connection_lost_during_auth() -> AppError {
+    AppError::Network("the connection dropped during authentication".into())
+}
+
+fn checked(result: AuthResult, handle: &Handle<ClientHandler>) -> AppResult<AuthResult> {
+    if dropped_during_auth(&result, handle) {
+        return Err(connection_lost_during_auth());
+    }
+    Ok(result)
+}
+
 fn truncate_chars(value: &str, limit: usize) -> String {
     value.chars().take(limit).collect()
 }
@@ -401,8 +426,10 @@ async fn authenticate_without_saved_password(
 ) -> AppResult<bool> {
     if allows(methods, MethodKind::Password) {
         let password = request_password(app, prompts, session_id, hop).await?;
-        let result =
-            with_ssh_timeout(handle.authenticate_password(&hop.username, password.clone())).await?;
+        let result = checked(
+            with_ssh_timeout(handle.authenticate_password(&hop.username, password.clone())).await?,
+            handle,
+        )?;
         if result.success() {
             return Ok(true);
         }
@@ -429,8 +456,10 @@ async fn authenticate(
 ) -> AppResult<()> {
     let ok = match &hop.auth {
         AuthMethod::Password(Some(password)) => {
-            let result =
-                with_ssh_timeout(handle.authenticate_password(&hop.username, password)).await?;
+            let result = checked(
+                with_ssh_timeout(handle.authenticate_password(&hop.username, password)).await?,
+                handle,
+            )?;
             if result.success() {
                 true
             } else if allows(&result, MethodKind::KeyboardInteractive) {
@@ -441,7 +470,10 @@ async fn authenticate(
             }
         }
         AuthMethod::Password(None) => {
-            let none = with_ssh_timeout(handle.authenticate_none(&hop.username)).await?;
+            let none = checked(
+                with_ssh_timeout(handle.authenticate_none(&hop.username)).await?,
+                handle,
+            )?;
             if none.success() {
                 true
             } else {
@@ -465,11 +497,14 @@ async fn authenticate(
             } else {
                 None
             };
-            let result = with_ssh_timeout(handle.authenticate_publickey(
-                &hop.username,
-                PrivateKeyWithHashAlg::new(Arc::new(key), hash),
-            ))
-            .await?;
+            let result = checked(
+                with_ssh_timeout(handle.authenticate_publickey(
+                    &hop.username,
+                    PrivateKeyWithHashAlg::new(Arc::new(key), hash),
+                ))
+                .await?,
+                handle,
+            )?;
             if result.success() {
                 true
             } else if is_partial(&result) && allows(&result, MethodKind::KeyboardInteractive) {
@@ -483,22 +518,32 @@ async fn authenticate(
             AgentAuth::KeyboardInteractive => {
                 keyboard_interactive(app, prompts, session_id, handle, hop, None).await?
             }
+            AgentAuth::Disconnected => return Err(connection_lost_during_auth()),
             AgentAuth::Failure => false,
         },
         AuthMethod::Automatic => {
-            let none = with_ssh_timeout(handle.authenticate_none(&hop.username)).await?;
+            let none = checked(
+                with_ssh_timeout(handle.authenticate_none(&hop.username)).await?,
+                handle,
+            )?;
             let agent = if allows(&none, MethodKind::PublicKey) {
                 authenticate_with_agent(handle, &hop.username).await
             } else {
                 AgentAuth::Failure
             };
-            if none.success() || matches!(agent, AgentAuth::Success) {
-                true
-            } else if matches!(agent, AgentAuth::KeyboardInteractive) {
-                keyboard_interactive(app, prompts, session_id, handle, hop, None).await?
-            } else {
-                authenticate_without_saved_password(app, prompts, session_id, handle, hop, &none)
+            match agent {
+                AgentAuth::Success => true,
+                AgentAuth::KeyboardInteractive => {
+                    keyboard_interactive(app, prompts, session_id, handle, hop, None).await?
+                }
+                AgentAuth::Disconnected => return Err(connection_lost_during_auth()),
+                AgentAuth::Failure if none.success() => true,
+                AgentAuth::Failure => {
+                    authenticate_without_saved_password(
+                        app, prompts, session_id, handle, hop, &none,
+                    )
                     .await?
+                }
             }
         }
     };
@@ -513,8 +558,31 @@ async fn authenticate(
 
 #[cfg(test)]
 mod tests {
-    use super::{client_config, with_host_key_aware_timeout_for, KEEPALIVE_INTERVAL};
+    use super::{
+        client_config, connection_lost_during_auth, no_remaining_methods,
+        with_host_key_aware_timeout_for, KEEPALIVE_INTERVAL,
+    };
+    use russh::client::AuthResult;
+    use russh::{MethodKind, MethodSet};
     use std::time::Duration;
+
+    #[test]
+    fn a_session_that_ends_mid_auth_leaves_no_remaining_methods() {
+        assert!(no_remaining_methods(&AuthResult::Failure {
+            remaining_methods: MethodSet::empty(),
+            partial_success: false,
+        }));
+        assert!(!no_remaining_methods(&AuthResult::Failure {
+            remaining_methods: MethodSet::from(&[MethodKind::Password][..]),
+            partial_success: false,
+        }));
+        assert!(!no_remaining_methods(&AuthResult::Success));
+    }
+
+    #[test]
+    fn a_connection_lost_mid_auth_is_not_reported_as_a_credential_failure() {
+        assert_eq!(connection_lost_during_auth().code(), "network");
+    }
 
     #[test]
     fn keepalives_do_not_close_compatible_servers_that_ignore_replies() {

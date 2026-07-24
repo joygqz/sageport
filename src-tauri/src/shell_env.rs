@@ -32,6 +32,12 @@ async fn capture() -> HashMap<String, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
+    unsafe {
+        builder.pre_exec(|| {
+            libc::setsid();
+            Ok(())
+        });
+    }
     match tokio::time::timeout(CAPTURE_TIMEOUT, builder.output()).await {
         Ok(Ok(output)) if output.status.success() => parse_env(&output.stdout),
         _ => HashMap::new(),

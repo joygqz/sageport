@@ -194,6 +194,7 @@ export const en = {
     noHosts: "No matching hosts",
     noCommands: "No matching commands",
     quickConnect: "Connect to",
+    localTerminal: "Local terminal",
   },
 
   commands: {
@@ -1204,7 +1205,7 @@ export const en = {
     },
     sync: {
       description:
-        "Back up hosts, keys, snippets, and settings to a storage of your choice. Everything is end-to-end encrypted with your passphrase before it leaves this device. Disconnect first to switch storage.",
+        "Back up hosts, groups, identities, keys, snippets, tasks, port forwards, SFTP bookmarks, and settings to a storage of your choice. Everything is end-to-end encrypted with your passphrase before it leaves this device. Disconnect first to switch storage.",
       providerLabel: "Storage provider",
       corruptRemoteBackup:
         "The backup may be corrupt or from an incompatible version of Sageport.",

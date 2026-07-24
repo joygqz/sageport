@@ -190,6 +190,7 @@ export const zhCN: Dictionary = {
     noHosts: "没有匹配的主机",
     noCommands: "没有匹配的命令",
     quickConnect: "连接到",
+    localTerminal: "本地终端",
   },
 
   commands: {
@@ -1173,7 +1174,7 @@ export const zhCN: Dictionary = {
     },
     sync: {
       description:
-        "将主机、密钥、命令片段和设置备份到你选择的存储。所有数据在离开本设备前都会先用口令进行端到端加密。切换存储需先断开连接。",
+        "将主机、分组、身份、密钥、命令片段、任务、端口转发、SFTP 书签和设置备份到你选择的存储。所有数据在离开本设备前都会先用口令进行端到端加密。切换存储需先断开连接。",
       providerLabel: "存储服务",
       corruptRemoteBackup: "备份可能已损坏，或来自不兼容的 Sageport 版本。",
       provider: {

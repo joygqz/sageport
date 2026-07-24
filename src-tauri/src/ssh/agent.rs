@@ -4,11 +4,13 @@ use russh::keys::agent::AgentIdentity;
 use russh::MethodKind;
 use tokio::io::{AsyncRead, AsyncWrite};
 
+use super::connect::dropped_during_auth;
 use super::handler::ClientHandler;
 
 pub enum AgentAuth {
     Success,
     KeyboardInteractive,
+    Disconnected,
     Failure,
 }
 
@@ -57,21 +59,31 @@ where
         } else {
             None
         };
-        if let Ok(result) = handle
+        match handle
             .authenticate_publickey_with(username, key, hash, &mut agent)
             .await
         {
-            if result.success() {
-                return AgentAuth::Success;
+            Ok(result) => {
+                if result.success() {
+                    return AgentAuth::Success;
+                }
+                if matches!(
+                    &result,
+                    AuthResult::Failure {
+                        remaining_methods,
+                        partial_success: true,
+                    } if remaining_methods.contains(&MethodKind::KeyboardInteractive)
+                ) {
+                    return AgentAuth::KeyboardInteractive;
+                }
+                if dropped_during_auth(&result, handle) {
+                    return AgentAuth::Disconnected;
+                }
             }
-            if matches!(
-                result,
-                AuthResult::Failure {
-                    remaining_methods,
-                    partial_success: true,
-                } if remaining_methods.contains(&MethodKind::KeyboardInteractive)
-            ) {
-                return AgentAuth::KeyboardInteractive;
+            Err(_) => {
+                if handle.is_closed() {
+                    return AgentAuth::Disconnected;
+                }
             }
         }
     }

@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ChevronRight, Plug, Server } from "lucide-react";
+import { ChevronRight, Plug, Server, TerminalSquare } from "lucide-react";
 
 import { DialogOverlay, Input, Kbd } from "@/components/ui";
 import { useGroups, useHosts } from "@/features/hosts/api";
@@ -52,6 +52,7 @@ export function CommandPalette({
 type PaletteItem =
   | { type: "host"; host: Host }
   | { type: "command"; command: WorkbenchCommand }
+  | { type: "localTerminal"; command: WorkbenchCommand }
   | { type: "adhoc"; target: AdhocTarget };
 
 function PaletteBody({
@@ -106,12 +107,9 @@ function PaletteBody({
       .map((host) => ({ type: "host", host }));
     const adhoc = parseQuickConnect(query);
     if (adhoc) matches.unshift({ type: "adhoc", target: adhoc });
-    const quickActions = ["terminal.newLocal", "host.new"];
-    for (const id of quickActions) {
-      const command = commands.find((c) => c.id === id);
-      if (command && fuzzyPaletteMatch(query, command.label))
-        matches.push({ type: "command", command });
-    }
+    const localTerminal = commands.find((c) => c.id === "terminal.newLocal");
+    if (localTerminal && fuzzyPaletteMatch(query, t("palette.localTerminal")))
+      matches.push({ type: "localTerminal", command: localTerminal });
     return matches;
   }, [commandMode, query, commands, groups, hosts, t]);
   const safeIndex = clampPaletteIndex(index, items.length);
@@ -280,6 +278,14 @@ function PaletteRow({
             {item.host.username ? `${item.host.username}@` : ""}
             {item.host.address}
           </span>
+        </>
+      ) : item.type === "localTerminal" ? (
+        <>
+          <TerminalSquare className="size-4 shrink-0 opacity-70" />
+          <span className="min-w-0 flex-1 truncate font-medium">
+            {t("palette.localTerminal")}
+          </span>
+          {item.command.shortcut && <Kbd keys={item.command.shortcut} />}
         </>
       ) : item.type === "adhoc" ? (
         <>
