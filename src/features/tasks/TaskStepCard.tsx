@@ -22,6 +22,7 @@ interface TaskStepCardProps {
   index: number;
   total: number;
   defaultOpen?: boolean;
+  autoScroll?: boolean;
   disabled?: boolean;
   onChange: (step: TaskStep) => void;
   onRemove: () => void;
@@ -33,6 +34,7 @@ export function TaskStepCard({
   index,
   total,
   defaultOpen = false,
+  autoScroll = false,
   disabled,
   onChange,
   onRemove,
@@ -46,10 +48,10 @@ export function TaskStepCard({
   const summary = stepSummary(step);
 
   useEffect(() => {
-    if (defaultOpen) {
+    if (autoScroll) {
       cardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-  }, [defaultOpen]);
+  }, [autoScroll]);
 
   return (
     <Collapsible ref={cardRef} open={open} onOpenChange={setOpen}>

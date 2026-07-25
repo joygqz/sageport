@@ -186,7 +186,10 @@ function TaskFormBody({
     task?.scheduleEnabled ?? false,
   );
   const [schedule, setSchedule] = useState(task?.schedule ?? "");
-  const [openStepIndex, setOpenStepIndex] = useState<number | null>(null);
+  const [openStepIndex, setOpenStepIndex] = useState<number | null>(
+    task ? null : 0,
+  );
+  const [addedStepIndex, setAddedStepIndex] = useState<number | null>(null);
 
   const needsHost = useMemo(() => taskNeedsRemote(steps), [steps]);
 
@@ -207,6 +210,7 @@ function TaskFormBody({
 
   const addStep = (type: (typeof STEP_TYPES)[number]) => {
     setOpenStepIndex(steps.length);
+    setAddedStepIndex(steps.length);
     setSteps((prev) => [...prev, newStep(type)]);
   };
 
@@ -293,6 +297,7 @@ function TaskFormBody({
       <StepsSection
         steps={steps}
         openIndex={openStepIndex}
+        addedIndex={addedStepIndex}
         onAdd={addStep}
         onChange={updateStep}
         onRemove={removeStep}
@@ -305,6 +310,7 @@ function TaskFormBody({
 function StepsSection({
   steps,
   openIndex,
+  addedIndex,
   onAdd,
   onChange,
   onRemove,
@@ -312,6 +318,7 @@ function StepsSection({
 }: {
   steps: TaskStep[];
   openIndex: number | null;
+  addedIndex: number | null;
   onAdd: (type: TaskStepType) => void;
   onChange: (index: number, step: TaskStep) => void;
   onRemove: (index: number) => void;
@@ -359,6 +366,7 @@ function StepsSection({
               index={index}
               total={steps.length}
               defaultOpen={index === openIndex}
+              autoScroll={index === addedIndex}
               onChange={(next) => onChange(index, next)}
               onRemove={() => onRemove(index)}
               onMove={(direction) => onMove(index, direction)}
