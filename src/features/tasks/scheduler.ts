@@ -119,18 +119,22 @@ function t(
 }
 
 export function useTaskScheduler(): void {
-  const { data: tasks = [] } = useTasks();
+  const { data: tasks } = useTasks();
   const tasksRef = useRef(tasks);
   useEffect(() => {
     tasksRef.current = tasks;
   }, [tasks]);
+  const loaded = tasks !== undefined;
 
   useEffect(() => {
+    if (!loaded) return;
     const tick = () => {
+      const current = tasksRef.current;
+      if (!current) return;
       const runs = useTaskRunStore.getState().runs;
       const result = dueTasks(
         new Date(),
-        tasksRef.current,
+        current,
         loadState(),
         (id) => selectRunningRunForTask(runs, id) !== undefined,
       );
@@ -147,5 +151,5 @@ export function useTaskScheduler(): void {
     tick();
     const timer = window.setInterval(tick, TICK_MS);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [loaded]);
 }

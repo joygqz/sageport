@@ -139,18 +139,6 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           : run.stepStates.some((step) => step.status === "error")
             ? "error"
             : status;
-      return {
-        runs: {
-          ...state.runs,
-          [requestId]: { ...run, status: resolved, finishedAt: Date.now() },
-        },
-      };
-    });
-
-  const failRun = (requestId: string, message: string) =>
-    set((state) => {
-      const run = state.runs[requestId];
-      if (!run) return state;
       const stepStates = run.stepStates.map((step) =>
         step.status === "pending" || step.status === "running"
           ? { ...step, status: "skipped" as const }
@@ -159,8 +147,22 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
       return {
         runs: {
           ...state.runs,
-          [requestId]: { ...run, stepStates, error: message },
+          [requestId]: {
+            ...run,
+            stepStates,
+            status: resolved,
+            finishedAt: Date.now(),
+          },
         },
+      };
+    });
+
+  const failRun = (requestId: string, message: string) =>
+    set((state) => {
+      const run = state.runs[requestId];
+      if (!run) return state;
+      return {
+        runs: { ...state.runs, [requestId]: { ...run, error: message } },
       };
     });
 
@@ -234,8 +236,9 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           finalize(requestId, cancelled ? "cancelled" : "error");
         }
         void queryClient.invalidateQueries({ queryKey: taskRunsKey });
+        const finished = get().runs[requestId];
         reportBackgroundCompletion(requestId);
-        return get().runs[requestId];
+        return finished;
       })();
 
       return { requestId, completion };

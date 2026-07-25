@@ -105,18 +105,24 @@ impl TransferCancel {
 
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
-        self.notify.notify_one();
+        self.notify.notify_waiters();
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Relaxed)
+        self.cancelled.load(Ordering::SeqCst)
     }
 
     pub async fn cancelled(&self) {
         if self.is_cancelled() {
             return;
         }
-        self.notify.notified().await;
+        let notified = self.notify.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if self.is_cancelled() {
+            return;
+        }
+        notified.await;
     }
 }
 
@@ -515,6 +521,40 @@ mod tests {
             .await
             .expect("cancellation should wake immediately")
             .expect("wait task should finish");
+    }
+
+    #[tokio::test]
+    async fn cancellation_wakes_every_concurrent_waiter() {
+        let cancel = Arc::new(TransferCancel::new());
+        let mut waiters = Vec::new();
+        for _ in 0..8 {
+            let waiting = cancel.clone();
+            waiters.push(tokio::spawn(async move { waiting.cancelled().await }));
+        }
+        tokio::task::yield_now().await;
+
+        cancel.cancel();
+
+        for waiter in waiters {
+            tokio::time::timeout(Duration::from_millis(500), waiter)
+                .await
+                .expect("every waiter should wake")
+                .expect("wait task should finish");
+        }
+    }
+
+    #[tokio::test]
+    async fn cancellation_racing_a_waiter_still_wakes_it() {
+        for _ in 0..200 {
+            let cancel = Arc::new(TransferCancel::new());
+            let waiting = cancel.clone();
+            let waiter = tokio::spawn(async move { waiting.cancelled().await });
+            cancel.cancel();
+            tokio::time::timeout(Duration::from_millis(500), waiter)
+                .await
+                .expect("a waiter registering during cancellation must not hang")
+                .expect("wait task should finish");
+        }
     }
 
     #[test]
