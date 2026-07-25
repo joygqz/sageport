@@ -16,7 +16,6 @@ import {
   LoadingState,
   PasswordInput,
   SectionHeader,
-  Spinner,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -211,9 +210,8 @@ function VersionsCard() {
       />
 
       {isLoading && (
-        <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <Spinner />
-          <span>{t("settings.sync.versions.loading")}</span>
+        <div className="overflow-hidden rounded-lg border border-border bg-surface">
+          <LoadingState label={t("settings.sync.versions.loading")} />
         </div>
       )}
 
