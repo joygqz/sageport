@@ -696,7 +696,6 @@ export const zhCN: Dictionary = {
       errorToast: "任务“{name}”运行失败",
     },
     schedule: {
-      label: "计划",
       enable: "按计划运行",
       enableHint: "应用打开时自动运行此任务",
       preset: {

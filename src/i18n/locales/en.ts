@@ -713,7 +713,6 @@ export const en = {
       errorToast: 'Task "{name}" failed',
     },
     schedule: {
-      label: "Schedule",
       enable: "Run on a schedule",
       enableHint: "Automatically run this task while the app is open",
       preset: {
