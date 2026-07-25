@@ -283,6 +283,10 @@ pub fn run() {
                 api.prevent_exit();
             }
         }
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen { .. } => {
+            tray::show_main_window(handle);
+        }
         tauri::RunEvent::Exit => {
             if let Some(state) = handle.try_state::<AppState>() {
                 cleanup_orphaned_sessions(&state);
