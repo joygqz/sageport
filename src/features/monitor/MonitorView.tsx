@@ -22,7 +22,7 @@ import {
   useMonitorStore,
 } from "@/features/terminal/monitor";
 import { useI18n, type TFunction, type TKey } from "@/i18n";
-import { cn, formatBytes } from "@/lib/utils";
+import { cn, formatBytes, formatUsage } from "@/lib/utils";
 import type { Host, HostStats } from "@/types/models";
 import { PanelContent } from "@/workbench/PanelHeader";
 import { SideBarView } from "@/workbench/SideBarView";
@@ -280,7 +280,8 @@ function HostMeters({ stats }: { stats: HostStats }) {
         icon={Cpu}
         labelKey="monitor.cpu"
         percent={percents.cpu}
-        detail={t("monitor.cpuDetail", {
+        detail={t("monitor.cpuLoad", { load: stats.cpuLoad.toFixed(2) })}
+        title={t("monitor.cpuDetail", {
           load: stats.cpuLoad.toFixed(2),
           count: stats.cpuCount,
         })}
@@ -289,13 +290,15 @@ function HostMeters({ stats }: { stats: HostStats }) {
         icon={MemoryStick}
         labelKey="monitor.memory"
         percent={percents.mem}
-        detail={`${formatBytes(stats.memUsed)} / ${formatBytes(stats.memTotal)}`}
+        detail={formatUsage(stats.memUsed, stats.memTotal)}
+        title={`${formatBytes(stats.memUsed)} / ${formatBytes(stats.memTotal)}`}
       />
       <Meter
         icon={HardDrive}
         labelKey="monitor.disk"
         percent={percents.disk}
-        detail={`${formatBytes(stats.diskUsed)} / ${formatBytes(stats.diskTotal)}`}
+        detail={formatUsage(stats.diskUsed, stats.diskTotal)}
+        title={`${formatBytes(stats.diskUsed)} / ${formatBytes(stats.diskTotal)}`}
       />
       {stats.netRxRate !== undefined && stats.netTxRate !== undefined && (
         <div className="flex items-center justify-between gap-2 text-2xs text-muted-foreground">
@@ -324,22 +327,29 @@ function Meter({
   labelKey,
   percent,
   detail,
+  title,
 }: {
   icon: LucideIcon;
   labelKey: TKey;
   percent: number;
   detail: string;
+  title: string;
 }) {
   const { t } = useI18n();
 
   return (
-    <div className="flex flex-col gap-1" title={detail}>
+    <div className="flex flex-col gap-1" title={title}>
       <div className="flex items-center justify-between gap-2 text-2xs text-muted-foreground">
-        <span className="flex items-center gap-1">
+        <span className="flex shrink-0 items-center gap-1">
           <Icon className="size-3" />
           {t(labelKey)}
         </span>
-        <span className="tabular-nums">{percent}%</span>
+        <span className="flex min-w-0 items-center gap-1.5 tabular-nums">
+          <span className="truncate">{detail}</span>
+          <span className="shrink-0 font-medium text-card-foreground">
+            {percent}%
+          </span>
+        </span>
       </div>
       <div
         role="progressbar"

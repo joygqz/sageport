@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cn, formatBytes, isValidRegex } from "./utils";
+import { cn, formatBytes, formatUsage, isValidRegex } from "./utils";
 
 describe("cn", () => {
   it("merges conditional classes", () => {
@@ -47,5 +47,21 @@ describe("formatBytes", () => {
 
   it("clamps beyond the largest unit", () => {
     expect(formatBytes(1024 ** 5)).toBe("1024.0 TB");
+  });
+});
+
+describe("formatUsage", () => {
+  it("drops the repeated unit when both sides match", () => {
+    expect(formatUsage(1024 ** 3 * 4.2, 1024 ** 3 * 16)).toBe("4.2 / 16.0 GB");
+  });
+
+  it("keeps both units when they differ", () => {
+    expect(formatUsage(1024 ** 2 * 820, 1024 ** 3 * 16)).toBe(
+      "820.0 MB / 16.0 GB",
+    );
+  });
+
+  it("formats an empty usage", () => {
+    expect(formatUsage(0, 1024 ** 3 * 8)).toBe("0 B / 8.0 GB");
   });
 });

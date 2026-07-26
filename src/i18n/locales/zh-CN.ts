@@ -86,6 +86,7 @@ export const zhCN: Dictionary = {
     cpu: "CPU",
     memory: "内存",
     disk: "磁盘",
+    cpuLoad: "负载 {load}",
     cpuDetail: "平均负载 {load}，共 {count} 核",
     network: "网络",
     uptime: "已运行 {value}",

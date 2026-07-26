@@ -89,6 +89,7 @@ export const en = {
     cpu: "CPU",
     memory: "Memory",
     disk: "Disk",
+    cpuLoad: "Load {load}",
     cpuDetail: "Load average {load} across {count} cores",
     network: "Network",
     uptime: "Up {value}",

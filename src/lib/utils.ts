@@ -24,3 +24,13 @@ export function formatBytes(bytes: number): string {
   const value = bytes / 1024 ** exp;
   return `${exp === 0 ? value : value.toFixed(1)} ${units[exp]}`;
 }
+
+export function formatUsage(used: number, total: number): string {
+  const usedText = formatBytes(used);
+  const totalText = formatBytes(total);
+  const [usedValue, usedUnit] = usedText.split(" ");
+  const totalUnit = totalText.split(" ")[1];
+  return usedUnit === totalUnit
+    ? `${usedValue} / ${totalText}`
+    : `${usedText} / ${totalText}`;
+}
