@@ -116,8 +116,8 @@ export function normalizeLayoutSnapshot(
     const auxExtra = auxWidth - auxMin;
     const extra = sidebarExtra + auxExtra;
     const ratio = extra > 0 ? availableExtra / extra : 0;
-    sidebarWidth = sidebarMin + sidebarExtra * ratio;
-    auxWidth = auxMin + auxExtra * ratio;
+    sidebarWidth = sidebarMin + Math.floor(sidebarExtra * ratio);
+    auxWidth = auxMin + Math.floor(auxExtra * ratio);
   }
 
   const panelMin = PANEL_MIN * scale;

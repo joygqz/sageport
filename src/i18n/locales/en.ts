@@ -582,7 +582,8 @@ export const en = {
       hostFilter: "Filter by host",
       allHosts: "All hosts",
       local: "Local terminal",
-      empty: "No matching command history",
+      empty: "No command history yet",
+      noMatches: "No matching command history",
       loadError: "Failed to load command history",
       useCount: "Used {count} times",
       clear: "Clear command history",
@@ -873,7 +874,7 @@ export const en = {
       deleteError: "Failed to delete transfer record",
       status: {
         active: "In progress",
-        done: "Done",
+        done: "Completed",
         error: "Failed",
         cancelled: "Canceled",
       },

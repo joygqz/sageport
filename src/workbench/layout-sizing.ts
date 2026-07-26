@@ -1,4 +1,4 @@
-export const SIDEBAR_MIN = 230;
+export const SIDEBAR_MIN = 220;
 export const PANEL_MIN = 180;
 export const AUX_MIN = 260;
 

@@ -400,7 +400,7 @@
     opacity: 0.8;
   }
 
-  .transfer-history-action {
+  .history-row-action {
     pointer-events: auto;
     margin-left: 0;
     width: 2rem;

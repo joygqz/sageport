@@ -1,5 +1,13 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { HardDrive, History, Server, Trash2 } from "lucide-react";
+import {
+  Clock,
+  HardDrive,
+  History,
+  Repeat,
+  Server,
+  SquareTerminal,
+  Trash2,
+} from "lucide-react";
 
 import {
   Button,
@@ -11,6 +19,7 @@ import {
   ErrorState,
   Input,
   LoadingState,
+  MetaItem,
   ScrollArea,
   Select,
   type ConfirmState,
@@ -71,6 +80,7 @@ export function CommandHistoryDialog({
   };
 
   const entries = history.data ?? [];
+  const filtering = deferredQuery.length > 0 || hostFilter !== ALL_HOSTS;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,7 +145,11 @@ export function CommandHistoryDialog({
           ) : entries.length === 0 ? (
             <EmptyState
               icon={History}
-              title={t("snippets.history.empty")}
+              title={
+                filtering
+                  ? t("snippets.history.noMatches")
+                  : t("snippets.history.empty")
+              }
               fill
             />
           ) : (
@@ -146,26 +160,26 @@ export function CommandHistoryDialog({
                     key={entry.id}
                     className="flex items-start gap-3 px-3 py-2.5"
                   >
-                    {entry.hostId ? (
-                      <Server className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    ) : (
-                      <HardDrive className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    )}
+                    <SquareTerminal className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
                       <pre className="whitespace-pre-wrap break-all font-mono text-xs text-foreground">
                         {entry.command}
                       </pre>
-                      <p className="mt-1 truncate text-2xs text-muted-foreground">
-                        {entry.hostId
-                          ? (entry.hostLabel ?? entry.hostId)
-                          : t("snippets.history.local")}
-                        {" · "}
-                        {new Date(entry.usedAt).toLocaleString()}
-                        {" · "}
-                        {t("snippets.history.useCount", {
-                          count: entry.useCount,
-                        })}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-muted-foreground">
+                        <MetaItem icon={entry.hostId ? Server : HardDrive}>
+                          {entry.hostId
+                            ? (entry.hostLabel ?? entry.hostId)
+                            : t("snippets.history.local")}
+                        </MetaItem>
+                        <MetaItem icon={Clock}>
+                          {new Date(entry.usedAt).toLocaleString()}
+                        </MetaItem>
+                        <MetaItem icon={Repeat}>
+                          {t("snippets.history.useCount", {
+                            count: entry.useCount,
+                          })}
+                        </MetaItem>
+                      </div>
                     </div>
                   </li>
                 ))}

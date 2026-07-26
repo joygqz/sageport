@@ -22,6 +22,7 @@ export * from "./badge";
 export * from "./spinner";
 export * from "./kbd";
 export * from "./empty-state";
+export * from "./meta-item";
 export * from "./section-header";
 export * from "./segmented-control";
 export * from "./radio-group";

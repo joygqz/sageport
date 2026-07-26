@@ -3,10 +3,14 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleSlash,
+  Clock,
   Clock3,
   History,
+  ListChecks,
   Server,
+  Timer,
   Trash2,
+  Workflow,
   XCircle,
 } from "lucide-react";
 
@@ -18,8 +22,10 @@ import {
   DialogContent,
   DialogToolbar,
   EmptyState,
+  ErrorState,
+  LoadingState,
+  MetaItem,
   ScrollArea,
-  Spinner,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -53,10 +59,11 @@ export function TaskRunHistoryDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useI18n();
-  const { data: entries, isLoading, isError } = useTaskRuns(open);
+  const { data, isLoading, isError, refetch } = useTaskRuns(open);
   const deleteOne = useDeleteTaskRun();
   const clearAll = useClearTaskRuns();
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const entries = data ?? [];
 
   const onClear = async () => {
     try {
@@ -94,22 +101,23 @@ export function TaskRunHistoryDialog({
       <DialogContent
         showClose={false}
         scrollMode="content"
-        className="flex max-h-[70vh] max-w-2xl flex-col gap-0 p-0 sm:p-0"
-        onInteractOutside={(e) => {
-          if (confirmState) e.preventDefault();
+        className="flex h-[min(70vh,620px)] max-w-2xl flex-col gap-0 p-0 sm:p-0"
+        onInteractOutside={(event) => {
+          if (confirmState) event.preventDefault();
         }}
-        onEscapeKeyDown={(e) => {
-          if (confirmState) e.preventDefault();
+        onEscapeKeyDown={(event) => {
+          if (confirmState) event.preventDefault();
         }}
       >
         <DialogToolbar
           actions={
-            !!entries?.length && (
+            entries.length > 0 && (
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-[var(--toolbar-control-size)] text-muted-foreground hover:text-danger"
                 onClick={confirmClear}
+                disabled={clearAll.isPending}
               >
                 <Trash2 /> {t("tasks.history.clear")}
               </Button>
@@ -120,25 +128,20 @@ export function TaskRunHistoryDialog({
         </DialogToolbar>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
-          {isLoading && (
-            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-              <Spinner /> {t("common.loading")}
-            </div>
-          )}
-
-          {isError && (
-            <p className="text-sm text-danger">
-              {t("tasks.history.loadError")}
-            </p>
-          )}
-
-          {!isLoading && !isError && entries?.length === 0 && (
-            <EmptyState icon={History} title={t("tasks.history.empty")} />
-          )}
-
-          {!isLoading && !!entries?.length && (
+          {isLoading ? (
+            <LoadingState label={t("common.loading")} fill />
+          ) : isError ? (
+            <ErrorState
+              title={t("tasks.history.loadError")}
+              retryLabel={t("common.retry")}
+              onRetry={() => void refetch()}
+              fill
+            />
+          ) : entries.length === 0 ? (
+            <EmptyState icon={History} title={t("tasks.history.empty")} fill />
+          ) : (
             <ScrollArea className="min-h-0 flex-1">
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
                 {entries.map((entry) => (
                   <RunRow
                     key={entry.id}
@@ -181,7 +184,7 @@ function RunRow({
   const duration = runDuration(entry);
 
   return (
-    <li className="group overflow-hidden rounded-lg border border-border bg-surface">
+    <li className="group">
       <div className="flex items-start gap-2 px-3 py-2.5">
         <button
           type="button"
@@ -198,6 +201,7 @@ function RunRow({
               !steps.length && "opacity-0",
             )}
           />
+          <Workflow className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex items-center gap-2">
               <span
@@ -210,30 +214,26 @@ function RunRow({
                 {t(`tasks.history.status.${entry.status}`)}
               </Badge>
             </div>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-muted-foreground">
               {entry.hostLabel && (
-                <span
-                  className="flex items-center gap-1"
-                  title={entry.hostLabel}
-                >
-                  <Server className="size-3 shrink-0" />
+                <MetaItem icon={Server} title={entry.hostLabel}>
                   {entry.hostLabel}
-                </span>
+                </MetaItem>
               )}
-              <span>
+              <MetaItem icon={ListChecks}>
                 {t("tasks.history.steps", { count: entry.totalSteps })}
-              </span>
-              <span>·</span>
-              <span>{new Date(entry.startedAt).toLocaleString()}</span>
+              </MetaItem>
+              <MetaItem icon={Clock}>
+                {new Date(entry.startedAt).toLocaleString()}
+              </MetaItem>
               {duration && (
-                <>
-                  <span>·</span>
-                  <span>{t("tasks.history.duration", { duration })}</span>
-                </>
+                <MetaItem icon={Timer}>
+                  {t("tasks.history.duration", { duration })}
+                </MetaItem>
               )}
             </div>
             {entry.message && (
-              <span className="text-xs text-danger">{entry.message}</span>
+              <span className="text-2xs text-danger">{entry.message}</span>
             )}
           </div>
         </button>
@@ -241,7 +241,7 @@ function RunRow({
           <Button
             size="icon"
             variant="ghost"
-            className="pointer-events-none -ml-3 h-6 w-0 shrink-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100"
+            className="history-row-action pointer-events-none -ml-3 h-6 w-0 shrink-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100"
             onClick={onDelete}
           >
             <Trash2 className="size-3.5" />

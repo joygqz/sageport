@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { History, HardDrive, RotateCcw, Server, Trash2 } from "lucide-react";
+import {
+  ArrowRightLeft,
+  ArrowUpDown,
+  Clock,
+  HardDrive,
+  History,
+  RotateCcw,
+  Server,
+  Trash2,
+} from "lucide-react";
 
 import {
   Badge,
@@ -9,8 +18,10 @@ import {
   DialogContent,
   DialogToolbar,
   EmptyState,
+  ErrorState,
+  LoadingState,
+  MetaItem,
   ScrollArea,
-  Spinner,
   Tooltip,
   type ConfirmState,
 } from "@/components/ui";
@@ -43,11 +54,12 @@ export function TransferHistoryDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useI18n();
-  const { data: entries, isLoading, isError } = useTransferHistory(open);
+  const { data, isLoading, isError, refetch } = useTransferHistory(open);
   const deleteOne = useDeleteTransferHistory();
   const clearAll = useClearTransferHistory();
   const retryTransfer = useRetryTransfer();
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const entries = data ?? [];
 
   const onClear = async () => {
     try {
@@ -65,7 +77,7 @@ export function TransferHistoryDialog({
     }
   };
 
-  const onRetry = async (entry: NonNullable<typeof entries>[number]) => {
+  const onRetry = async (entry: (typeof entries)[number]) => {
     try {
       await retryTransfer.mutateAsync(entry);
     } catch (err) {
@@ -93,22 +105,23 @@ export function TransferHistoryDialog({
       <DialogContent
         showClose={false}
         scrollMode="content"
-        className="flex max-h-[70vh] max-w-2xl flex-col gap-0 p-0 sm:p-0"
-        onInteractOutside={(e) => {
-          if (confirmState) e.preventDefault();
+        className="flex h-[min(70vh,620px)] max-w-2xl flex-col gap-0 p-0 sm:p-0"
+        onInteractOutside={(event) => {
+          if (confirmState) event.preventDefault();
         }}
-        onEscapeKeyDown={(e) => {
-          if (confirmState) e.preventDefault();
+        onEscapeKeyDown={(event) => {
+          if (confirmState) event.preventDefault();
         }}
       >
         <DialogToolbar
           actions={
-            !!entries?.length && (
+            entries.length > 0 && (
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-[var(--toolbar-control-size)] text-muted-foreground hover:text-danger"
                 onClick={confirmClear}
+                disabled={clearAll.isPending}
               >
                 <Trash2 /> {t("sftp.history.clear")}
               </Button>
@@ -119,84 +132,91 @@ export function TransferHistoryDialog({
         </DialogToolbar>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
-          {isLoading && (
-            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-              <Spinner /> …
-            </div>
-          )}
-
-          {isError && (
-            <p className="text-sm text-danger">{t("sftp.history.loadError")}</p>
-          )}
-
-          {!isLoading && !isError && entries?.length === 0 && (
-            <EmptyState icon={History} title={t("sftp.history.empty")} />
-          )}
-
-          {!isLoading && !!entries?.length && (
+          {isLoading ? (
+            <LoadingState label={t("common.loading")} fill />
+          ) : isError ? (
+            <ErrorState
+              title={t("sftp.history.loadError")}
+              retryLabel={t("common.retry")}
+              onRetry={() => void refetch()}
+              fill
+            />
+          ) : entries.length === 0 ? (
+            <EmptyState icon={History} title={t("sftp.history.empty")} fill />
+          ) : (
             <ScrollArea className="min-h-0 flex-1">
               <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
-                {entries.map((e) => (
+                {entries.map((entry) => (
                   <li
-                    key={e.id}
-                    className="group flex items-center gap-3 px-3 py-2.5"
+                    key={entry.id}
+                    className="group flex items-start gap-3 px-3 py-2.5"
                   >
+                    <ArrowRightLeft className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <span
                           className="truncate text-sm font-medium text-foreground"
-                          title={e.sourceLabel}
+                          title={entry.sourceLabel}
                         >
-                          {e.sourceLabel}
+                          {entry.sourceLabel}
                         </span>
-                        <Badge variant={statusVariant[e.status]}>
-                          {t(`sftp.history.status.${e.status}`)}
+                        <Badge variant={statusVariant[entry.status]}>
+                          {t(`sftp.history.status.${entry.status}`)}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                        {e.sourceConnectionId ? (
+                        {entry.sourceConnectionId ? (
                           <Server className="size-3 shrink-0" />
                         ) : (
                           <HardDrive className="size-3 shrink-0" />
                         )}
-                        {e.sourceHostLabel && (
+                        {entry.sourceHostLabel && (
                           <span
                             className="shrink-0 text-foreground"
-                            title={e.sourceHostLabel}
+                            title={entry.sourceHostLabel}
                           >
-                            {e.sourceHostLabel}:
+                            {entry.sourceHostLabel}:
                           </span>
                         )}
-                        <span className="truncate" title={e.sourcePath}>
-                          {e.sourcePath}
+                        <span className="truncate" title={entry.sourcePath}>
+                          {entry.sourcePath}
                         </span>
                         <span className="shrink-0">→</span>
-                        {e.destConnectionId ? (
+                        {entry.destConnectionId ? (
                           <Server className="size-3 shrink-0" />
                         ) : (
                           <HardDrive className="size-3 shrink-0" />
                         )}
-                        {e.destHostLabel && (
+                        {entry.destHostLabel && (
                           <span
                             className="shrink-0 text-foreground"
-                            title={e.destHostLabel}
+                            title={entry.destHostLabel}
                           >
-                            {e.destHostLabel}:
+                            {entry.destHostLabel}:
                           </span>
                         )}
-                        <span className="truncate" title={e.destPath}>
-                          {e.destPath}
+                        <span className="truncate" title={entry.destPath}>
+                          {entry.destPath}
                         </span>
                       </div>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {formatBytes(e.transferredBytes)}
-                        {e.totalBytes > 0 && ` / ${formatBytes(e.totalBytes)}`}
-                        {" · "}
-                        {new Date(e.startedAt).toLocaleString()}
-                        {e.message && ` · ${e.message}`}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-muted-foreground">
+                        <MetaItem icon={ArrowUpDown}>
+                          {formatBytes(entry.transferredBytes)}
+                          {entry.totalBytes > 0 &&
+                            ` / ${formatBytes(entry.totalBytes)}`}
+                        </MetaItem>
+                        <MetaItem icon={Clock}>
+                          {new Date(entry.startedAt).toLocaleString()}
+                        </MetaItem>
+                      </div>
+                      {entry.message && (
+                        <span className="text-2xs text-danger">
+                          {entry.message}
+                        </span>
+                      )}
                     </div>
-                    {(e.status === "error" || e.status === "cancelled") && (
+                    {(entry.status === "error" ||
+                      entry.status === "cancelled") && (
                       <Tooltip content={t("sftp.history.retry")}>
                         <Button
                           size="icon"
@@ -204,9 +224,9 @@ export function TransferHistoryDialog({
                           className="h-6 w-6 shrink-0"
                           loading={
                             retryTransfer.isPending &&
-                            retryTransfer.variables?.id === e.id
+                            retryTransfer.variables?.id === entry.id
                           }
-                          onClick={() => void onRetry(e)}
+                          onClick={() => void onRetry(entry)}
                         >
                           <RotateCcw className="size-3.5" />
                         </Button>
@@ -216,8 +236,8 @@ export function TransferHistoryDialog({
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="transfer-history-action pointer-events-none -ml-3 h-6 w-0 shrink-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100"
-                        onClick={() => void onDeleteOne(e.id)}
+                        className="history-row-action pointer-events-none -ml-3 h-6 w-0 shrink-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100"
+                        onClick={() => void onDeleteOne(entry.id)}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
