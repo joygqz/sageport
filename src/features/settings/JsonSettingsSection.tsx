@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from "react";
 import { Save, Undo2 } from "lucide-react";
 
 import { Button, ErrorState, LoadingState } from "@/components/ui";
-import { useAiConfig } from "@/features/ai/api";
+import { useAiApiKey, useAiConfig } from "@/features/ai/api";
 import { clearModelLimitsCache } from "@/features/ai/model-limits";
 import { useI18n, type TFunction } from "@/i18n";
 import { systemLocale } from "@/i18n/config";
@@ -49,16 +49,20 @@ export function JsonSettingsSection() {
   const fontFamily = useFontStore((state) => state.family);
   const zoomLevel = useZoomStore((state) => state.level);
   const ai = useAiConfig();
+  const apiKey = useAiApiKey(Boolean(ai.data?.hasApiKey));
 
-  if (ai.isPending) {
+  if (ai.isPending || apiKey.isLoading) {
     return <LoadingState label={t("common.loading")} />;
   }
-  if (ai.isError || !ai.data) {
+  if (ai.isError || !ai.data || apiKey.isError) {
     return (
       <ErrorState
         title={t("common.loadError")}
         retryLabel={t("common.retry")}
-        onRetry={() => void ai.refetch()}
+        onRetry={() => {
+          void ai.refetch();
+          void apiKey.refetch();
+        }}
       />
     );
   }
@@ -69,6 +73,7 @@ export function JsonSettingsSection() {
     fontFamily,
     zoomLevel,
     ai: ai.data,
+    apiKey: apiKey.data ?? "",
   });
   const defaults = defaultJsonSettings(systemLocale());
   const document = createJsonSettingsDocument(values, defaults);
@@ -105,10 +110,6 @@ function JsonSettingsForm({
     setIssue(null);
     setSaving(true);
     const next = resolveJsonSettings(parsed.value, defaults);
-    const includesApiKey = Object.prototype.hasOwnProperty.call(
-      parsed.value,
-      "ai.api_key",
-    );
 
     try {
       await ipc.settings.applyJson({
@@ -118,7 +119,7 @@ function JsonSettingsForm({
         zoomLevel: next["general.zoomLevel"],
         protocol: next["ai.protocol"],
         baseUrl: next["ai.base_url"],
-        apiKey: includesApiKey ? next["ai.api_key"] : undefined,
+        apiKey: next["ai.api_key"],
         model: next["ai.model"],
         autoApprove: next["ai.auto_approve"],
         enabledTools: next["ai.enabled_tools"],

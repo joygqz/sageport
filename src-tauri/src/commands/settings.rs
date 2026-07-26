@@ -16,7 +16,7 @@ pub struct JsonSettingsInput {
     zoom_level: i32,
     protocol: Protocol,
     base_url: String,
-    api_key: Option<String>,
+    api_key: String,
     model: String,
     auto_approve: bool,
     enabled_tools: Vec<String>,
@@ -84,7 +84,7 @@ fn validate_json_settings(input: JsonSettingsInput) -> AppResult<Vec<(String, St
     let validated_ai = ai::validate_ai_config(AiConfigInput {
         base_url: input.base_url,
         protocol: input.protocol,
-        api_key: input.api_key,
+        api_key: Some(input.api_key),
         auto_approve: input.auto_approve,
         enabled_tools: Some(input.enabled_tools),
         max_history_tokens: input.max_history_tokens,
@@ -123,27 +123,29 @@ mod tests {
     }
 
     #[test]
-    fn json_settings_preserve_or_replace_api_keys_explicitly() {
-        let input = |api_key| JsonSettingsInput {
+    fn json_settings_write_the_api_key_like_any_other_setting() {
+        let input = |api_key: &str| JsonSettingsInput {
             locale: "en".into(),
             theme: "midnight:dark".into(),
             font_family: String::new(),
             zoom_level: 0,
             protocol: Protocol::Openai,
             base_url: "https://example.com/v1".into(),
-            api_key,
+            api_key: api_key.into(),
             model: "model".into(),
             auto_approve: false,
             enabled_tools: Vec::new(),
             max_history_tokens: None,
         };
 
-        let preserved = validate_json_settings(input(None)).unwrap();
-        assert!(!preserved.iter().any(|(key, _)| key == "ai.api_key"));
-
-        let replaced = validate_json_settings(input(Some(" secret ".into()))).unwrap();
+        let replaced = validate_json_settings(input(" secret ")).unwrap();
         assert!(replaced
             .iter()
             .any(|(key, value)| key == "ai.api_key" && value == "secret"));
+
+        let cleared = validate_json_settings(input("")).unwrap();
+        assert!(cleared
+            .iter()
+            .any(|(key, value)| key == "ai.api_key" && value.is_empty()));
     }
 }

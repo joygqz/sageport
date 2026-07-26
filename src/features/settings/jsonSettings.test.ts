@@ -27,6 +27,7 @@ describe("JSON settings", () => {
         enabledTools: null,
         maxHistoryTokens: null,
       },
+      apiKey: "",
     });
     const text = stringifyJsonSettings(
       createJsonSettingsDocument(values, defaults),
@@ -35,7 +36,7 @@ describe("JSON settings", () => {
     expect(text).toBe("{}\n");
   });
 
-  it("uses persisted setting keys for overrides without exposing the API key", () => {
+  it("uses persisted setting keys for overrides", () => {
     const values = createJsonSettingsValues({
       locale: "zh-CN",
       theme: "graphite:system",
@@ -50,6 +51,7 @@ describe("JSON settings", () => {
         enabledTools: [],
         maxHistoryTokens: 200_000,
       },
+      apiKey: "sk-secret",
     });
     const document = createJsonSettingsDocument(values, defaults);
 
@@ -59,14 +61,14 @@ describe("JSON settings", () => {
     });
     expect(document).toMatchObject({
       "ai.base_url": "https://api.anthropic.com",
+      "ai.api_key": "sk-secret",
       "ai.auto_approve": true,
       "ai.enabled_tools": [],
       "ai.max_history_tokens": 200_000,
     });
-    expect(document).not.toHaveProperty("ai.api_key");
   });
 
-  it("accepts an API key only as an explicit write", () => {
+  it("trims the API key", () => {
     expect(parseJsonSettings('{ "ai.api_key": " sk-secret " }')).toEqual({
       ok: true,
       value: { "ai.api_key": "sk-secret" },

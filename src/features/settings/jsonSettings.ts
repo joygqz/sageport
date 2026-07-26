@@ -119,6 +119,7 @@ export function createJsonSettingsValues(input: {
   fontFamily: string;
   zoomLevel: number;
   ai: AiConfig;
+  apiKey: string;
 }): JsonSettingsValues {
   return {
     "general.locale": input.locale,
@@ -127,7 +128,7 @@ export function createJsonSettingsValues(input: {
     "general.zoomLevel": input.zoomLevel,
     "ai.protocol": input.ai.protocol,
     "ai.base_url": input.ai.baseUrl,
-    "ai.api_key": "",
+    "ai.api_key": input.apiKey,
     "ai.model": input.ai.model,
     "ai.auto_approve": input.ai.autoApprove,
     "ai.enabled_tools": resolveEnabledToolNames(input.ai.enabledTools),
@@ -141,8 +142,7 @@ export function createJsonSettingsDocument(
 ): JsonSettingsDocument {
   return Object.fromEntries(
     SETTING_KEYS.filter(
-      (key) =>
-        key !== "ai.api_key" && !equalSettingValue(values[key], defaults[key]),
+      (key) => !equalSettingValue(values[key], defaults[key]),
     ).map((key) => [key, values[key]]),
   ) as JsonSettingsDocument;
 }

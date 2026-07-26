@@ -1082,7 +1082,7 @@ export const zhCN: Dictionary = {
       unsaved: "有未保存的更改",
       saved: "设置已保存",
       saveError: "保存 JSON 设置失败",
-      hint: "仅显示非默认设置。移除设置可恢复默认值。已保存的 API 密钥不会显示。仅在需要替换或清空密钥时添加 ai.api_key。",
+      hint: "仅显示非默认设置，移除设置可恢复默认值。",
       error: {
         syntax: "请修正 JSON 语法后再保存。",
         root: "顶层内容必须是 JSON 对象。",

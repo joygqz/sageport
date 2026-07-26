@@ -5,6 +5,7 @@ import type { AiConfig, AiProtocol } from "@/types/models";
 import { clearModelLimitsCache } from "./model-limits";
 
 const configKey = ["ai", "config"] as const;
+const apiKeyKey = ["ai", "apiKey"] as const;
 const modelsKey = ["ai", "models"] as const;
 
 export const AI_PROTOCOLS: { value: AiProtocol; exampleBaseUrl: string }[] = [
@@ -25,6 +26,14 @@ function effectiveBaseUrl(baseUrl: string): string {
 
 export function useAiConfig() {
   return useQuery({ queryKey: configKey, queryFn: ipc.ai.getConfig });
+}
+
+export function useAiApiKey(hasApiKey: boolean) {
+  return useQuery({
+    queryKey: apiKeyKey,
+    queryFn: ipc.ai.revealApiKey,
+    enabled: hasApiKey,
+  });
 }
 
 export function useSetAiConfig() {

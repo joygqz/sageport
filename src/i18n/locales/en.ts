@@ -1110,7 +1110,7 @@ export const en = {
       unsaved: "Unsaved changes",
       saved: "Settings saved",
       saveError: "Failed to save settings",
-      hint: "Only non-default settings appear. Removing a setting restores its default. Saved API keys stay hidden. Add ai.api_key only to replace or clear one.",
+      hint: "Only non-default settings appear. Removing a setting restores its default.",
       error: {
         syntax: "Fix invalid syntax before saving.",
         root: "Use an object at the top level.",

@@ -188,7 +188,7 @@ export const ipc = {
       zoomLevel: number;
       protocol: AiProtocol;
       baseUrl: string;
-      apiKey?: string;
+      apiKey: string;
       model: string;
       autoApprove: boolean;
       enabledTools: string[];
