@@ -42,6 +42,29 @@ function runUpdateAction(
   void action().catch((error) => toast.error(errorTitle, errorMessage(error)));
 }
 
+function MetaRow({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-muted-foreground">{term}</dt>
+      <dd className="min-w-0 truncate">{children}</dd>
+    </>
+  );
+}
+
+function MetaLink({ label, url }: { label: string; url: string }) {
+  const { t } = useI18n();
+
+  return (
+    <button
+      type="button"
+      className="max-w-full truncate rounded-sm text-left text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
+      onClick={() => openExternal(url, t)}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function AboutSection() {
   const { t } = useI18n();
   const state = useUpdateStatus();
@@ -53,34 +76,16 @@ export function AboutSection() {
         <img src="/app-icon.png" alt="" className="size-14 shrink-0" />
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-foreground">Sageport</h3>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {t("settings.about.version", { version: __APP_VERSION__ })}
-          </p>
-          <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">
-              {t("settings.about.author")}
-            </dt>
-            <dd>
-              <button
-                type="button"
-                className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
-                onClick={() => openExternal(AUTHOR_URL, t)}
-              >
-                {AUTHOR_NAME}
-              </button>
-            </dd>
-            <dt className="text-muted-foreground">
-              {t("settings.about.license")}
-            </dt>
-            <dd className="min-w-0">
-              <button
-                type="button"
-                className="max-w-full truncate rounded-sm text-left text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
-                onClick={() => openExternal(LICENSE_URL, t)}
-              >
-                {LICENSE_NAME}
-              </button>
-            </dd>
+          <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5 text-sm">
+            <MetaRow term={t("settings.about.version")}>
+              {__APP_VERSION__}
+            </MetaRow>
+            <MetaRow term={t("settings.about.author")}>
+              <MetaLink label={AUTHOR_NAME} url={AUTHOR_URL} />
+            </MetaRow>
+            <MetaRow term={t("settings.about.license")}>
+              <MetaLink label={LICENSE_NAME} url={LICENSE_URL} />
+            </MetaRow>
           </dl>
         </div>
       </section>
@@ -101,7 +106,7 @@ function UpdateStatusCard({
   const progress = updateDownloadProgress(state);
 
   let title = t("settings.about.update.title");
-  let description = t("settings.about.update.idle");
+  let description: string | null = t("settings.about.update.idle");
   let icon = <RefreshCw />;
   let iconClassName = "text-muted-foreground";
   let action: ReactNode = (
@@ -119,24 +124,18 @@ function UpdateStatusCard({
 
   if (state.status === "checking") {
     title = t("settings.about.update.checking");
-    description = t("settings.about.update.currentVersion", {
-      version: __APP_VERSION__,
-    });
+    description = null;
     icon = <RefreshCw className="animate-spin" />;
     iconClassName = "text-link";
     action = null;
   } else if (state.status === "up-to-date") {
     title = t("settings.about.update.upToDate");
-    description = t("settings.about.update.currentVersion", {
-      version: __APP_VERSION__,
-    });
+    description = null;
     icon = <CheckCircle2 />;
     iconClassName = "text-success";
   } else if (state.status === "available") {
     title = t("settings.about.update.available", { version: state.version });
-    description =
-      state.body ??
-      t("settings.about.update.currentVersion", { version: __APP_VERSION__ });
+    description = state.body;
     icon = <Sparkles />;
     iconClassName = "text-link";
     action =
@@ -213,14 +212,16 @@ function UpdateStatusCard({
 
       <div className="flex min-w-0 flex-1 basis-64 flex-col">
         <span className="text-sm font-medium text-foreground">{title}</span>
-        <p
-          className={cn(
-            "mt-0.5 whitespace-pre-line text-xs leading-relaxed text-muted-foreground",
-            state.status === "error" && "select-text text-danger",
-          )}
-        >
-          {description}
-        </p>
+        {description !== null && (
+          <p
+            className={cn(
+              "mt-0.5 whitespace-pre-line text-xs leading-relaxed text-muted-foreground",
+              state.status === "error" && "select-text text-danger",
+            )}
+          >
+            {description}
+          </p>
+        )}
 
         {state.status === "downloading" && (
           <div

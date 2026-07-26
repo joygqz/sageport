@@ -1316,7 +1316,7 @@ export const en = {
       },
     },
     about: {
-      version: "Version {version}",
+      version: "Version",
       author: "Author",
       license: "License",
       openLinkError: "Failed to open link",
@@ -1325,7 +1325,6 @@ export const en = {
         idle: "Check whether a new version of Sageport is available.",
         check: "Check for updates",
         checking: "Checking for updates…",
-        currentVersion: "Current version {version}",
         upToDate: "Sageport is up to date",
         available: "Version {version} is available",
         install: "Download and install",

@@ -1279,7 +1279,7 @@ export const zhCN: Dictionary = {
       },
     },
     about: {
-      version: "版本 {version}",
+      version: "版本",
       author: "作者",
       license: "许可证",
       openLinkError: "打开链接失败",
@@ -1288,7 +1288,6 @@ export const zhCN: Dictionary = {
         idle: "检查 Sageport 是否有可用的新版本。",
         check: "检查更新",
         checking: "正在检查更新…",
-        currentVersion: "当前版本 {version}",
         upToDate: "Sageport 已是最新版本",
         available: "发现新版本 {version}",
         install: "下载并安装",
