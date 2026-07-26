@@ -280,8 +280,7 @@ function HostMeters({ stats }: { stats: HostStats }) {
         icon={Cpu}
         labelKey="monitor.cpu"
         percent={percents.cpu}
-        detail={t("monitor.cpuLoad", { load: stats.cpuLoad.toFixed(2) })}
-        title={t("monitor.cpuDetail", {
+        detail={t("monitor.cpuDetail", {
           load: stats.cpuLoad.toFixed(2),
           count: stats.cpuCount,
         })}
@@ -327,13 +326,13 @@ function Meter({
   labelKey,
   percent,
   detail,
-  title,
+  title = detail,
 }: {
   icon: LucideIcon;
   labelKey: TKey;
   percent: number;
   detail: string;
-  title: string;
+  title?: string;
 }) {
   const { t } = useI18n();
 
