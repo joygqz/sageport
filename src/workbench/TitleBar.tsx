@@ -9,6 +9,8 @@ import { useI18n } from "@/i18n";
 import { IS_MACOS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "./layout";
+import { keybindingDisplayKeys } from "./keybinding-registry";
+import { useKeybindingStore } from "./keybinding-store";
 import { useOverlayStore } from "./overlays";
 import { WindowControls } from "./WindowControls";
 
@@ -19,6 +21,11 @@ export const TitleBar = memo(function TitleBar() {
   const auxVisible = useLayoutStore((s) => s.auxVisible);
   const togglePanel = useLayoutStore((s) => s.togglePanel);
   const toggleAux = useLayoutStore((s) => s.toggleAux);
+  const keybindingOverrides = useKeybindingStore((state) => state.overrides);
+  const quickConnectKeys = keybindingDisplayKeys(
+    "palette.quick",
+    keybindingOverrides,
+  );
 
   return (
     <header
@@ -52,7 +59,9 @@ export const TitleBar = memo(function TitleBar() {
       >
         <Search className="size-3.5 shrink-0" />
         <span className="truncate">{t("titleBar.commandCenter")}</span>
-        <Kbd keys={["mod", "P"]} className="h-4 min-w-4 border-0 px-1" />
+        {quickConnectKeys && (
+          <Kbd keys={quickConnectKeys} className="h-4 min-w-4 border-0 px-1" />
+        )}
       </button>
 
       <div

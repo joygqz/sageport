@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-export type SettingsSection = "general" | "ai" | "sync" | "about";
+export type SettingsSection =
+  "general" | "keybindings" | "ai" | "sync" | "about";
 
 type SettingsSectionInput = SettingsSection | "appearance";
 

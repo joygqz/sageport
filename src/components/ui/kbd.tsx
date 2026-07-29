@@ -7,6 +7,32 @@ const MODIFIER_LABELS: Record<string, string> = IS_MACOS
   ? { mod: "⌘", ctrl: "⌃", shift: "⇧", alt: "⌥" }
   : { mod: "Ctrl", ctrl: "Ctrl", shift: "Shift", alt: "Alt" };
 
+const KEY_LABELS: Record<string, string> = {
+  arrowdown: "↓",
+  arrowleft: "←",
+  arrowright: "→",
+  arrowup: "↑",
+  backspace: "Backspace",
+  delete: "Del",
+  end: "End",
+  enter: "Enter",
+  home: "Home",
+  insert: "Ins",
+  pagedown: "PgDn",
+  pageup: "PgUp",
+  space: "Space",
+  tab: "Tab",
+};
+
+function keyLabel(key: string): string {
+  if (MODIFIER_LABELS[key]) return MODIFIER_LABELS[key];
+  if (KEY_LABELS[key]) return KEY_LABELS[key];
+  if (/^[a-z]$|^f(?:[1-9]|1\d|2[0-4])$/.test(key)) {
+    return key.toUpperCase();
+  }
+  return key;
+}
+
 interface KbdProps {
   keys: string[];
 
@@ -27,7 +53,7 @@ export function Kbd({ keys, className }: KbdProps) {
               className,
             )}
           >
-            {MODIFIER_LABELS[key] ?? key}
+            {keyLabel(key)}
           </span>
         </React.Fragment>
       ))}

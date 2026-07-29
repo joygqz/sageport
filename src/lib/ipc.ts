@@ -186,6 +186,7 @@ export const ipc = {
       theme: string;
       fontFamily: string;
       zoomLevel: number;
+      keybindings: Record<string, string | null>;
       protocol: AiProtocol;
       baseUrl: string;
       apiKey: string;

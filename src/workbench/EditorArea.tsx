@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
 import { focusTerminal } from "@/features/terminal/sessions";
 import { useOverlayStore } from "./overlays";
+import { keybindingDisplayKeys } from "./keybinding-registry";
+import { useKeybindingStore } from "./keybinding-store";
 import { getTabDropTarget } from "./tab-drag";
 import {
   STATUS_DOT_CLASS,
@@ -639,13 +641,19 @@ function TabDragGhost({
 
 function Watermark() {
   const { t } = useI18n();
-  const hints: { label: string; keys: string[] }[] = [
-    { label: t("watermark.quickConnect"), keys: ["mod", "P"] },
-    { label: t("watermark.commands"), keys: ["mod", "shift", "P"] },
-    { label: t("watermark.newHost"), keys: ["mod", "N"] },
-    { label: t("watermark.newLocal"), keys: ["mod", "shift", "T"] },
-    { label: t("watermark.settings"), keys: ["mod", ","] },
-  ];
+  const keybindingOverrides = useKeybindingStore((state) => state.overrides);
+  const hints = (
+    [
+      ["watermark.quickConnect", "palette.quick"],
+      ["watermark.commands", "palette.commands"],
+      ["watermark.newHost", "host.new"],
+      ["watermark.newLocal", "terminal.newLocal"],
+      ["watermark.settings", "settings.open"],
+    ] as const
+  ).flatMap(([labelKey, id]) => {
+    const keys = keybindingDisplayKeys(id, keybindingOverrides);
+    return keys ? [{ label: t(labelKey), keys }] : [];
+  });
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background [background-image:radial-gradient(circle_at_50%_42%,color-mix(in_oklch,var(--color-primary)_7%,transparent),transparent_32%)]">

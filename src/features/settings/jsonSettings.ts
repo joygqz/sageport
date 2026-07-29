@@ -10,12 +10,18 @@ import { THEME_FAMILIES, type ThemeMode } from "@/themes";
 import { DEFAULT_THEME_FAMILY_ID, DEFAULT_THEME_MODE } from "@/themes/themes";
 import type { AiConfig, AiProtocol } from "@/types/models";
 import { ZOOM_LEVEL_MAX, ZOOM_LEVEL_MIN } from "@/workbench/appearance";
+import {
+  KEYBINDING_DEFINITIONS,
+  parseKeybindingOverrides,
+  type KeybindingOverrides,
+} from "@/workbench/keybinding-registry";
 
 export interface JsonSettingsValues {
   "general.locale": Locale;
   "general.theme": string;
   "general.fontFamily": string;
   "general.zoomLevel": number;
+  "general.keybindings": KeybindingOverrides;
   "ai.protocol": AiProtocol;
   "ai.base_url": string;
   "ai.api_key": string;
@@ -42,6 +48,7 @@ const SETTING_KEYS = [
   "general.theme",
   "general.fontFamily",
   "general.zoomLevel",
+  "general.keybindings",
   "ai.protocol",
   "ai.base_url",
   "ai.api_key",
@@ -103,6 +110,7 @@ export function defaultJsonSettings(locale: Locale): JsonSettingsValues {
     "general.theme": `${DEFAULT_THEME_FAMILY_ID}:${DEFAULT_THEME_MODE}`,
     "general.fontFamily": "",
     "general.zoomLevel": 0,
+    "general.keybindings": {},
     "ai.protocol": "openai",
     "ai.base_url": "",
     "ai.api_key": "",
@@ -118,6 +126,7 @@ export function createJsonSettingsValues(input: {
   theme: string;
   fontFamily: string;
   zoomLevel: number;
+  keybindings: KeybindingOverrides;
   ai: AiConfig;
   apiKey: string;
 }): JsonSettingsValues {
@@ -126,6 +135,7 @@ export function createJsonSettingsValues(input: {
     "general.theme": input.theme,
     "general.fontFamily": input.fontFamily,
     "general.zoomLevel": input.zoomLevel,
+    "general.keybindings": input.keybindings,
     "ai.protocol": input.ai.protocol,
     "ai.base_url": input.ai.baseUrl,
     "ai.api_key": input.apiKey,
@@ -175,6 +185,18 @@ export function jsonSettingsSchema(): Record<string, unknown> {
         type: "integer",
         minimum: ZOOM_LEVEL_MIN,
         maximum: ZOOM_LEVEL_MAX,
+      },
+      "general.keybindings": {
+        type: "object",
+        additionalProperties: false,
+        properties: Object.fromEntries(
+          KEYBINDING_DEFINITIONS.map(({ id }) => [
+            id,
+            {
+              type: ["string", "null"],
+            },
+          ]),
+        ),
       },
       "ai.protocol": {
         type: "string",
@@ -277,6 +299,14 @@ export function parseJsonSettings(text: string): JsonSettingsParseResult {
       return invalid("general.zoomLevel");
     }
     patch["general.zoomLevel"] = value;
+  }
+
+  if (has("general.keybindings")) {
+    const value = parseKeybindingOverrides(raw["general.keybindings"]);
+    if (!value) {
+      return invalid("general.keybindings");
+    }
+    patch["general.keybindings"] = value;
   }
 
   if (has("ai.protocol")) {

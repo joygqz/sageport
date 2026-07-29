@@ -13,6 +13,11 @@ import { errorMessage, toast } from "@/lib/toast";
 import { serializeThemePreference } from "@/themes/apply";
 import { useTheme } from "@/themes";
 import { useFontStore } from "@/workbench/font";
+import {
+  KEYBINDINGS_SYNC_KEY,
+  useKeybindingStore,
+} from "@/workbench/keybinding-store";
+import { serializeKeybindingOverrides } from "@/workbench/keybinding-registry";
 import { useZoomStore } from "@/workbench/zoom";
 import { SettingsGroup } from "./SettingsGroup";
 import {
@@ -48,6 +53,7 @@ export function JsonSettingsSection() {
   const { preference } = useTheme();
   const fontFamily = useFontStore((state) => state.family);
   const zoomLevel = useZoomStore((state) => state.level);
+  const keybindings = useKeybindingStore((state) => state.overrides);
   const ai = useAiConfig();
   const apiKey = useAiApiKey(Boolean(ai.data?.hasApiKey));
 
@@ -72,6 +78,7 @@ export function JsonSettingsSection() {
     theme: serializeThemePreference(preference),
     fontFamily,
     zoomLevel,
+    keybindings,
     ai: ai.data,
     apiKey: apiKey.data ?? "",
   });
@@ -92,6 +99,9 @@ function JsonSettingsForm({
   const { preference, setPreference } = useTheme();
   const setFontFamily = useFontStore((state) => state.setFamily);
   const setZoomLevel = useZoomStore((state) => state.setLevel);
+  const replaceKeybindings = useKeybindingStore(
+    (state) => state.replaceOverrides,
+  );
   const initialText = stringifyJsonSettings(initialDocument);
   const [savedText, setSavedText] = useState(initialText);
   const [draft, setDraft] = useState(initialText);
@@ -117,6 +127,7 @@ function JsonSettingsForm({
         theme: next["general.theme"],
         fontFamily: next["general.fontFamily"],
         zoomLevel: next["general.zoomLevel"],
+        keybindings: next["general.keybindings"],
         protocol: next["ai.protocol"],
         baseUrl: next["ai.base_url"],
         apiKey: next["ai.api_key"],
@@ -130,6 +141,10 @@ function JsonSettingsForm({
       cacheSettingValue("general.theme", next["general.theme"]);
       cacheSettingValue("general.fontFamily", next["general.fontFamily"]);
       cacheSettingValue("general.zoomLevel", String(next["general.zoomLevel"]));
+      cacheSettingValue(
+        KEYBINDINGS_SYNC_KEY,
+        serializeKeybindingOverrides(next["general.keybindings"]),
+      );
       clearModelLimitsCache();
       void queryClient.invalidateQueries({ queryKey: ["ai"] });
 
@@ -145,6 +160,7 @@ function JsonSettingsForm({
       }
       setFontFamily(next["general.fontFamily"]);
       setZoomLevel(next["general.zoomLevel"]);
+      replaceKeybindings(next["general.keybindings"]);
 
       const formatted = stringifyJsonSettings(
         createJsonSettingsDocument(next, defaults),

@@ -69,6 +69,11 @@ for (const file of localeFiles) {
 
 for (const file of sourceFiles.filter((file) => file.endsWith(".tsx"))) {
   const text = readFileSync(root + file, "utf8");
+  if (/<Kbd\b[^>]*\bkeys=\{\s*\[/.test(text)) {
+    problems.push(
+      `${file}: render configurable shortcuts from the keybinding registry`,
+    );
+  }
   if (
     file !== "src/components/ui/select.tsx" &&
     /<(?:select|option)\b/.test(text)

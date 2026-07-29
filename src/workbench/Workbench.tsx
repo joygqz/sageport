@@ -24,6 +24,8 @@ import {
 import { ActivityBar } from "./ActivityBar";
 import { EditorArea } from "./EditorArea";
 import { FONT_SYNC_KEY, useFontStore } from "./font";
+import { serializeKeybindingOverrides } from "./keybinding-registry";
+import { KEYBINDINGS_SYNC_KEY, useKeybindingStore } from "./keybinding-store";
 import { useKeybindings } from "./keybindings";
 import {
   auxLimits,
@@ -208,6 +210,30 @@ export function Workbench() {
       if (state.family !== prev.family) pushFont(state.family);
     });
   }, [pushFont]);
+
+  const keybindingOverrides = useKeybindingStore((state) => state.overrides);
+  const serializedKeybindings =
+    serializeKeybindingOverrides(keybindingOverrides);
+  const pushKeybindings = useSettingSync(
+    KEYBINDINGS_SYNC_KEY,
+    serializedKeybindings,
+    (remote) => {
+      useKeybindingStore.getState().load(remote);
+    },
+    {
+      onLoadError: (error) =>
+        toast.error(t("settings.persistence.loadError"), errorMessage(error)),
+      onSaveError: (error) =>
+        toast.error(t("settings.persistence.saveError"), errorMessage(error)),
+    },
+  );
+  useEffect(() => {
+    return useKeybindingStore.subscribe((state, previous) => {
+      if (state.overrides !== previous.overrides) {
+        pushKeybindings(serializeKeybindingOverrides(state.overrides));
+      }
+    });
+  }, [pushKeybindings]);
 
   useEffect(() => {
     if (!IS_MACOS) return;

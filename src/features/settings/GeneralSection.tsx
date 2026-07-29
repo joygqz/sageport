@@ -28,6 +28,8 @@ import {
   ZOOM_LEVEL_MAX,
   ZOOM_LEVEL_MIN,
 } from "@/workbench/zoom";
+import { keybindingDisplayKeys } from "@/workbench/keybinding-registry";
+import { useKeybindingStore } from "@/workbench/keybinding-store";
 import { AutostartSetting } from "./AutostartSetting";
 import { DraftInput } from "./DraftInput";
 import { SettingsGroup, SETTINGS_GROUP_STACK_CLASS } from "./SettingsGroup";
@@ -159,11 +161,18 @@ function FontField() {
 
 function ZoomField() {
   const { t } = useI18n();
+  const keybindingOverrides = useKeybindingStore((state) => state.overrides);
   const level = useZoomStore((state) => state.level);
   const zoomIn = useZoomStore((state) => state.zoomIn);
   const zoomOut = useZoomStore((state) => state.zoomOut);
   const resetZoom = useZoomStore((state) => state.resetZoom);
   const percent = Math.round(zoomFactor(level) * 100);
+  const shortcuts = (
+    ["view.zoomIn", "view.zoomOut", "view.zoomReset"] as const
+  ).flatMap((id) => {
+    const keys = keybindingDisplayKeys(id, keybindingOverrides);
+    return keys ? [keys] : [];
+  });
 
   return (
     <Field
@@ -171,9 +180,15 @@ function ZoomField() {
       hint={
         <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
           {t("settings.general.display.zoomHint")}
-          <Kbd keys={["mod", "+"]} className="h-4 min-w-4" /> /
-          <Kbd keys={["mod", "−"]} className="h-4 min-w-4" /> /
-          <Kbd keys={["mod", "0"]} className="h-4 min-w-4" />
+          {shortcuts.map((keys, index) => (
+            <span
+              key={keys.join("+")}
+              className="inline-flex items-center gap-1.5"
+            >
+              {index > 0 && <span aria-hidden="true">/</span>}
+              <Kbd keys={keys} className="h-4 min-w-4" />
+            </span>
+          ))}
         </span>
       }
     >

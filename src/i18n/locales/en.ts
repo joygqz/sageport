@@ -212,14 +212,28 @@ export const en = {
       toggleBroadcast: "Toggle terminal input broadcasting",
       splitRight: "Split terminal right",
       splitDown: "Split terminal down",
+      focusPreviousPane: "Focus previous terminal pane",
       focusNextPane: "Focus next terminal pane",
+      search: "Find in terminal",
+    },
+    palette: {
+      quick: "Open quick connect",
+      commands: "Open command palette",
     },
     view: {
       toggleSidebar: "Toggle sidebar",
       togglePanel: "Toggle files panel",
       toggleAssistant: "Toggle AI assistant",
+      zoomIn: "Zoom in",
+      zoomOut: "Zoom out",
+      zoomReset: "Reset zoom",
     },
-    tab: { close: "Close tab" },
+    tab: {
+      close: "Close tab",
+      previous: "Open previous tab",
+      next: "Open next tab",
+      activate: "Open tab {number}",
+    },
     settings: { open: "Open settings" },
   },
 
@@ -1095,13 +1109,15 @@ export const en = {
     },
     nav: {
       general: "General",
+      keybindings: "Shortcuts",
       ai: "AI",
       sync: "Sync",
       about: "About",
     },
     json: {
       title: "JSON settings",
-      description: "Edit appearance, display, and AI settings in one place.",
+      description:
+        "Edit appearance, display, keyboard shortcut, and AI settings in one place.",
       open: "Open JSON settings",
       openVisual: "Open visual settings",
       editorLabel: "JSON settings editor",
@@ -1152,6 +1168,21 @@ export const en = {
         zoomOut: "Zoom out",
         zoomReset: "Reset zoom",
       },
+    },
+    keybindings: {
+      search: "Search keyboard shortcuts",
+      noResults: "No matching keyboard shortcuts",
+      recording: "Press shortcut",
+      unassigned: "Not assigned",
+      change: "Change shortcut for {command}",
+      disable: "Disable shortcut",
+      disableCommand: "Disable shortcut for {command}",
+      reset: "Reset shortcut",
+      resetCommand: "Reset shortcut for {command}",
+      replace: "Replace shortcut",
+      invalid: "Press a modifier and another key.",
+      conflict:
+        "This shortcut is assigned to {command}. Replacing it will disable that command shortcut.",
     },
     ai: {
       description:

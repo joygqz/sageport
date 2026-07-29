@@ -1,4 +1,5 @@
 use chrono::DateTime;
+use std::collections::BTreeMap;
 
 use super::SettingEntry;
 
@@ -8,6 +9,7 @@ const MAX_FONT_FAMILY_BYTES: usize = 1024;
 const MAX_MODEL_BYTES: usize = 1024;
 const MAX_ENABLED_TOOLS: usize = 256;
 const MAX_TOOL_NAME_BYTES: usize = 128;
+const MAX_KEYBINDINGS: usize = 64;
 
 pub(super) fn sanitize(entry: &SettingEntry) -> Option<SettingEntry> {
     if DateTime::parse_from_rfc3339(&entry.updated_at).is_err() {
@@ -19,6 +21,7 @@ pub(super) fn sanitize(entry: &SettingEntry) -> Option<SettingEntry> {
         "general.locale" => one_of(&entry.value, &["en", "zh-CN"])?,
         "general.zoomLevel" => sanitize_general_value(&entry.key, &entry.value)?,
         "general.fontFamily" => sanitize_general_value(&entry.key, &entry.value)?,
+        "general.keybindings" => sanitize_general_value(&entry.key, &entry.value)?,
         "ai.protocol" => one_of(&entry.value, &["openai", "anthropic"])?,
         "ai.base_url" => sanitize_base_url(&entry.value)?,
         "ai.api_key" => bounded_text(&entry.value, MAX_API_KEY_BYTES)?.to_string(),
@@ -68,8 +71,108 @@ pub(crate) fn sanitize_general_value(key: &str, value: &str) -> Option<String> {
         "general.locale" => one_of(value, &["en", "zh-CN"]),
         "general.zoomLevel" => sanitize_zoom(value),
         "general.fontFamily" => bounded_text(value, MAX_FONT_FAMILY_BYTES).map(str::to_string),
+        "general.keybindings" => sanitize_keybindings(value),
         _ => None,
     }
+}
+
+fn sanitize_keybindings(value: &str) -> Option<String> {
+    let bindings = serde_json::from_str::<BTreeMap<String, Option<String>>>(value).ok()?;
+    if bindings.len() > MAX_KEYBINDINGS
+        || bindings.iter().any(|(id, binding)| {
+            !is_keybinding_id(id)
+                || binding
+                    .as_deref()
+                    .is_some_and(|value| !is_keybinding(value))
+        })
+    {
+        return None;
+    }
+    serde_json::to_string(&bindings).ok()
+}
+
+fn is_keybinding_id(value: &str) -> bool {
+    matches!(
+        value,
+        "palette.quick"
+            | "palette.commands"
+            | "host.new"
+            | "terminal.newLocal"
+            | "terminal.toggleBroadcast"
+            | "terminal.splitRight"
+            | "terminal.splitDown"
+            | "terminal.focusPreviousPane"
+            | "terminal.focusNextPane"
+            | "terminal.search"
+            | "view.toggleSidebar"
+            | "view.togglePanel"
+            | "view.toggleAssistant"
+            | "tab.close"
+            | "tab.previous"
+            | "tab.next"
+            | "tab.activate.1"
+            | "tab.activate.2"
+            | "tab.activate.3"
+            | "tab.activate.4"
+            | "tab.activate.5"
+            | "tab.activate.6"
+            | "tab.activate.7"
+            | "tab.activate.8"
+            | "tab.activate.9"
+            | "settings.open"
+            | "view.zoomIn"
+            | "view.zoomOut"
+            | "view.zoomReset"
+    )
+}
+
+fn is_keybinding(value: &str) -> bool {
+    if value.len() > 64 {
+        return false;
+    }
+    let tokens = value.split('+').collect::<Vec<_>>();
+    if tokens.len() < 2 {
+        return false;
+    }
+    let (key, modifiers) = tokens.split_last().unwrap();
+    let valid_modifiers = modifiers
+        .iter()
+        .all(|modifier| matches!(*modifier, "mod" | "ctrl" | "alt" | "shift"));
+    let unique_modifiers = modifiers
+        .iter()
+        .enumerate()
+        .all(|(index, modifier)| !modifiers[..index].contains(modifier));
+    let has_action_modifier = modifiers
+        .iter()
+        .any(|modifier| matches!(*modifier, "mod" | "ctrl" | "alt"));
+    let valid_key = (key.len() == 1
+        && key.chars().next().is_some_and(|character| {
+            character.is_ascii_lowercase()
+                || character.is_ascii_digit()
+                || "`-=[]\\;',./".contains(character)
+        }))
+        || (key
+            .strip_prefix('f')
+            .and_then(|number| number.parse::<u8>().ok())
+            .is_some_and(|number| (1..=24).contains(&number)))
+        || matches!(
+            *key,
+            "arrowdown"
+                | "arrowleft"
+                | "arrowright"
+                | "arrowup"
+                | "backspace"
+                | "delete"
+                | "end"
+                | "enter"
+                | "home"
+                | "insert"
+                | "pagedown"
+                | "pageup"
+                | "space"
+                | "tab"
+        );
+    valid_modifiers && unique_modifiers && has_action_modifier && valid_key
 }
 
 fn sanitize_base_url(value: &str) -> Option<String> {
@@ -151,6 +254,11 @@ mod tests {
         );
         assert!(sanitize(&setting("general.locale", "zh-CN")).is_some());
         assert!(sanitize(&setting("general.zoomLevel", "-3")).is_some());
+        assert!(sanitize(&setting(
+            "general.keybindings",
+            r#"{"view.toggleSidebar":null,"terminal.search":"mod+shift+f"}"#
+        ))
+        .is_some());
         assert!(sanitize(&setting("ai.protocol", "anthropic")).is_some());
         assert!(sanitize(&setting("ai.base_url", "http://localhost:11434/v1")).is_some());
         assert!(sanitize(&setting("ai.auto_approve", "false")).is_some());
@@ -162,6 +270,16 @@ mod tests {
         assert!(sanitize(&setting("general.theme", "removed-theme")).is_none());
         assert!(sanitize(&setting("general.locale", "invalid")).is_none());
         assert!(sanitize(&setting("general.zoomLevel", "99")).is_none());
+        assert!(sanitize(&setting(
+            "general.keybindings",
+            r#"{"unknown.command":"mod+k"}"#
+        ))
+        .is_none());
+        assert!(sanitize(&setting(
+            "general.keybindings",
+            r#"{"view.toggleSidebar":"b"}"#
+        ))
+        .is_none());
         assert!(sanitize(&setting("appearance.theme", "midnight:dark")).is_none());
         assert!(sanitize(&setting("ai.protocol", "removed-protocol")).is_none());
         assert!(sanitize(&setting("ai.base_url", "not a url")).is_none());

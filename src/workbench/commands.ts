@@ -5,6 +5,12 @@ import { useBroadcastStore } from "@/features/terminal/broadcast";
 import { THEMES } from "@/themes";
 import { useTheme } from "@/themes/useTheme";
 import { useLayoutStore, type Activity } from "./layout";
+import {
+  keybindingDisplayKeys,
+  type KeybindingId,
+  type KeybindingOverrides,
+} from "./keybinding-registry";
+import { useKeybindingStore } from "./keybinding-store";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
 
@@ -33,9 +39,17 @@ function showActivity(activity: Activity) {
   }
 }
 
+function commandShortcut(
+  id: KeybindingId,
+  overrides: KeybindingOverrides,
+): string[] | undefined {
+  return keybindingDisplayKeys(id, overrides);
+}
+
 export function useCommands(): WorkbenchCommand[] {
   const { t } = useI18n();
   const { setTheme } = useTheme();
+  const keybindingOverrides = useKeybindingStore((state) => state.overrides);
 
   return useMemo(() => {
     const layout = useLayoutStore.getState;
@@ -47,7 +61,7 @@ export function useCommands(): WorkbenchCommand[] {
         id: "host.new",
         categoryKey: "commands.category.hosts",
         label: t("commands.host.new"),
-        shortcut: ["mod", "N"],
+        shortcut: commandShortcut("host.new", keybindingOverrides),
         run: () => overlays().openHostForm(),
       },
       {
@@ -60,56 +74,62 @@ export function useCommands(): WorkbenchCommand[] {
         id: "terminal.newLocal",
         categoryKey: "commands.category.terminal",
         label: t("commands.terminal.newLocal"),
-        shortcut: ["mod", "shift", "T"],
+        shortcut: commandShortcut("terminal.newLocal", keybindingOverrides),
         run: () => tabs().openLocalTerminal(),
       },
       {
         id: "terminal.toggleBroadcast",
         categoryKey: "commands.category.terminal",
         label: t("commands.terminal.toggleBroadcast"),
-        shortcut: ["mod", "shift", "B"],
+        shortcut: commandShortcut(
+          "terminal.toggleBroadcast",
+          keybindingOverrides,
+        ),
         run: () => useBroadcastStore.getState().toggle(),
       },
       {
         id: "terminal.splitRight",
         categoryKey: "commands.category.terminal",
         label: t("commands.terminal.splitRight"),
-        shortcut: ["mod", "\\"],
+        shortcut: commandShortcut("terminal.splitRight", keybindingOverrides),
         run: () => splitActivePane("right"),
       },
       {
         id: "terminal.splitDown",
         categoryKey: "commands.category.terminal",
         label: t("commands.terminal.splitDown"),
-        shortcut: ["mod", "shift", "\\"],
+        shortcut: commandShortcut("terminal.splitDown", keybindingOverrides),
         run: () => splitActivePane("down"),
       },
       {
         id: "terminal.focusNextPane",
         categoryKey: "commands.category.terminal",
         label: t("commands.terminal.focusNextPane"),
-        shortcut: ["mod", "]"],
+        shortcut: commandShortcut(
+          "terminal.focusNextPane",
+          keybindingOverrides,
+        ),
         run: () => useTabsStore.getState().focusPaneNext(1),
       },
       {
         id: "view.toggleSidebar",
         categoryKey: "commands.category.view",
         label: t("commands.view.toggleSidebar"),
-        shortcut: ["mod", "B"],
+        shortcut: commandShortcut("view.toggleSidebar", keybindingOverrides),
         run: () => layout().toggleSidebar(),
       },
       {
         id: "view.togglePanel",
         categoryKey: "commands.category.view",
         label: t("commands.view.togglePanel"),
-        shortcut: ["mod", "J"],
+        shortcut: commandShortcut("view.togglePanel", keybindingOverrides),
         run: () => layout().togglePanel(),
       },
       {
         id: "view.toggleAssistant",
         categoryKey: "commands.category.view",
         label: t("commands.view.toggleAssistant"),
-        shortcut: ["mod", "L"],
+        shortcut: commandShortcut("view.toggleAssistant", keybindingOverrides),
         run: () => layout().toggleAux(),
       },
       ...(
@@ -131,7 +151,7 @@ export function useCommands(): WorkbenchCommand[] {
         id: "tab.close",
         categoryKey: "commands.category.view",
         label: t("commands.tab.close"),
-        shortcut: ["mod", "W"],
+        shortcut: commandShortcut("tab.close", keybindingOverrides),
         run: () => {
           const { activeId, close } = tabs();
           if (activeId) close(activeId);
@@ -141,15 +161,17 @@ export function useCommands(): WorkbenchCommand[] {
         id: "settings.open",
         categoryKey: "commands.category.preferences",
         label: t("commands.settings.open"),
-        shortcut: ["mod", ","],
+        shortcut: commandShortcut("settings.open", keybindingOverrides),
         run: () => overlays().openSettings(),
       },
-      ...(["general", "ai", "sync", "about"] as const).map((section) => ({
-        id: `settings.${section}`,
-        categoryKey: "commands.category.preferences" as TKey,
-        label: t(`settings.nav.${section}`),
-        run: () => overlays().openSettings(section),
-      })),
+      ...(["general", "keybindings", "ai", "sync", "about"] as const).map(
+        (section) => ({
+          id: `settings.${section}`,
+          categoryKey: "commands.category.preferences" as TKey,
+          label: t(`settings.nav.${section}`),
+          run: () => overlays().openSettings(section),
+        }),
+      ),
       ...THEMES.map((theme) => ({
         id: `theme.${theme.id}`,
         categoryKey: "commands.category.theme" as TKey,
@@ -158,5 +180,5 @@ export function useCommands(): WorkbenchCommand[] {
       })),
     ];
     return commands;
-  }, [t, setTheme]);
+  }, [t, setTheme, keybindingOverrides]);
 }

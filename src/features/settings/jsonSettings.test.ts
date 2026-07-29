@@ -18,6 +18,7 @@ describe("JSON settings", () => {
       theme: "midnight:dark",
       fontFamily: "",
       zoomLevel: 0,
+      keybindings: {},
       ai: {
         hasApiKey: false,
         protocol: "openai",
@@ -42,6 +43,10 @@ describe("JSON settings", () => {
       theme: "graphite:system",
       fontFamily: "JetBrains Mono",
       zoomLevel: 1,
+      keybindings: {
+        "view.toggleSidebar": null,
+        "terminal.search": "mod+shift+f",
+      },
       ai: {
         hasApiKey: true,
         protocol: "anthropic",
@@ -65,6 +70,10 @@ describe("JSON settings", () => {
       "ai.auto_approve": true,
       "ai.enabled_tools": [],
       "ai.max_history_tokens": 200_000,
+      "general.keybindings": {
+        "view.toggleSidebar": null,
+        "terminal.search": "mod+shift+f",
+      },
     });
   });
 
@@ -116,6 +125,14 @@ describe("JSON settings", () => {
     expect(parseJsonSettings('{ "ai.api_key": "bad\\nkey" }')).toEqual({
       ok: false,
       issue: { kind: "invalid", key: "ai.api_key" },
+    });
+    expect(
+      parseJsonSettings(
+        '{ "general.keybindings": { "view.toggleSidebar": "b" } }',
+      ),
+    ).toEqual({
+      ok: false,
+      issue: { kind: "invalid", key: "general.keybindings" },
     });
   });
 });

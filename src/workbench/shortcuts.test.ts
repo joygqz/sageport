@@ -61,4 +61,17 @@ describe("isWorkbenchShortcut", () => {
     expect(shortcut(key("b", { altKey: true }))).toBe(false);
     expect(shortcut(key("b", { ctrlKey: false }))).toBe(false);
   });
+
+  it("honors custom and disabled shortcuts", () => {
+    expect(
+      isWorkbenchShortcut(key("b"), false, {
+        "view.toggleSidebar": null,
+      }),
+    ).toBe(false);
+    expect(
+      isWorkbenchShortcut(key("S", { shiftKey: true }), false, {
+        "view.toggleSidebar": "mod+shift+s",
+      }),
+    ).toBe(true);
+  });
 });

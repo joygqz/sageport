@@ -3,6 +3,7 @@ import {
   Braces,
   ChevronRight,
   Info,
+  Keyboard,
   RefreshCw,
   Settings2,
   Sparkles,
@@ -47,6 +48,7 @@ import { AboutSection } from "./AboutSection";
 import { DraftInput } from "./DraftInput";
 import { GeneralSection } from "./GeneralSection";
 import { JsonSettingsSection } from "./JsonSettingsSection";
+import { KeybindingsSection } from "./KeybindingsSection";
 import { SettingsGroup, SETTINGS_GROUP_STACK_CLASS } from "./SettingsGroup";
 
 const NAV: {
@@ -58,6 +60,11 @@ const NAV: {
     id: "general",
     labelKey: "settings.nav.general",
     icon: Settings2,
+  },
+  {
+    id: "keybindings",
+    labelKey: "settings.nav.keybindings",
+    icon: Keyboard,
   },
   {
     id: "ai",
@@ -197,6 +204,7 @@ function SettingsPage({
         <ScrollArea className="min-h-0 min-w-0 flex-1">
           <main className="settings-content mx-auto flex w-full max-w-3xl flex-col px-5 py-6 sm:px-8 sm:py-8">
             {section === "general" && <GeneralSection />}
+            {section === "keybindings" && <KeybindingsSection />}
             {section === "ai" && <AiSection />}
             {section === "sync" && <SyncSection />}
             {section === "about" && <AboutSection />}

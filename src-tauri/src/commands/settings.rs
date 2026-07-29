@@ -14,6 +14,7 @@ pub struct JsonSettingsInput {
     theme: String,
     font_family: String,
     zoom_level: i32,
+    keybindings: serde_json::Value,
     protocol: Protocol,
     base_url: String,
     api_key: String,
@@ -26,7 +27,11 @@ pub struct JsonSettingsInput {
 fn validate_key(key: &str) -> AppResult<()> {
     if matches!(
         key,
-        "general.theme" | "general.locale" | "general.zoomLevel" | "general.fontFamily"
+        "general.theme"
+            | "general.locale"
+            | "general.zoomLevel"
+            | "general.fontFamily"
+            | "general.keybindings"
     ) {
         Ok(())
     } else {
@@ -67,11 +72,13 @@ pub async fn settings_apply_json(
 }
 
 fn validate_json_settings(input: JsonSettingsInput) -> AppResult<Vec<(String, String)>> {
+    let keybindings = serde_json::to_string(&input.keybindings)?;
     let general = [
         ("general.locale", input.locale),
         ("general.theme", input.theme),
         ("general.fontFamily", input.font_family),
         ("general.zoomLevel", input.zoom_level.to_string()),
+        ("general.keybindings", keybindings),
     ];
     let mut entries = general
         .into_iter()
@@ -102,6 +109,7 @@ mod tests {
     fn only_exposes_non_secret_general_settings() {
         assert!(validate_key("general.theme").is_ok());
         assert!(validate_key("general.fontFamily").is_ok());
+        assert!(validate_key("general.keybindings").is_ok());
         assert!(validate_key("appearance.theme").is_err());
         assert!(validate_key("ai.api_key").is_err());
         assert!(validate_key("sync.connection").is_err());
@@ -129,6 +137,7 @@ mod tests {
             theme: "midnight:dark".into(),
             font_family: String::new(),
             zoom_level: 0,
+            keybindings: serde_json::json!({}),
             protocol: Protocol::Openai,
             base_url: "https://example.com/v1".into(),
             api_key: api_key.into(),
