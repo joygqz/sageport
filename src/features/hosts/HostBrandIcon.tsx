@@ -28,24 +28,34 @@ import {
 import type { HostSystem } from "./hostSystem";
 
 type BrandIcon = ComponentType<{
+  className?: string;
   color?: string;
   size?: string | number;
   title?: string;
 }>;
 
 function OpenEulerLogo({
+  className,
+  color = "currentColor",
   size = 24,
   title = "openEuler",
 }: {
+  className?: string;
   color?: string;
   size?: string | number;
   title?: string;
 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 512 512" role="img">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      role="img"
+      className={className}
+    >
       <title>{title}</title>
       <path
-        fill="#1d2aa6"
+        fill={color}
         fillRule="evenodd"
         d="M475.7 116.6 272.3 4.2c-10.1-5.6-22.5-5.6-32.6 0L36.3 116.6c-10.1 5.6-16.3 15.9-16.3 27v224.8c0 11.1 6.2 21.4 16.3 27l203.4 112.4c10.1 5.6 22.5 5.6 32.6 0l203.4-112.4c10.1-5.6 16.3-15.9 16.3-27V143.6c0-11.1-6.2-21.4-16.3-27"
       />
@@ -85,6 +95,25 @@ const BRAND_ICONS: Partial<Record<HostSystem, BrandIcon>> = {
   ubuntu: SiUbuntu,
 };
 
+const ADAPTIVE_BRAND_COLOR_CLASS: Partial<Record<HostSystem, string>> = {
+  alma: "text-black dark:text-link",
+  alpine: "text-[#0D597F] dark:text-link",
+  arch: "text-[#1793D1] dark:text-link",
+  centos: "text-[#262577] dark:text-link",
+  debian: "text-[#A81D33] dark:text-link",
+  deepin: "text-[#007CFF] dark:text-link",
+  euleros: "text-[#FF0000] dark:text-link",
+  freebsd: "text-[#AB2B28] dark:text-link",
+  gentoo: "text-[#54487A] dark:text-link",
+  harmonyos: "text-black dark:text-link",
+  kali: "text-[#557C94] dark:text-link",
+  nixos: "text-[#5277C3] dark:text-link",
+  openeuler: "text-[#1D2AA6] dark:text-link",
+  redhat: "text-[#EE0000] dark:text-link",
+  suse: "text-[#0C322C] dark:text-link",
+  ubuntu: "text-[#E95420] dark:text-link",
+};
+
 export function HostBrandIcon({
   system,
   title,
@@ -93,11 +122,15 @@ export function HostBrandIcon({
   title: string;
 }) {
   const Brand = BRAND_ICONS[system];
+  const adaptiveColorClass = ADAPTIVE_BRAND_COLOR_CLASS[system];
   if (!Brand) return null;
   return (
     <Brand
       size={18}
-      color={system === "apple" ? "currentColor" : "default"}
+      className={adaptiveColorClass}
+      color={
+        system === "apple" || adaptiveColorClass ? "currentColor" : "default"
+      }
       title={title}
     />
   );

@@ -1,5 +1,8 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { HostBrandIcon } from "./HostBrandIcon";
+import { HostSystemIcon } from "./HostSystemIcon";
 import { detectHostSystem } from "./hostSystem";
 
 describe("detectHostSystem", () => {
@@ -40,5 +43,49 @@ describe("detectHostSystem", () => {
     [null, "unknown"],
   ] as const)("maps %s to %s", (value, expected) => {
     expect(detectHostSystem(value)).toBe(expected);
+  });
+});
+
+describe("HostSystemIcon", () => {
+  it("keeps brand icons on the theme card background", () => {
+    const html = renderToStaticMarkup(<HostSystemIcon os="NixOS 25.05" />);
+
+    expect(html).toContain("bg-card");
+    expect(html).not.toContain("bg-white");
+  });
+
+  it.each([
+    ["alma", "AlmaLinux 9.6"],
+    ["alpine", "Alpine Linux 3.22"],
+    ["arch", "Arch Linux"],
+    ["centos", "CentOS Stream 10"],
+    ["debian", "Debian 13"],
+    ["deepin", "deepin 25"],
+    ["euleros", "EulerOS 2.0"],
+    ["freebsd", "FreeBSD 14.3"],
+    ["gentoo", "Gentoo Linux"],
+    ["harmonyos", "OpenHarmony 5"],
+    ["kali", "Kali Linux"],
+    ["nixos", "NixOS 25.05"],
+    ["openeuler", "openEuler 24.03"],
+    ["redhat", "Red Hat Enterprise Linux 10"],
+    ["suse", "SUSE Linux Enterprise Server 15"],
+    ["ubuntu", "Ubuntu 25.04"],
+  ] as const)("uses the theme link color for the %s icon", (system, title) => {
+    const html = renderToStaticMarkup(
+      <HostBrandIcon system={system} title={title} />,
+    );
+
+    expect(html).toContain('fill="currentColor"');
+    expect(html).toContain("dark:text-link");
+  });
+
+  it("keeps high-contrast brand colors in dark themes", () => {
+    const html = renderToStaticMarkup(
+      <HostBrandIcon system="fedora" title="Fedora Linux 42" />,
+    );
+
+    expect(html).toContain('fill="#51A2DA"');
+    expect(html).not.toContain("dark:text-link");
   });
 });
