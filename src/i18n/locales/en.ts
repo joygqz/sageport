@@ -1182,7 +1182,7 @@ export const en = {
       replace: "Replace shortcut",
       invalid: "Press a modifier and another key.",
       conflict:
-        "This shortcut is assigned to {command}. Replacing it will disable that command shortcut.",
+        "This shortcut is assigned to {command}. Replacing it will remove the conflicting shortcut from that command.",
     },
     ai: {
       description:

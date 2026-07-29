@@ -1152,7 +1152,8 @@ export const zhCN: Dictionary = {
       resetCommand: "重置“{command}”的快捷键",
       replace: "替换快捷键",
       invalid: "请同时按下 Ctrl、Alt 或 Command 和另一个按键。",
-      conflict: "该快捷键已分配给“{command}”。替换后将禁用该命令的快捷键。",
+      conflict:
+        "该快捷键已分配给“{command}”。替换后将从该命令中移除冲突的快捷键。",
     },
     ai: {
       description:

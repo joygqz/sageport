@@ -405,6 +405,30 @@ function platformKeybindingSignature(value: string, isMacOS: boolean): string {
     .join("+");
 }
 
+function keybindingsMatch(
+  left: string,
+  right: string,
+  isMacOS: boolean,
+): boolean {
+  return (
+    platformKeybindingSignature(left, isMacOS) ===
+    platformKeybindingSignature(right, isMacOS)
+  );
+}
+
+export function keybindingOverrideWithoutConflict(
+  id: KeybindingId,
+  value: string,
+  overrides: KeybindingOverrides,
+  isMacOS: boolean,
+): string | null {
+  return (
+    effectiveKeybindings(id, overrides).find(
+      (binding) => !keybindingsMatch(binding, value, isMacOS),
+    ) ?? null
+  );
+}
+
 export function findKeybindingConflict(
   id: KeybindingId,
   value: string,

@@ -20,6 +20,7 @@ interface PendingKeybinding {
   id: KeybindingId;
   binding: string;
   conflictId: KeybindingId;
+  operation: "assign" | "reset";
 }
 
 export function KeybindingsSection() {
@@ -27,6 +28,9 @@ export function KeybindingsSection() {
   const overrides = useKeybindingStore((state) => state.overrides);
   const setBinding = useKeybindingStore((state) => state.set);
   const replaceBinding = useKeybindingStore((state) => state.replace);
+  const removeBindingConflict = useKeybindingStore(
+    (state) => state.removeConflict,
+  );
   const disableBinding = useKeybindingStore((state) => state.disable);
   const resetBinding = useKeybindingStore((state) => state.reset);
   const [query, setQuery] = useState("");
@@ -63,17 +67,26 @@ export function KeybindingsSection() {
     setPending(null);
   };
 
-  const reset = (id: KeybindingId) => {
-    const defaultBinding = keybindingDefinition(id).defaultBindings[0];
-    const conflictId = findKeybindingConflict(
-      id,
-      defaultBinding,
-      overrides,
-      IS_MACOS,
-    );
-    if (conflictId) {
-      setPending({ id, binding: defaultBinding, conflictId });
-      return;
+  const reset = (
+    id: KeybindingId,
+    currentOverrides: typeof overrides = overrides,
+  ) => {
+    for (const defaultBinding of keybindingDefinition(id).defaultBindings) {
+      const conflictId = findKeybindingConflict(
+        id,
+        defaultBinding,
+        currentOverrides,
+        IS_MACOS,
+      );
+      if (conflictId) {
+        setPending({
+          id,
+          binding: defaultBinding,
+          conflictId,
+          operation: "reset",
+        });
+        return;
+      }
     }
     resetBinding(id);
     cancelRecording();
@@ -117,7 +130,12 @@ export function KeybindingsSection() {
         IS_MACOS,
       );
       if (conflictId) {
-        setPending({ id: editingId, binding, conflictId });
+        setPending({
+          id: editingId,
+          binding,
+          conflictId,
+          operation: "assign",
+        });
         setEditingId(null);
         setInvalidId(null);
         return;
@@ -201,7 +219,24 @@ export function KeybindingsSection() {
                         ) : conflict ? (
                           <Kbd keys={keybindingKeys(conflict.binding)} />
                         ) : binding ? (
-                          <Kbd keys={keybindingKeys(binding)} />
+                          <span className="flex flex-wrap items-center justify-center gap-1.5">
+                            {bindings.map((item, index) => (
+                              <span
+                                key={item}
+                                className="inline-flex items-center gap-1.5"
+                              >
+                                {index > 0 && (
+                                  <span
+                                    aria-hidden="true"
+                                    className="text-muted-foreground"
+                                  >
+                                    /
+                                  </span>
+                                )}
+                                <Kbd keys={keybindingKeys(item)} />
+                              </span>
+                            ))}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">
                             {t("settings.keybindings.unassigned")}
@@ -268,10 +303,23 @@ export function KeybindingsSection() {
                         <Button
                           size="sm"
                           onClick={() => {
+                            if (conflict.operation === "reset") {
+                              removeBindingConflict(
+                                conflict.binding,
+                                conflict.conflictId,
+                                IS_MACOS,
+                              );
+                              reset(
+                                conflict.id,
+                                useKeybindingStore.getState().overrides,
+                              );
+                              return;
+                            }
                             replaceBinding(
                               conflict.id,
                               conflict.binding,
                               conflict.conflictId,
+                              IS_MACOS,
                             );
                             cancelRecording();
                           }}

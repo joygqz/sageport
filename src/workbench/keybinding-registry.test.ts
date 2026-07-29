@@ -7,6 +7,7 @@ import {
   findKeybindingConflict,
   keybindingDisplayKeys,
   keybindingFromKeyboardEvent,
+  keybindingOverrideWithoutConflict,
   parseKeybinding,
   parseKeybindingOverrides,
   serializeKeybindingOverrides,
@@ -96,6 +97,14 @@ describe("keybinding registry", () => {
         false,
       ),
     ).toBeNull();
+    expect(
+      keybindingOverrideWithoutConflict(
+        "view.zoomOut",
+        "mod+shift+-",
+        {},
+        true,
+      ),
+    ).toBe("mod+-");
   });
 
   it("serializes only known, valid overrides in registry order", () => {
