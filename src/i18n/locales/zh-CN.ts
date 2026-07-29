@@ -1141,7 +1141,7 @@ export const zhCN: Dictionary = {
       },
     },
     keybindings: {
-      search: "搜索键盘快捷键",
+      search: "搜索快捷键",
       noResults: "没有匹配的键盘快捷键",
       recording: "请按快捷键",
       unassigned: "未分配",

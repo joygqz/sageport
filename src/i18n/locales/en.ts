@@ -1170,7 +1170,7 @@ export const en = {
       },
     },
     keybindings: {
-      search: "Search keyboard shortcuts",
+      search: "Search shortcuts",
       noResults: "No matching keyboard shortcuts",
       recording: "Press shortcut",
       unassigned: "Not assigned",
