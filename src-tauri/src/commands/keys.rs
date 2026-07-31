@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::path::PathBuf;
 use tauri::State;
 
 use crate::domain::{SshKeyGenerateInput, SshKeyInput, SshKeyView};
@@ -23,6 +24,51 @@ pub async fn keys_reveal_passphrase(state: State<'_, AppState>, id: String) -> A
         .passphrase
         .filter(|passphrase| !passphrase.is_empty())
         .ok_or_else(|| AppError::NotFound(format!("passphrase for key {id}")))
+}
+
+#[tauri::command]
+pub async fn keys_reveal_private_key(state: State<'_, AppState>, id: String) -> AppResult<String> {
+    key_repo::get(&state.db, &id)
+        .await?
+        .private_key
+        .filter(|private_key| !private_key.is_empty())
+        .ok_or_else(|| AppError::NotFound(format!("private key for key {id}")))
+}
+
+#[tauri::command]
+pub async fn keys_export(state: State<'_, AppState>, id: String, path: String) -> AppResult<()> {
+    if path.trim().is_empty() {
+        return Err(AppError::Invalid("export path is required".into()));
+    }
+    let private_key = key_repo::get(&state.db, &id)
+        .await?
+        .private_key
+        .filter(|private_key| !private_key.is_empty())
+        .ok_or_else(|| AppError::NotFound(format!("private key for key {id}")))?;
+    let path = PathBuf::from(path);
+    tokio::task::spawn_blocking(move || sshkey::write_private_key_file(&path, &private_key))
+        .await
+        .map_err(|error| AppError::Other(format!("key export task failed: {error}")))?
+}
+
+#[tauri::command]
+pub async fn keys_export_public(
+    state: State<'_, AppState>,
+    id: String,
+    path: String,
+) -> AppResult<()> {
+    if path.trim().is_empty() {
+        return Err(AppError::Invalid("export path is required".into()));
+    }
+    let public_key = key_repo::get(&state.db, &id)
+        .await?
+        .public_key
+        .filter(|public_key| !public_key.is_empty())
+        .ok_or_else(|| AppError::NotFound(format!("public key for key {id}")))?;
+    let path = PathBuf::from(path);
+    tokio::task::spawn_blocking(move || sshkey::write_public_key_file(&path, &public_key))
+        .await
+        .map_err(|error| AppError::Other(format!("public key export task failed: {error}")))?
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -10,11 +10,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import {
-  CONTROL_BORDER_CLASS,
-  CONTROL_FOCUS_CLASS,
-  EmptyState,
-} from "@/components/ui";
+import { EmptyState, INTERACTIVE_FOCUS_CLASS } from "@/components/ui";
 import { useHosts } from "@/features/hosts/api";
 import {
   bridgeMonitorEvents,
@@ -79,7 +75,7 @@ export function MonitorView() {
         />
       }
     >
-      <PanelContent className="flex flex-col gap-2.5">
+      <PanelContent className="flex flex-col gap-1">
         {filteredGroups.length === 0 ? (
           <EmptyState
             icon={Gauge}
@@ -214,20 +210,18 @@ function HostCard({
       type="button"
       onClick={() => setActive(primary.id)}
       className={cn(
-        "group flex flex-col gap-3 rounded-lg border bg-card p-3 text-left transition-[background-color,border-color,box-shadow] hover:bg-muted",
-        CONTROL_FOCUS_CLASS,
-        active
-          ? "border-ring/70 bg-card ring-1 ring-ring/20"
-          : CONTROL_BORDER_CLASS,
+        "group flex flex-col gap-2.5 rounded-md bg-muted/25 p-2.5 text-left transition-[background-color,box-shadow] hover:bg-muted/45",
+        INTERACTIVE_FOCUS_CLASS,
+        active && "bg-muted/45 ring-1 ring-inset ring-ring/45",
       )}
     >
       <div className="flex w-full flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <div className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-link">
+          <div className="relative flex size-7 shrink-0 items-center justify-center text-link">
             <Gauge className="size-4" strokeWidth={1.7} />
             <span
               className={cn(
-                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card group-hover:ring-muted",
+                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface",
                 STATUS_DOT_CLASS[connected ? "connected" : primary.status],
               )}
             />
@@ -249,7 +243,7 @@ function HostCard({
           )}
         </div>
         {system && (
-          <p className="mt-1 truncate pl-10 text-2xs text-muted-foreground">
+          <p className="mt-1 truncate pl-9 text-2xs text-muted-foreground">
             {system}
           </p>
         )}
@@ -275,7 +269,7 @@ function HostMeters({ stats }: { stats: HostStats }) {
   const percents = statsPercents(stats);
 
   return (
-    <div className="flex w-full flex-col gap-2">
+    <div className="flex w-full flex-col gap-1.5">
       <Meter
         icon={Cpu}
         labelKey="monitor.cpu"

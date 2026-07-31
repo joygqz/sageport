@@ -14,11 +14,9 @@ export function SectionHeader({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <h3 className="text-base font-semibold tracking-tight text-foreground">
-          {title}
-        </h3>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         {description && (
-          <p className="mt-1.5 text-pretty text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-1 text-pretty text-xs leading-normal text-muted-foreground">
             {description}
           </p>
         )}

@@ -3,7 +3,6 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Field } from "./field";
 import { Label } from "./label";
-import { CONTROL_CONTAINER_CLASS } from "./styles";
 import { Switch } from "./switch";
 
 export interface SwitchFieldProps extends Omit<
@@ -87,8 +86,7 @@ export const SwitchField = React.forwardRef<
         <div
           onClick={toggleFromCard}
           className={cn(
-            CONTROL_CONTAINER_CLASS,
-            "flex min-h-[var(--control-height)] items-center justify-between gap-4 px-3 text-foreground",
+            "flex min-h-[var(--control-height)] items-center justify-between gap-4 rounded-lg bg-muted/35 px-3 text-foreground transition-colors focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/60 hover:bg-muted/55",
             description ? "py-2.5" : "h-[var(--control-height)]",
             disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
             controlClassName,

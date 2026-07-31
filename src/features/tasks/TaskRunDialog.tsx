@@ -107,7 +107,7 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex flex-col gap-4 overflow-y-auto p-5">
+      <div className="flex flex-col gap-3 overflow-y-auto p-4">
         <div className="flex min-w-0 flex-col gap-1.5">
           <h3 className="truncate text-base font-semibold leading-tight">
             {task.name}
@@ -165,7 +165,7 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-t border-border bg-surface/30 px-5 py-3">
+      <div className="flex shrink-0 items-center gap-2 border-t border-border bg-surface/20 px-4 py-3">
         <RunSummary run={run} />
         <Button variant="ghost" onClick={onClose}>
           {t("common.close")}

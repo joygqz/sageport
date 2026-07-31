@@ -39,7 +39,7 @@
   --terminal-background: #12141f;
   --terminal-foreground: #e1e4ee;
 
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --titlebar-height: 2.5rem;
   --workbench-bar-height: 2.75rem;
   --compact-toolbar-height: 2.25rem;
@@ -411,7 +411,7 @@
   .host-list-actions {
     pointer-events: auto;
     margin-left: 0;
-    width: 4.25rem;
+    width: 2rem;
     opacity: 1;
   }
 }

@@ -131,6 +131,12 @@ export const ipc = {
     list: () => invoke<SshKey[]>("keys_list"),
     revealPassphrase: (id: string) =>
       invoke<string>("keys_reveal_passphrase", { id }),
+    revealPrivateKey: (id: string) =>
+      invoke<string>("keys_reveal_private_key", { id }),
+    export: (id: string, path: string) =>
+      invoke<void>("keys_export", { id, path }),
+    exportPublic: (id: string, path: string) =>
+      invoke<void>("keys_export_public", { id, path }),
     create: (input: SshKeyInput) => invoke<SshKey>("keys_create", { input }),
     update: (id: string, input: SshKeyInput) =>
       invoke<SshKey>("keys_update", { id, input }),

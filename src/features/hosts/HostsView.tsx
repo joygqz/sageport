@@ -133,9 +133,7 @@ export function HostsView() {
   const [healthByHost, setHealthByHost] = useState<
     Record<string, HostHealthCheck>
   >({});
-  const [checkingHosts, setCheckingHosts] = useState<Record<string, number>>(
-    {},
-  );
+  const [, setCheckingHosts] = useState<Record<string, number>>({});
   const healthRequestSeq = useRef(0);
   const latestHealthRequest = useRef<Record<string, number>>({});
   const [checkingAll, setCheckingAll] = useState(false);
@@ -648,7 +646,6 @@ export function HostsView() {
                     key={host.id}
                     host={host}
                     health={healthByHost[host.id]}
-                    checking={(checkingHosts[host.id] ?? 0) > 0}
                     dragging={dragState?.host.id === host.id}
                     onDragStart={beginHostDrag}
                     onDragMove={updateHostDrag}
@@ -846,7 +843,6 @@ function GroupSection({
 function HostRow({
   host,
   health,
-  checking,
   dragging,
   onDragStart,
   onDragMove,
@@ -857,7 +853,6 @@ function HostRow({
 }: {
   host: Host;
   health?: HostHealthCheck;
-  checking: boolean;
   dragging: boolean;
   onDragStart: (host: Host, pointer: HostDragPointer) => void;
   onDragMove: (clientX: number, clientY: number) => void;
@@ -1012,25 +1007,11 @@ function HostRow({
               {host.address}
             </p>
           </div>
-          <div className="host-list-actions pointer-events-none -ml-2 flex w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-[3.125rem] group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-[3.125rem] group-focus-within:opacity-100">
-            <Tooltip content={t("hosts.health.check")}>
-              <button
-                type="button"
-                disabled={checking}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onCheckHealth([host.id]);
-                }}
-                className={cn(PANEL_LIST_ACTION_CLASS, "disabled:opacity-40")}
-              >
-                <RefreshCw
-                  className={cn("size-3.5", checking && "animate-spin")}
-                />
-              </button>
-            </Tooltip>
+          <div className="host-list-actions pointer-events-none -ml-2 flex w-0 shrink-0 items-center overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100">
             <Tooltip content={t("hosts.connect")}>
               <button
                 type="button"
+                aria-label={t("hosts.connect")}
                 onClick={(event) => {
                   event.stopPropagation();
                   openTerminal(host);

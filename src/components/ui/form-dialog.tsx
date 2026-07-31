@@ -70,10 +70,10 @@ export function FormBody({
       }}
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
         {children}
       </div>
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface/30 px-5 py-3">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface/20 px-4 py-3">
         {footerStart && <div className="mr-auto">{footerStart}</div>}
         <Button type="button" variant="ghost" onClick={onClose}>
           {t("common.cancel")}

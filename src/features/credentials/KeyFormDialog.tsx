@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FileUp } from "lucide-react";
 
@@ -84,24 +84,56 @@ function KeyFormBody({
   const [passphraseEdited, setPassphraseEdited] = useState(false);
   const [algorithm, setAlgorithm] = useState<SshKeyAlgorithm>("ed25519");
   const [privateKey, setPrivateKey] = useState("");
+  const [privateKeyEdited, setPrivateKeyEdited] = useState(false);
+  const [privateKeyLoading, setPrivateKeyLoading] = useState(
+    Boolean(sshKey?.hasPrivateKey),
+  );
   const [publicKey, setPublicKey] = useState("");
   const editing = Boolean(sshKey);
 
-  const revealSavedPassphrase = async () => {
-    if (passphrase) return true;
-    if (!sshKey?.hasPassphrase) return true;
+  useEffect(() => {
+    if (!sshKey?.hasPrivateKey) return;
+    let active = true;
+    void ipc.keys
+      .revealPrivateKey(sshKey.id)
+      .then((value) => {
+        if (active) setPrivateKey(value);
+      })
+      .catch((error) => {
+        if (active) {
+          toast.error(
+            t("credentials.keys.privateKeyRevealError"),
+            errorMessage(error),
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setPrivateKeyLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [sshKey, t]);
+
+  const loadSavedPassphrase = async (): Promise<string | null> => {
+    if (passphrase) return passphrase;
+    if (!sshKey?.hasPassphrase) return "";
     try {
-      setPassphrase(await ipc.keys.revealPassphrase(sshKey.id));
+      const savedPassphrase = await ipc.keys.revealPassphrase(sshKey.id);
+      setPassphrase(savedPassphrase);
       setPassphraseEdited(false);
-      return true;
+      return savedPassphrase;
     } catch (error) {
       toast.error(
         t("credentials.keys.passphraseRevealError"),
         errorMessage(error),
       );
-      return false;
+      return null;
     }
   };
+
+  const revealSavedPassphrase = async () =>
+    (await loadSavedPassphrase()) !== null;
 
   const pickFile = async () => {
     try {
@@ -114,6 +146,7 @@ function KeyFormBody({
       const file = await importFile.mutateAsync(path);
       setName((prev) => prev || file.name);
       setPrivateKey(file.privateKey);
+      setPrivateKeyEdited(true);
       setPublicKey(file.publicKey ?? "");
     } catch (err) {
       toast.error(t("credentials.keys.import.readError"), errorMessage(err));
@@ -124,12 +157,17 @@ function KeyFormBody({
     if (!name.trim()) {
       return toast.error(t("credentials.keys.nameRequired"));
     }
-    if (editing && passphraseEdited && !privateKey.trim()) {
+    if (editing && passphraseEdited && !privateKeyEdited) {
       return toast.error(t("credentials.keys.passphraseRequiresPrivateKey"));
     }
     try {
       if (sshKey) {
-        const replacingMaterial = privateKey.trim().length > 0;
+        const replacingMaterial = privateKeyEdited;
+        const replacementPassphrase =
+          replacingMaterial && sshKey.hasPassphrase && !passphraseEdited
+            ? await loadSavedPassphrase()
+            : passphrase;
+        if (replacementPassphrase === null) return;
         await updateKey.mutateAsync({
           id: sshKey.id,
           input: {
@@ -138,7 +176,7 @@ function KeyFormBody({
               ? {
                   privateKey,
                   publicKey: publicKey || null,
-                  passphrase: passphrase || "",
+                  passphrase: replacementPassphrase || "",
                 }
               : {}),
           },
@@ -181,7 +219,8 @@ function KeyFormBody({
         generateKey.isPending ||
         createKey.isPending ||
         updateKey.isPending ||
-        importFile.isPending
+        importFile.isPending ||
+        privateKeyLoading
       }
     >
       {!editing && (
@@ -248,7 +287,7 @@ function KeyFormBody({
             required={!editing}
             hint={
               editing
-                ? t("credentials.keys.privateKeyReplaceHint")
+                ? t("credentials.keys.privateKeyShownHint")
                 : t("credentials.keys.privateKeyHint")
             }
           >
@@ -256,11 +295,17 @@ function KeyFormBody({
               <Textarea
                 rows={5}
                 value={privateKey}
-                onChange={(e) => setPrivateKey(e.target.value)}
+                onChange={(e) => {
+                  setPrivateKey(e.target.value);
+                  setPrivateKeyEdited(true);
+                }}
+                readOnly={privateKeyLoading}
                 placeholder={
-                  editing
-                    ? t("credentials.keys.privateKeyKeepPlaceholder")
-                    : "-----BEGIN OPENSSH PRIVATE KEY-----"
+                  privateKeyLoading
+                    ? t("common.loading")
+                    : editing
+                      ? t("credentials.keys.privateKeyKeepPlaceholder")
+                      : "-----BEGIN OPENSSH PRIVATE KEY-----"
                 }
                 className="font-mono text-xs"
               />

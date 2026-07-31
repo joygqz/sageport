@@ -528,8 +528,11 @@ export const en = {
       privateKeyHint: "PEM or OpenSSH format.",
       privateKeyReplaceHint:
         "A new private key replaces the current private key.",
+      privateKeyShownHint:
+        "The saved private key is shown as plain text. Editing it replaces the current key.",
       privateKeyKeepPlaceholder: "Current private key remains unchanged",
       privateKeyRequired: "Enter a private key",
+      privateKeyRevealError: "Failed to load the saved private key",
       publicKey: "Public key",
       chooseFile: "Choose file",
       import: {
@@ -540,6 +543,14 @@ export const en = {
       importAction: "Save key",
       copyPublicKey: "Copy public key",
       copyError: "Failed to copy public key",
+      exportPrivateKey: "Export private key",
+      exportDialogTitle: "Export private key",
+      exportSuccess: "Private key exported",
+      exportError: "Failed to export private key",
+      exportPublicKey: "Export public key",
+      exportPublicKeyDialogTitle: "Export public key",
+      exportPublicKeySuccess: "Public key exported",
+      exportPublicKeyError: "Failed to export public key",
       empty: "No keys yet. Generate one or import an existing key.",
       addError: "Failed to save key",
       delete: {

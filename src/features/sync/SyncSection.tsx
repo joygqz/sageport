@@ -127,8 +127,8 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
     : null;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+    <div className="overflow-hidden rounded-md bg-muted/30">
+      <div className="flex flex-wrap items-center gap-3 px-3 py-2.5">
         <Icon className="size-6 shrink-0 text-foreground" />
         <div className="flex min-w-0 flex-1 basis-64 flex-col gap-0.5">
           <span className="text-sm font-semibold text-foreground">
@@ -150,7 +150,7 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
         <Badge variant="primary">{t("settings.sync.connected.badge")}</Badge>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-border/70 bg-surface/35 px-4 py-3">
+      <div className="flex flex-wrap gap-2 border-t border-border/50 px-3 py-2.5">
         <Button variant="outline" onClick={doPush} loading={push.isPending}>
           {t("settings.sync.connected.pushButton")}
         </Button>
@@ -210,7 +210,7 @@ function VersionsCard() {
       />
 
       {isLoading && (
-        <div className="overflow-hidden rounded-lg border border-border bg-surface">
+        <div>
           <LoadingState label={t("settings.sync.versions.loading")} />
         </div>
       )}

@@ -36,7 +36,7 @@ export function HostKeyDialog() {
             <DialogToolbar>
               {changed ? t("hostKey.changedTitle") : t("hostKey.unknownTitle")}
             </DialogToolbar>
-            <div className="flex flex-col gap-4 p-5">
+            <div className="flex flex-col gap-3 p-4">
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {changed ? (
                   <ShieldAlert className="float-left mr-2 mt-[3px] size-4 text-danger" />

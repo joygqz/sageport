@@ -127,7 +127,7 @@ export function TaskRunHistoryDialog({
           {t("tasks.history.title")}
         </DialogToolbar>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
           {isLoading ? (
             <LoadingState label={t("common.loading")} fill />
           ) : isError ? (

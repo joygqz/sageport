@@ -9,7 +9,7 @@ export const DIALOG_OVERLAY_CLASS =
   "fixed inset-0 z-50 bg-black/40 dark:bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 
 export const DIALOG_CONTENT_CLASS =
-  "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-4 overscroll-contain rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-md sm:p-6 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
+  "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-3 overscroll-contain rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-md sm:p-5 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
 
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -164,7 +164,7 @@ function DialogToolbar({
     <div
       data-slot="dialog-toolbar"
       className={cn(
-        "flex h-[var(--workbench-bar-height)] shrink-0 items-center gap-2 border-b border-border bg-surface/45 pr-2",
+        "flex h-[var(--workbench-bar-height)] shrink-0 items-center gap-2 border-b border-border bg-surface/25 pr-2",
         leading ? "pl-2" : "pl-4",
         className,
       )}

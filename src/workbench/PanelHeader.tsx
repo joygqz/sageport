@@ -8,10 +8,10 @@ export const PANEL_HEADER_ACTION_CLASS = "size-[var(--toolbar-control-size)]";
 export const PANEL_LIST_CLASS = "space-y-0.5";
 
 export const PANEL_LIST_ITEM_CLASS =
-  "group flex min-h-12 items-center gap-2 rounded-lg px-2 py-1.5 outline-none transition-colors hover:bg-list-hover focus-within:bg-list-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60";
+  "group flex min-h-10 items-center gap-2 rounded-md px-2 py-1 outline-none transition-colors hover:bg-list-hover focus-within:bg-list-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60";
 
 export const PANEL_LIST_ICON_CLASS =
-  "flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card text-link";
+  "flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/45 text-muted-foreground";
 
 export const PANEL_LIST_ACTION_CLASS =
   "panel-list-action pointer-events-none -ml-2 flex h-6 w-0 shrink-0 items-center justify-center overflow-hidden rounded-md text-muted-foreground opacity-0 transition-[background-color,color,opacity] hover:bg-accent hover:text-accent-foreground group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100";
@@ -31,7 +31,7 @@ export function PanelHeader({
     <div
       data-slot="panel-header"
       className={cn(
-        "flex h-[var(--workbench-bar-height)] shrink-0 items-center justify-between gap-2 border-b border-border bg-surface/35 pl-4 pr-2",
+        "flex h-[var(--workbench-bar-height)] shrink-0 items-center justify-between gap-2 border-b border-border pl-3 pr-2",
         className,
       )}
     >

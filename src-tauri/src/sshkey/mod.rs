@@ -1,5 +1,9 @@
-use std::io::Read;
+use std::fs::OpenOptions;
+use std::io::{Read, Write};
 use std::path::Path;
+
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 
 use russh::keys::{decode_secret_key, HashAlg as RusshHashAlg};
 use serde::Serialize;
@@ -57,6 +61,70 @@ pub fn inspect(private_key: &str, passphrase: Option<&str>) -> AppResult<Option<
         public_key,
         encrypted,
     }))
+}
+
+pub fn write_private_key_file(path: &Path, private_key: &str) -> AppResult<()> {
+    write_key_file(path, private_key, 0o600)
+}
+
+pub fn write_public_key_file(path: &Path, public_key: &str) -> AppResult<()> {
+    write_key_file(path, public_key, 0o644)
+}
+
+fn write_key_file(path: &Path, key: &str, mode: u32) -> AppResult<()> {
+    let parent = path
+        .parent()
+        .filter(|value| !value.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if !parent.is_dir() {
+        return Err(AppError::Invalid(
+            "key export destination folder does not exist".into(),
+        ));
+    }
+    if path
+        .symlink_metadata()
+        .is_ok_and(|metadata| metadata.file_type().is_dir())
+    {
+        return Err(AppError::Invalid(
+            "key export destination must be a file".into(),
+        ));
+    }
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| AppError::Invalid("key export destination must be a file".into()))?
+        .to_string_lossy();
+    let temp = parent.join(format!(".{file_name}.{}.tmp", uuid::Uuid::new_v4()));
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    options.mode(mode);
+    #[cfg(not(unix))]
+    let _ = mode;
+
+    let write_result = (|| -> AppResult<()> {
+        let mut file = options.open(&temp)?;
+        file.write_all(key.trim().as_bytes())?;
+        file.write_all(b"\n")?;
+        file.sync_all()?;
+        drop(file);
+
+        if path.exists() || path.symlink_metadata().is_ok() {
+            let backup = parent.join(format!(".{file_name}.{}.bak", uuid::Uuid::new_v4()));
+            std::fs::rename(path, &backup)?;
+            if let Err(error) = std::fs::rename(&temp, path) {
+                let _ = std::fs::rename(&backup, path);
+                return Err(error.into());
+            }
+            std::fs::remove_file(backup)?;
+        } else {
+            std::fs::rename(&temp, path)?;
+        }
+        Ok(())
+    })();
+    if write_result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    write_result
 }
 
 pub struct GeneratedKey {
@@ -287,6 +355,51 @@ mod tests {
             Err(AppError::Invalid(_))
         ));
 
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn exported_private_key_has_expected_content() {
+        let path =
+            std::env::temp_dir().join(format!("sageport-key-export-test-{}", uuid::Uuid::new_v4()));
+        std::fs::write(&path, "old-private-key").unwrap();
+
+        write_private_key_file(&path, "private-key\n").unwrap();
+
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "private-key\n");
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn exported_public_key_has_expected_content() {
+        let path = std::env::temp_dir().join(format!(
+            "sageport-public-key-export-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+
+        write_public_key_file(&path, "ssh-ed25519 public-key comment\n").unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "ssh-ed25519 public-key comment\n"
+        );
+        std::fs::remove_file(path).ok();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exported_private_key_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = std::env::temp_dir().join(format!(
+            "sageport-key-export-mode-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+
+        write_private_key_file(&path, "private-key").unwrap();
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
         std::fs::remove_file(path).ok();
     }
 

@@ -102,11 +102,11 @@ export function SetupView({ status }: { status: SyncStatus }) {
               key={p.kind}
               value={p.kind}
               className={cn(
-                "flex min-w-0 flex-col gap-1.5 rounded-lg border bg-card p-3 text-left transition-colors",
+                "flex min-w-0 flex-col gap-1.5 rounded-md border bg-transparent p-2.5 text-left transition-colors",
                 CONTROL_FOCUS_CLASS,
                 active
-                  ? "border-primary ring-2 ring-primary/25"
-                  : cn(CONTROL_BORDER_CLASS, "hover:bg-list-hover"),
+                  ? "border-ring bg-muted/35 ring-1 ring-ring/25"
+                  : cn(CONTROL_BORDER_CLASS, "hover:bg-muted/25"),
               )}
             >
               <Icon className="size-5 text-foreground" />
@@ -130,7 +130,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
             onPhase={setOAuth}
           />
         ) : (
-          <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+          <p className="rounded-md bg-muted/35 px-3 py-2 text-xs text-muted-foreground">
             {t("settings.sync.setup.oauthUnavailable", { name: meta.name })}
           </p>
         )
@@ -257,7 +257,7 @@ function OAuthPanel({
 
   if (phase.step === "device") {
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex flex-col gap-3 rounded-md bg-muted/35 px-3 py-2.5">
         <p className="text-sm text-muted-foreground">
           {t("settings.sync.setup.deviceCodeHint")}
         </p>
@@ -298,7 +298,7 @@ function OAuthPanel({
 
   if (phase.step === "browser") {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex items-center gap-3 rounded-md bg-muted/35 px-3 py-2.5">
         <Spinner />
         <p className="flex-1 text-sm text-muted-foreground">
           {t("settings.sync.setup.browserWaiting")}
@@ -312,7 +312,7 @@ function OAuthPanel({
 
   if (phase.step === "authorized") {
     return (
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-md bg-muted/35 px-3 py-2.5">
         <Check className="size-4 text-link" />
         <p className="min-w-0 flex-1 text-sm text-foreground">
           {t("settings.sync.setup.authorizedAs", { account: phase.account })}

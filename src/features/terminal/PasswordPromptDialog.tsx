@@ -80,7 +80,7 @@ function PasswordPromptForm({
   return (
     <>
       <DialogToolbar>{t("ssh.passwordPrompt.title")}</DialogToolbar>
-      <form className="flex flex-col gap-4 p-5" onSubmit={submit}>
+      <form className="flex flex-col gap-3 p-4" onSubmit={submit}>
         <p className="font-mono text-sm leading-relaxed text-muted-foreground">
           {t("ssh.passwordPrompt.description", { host, username })}
         </p>

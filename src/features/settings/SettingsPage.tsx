@@ -161,7 +161,7 @@ function SettingsPage({
     return (
       <div className="settings-page min-h-0 flex-1 overflow-hidden bg-background">
         <ScrollArea className="h-full">
-          <main className="settings-content mx-auto flex w-full max-w-5xl flex-col px-5 py-6 sm:px-8 sm:py-8">
+          <main className="settings-content mx-auto flex w-full max-w-5xl flex-col px-5 py-5 sm:px-7 sm:py-6">
             <JsonSettingsSection />
           </main>
         </ScrollArea>
@@ -172,7 +172,7 @@ function SettingsPage({
   return (
     <div className="settings-page min-h-0 flex-1 overflow-hidden bg-background">
       <div className="flex h-full min-w-0 flex-col sm:flex-row">
-        <aside className="flex shrink-0 flex-col border-b border-border bg-surface/65 px-2 py-2 sm:w-48 sm:border-b-0 sm:border-r sm:px-3 sm:py-4">
+        <aside className="flex shrink-0 flex-col border-b border-border bg-surface/45 px-2 py-2 sm:w-44 sm:border-b-0 sm:border-r sm:px-2 sm:py-3">
           <nav
             className="scrollbar-none flex gap-1 overflow-x-auto sm:flex-col sm:overflow-visible"
             aria-label={t("settings.title")}
@@ -187,7 +187,7 @@ function SettingsPage({
                   aria-current={active ? "page" : undefined}
                   onClick={() => onSectionChange(item.id)}
                   className={cn(
-                    "flex h-[var(--control-height)] shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60 sm:w-full",
+                    "flex h-[var(--control-height)] shrink-0 items-center gap-2 rounded-md px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60 sm:w-full",
                     active
                       ? "bg-list-active font-medium text-list-active-foreground"
                       : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
@@ -202,7 +202,7 @@ function SettingsPage({
         </aside>
 
         <ScrollArea className="min-h-0 min-w-0 flex-1">
-          <main className="settings-content mx-auto flex w-full max-w-3xl flex-col px-5 py-6 sm:px-8 sm:py-8">
+          <main className="settings-content mx-auto flex w-full max-w-3xl flex-col px-5 py-5 sm:px-7 sm:py-6">
             {section === "general" && <GeneralSection />}
             {section === "keybindings" && <KeybindingsSection />}
             {section === "ai" && <AiSection />}
@@ -458,7 +458,7 @@ function AiForm({ config }: { config: AiConfig }) {
       >
         <div
           aria-label={t("settings.ai.tools.title")}
-          className="overflow-hidden rounded-lg border border-border bg-card"
+          className="overflow-hidden rounded-lg border border-border/70"
         >
           {TOOL_GROUPS.map((group) => (
             <ToolTreeGroup

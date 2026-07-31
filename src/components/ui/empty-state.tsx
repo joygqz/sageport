@@ -24,7 +24,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-3 px-6 py-12 text-center",
+        "flex flex-col items-center justify-center gap-2.5 px-4 py-8 text-center",
         fill && "flex-1",
         className,
       )}
@@ -32,17 +32,17 @@ export function EmptyState({
       {Icon && (
         <div
           className={cn(
-            "flex size-12 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 text-link",
+            "flex size-8 items-center justify-center text-muted-foreground",
             iconClassName,
           )}
         >
-          <Icon className="size-5.5" strokeWidth={1.7} />
+          <Icon className="size-5" strokeWidth={1.7} />
         </div>
       )}
-      <div className="space-y-1">
-        <p className="text-sm font-semibold text-foreground">{title}</p>
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium text-foreground">{title}</p>
         {description && (
-          <p className="mx-auto max-w-xs text-xs leading-relaxed text-muted-foreground">
+          <p className="mx-auto max-w-xs text-xs leading-normal text-muted-foreground">
             {description}
           </p>
         )}
@@ -65,7 +65,7 @@ export function LoadingState({
     <div
       role="status"
       className={cn(
-        "flex items-center justify-center gap-2 px-6 py-12 text-sm text-muted-foreground",
+        "flex items-center justify-center gap-2 px-4 py-8 text-sm text-muted-foreground",
         fill && "flex-1",
         className,
       )}
@@ -94,7 +94,7 @@ export function ErrorState({
       icon={CircleAlert}
       title={title}
       fill={fill}
-      iconClassName="border-danger/15 bg-danger/10 text-danger"
+      iconClassName="text-danger"
       className={className}
       action={
         <Button size="sm" variant="secondary" onClick={onRetry}>

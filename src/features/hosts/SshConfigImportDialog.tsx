@@ -128,7 +128,7 @@ function ImportBody({ onClose }: { onClose: () => void }) {
 
   if (entries.length === 0) {
     return (
-      <div className="flex flex-col gap-4 p-5">
+      <div className="flex flex-col gap-3 p-4">
         <p className="text-sm text-muted-foreground">
           {t("hosts.import.empty")}
         </p>

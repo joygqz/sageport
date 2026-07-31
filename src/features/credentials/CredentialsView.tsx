@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { save } from "@tauri-apps/plugin-dialog";
 import {
   Check,
   Copy,
+  Download,
   KeyRound,
   Pencil,
   Plus,
@@ -25,6 +27,7 @@ import {
   type ConfirmState,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
+import { ipc } from "@/lib/ipc";
 import { errorDescription, errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { Identity, SshKey } from "@/types/models";
@@ -230,12 +233,12 @@ function Section({
         title={title}
         collapsed={isCollapsed}
         onToggle={() => setCollapsed((c) => !c)}
-        trailingClassName="panel-section-action pointer-events-none mr-0 w-0 min-w-0 overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:mr-1 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:mr-1 group-focus-within:w-6 group-focus-within:opacity-100"
         trailing={
           <Tooltip content={addLabel}>
             <Button
               size="icon"
               variant="ghost"
+              aria-label={addLabel}
               className="size-6 shrink-0"
               onClick={onAdd}
             >
@@ -253,6 +256,17 @@ function algorithmTag(publicKey: string | null): string | null {
   const token = publicKey?.trim().split(/\s+/)[0];
   if (!token) return null;
   return token.replace(/^ssh-/, "").replace(/^ecdsa-sha2-nistp/, "ecdsa-p");
+}
+
+function exportFileName(name: string): string {
+  const sanitized = Array.from(name, (character) =>
+    character.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(character)
+      ? "-"
+      : character,
+  )
+    .join("")
+    .trim();
+  return sanitized || "ssh-private-key";
 }
 
 function KeyList({
@@ -330,6 +344,38 @@ function KeyRow({
     }
   };
 
+  const exportPrivateKey = async () => {
+    try {
+      const path = await save({
+        title: t("credentials.keys.exportDialogTitle"),
+        defaultPath: exportFileName(sshKey.name),
+      });
+      if (!path) return;
+      await ipc.keys.export(sshKey.id, path);
+      toast.success(t("credentials.keys.exportSuccess"));
+    } catch (err) {
+      toast.error(t("credentials.keys.exportError"), errorMessage(err));
+    }
+  };
+
+  const exportPublicKey = async () => {
+    if (!sshKey.publicKey) return;
+    try {
+      const path = await save({
+        title: t("credentials.keys.exportPublicKeyDialogTitle"),
+        defaultPath: `${exportFileName(sshKey.name)}.pub`,
+      });
+      if (!path) return;
+      await ipc.keys.exportPublic(sshKey.id, path);
+      toast.success(t("credentials.keys.exportPublicKeySuccess"));
+    } catch (err) {
+      toast.error(
+        t("credentials.keys.exportPublicKeyError"),
+        errorMessage(err),
+      );
+    }
+  };
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -376,18 +422,6 @@ function KeyRow({
               </button>
             </Tooltip>
           )}
-          <Tooltip content={t("common.edit")}>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onEdit();
-              }}
-              className={PANEL_LIST_ACTION_CLASS}
-            >
-              <Pencil className="size-3.5" />
-            </button>
-          </Tooltip>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
@@ -399,6 +433,17 @@ function KeyRow({
           <>
             <ContextMenuItem onSelect={() => void copyPublicKey()}>
               <Copy /> {t("credentials.keys.copyPublicKey")}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => void exportPublicKey()}>
+              <Download /> {t("credentials.keys.exportPublicKey")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
+        {sshKey.hasPrivateKey && (
+          <>
+            <ContextMenuItem onSelect={() => void exportPrivateKey()}>
+              <Download /> {t("credentials.keys.exportPrivateKey")}
             </ContextMenuItem>
             <ContextMenuSeparator />
           </>
@@ -505,7 +550,7 @@ function IdentityList({
 
 function SectionEmpty({ text }: { text: string }) {
   return (
-    <p className="mt-[var(--panel-gutter)] rounded-lg border border-dashed border-border px-3 py-3 text-xs leading-relaxed text-muted-foreground">
+    <p className="px-2 py-2 text-xs leading-normal text-muted-foreground">
       {text}
     </p>
   );
