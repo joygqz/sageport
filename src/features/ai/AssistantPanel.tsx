@@ -18,12 +18,12 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 import {
   Button,
-  CONTROL_INTERACTION_CLASS,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  INTERACTIVE_FOCUS_CLASS,
   Select,
   Textarea,
   Tooltip,
@@ -40,14 +40,18 @@ import {
 import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
 import { safeExternalUrl } from "./links";
-import { pickSuggestionsForSession } from "./suggestions";
 import { useAiStore } from "./store";
 import { MAX_AI_PROMPT_CHARS, type AgentLogItem } from "./transcript";
 import { askUserOptions, askUserQuestion } from "./tools";
-import { resolveEnabledToolNames, TOOL_GROUPS } from "./tools/registry";
+import { resolveEnabledToolNames } from "./tools/registry";
 import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
 const EMPTY_LOG: AgentLogItem[] = [];
+const SUGGESTIONS = [
+  "ai.suggestion.terminalOutput",
+  "ai.suggestion.resourceUsage",
+  "ai.suggestion.systemLogs",
+] as const;
 
 export function AssistantPanel({ width }: { width: number }) {
   const { t } = useI18n();
@@ -66,6 +70,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const loadSessions = useAiStore((s) => s.loadSessions);
   const openSession = useAiStore((s) => s.openSession);
   const newSession = useAiStore((s) => s.newSession);
+  const startNewChat = useAiStore((s) => s.startNewChat);
   const deleteSession = useAiStore((s) => s.deleteSession);
   const send = useAiStore((s) => s.send);
   const resume = useAiStore((s) => s.resume);
@@ -95,16 +100,6 @@ export function AssistantPanel({ width }: { width: number }) {
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const enabledToolList = resolveEnabledToolNames(config?.enabledTools);
-  const enabledToolNames = new Set(enabledToolList);
-  const enabledSuggestionGroups = TOOL_GROUPS.filter(
-    ({ id, tools }) =>
-      id === "core" ||
-      tools.some(({ spec }) => enabledToolNames.has(spec.name)),
-  ).map(({ id }) => id);
-  const suggestions = pickSuggestionsForSession(
-    activeId ?? "pending-session",
-    enabledSuggestionGroups,
-  );
 
   const onLogScroll = () => {
     const el = scrollRef.current;
@@ -134,13 +129,9 @@ export function AssistantPanel({ width }: { width: number }) {
     });
   };
 
-  const createSession = async () => {
-    try {
-      await newSession();
-      inputRef.current?.focus();
-    } catch (err) {
-      toast.error(t("ai.error"), errorMessage(err));
-    }
+  const startChat = () => {
+    startNewChat();
+    inputRef.current?.focus();
   };
 
   useEffect(() => {
@@ -235,7 +226,8 @@ export function AssistantPanel({ width }: { width: number }) {
                     size="icon"
                     variant="ghost"
                     className={PANEL_HEADER_ACTION_CLASS}
-                    onClick={() => void createSession()}
+                    aria-label={t("ai.newChat")}
+                    onClick={startChat}
                   >
                     <MessageCirclePlus className="size-4" />
                   </Button>
@@ -251,6 +243,7 @@ export function AssistantPanel({ width }: { width: number }) {
                         size="icon"
                         variant="ghost"
                         className={PANEL_HEADER_ACTION_CLASS}
+                        aria-label={t("ai.history")}
                       >
                         <History className="size-4" />
                       </Button>
@@ -314,6 +307,7 @@ export function AssistantPanel({ width }: { width: number }) {
                 size="icon"
                 variant="ghost"
                 className={PANEL_HEADER_ACTION_CLASS}
+                aria-label={t("ai.hidePanel")}
                 onClick={toggleAux}
               >
                 <X className="size-4" />
@@ -342,32 +336,29 @@ export function AssistantPanel({ width }: { width: number }) {
             onScroll={onLogScroll}
             className="flex-1 overflow-y-auto"
           >
-            <div className="flex min-h-full flex-col gap-3 p-3">
+            <div className="flex min-h-full flex-col gap-4 px-3 py-4">
               {log.length === 0 ? (
-                <div className="my-auto flex w-full max-w-md self-center flex-col gap-3 py-4">
-                  <EmptyState
-                    className="gap-3 px-4 py-4"
-                    icon={Sparkles}
-                    title={t("ai.empty.title")}
-                    description={t(
-                      config?.autoApprove
-                        ? "ai.empty.descriptionAutonomous"
-                        : "ai.empty.description",
-                    )}
-                  />
-                  <div className="flex flex-col gap-1.5 px-1">
-                    {suggestions.map((suggestion) => (
+                <div className="my-auto w-full max-w-md self-center py-8">
+                  <div className="mb-2 flex items-center gap-1.5 px-1 text-muted-foreground">
+                    <Sparkles className="size-3.5" strokeWidth={1.8} />
+                    <h3 className="text-xs font-medium">
+                      {t("ai.empty.title")}
+                    </h3>
+                  </div>
+                  <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/70 bg-muted/20">
+                    {SUGGESTIONS.map((suggestion) => (
                       <button
-                        key={suggestion.key}
+                        key={suggestion}
                         type="button"
                         disabled={pending || !model}
-                        onClick={() => void sendPrompt(t(suggestion.key))}
+                        onClick={() => void sendPrompt(t(suggestion))}
                         className={cn(
-                          "rounded-lg border bg-surface px-3 py-2 text-left text-xs leading-normal text-muted-foreground transition-[background-color,border-color,color] hover:bg-muted hover:text-foreground disabled:opacity-50",
-                          CONTROL_INTERACTION_CLASS,
+                          "group flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs leading-normal text-foreground/75 transition-colors hover:bg-list-hover hover:text-foreground disabled:opacity-50",
+                          INTERACTIVE_FOCUS_CLASS,
                         )}
                       >
-                        {t(suggestion.key)}
+                        <span className="min-w-0 flex-1">{t(suggestion)}</span>
+                        <ArrowUp className="size-3.5 shrink-0 opacity-40 transition-opacity group-hover:opacity-80" />
                       </button>
                     ))}
                   </div>
@@ -390,8 +381,8 @@ export function AssistantPanel({ width }: { width: number }) {
             </div>
           </div>
 
-          <div className="border-t border-border bg-surface/35 p-3">
-            <div className="overflow-hidden rounded-lg border border-input bg-surface transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/60">
+          <div className="shrink-0 px-3 pb-3 pt-2">
+            <div className="overflow-hidden rounded-xl border border-input bg-surface transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/40">
               <Textarea
                 ref={inputRef}
                 rows={1}
@@ -405,9 +396,9 @@ export function AssistantPanel({ width }: { width: number }) {
                   }
                 }}
                 placeholder={t("ai.inputPlaceholder")}
-                className="max-h-40 min-h-0 resize-none rounded-none border-0 bg-transparent py-2.5 focus-visible:ring-0"
+                className="max-h-40 min-h-0 resize-none rounded-none border-0 bg-transparent px-3 pb-1.5 pt-2.5 focus-visible:ring-0"
               />
-              <div className="flex items-center gap-1.5 border-t border-input px-1.5 py-1.5">
+              <div className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-1">
                 <Select
                   value={model}
                   onValueChange={changeModel}
@@ -422,16 +413,13 @@ export function AssistantPanel({ width }: { width: number }) {
                   className="h-7 w-auto min-w-0 max-w-[70%] border-0 bg-transparent px-2 text-xs hover:bg-accent focus-visible:ring-0"
                 />
                 <div className="ml-auto flex items-center gap-1.5">
-                  <ContextMeter
-                    tokens={runtime?.contextTokens ?? null}
-                    window={runtime?.contextWindow ?? null}
-                  />
                   {pending ? (
                     <Tooltip content={t("ai.stop")}>
                       <Button
                         size="icon"
                         variant="secondary"
                         className="size-7 shrink-0"
+                        aria-label={t("ai.stop")}
                         onClick={() => activeId && stop(activeId)}
                       >
                         <Square className="size-3.5 fill-current" />
@@ -482,7 +470,7 @@ function ContinueRun({
   const { t } = useI18n();
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-md bg-muted/45 px-2.5 py-2">
       <span className="min-w-0 truncate text-xs text-muted-foreground">
         {t("ai.stepLimitReached")}
       </span>
@@ -496,46 +484,6 @@ function ContinueRun({
         {t("ai.continueRun")}
       </Button>
     </div>
-  );
-}
-
-function formatTokens(count: number): string {
-  if (count < 1000) return String(count);
-  return `${(count / 1000).toFixed(count < 10_000 ? 1 : 0)}k`;
-}
-
-function ContextMeter({
-  tokens,
-  window,
-}: {
-  tokens: number | null;
-  window: number | null;
-}) {
-  const { t } = useI18n();
-  if (tokens === null || !window || window <= 0) return null;
-
-  const percent = Math.min(100, Math.round((tokens / window) * 100));
-  return (
-    <Tooltip
-      content={t("ai.contextUsage", {
-        percent,
-        used: formatTokens(tokens),
-        total: formatTokens(window),
-      })}
-    >
-      <span
-        className={cn(
-          "shrink-0 cursor-default select-none tabular-nums text-2xs font-medium",
-          percent >= 90
-            ? "text-danger"
-            : percent >= 75
-              ? "text-warning"
-              : "text-muted-foreground",
-        )}
-      >
-        {percent}%
-      </span>
-    </Tooltip>
   );
 }
 
@@ -572,8 +520,8 @@ function Bubble({
 }) {
   if (role === "user") {
     return (
-      <div className="ml-auto max-w-[92%] rounded-xl rounded-br-sm border border-primary/15 bg-primary/12 px-3 py-2">
-        <p className="select-text whitespace-pre-wrap break-words text-sm">
+      <div className="ml-auto max-w-[88%] rounded-xl rounded-br-sm bg-muted px-3 py-2">
+        <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
           {content}
         </p>
       </div>
@@ -733,6 +681,7 @@ function CodeBlock({ code }: { code: string }) {
               size="icon"
               variant="ghost"
               className="size-6"
+              aria-label={t("snippets.run")}
               onClick={run}
             >
               <TerminalIcon className="size-3.5" />
@@ -743,6 +692,7 @@ function CodeBlock({ code }: { code: string }) {
               size="icon"
               variant="ghost"
               className="size-6"
+              aria-label={copied ? t("common.copied") : t("common.copy")}
               onClick={copy}
             >
               {copied ? (

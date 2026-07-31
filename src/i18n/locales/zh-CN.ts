@@ -882,68 +882,12 @@ export const zhCN: Dictionary = {
       action: "打开设置",
     },
     empty: {
-      title: "向助手提问",
-      description:
-        "助手可以查看终端、执行命令并使用已启用的工具。变更操作需要你的审批。",
-      descriptionAutonomous:
-        "自动模式已开启。操作无需逐项审批，你可随时停止执行。",
+      title: "试试这样问",
     },
     suggestion: {
-      core: {
-        terminalOutput: "查看当前终端输出，帮我定位报错原因",
-        resourceUsage: "检查当前主机的 CPU、内存和磁盘使用情况",
-        systemLogs: "查看当前主机的系统日志，帮我排查异常",
-      },
-      terminal: {
-        gitHistory: "从命令历史中找出我最近执行过的 Git 命令",
-        commonCommands: "分析命令历史，整理我最常用的命令",
-        dockerHistory: "搜索最近执行过的 Docker 相关命令",
-      },
-      hosts: {
-        health: "检查所有主机的在线状态和连接延迟",
-        inventory: "按分组汇总我保存的主机",
-        stats: "查看所有在线主机的资源使用情况",
-      },
-      files: {
-        largeFiles: "找出当前目录中占用空间最大的文件",
-        config: "读取当前目录的配置文件并总结关键设置",
-        bookmarks: "列出文件书签并帮我整理分类",
-      },
-      snippets: {
-        inventory: "查看并整理我保存的常用命令片段",
-        save: "把当前终端最近执行的命令保存为命令片段",
-        runOnHosts: "在多台主机上运行同一个命令片段",
-      },
-      tasks: {
-        inventory: "列出我保存的自动化任务及各自的作用",
-        runs: "查看最近的任务运行记录和结果",
-        create: "帮我新建一个定时执行的任务",
-      },
-      forwards: {
-        inventory: "检查已保存的端口转发及运行状态",
-        start: "启动我保存的端口转发",
-        create: "帮我新建一条本地端口转发",
-      },
-      credentials: {
-        inventory: "列出已保存的 SSH 身份和 SSH 密钥",
-        generateKey: "帮我生成一对新的 Ed25519 SSH 密钥",
-        audit: "检查 SSH 身份配置是否完整",
-      },
-      settings: {
-        overview: "汇总当前应用设置",
-        models: "列出当前接口可用的模型",
-        limits: "查看当前模型的上下文长度限制",
-      },
-      sync: {
-        status: "检查备份与同步状态",
-        push: "把当前数据推送到云端备份",
-        versions: "列出云端备份的历史版本",
-      },
-      updates: {
-        check: "检查是否有可用的 Sageport 更新",
-        status: "查看当前版本和更新状态",
-        install: "安装可用的 Sageport 更新",
-      },
+      terminalOutput: "查看当前终端输出，帮我定位报错原因",
+      resourceUsage: "检查当前主机的 CPU、内存和磁盘使用情况",
+      systemLogs: "查看当前主机的系统日志，帮我排查异常",
     },
     newChat: "新对话",
     history: "对话历史",
@@ -968,7 +912,6 @@ export const zhCN: Dictionary = {
     modelLabel: "模型",
     modelLoading: "正在加载模型…",
     promptTooLong: "消息过长，无法发送。",
-    contextUsage: "上下文 {percent}% · {used} / {total} tokens",
     autonomousMode: "自动",
     autonomousModeHint:
       "符合条件的操作会自动获得审批。读取内容及受不可信内容影响的操作仍需人工审批。",
@@ -1179,9 +1122,6 @@ export const zhCN: Dictionary = {
         "自动审批符合条件的操作。读取终端或远程文件内容，以及受这些内容影响的操作仍需人工审批。",
       autonomousModeWarning:
         "此模式可能对系统造成不可逆更改，请仅在信任的主机和任务中开启。",
-      maxHistoryTokensLabel: "历史 token 上限",
-      maxHistoryTokensHint:
-        "限制每次请求发送的对话历史。留空则使用 200,000。调高可保留更多历史，调低可节省成本。",
       tools: {
         title: "助手工具",
         description: "核心工具始终开启。请只开启需要的附加工具。",

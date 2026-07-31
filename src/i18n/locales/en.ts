@@ -904,74 +904,13 @@ export const en = {
       action: "Open settings",
     },
     empty: {
-      title: "Ask the assistant",
-      description:
-        "It can inspect terminals, run commands, and use enabled tools. Changes require your approval.",
-      descriptionAutonomous:
-        "Autonomous mode is on. Operations run without individual approval. You can stop them at any time.",
+      title: "Try asking",
     },
     suggestion: {
-      core: {
-        terminalOutput:
-          "Review the current terminal output and identify the error",
-        resourceUsage: "Check this host's CPU, memory, and disk usage",
-        systemLogs:
-          "Review this host's system logs and help troubleshoot issues",
-      },
-      terminal: {
-        gitHistory: "Find the Git commands I ran recently in command history",
-        commonCommands:
-          "Analyze my command history and list my most-used commands",
-        dockerHistory:
-          "Search command history for recently used Docker commands",
-      },
-      hosts: {
-        health: "Check the availability and connection latency of all hosts",
-        inventory: "Summarize my saved hosts by group",
-        stats: "Show resource usage for all online hosts",
-      },
-      files: {
-        largeFiles:
-          "Find the files using the most space in the current directory",
-        config:
-          "Read the config files in the current directory and summarize key settings",
-        bookmarks: "List my file bookmarks and help organize them",
-      },
-      snippets: {
-        inventory: "Review and organize my saved command snippets",
-        save: "Save the most recent terminal command as a command snippet",
-        runOnHosts: "Run one of my snippets across several hosts",
-      },
-      tasks: {
-        inventory: "List my saved automation tasks and what each one does",
-        runs: "Show recent task runs and their results",
-        create: "Help me create a task that runs on a schedule",
-      },
-      forwards: {
-        inventory: "Check my saved port forwards and their running status",
-        start: "Start one of my saved port forwards",
-        create: "Help me create a local port forward",
-      },
-      credentials: {
-        inventory: "List my saved SSH identities and SSH keys",
-        generateKey: "Generate a new Ed25519 SSH key pair",
-        audit: "Check whether my SSH identity settings are complete",
-      },
-      settings: {
-        overview: "Summarize my current application settings",
-        models: "List the models available from my current endpoint",
-        limits: "Show the context limits of my current model",
-      },
-      sync: {
-        status: "Check my backup and sync status",
-        push: "Push my current data to the cloud backup",
-        versions: "List the backup versions stored in the cloud",
-      },
-      updates: {
-        check: "Check whether a Sageport update is available",
-        status: "Show my current version and update status",
-        install: "Install the available Sageport update",
-      },
+      terminalOutput:
+        "Review the current terminal output and identify the error",
+      resourceUsage: "Check this host's CPU, memory, and disk usage",
+      systemLogs: "Review this host's system logs and troubleshoot issues",
     },
     newChat: "New chat",
     history: "Chat history",
@@ -996,7 +935,6 @@ export const en = {
     modelLabel: "Model",
     modelLoading: "Loading models…",
     promptTooLong: "The message is too long to send.",
-    contextUsage: "Context {percent}% · {used} / {total} tokens",
     autonomousMode: "Autonomous",
     autonomousModeHint:
       "Eligible operations are approved automatically. Reads and operations influenced by untrusted content still need approval.",
@@ -1210,9 +1148,6 @@ export const en = {
         "Automatically approves eligible operations. Reading terminal or remote file content and operations influenced by that content still require approval.",
       autonomousModeWarning:
         "This can make irreversible changes to your systems. Enable it only for hosts and tasks you trust.",
-      maxHistoryTokensLabel: "Max history tokens",
-      maxHistoryTokensHint:
-        "Limits the conversation history sent with each request. Leave blank for 200,000. Increase it to keep more history or decrease it to reduce cost.",
       tools: {
         title: "Assistant tools",
         description:

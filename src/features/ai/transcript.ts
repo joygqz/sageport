@@ -61,12 +61,6 @@ export interface RuntimeSession {
 
   stopRequested: boolean;
   stepLimitReached: boolean;
-
-  contextTokens: number | null;
-  contextWindow: number | null;
-
-  summary: string;
-  summaryUpTo: number;
 }
 
 export function truncateToolResult(text: string): string {

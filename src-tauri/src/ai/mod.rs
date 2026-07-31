@@ -86,15 +86,6 @@ pub struct ChatResult {
     pub content: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<ToolCall>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub usage: Option<Usage>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Usage {
-    pub input_tokens: u32,
-    pub output_tokens: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]

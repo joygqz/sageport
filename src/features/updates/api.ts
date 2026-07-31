@@ -9,6 +9,7 @@ export const RELEASES_URL =
   "https://github.com/joygqz/sageport/releases/latest";
 
 let canSelfUpdatePromise: Promise<boolean> | null = null;
+let latestUpdateStatus: UpdateStatus = { status: "checking" };
 
 function fetchCanSelfUpdate(): Promise<boolean> {
   canSelfUpdatePromise ??= probeSelfUpdate(ipc.update.canSelfUpdate);
@@ -32,16 +33,20 @@ export function useCanSelfUpdate(): boolean | null {
 }
 
 export function useUpdateStatus(): UpdateStatus {
-  const [state, setState] = useState<UpdateStatus>({ status: "idle" });
+  const [state, setState] = useState<UpdateStatus>(latestUpdateStatus);
 
   useEffect(() => {
     let cancelled = false;
     let unlisten: (() => void) | undefined;
+    const apply = (status: UpdateStatus) => {
+      latestUpdateStatus = status;
+      setState(status);
+    };
 
     void initializeUpdateStatus({
       listen: ipc.update.onStatus,
       read: ipc.update.status,
-      apply: setState,
+      apply,
       active: () => !cancelled,
     })
       .then((stop) => {
@@ -53,7 +58,7 @@ export function useUpdateStatus(): UpdateStatus {
       })
       .catch((error) => {
         if (!cancelled) {
-          setState({
+          apply({
             status: "error",
             operation: "check",
             message: errorMessage(error),

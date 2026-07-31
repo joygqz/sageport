@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const root = new URL("..", import.meta.url).pathname;
 const problems = [];
@@ -35,7 +35,7 @@ if (releaseTag && releaseTag !== `v${packageJson.version}`) {
 function tracked(glob) {
   return execSync(`git ls-files ${glob}`, { cwd: root, encoding: "utf8" })
     .split("\n")
-    .filter(Boolean);
+    .filter((file) => file && existsSync(root + file));
 }
 
 const sourceFiles = tracked("'src/**/*.ts' 'src/**/*.tsx'");

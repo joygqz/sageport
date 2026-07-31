@@ -244,9 +244,6 @@ function AiForm({ config }: { config: AiConfig }) {
   const [enabledTools, setEnabledTools] = useState(() =>
     resolveEnabledToolNames(config.enabledTools),
   );
-  const [maxHistoryTokens, setMaxHistoryTokens] = useState(
-    config.maxHistoryTokens,
-  );
   const [expandedToolGroups, setExpandedToolGroups] = useState<Set<string>>(
     () => new Set(),
   );
@@ -331,13 +328,6 @@ function AiForm({ config }: { config: AiConfig }) {
       toast.error(t("settings.ai.apiKeyRevealError"), errorMessage(error));
       return false;
     }
-  };
-
-  const commitMaxHistoryTokens = (raw: string) => {
-    const parsed = Number.parseInt(raw, 10);
-    const next = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-    setMaxHistoryTokens(next);
-    saveConfig({ maxHistoryTokens: next });
   };
 
   const changeProtocol = (next: AiProtocol) => {
@@ -459,23 +449,6 @@ function AiForm({ config }: { config: AiConfig }) {
             checked={autoApprove}
             onCheckedChange={changeAutoApprove}
           />
-
-          <Field
-            label={t("settings.ai.maxHistoryTokensLabel")}
-            hint={t("settings.ai.maxHistoryTokensHint")}
-          >
-            <DraftInput
-              type="number"
-              min={0}
-              max={4294967295}
-              step={1000}
-              value={maxHistoryTokens?.toString() ?? ""}
-              onCommit={commitMaxHistoryTokens}
-              placeholder="200000"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </Field>
         </div>
       </SettingsGroup>
 

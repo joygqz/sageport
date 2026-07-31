@@ -28,10 +28,6 @@ function emptyRuntime(): RuntimeSession {
     requestId: null,
     stopRequested: false,
     stepLimitReached: false,
-    contextTokens: null,
-    contextWindow: null,
-    summary: "",
-    summaryUpTo: 0,
   };
 }
 
@@ -46,6 +42,7 @@ interface AiStoreState {
   openSession: (id: string) => Promise<void>;
 
   newSession: () => Promise<string>;
+  startNewChat: () => void;
   deleteSession: (id: string) => Promise<void>;
 
   send: (
@@ -279,6 +276,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       }
       return sessionCreate;
     },
+
+    startNewChat: () => set({ activeId: null }),
 
     deleteSession: async (id) => {
       sessionMutationVersion += 1;

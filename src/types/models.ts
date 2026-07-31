@@ -404,12 +404,6 @@ export interface AiToolSpec {
 export interface AiChatResult {
   content?: string;
   toolCalls?: AiToolCall[];
-  usage?: AiUsage;
-}
-
-export interface AiUsage {
-  inputTokens: number;
-  outputTokens: number;
 }
 
 export interface AiModelLimits {

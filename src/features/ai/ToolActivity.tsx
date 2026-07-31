@@ -129,14 +129,14 @@ export function ToolActivity({
       : (target?.title ?? targetSessionId ?? "");
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card text-xs">
+    <div className="overflow-hidden rounded-md bg-muted/40 text-xs">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
         className={cn(
           INTERACTIVE_FOCUS_CLASS,
-          "flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-accent",
+          "flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-list-hover",
         )}
       >
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -152,7 +152,7 @@ export function ToolActivity({
       </button>
 
       {expanded && (
-        <div className="space-y-1.5 border-t border-border px-2.5 py-1.5">
+        <div className="space-y-1.5 px-2.5 pb-2 pt-0.5">
           {command && (
             <>
               {targetSessionId && (
@@ -234,7 +234,7 @@ export function QuestionPrompt({
   const selected = options.find((o) => item.result === selectionResult(o));
 
   return (
-    <div className="space-y-1.5 rounded-lg border border-border bg-card p-2.5">
+    <div className="space-y-2 rounded-md bg-muted/40 p-2.5">
       <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
         {question}
       </p>
@@ -246,15 +246,15 @@ export function QuestionPrompt({
             disabled={!awaiting}
             onClick={() => onAnswer(item.id, option)}
             className={cn(
-              "flex items-center gap-2 rounded-md border px-3 py-1.5 text-left text-xs transition-colors",
+              "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition-colors",
               awaiting
                 ? cn(
                     CONTROL_INTERACTION_CLASS,
-                    "text-foreground hover:bg-accent",
+                    "bg-surface/45 text-foreground hover:bg-list-hover",
                   )
                 : option === selected
-                  ? "border-primary/50 bg-accent/60 text-foreground"
-                  : "border-input text-muted-foreground opacity-60",
+                  ? "bg-primary/10 text-foreground"
+                  : "text-muted-foreground opacity-60",
             )}
           >
             <span className="min-w-0 flex-1 break-words">{option}</span>
