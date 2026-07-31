@@ -18,7 +18,7 @@ export function SnippetRunDialog({
     <FormDialog
       open={Boolean(snippet)}
       onClose={onClose}
-      width="w-[480px]"
+      width="w-[var(--dialog-width-md)]"
       title={snippet?.name ?? ""}
     >
       {snippet && <RunBody snippet={snippet} onClose={onClose} onRun={onRun} />}
@@ -78,7 +78,7 @@ function RunBody({
           />
         </Field>
       ))}
-      <div className="rounded-lg border border-border bg-surface p-3">
+      <div className="ui-surface-card ui-panel-padding">
         <p className="whitespace-pre-wrap break-all font-mono text-xs text-muted-foreground">
           {preview}
         </p>

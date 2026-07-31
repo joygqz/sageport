@@ -204,7 +204,7 @@ function JsonSettingsForm({
       }
       contentClassName="gap-2"
     >
-      <div className="overflow-hidden rounded-lg border border-border">
+      <div className="ui-surface-card overflow-hidden">
         <Suspense fallback={<LoadingState label={t("common.loading")} />}>
           <JsonSettingsEditor
             value={draft}

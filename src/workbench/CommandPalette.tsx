@@ -36,7 +36,7 @@ export function CommandPalette({
       <DialogPrimitive.Portal>
         <DialogOverlay />
         <DialogPrimitive.Content
-          className="fixed left-1/2 top-12 z-50 w-[36rem] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-xl border border-border/90 bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2"
+          className="fixed left-1/2 top-12 z-50 w-[36rem] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-lg border border-border-strong bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2"
           aria-describedby={undefined}
         >
           <DialogPrimitive.Title className="sr-only">
@@ -159,7 +159,7 @@ function PaletteBody({
 
   return (
     <div className="flex max-h-[24rem] flex-col">
-      <div className="border-b border-border p-2">
+      <div className="border-b border-border-subtle bg-surface/50 p-2">
         <Input
           autoFocus
           value={input}
@@ -183,7 +183,7 @@ function PaletteBody({
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          className="h-8 bg-background px-2.5"
+          className="h-[var(--control-height-sm)] bg-background px-2.5"
         />
       </div>
 
@@ -259,7 +259,7 @@ function PaletteRow({
       onPointerMove={onHover}
       onClick={onSelect}
       className={cn(
-        "flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm outline-none",
+        "flex min-h-[var(--menu-row-height)] cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm outline-none",
         highlighted
           ? "bg-list-active text-list-active-foreground"
           : "text-foreground",

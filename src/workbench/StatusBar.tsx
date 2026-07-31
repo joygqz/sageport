@@ -29,7 +29,7 @@ export const StatusBar = memo(function StatusBar() {
   const { t } = useI18n();
 
   return (
-    <footer className="flex h-[var(--statusbar-height)] shrink-0 select-none items-center justify-between border-t border-border bg-surface/95 text-2xs text-muted-foreground">
+    <footer className="flex h-[var(--statusbar-height)] shrink-0 select-none items-center justify-between border-t border-border-subtle bg-surface/95 text-2xs text-muted-foreground">
       <div className="flex h-full min-w-0 items-center overflow-hidden">
         <SessionItem />
         <MonitorItem />

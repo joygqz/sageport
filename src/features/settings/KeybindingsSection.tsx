@@ -152,7 +152,7 @@ export function KeybindingsSection() {
   }, [disableBinding, editingId, overrides, setBinding]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -176,7 +176,7 @@ export function KeybindingsSection() {
                 categoryKey as (typeof definitions)[number]["categoryKey"],
               )}
             />
-            <div className="overflow-hidden rounded-lg border border-border">
+            <div className="ui-divided-list">
               {definitions.map((definition) => {
                 const bindings = effectiveKeybindings(definition.id, overrides);
                 const binding = bindings[0];
@@ -189,11 +189,8 @@ export function KeybindingsSection() {
                 const label = t(definition.labelKey, definition.labelParams);
 
                 return (
-                  <div
-                    key={definition.id}
-                    className="border-b border-border last:border-b-0"
-                  >
-                    <div className="flex min-h-14 items-center gap-3 px-3 py-2">
+                  <div key={definition.id} className="last:border-b-0">
+                    <div className="flex min-h-[var(--settings-row-height)] items-center gap-3 px-3 py-2">
                       <span className="min-w-0 flex-1 text-sm">{label}</span>
                       <button
                         type="button"
@@ -208,10 +205,10 @@ export function KeybindingsSection() {
                           command: label,
                         })}
                         className={cn(
-                          "flex h-8 min-w-36 items-center justify-center rounded-md border px-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60",
+                          "flex h-[var(--control-height-sm)] min-w-36 items-center justify-center rounded-md border px-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40",
                           editing
                             ? "border-primary bg-primary/10 text-foreground"
-                            : "border-input bg-background hover:bg-muted",
+                            : "border-border-strong bg-surface hover:bg-muted",
                         )}
                       >
                         {editing ? (

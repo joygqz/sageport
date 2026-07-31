@@ -30,7 +30,7 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
 ];
 
 const ACTIVITY_BUTTON_CLASS =
-  "flex size-9 items-center justify-center rounded-lg outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60";
+  "flex size-[var(--activity-control-size)] items-center justify-center rounded-md outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45";
 
 export const ActivityBar = memo(function ActivityBar() {
   const { t } = useI18n();
@@ -40,8 +40,8 @@ export const ActivityBar = memo(function ActivityBar() {
   const openSettings = useOverlayStore((s) => s.openSettings);
 
   return (
-    <nav className="flex w-[var(--activitybar-width)] shrink-0 flex-col items-center justify-between border-r border-border bg-surface/95 py-2">
-      <div className="flex flex-col items-center gap-1.5">
+    <nav className="flex w-[var(--activitybar-width)] shrink-0 flex-col items-center justify-between border-r border-border-subtle bg-surface/95 py-1.5">
+      <div className="flex flex-col items-center gap-1">
         {ACTIVITIES.map((item) => {
           const Icon = item.icon;
           const active = sidebarVisible && activity === item.id;

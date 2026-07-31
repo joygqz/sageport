@@ -239,7 +239,7 @@ function Section({
               size="icon"
               variant="ghost"
               aria-label={addLabel}
-              className="size-6 shrink-0"
+              className="size-[var(--compact-control-size)] shrink-0"
               onClick={onAdd}
             >
               <Plus className="size-4" />

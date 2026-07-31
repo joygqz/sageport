@@ -418,7 +418,7 @@ export function FileList({
               setToolbarVisible(true);
             }}
             className={cn(
-              "absolute inset-x-0 top-0 z-10 flex h-9 items-center gap-1 border-b border-border bg-surface px-1.5 transition-transform duration-200 ease-out motion-reduce:transition-none",
+              "absolute inset-x-0 top-0 z-10 flex h-[var(--control-height)] items-center gap-1 border-b border-border-subtle bg-surface/95 px-1.5 transition-transform duration-200 ease-out motion-reduce:transition-none",
               toolbarVisible
                 ? "translate-y-0"
                 : "pointer-events-none -translate-y-full",
@@ -432,7 +432,7 @@ export function FileList({
                 onChange={(event) => setFilterQuery(event.target.value)}
                 placeholder={t("sftp.filterPlaceholder")}
                 aria-label={t("sftp.filterPlaceholder")}
-                className="h-7 w-full rounded-lg bg-background/70 pl-7 pr-2 text-xs"
+                className="h-[var(--compact-row-height)] w-full rounded-md bg-surface-sunken pl-7 pr-2 text-xs"
               />
             </div>
             <FileSortMenu sort={sort} onSortChange={onSortChange} />
@@ -440,7 +440,9 @@ export function FileList({
         ) : undefined
       }
     >
-      {showFileToolbar && <div aria-hidden="true" className="h-9" />}
+      {showFileToolbar && (
+        <div aria-hidden="true" className="h-[var(--control-height)]" />
+      )}
       <table
         tabIndex={0}
         aria-label={t("sftp.fileList")}
@@ -542,7 +544,7 @@ export function FileList({
                       }}
                       onDoubleClick={() => open(entry)}
                       className={cn(
-                        "h-7 cursor-pointer touch-none select-none transition-colors",
+                        "h-[var(--compact-row-height)] cursor-pointer touch-none select-none transition-colors",
                         selected
                           ? "bg-list-active text-list-active-foreground"
                           : "hover:bg-list-hover",
@@ -551,8 +553,8 @@ export function FileList({
                         ) && "opacity-50",
                       )}
                     >
-                      <td className="h-7 truncate pl-2.5 pr-1 align-middle">
-                        <span className="flex h-7 max-w-full items-center gap-2">
+                      <td className="h-[var(--compact-row-height)] truncate pl-2.5 pr-1 align-middle">
+                        <span className="flex h-[var(--compact-row-height)] max-w-full items-center gap-2">
                           <EntryIcon entry={entry} />
                           {renamingPath === entry.path ? (
                             <InlineNameInput
@@ -572,7 +574,7 @@ export function FileList({
                       </td>
                       <td
                         className={cn(
-                          "h-7 truncate px-1 text-right align-middle leading-none",
+                          "h-[var(--compact-row-height)] truncate px-1 text-right align-middle leading-none",
                           selected
                             ? "text-list-active-foreground/70"
                             : "text-muted-foreground",
@@ -582,7 +584,7 @@ export function FileList({
                       </td>
                       <td
                         className={cn(
-                          "h-7 truncate pl-1 pr-2.5 text-right align-middle leading-none",
+                          "h-[var(--compact-row-height)] truncate pl-1 pr-2.5 text-right align-middle leading-none",
                           selected
                             ? "text-list-active-foreground/70"
                             : "text-muted-foreground",
@@ -681,7 +683,7 @@ function FileSortMenu({
             size="icon"
             variant="ghost"
             className={cn(
-              "size-7 shrink-0",
+              "size-[var(--toolbar-control-size)] shrink-0",
               customized && "bg-accent text-accent-foreground",
             )}
           >
@@ -735,9 +737,9 @@ function InlineCreateRow({
   const { t } = useI18n();
 
   return (
-    <tr className="h-7 bg-list-hover">
-      <td className="h-7 pl-2.5 pr-1 align-middle">
-        <span className="flex h-7 items-center gap-2">
+    <tr className="h-[var(--compact-row-height)] bg-list-hover">
+      <td className="h-[var(--compact-row-height)] pl-2.5 pr-1 align-middle">
+        <span className="flex h-[var(--compact-row-height)] items-center gap-2">
           {kind === "folder" ? (
             <Folder className="size-4 shrink-0 text-warning" />
           ) : (
@@ -854,7 +856,7 @@ function FileDragGhost({ dragState }: { dragState: FileDragState }) {
       {previewEntries.map((entry, index) => (
         <div
           key={entry.path}
-          className="flex w-full items-center gap-2 rounded-lg border border-border bg-popover px-2 text-xs text-popover-foreground opacity-95 shadow-md"
+          className="flex w-full items-center gap-2 rounded-md border border-border-strong bg-popover px-2 text-xs text-popover-foreground opacity-95 shadow-md"
           style={{ height: dragState.rect.height }}
         >
           <EntryIcon entry={entry} />

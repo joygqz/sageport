@@ -6,10 +6,10 @@ import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 export const DIALOG_OVERLAY_CLASS =
-  "fixed inset-0 z-50 bg-black/40 dark:bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
+  "fixed inset-0 z-50 bg-black/35 backdrop-blur-[1px] dark:bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 
 export const DIALOG_CONTENT_CLASS =
-  "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-3 overscroll-contain rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-md sm:p-5 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
+  "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-[var(--content-gap)] overscroll-contain rounded-lg border border-border-strong bg-popover p-[var(--dialog-padding)] text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
 
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -129,7 +129,7 @@ function DialogContent({
       >
         {children}
         {showClose && (
-          <DialogPrimitive.Close className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+          <DialogPrimitive.Close className="absolute right-3 top-3 flex size-[var(--toolbar-control-size)] items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
             <X aria-hidden="true" className="size-4" />
             <span className="sr-only">{t("common.close")}</span>
           </DialogPrimitive.Close>
@@ -164,7 +164,7 @@ function DialogToolbar({
     <div
       data-slot="dialog-toolbar"
       className={cn(
-        "flex h-[var(--workbench-bar-height)] shrink-0 items-center gap-2 border-b border-border bg-surface/25 pr-2",
+        "flex h-[var(--workbench-bar-height)] shrink-0 items-center gap-2 border-b border-border-subtle bg-surface/70 pr-2",
         leading ? "pl-2" : "pl-4",
         className,
       )}
@@ -173,7 +173,7 @@ function DialogToolbar({
       {leading}
       <DialogTitle className="min-w-0 flex-1 truncate">{children}</DialogTitle>
       {actions}
-      <DialogPrimitive.Close className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+      <DialogPrimitive.Close className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
         <X aria-hidden="true" className="size-4" />
         <span className="sr-only">{t("common.close")}</span>
       </DialogPrimitive.Close>
@@ -206,7 +206,7 @@ function DialogTitle({
       ref={ref}
       data-slot="dialog-title"
       className={cn(
-        "text-pretty text-base font-semibold leading-snug",
+        "text-pretty text-base font-semibold leading-snug tracking-[-0.01em]",
         className,
       )}
       {...props}

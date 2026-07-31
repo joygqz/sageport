@@ -29,14 +29,14 @@ export function HostKeyDialog() {
     >
       <DialogContent
         showClose={false}
-        className="flex w-[460px] max-w-[92vw] flex-col gap-0 p-0 sm:p-0"
+        className="flex w-[var(--dialog-width-md)] max-w-[92vw] flex-col gap-0 p-0 sm:p-0"
       >
         {shown && (
           <>
             <DialogToolbar>
               {changed ? t("hostKey.changedTitle") : t("hostKey.unknownTitle")}
             </DialogToolbar>
-            <div className="flex flex-col gap-3 p-4">
+            <div className="ui-dialog-body">
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {changed ? (
                   <ShieldAlert className="float-left mr-2 mt-[3px] size-4 text-danger" />
@@ -51,7 +51,7 @@ export function HostKeyDialog() {
                 )}
               </p>
 
-              <dl className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3 text-xs">
+              <dl className="ui-surface-card ui-panel-padding flex flex-col gap-2 text-xs">
                 <div className="flex flex-col gap-1">
                   <dt className="text-muted-foreground">
                     {t("hostKey.keyType")}

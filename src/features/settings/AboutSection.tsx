@@ -72,7 +72,7 @@ export function AboutSection() {
 
   return (
     <div className={SETTINGS_GROUP_STACK_CLASS}>
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <section className="ui-surface-card ui-card-padding flex flex-col gap-[var(--content-gap)] sm:flex-row sm:items-center">
         <img src="/app-icon.png" alt="" className="size-14 shrink-0" />
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-foreground">Sageport</h3>
@@ -199,7 +199,7 @@ function UpdateStatusCard({
   }
 
   return (
-    <section className="flex flex-wrap items-center gap-3 rounded-md bg-muted/30 px-3 py-2.5">
+    <section className="ui-surface-card ui-card-padding flex flex-wrap items-center gap-3">
       <span
         className={cn(
           "flex size-6 shrink-0 items-center justify-center [&_svg]:size-5",

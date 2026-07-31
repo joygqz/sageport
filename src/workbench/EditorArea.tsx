@@ -306,7 +306,7 @@ export const EditorArea = memo(function EditorArea() {
               el.scrollLeft += e.deltaY;
             }}
             className={cn(
-              "scrollbar-none flex h-[var(--workbench-bar-height)] overflow-x-auto overflow-y-hidden",
+              "scrollbar-none flex h-[var(--workbench-bar-height)] gap-1 overflow-x-auto overflow-y-hidden",
               WORKBENCH_TAB_STRIP_GUTTER_CLASS,
             )}
           >
@@ -336,7 +336,7 @@ export const EditorArea = memo(function EditorArea() {
               <button
                 type="button"
                 onClick={() => openPalette("quick")}
-                className="ml-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center self-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+                className="flex size-[var(--workbench-tab-height)] shrink-0 items-center justify-center self-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/45"
               >
                 <Plus className="size-4" />
               </button>
@@ -525,7 +525,7 @@ function TabItem({
       }}
       className={cn(
         WORKBENCH_TAB_CLASS,
-        "h-full w-fit min-w-24 max-w-52 gap-2 px-3",
+        "h-[var(--workbench-tab-height)] w-fit min-w-24 max-w-52 gap-2 px-3",
         dragged && "opacity-50",
         active
           ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
@@ -608,7 +608,7 @@ function TabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-lg border border-border bg-list-active px-2.5 text-xs text-list-active-foreground opacity-90 shadow-md"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-list-active px-2.5 text-xs text-list-active-foreground opacity-95 shadow-md"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,

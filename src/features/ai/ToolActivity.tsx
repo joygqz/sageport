@@ -129,7 +129,7 @@ export function ToolActivity({
       : (target?.title ?? targetSessionId ?? "");
 
   return (
-    <div className="overflow-hidden rounded-md bg-muted/40 text-xs">
+    <div className="ui-muted-panel overflow-hidden text-xs">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
@@ -196,14 +196,14 @@ export function ToolActivity({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 shrink-0 px-2"
+                className="h-[var(--compact-control-size)] shrink-0 px-2"
                 onClick={() => onDeny(item.id)}
               >
                 {t("ai.deny")}
               </Button>
               <Button
                 size="sm"
-                className="h-6 shrink-0 px-2"
+                className="h-[var(--compact-control-size)] shrink-0 px-2"
                 onClick={() => onApprove(item.id)}
               >
                 {t("ai.approve")}
@@ -234,7 +234,7 @@ export function QuestionPrompt({
   const selected = options.find((o) => item.result === selectionResult(o));
 
   return (
-    <div className="space-y-2 rounded-md bg-muted/40 p-2.5">
+    <div className="ui-muted-panel space-y-2 p-2.5">
       <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
         {question}
       </p>
@@ -250,7 +250,7 @@ export function QuestionPrompt({
               awaiting
                 ? cn(
                     CONTROL_INTERACTION_CLASS,
-                    "bg-surface/45 text-foreground hover:bg-list-hover",
+                    "border border-border-subtle bg-surface-raised text-foreground hover:bg-list-hover",
                   )
                 : option === selected
                   ? "bg-primary/10 text-foreground"

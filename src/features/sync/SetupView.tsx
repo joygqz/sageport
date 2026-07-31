@@ -86,7 +86,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="ui-content-stack">
       <RadioGroup
         value={kind}
         disabled={connect.isPending}
@@ -102,11 +102,11 @@ export function SetupView({ status }: { status: SyncStatus }) {
               key={p.kind}
               value={p.kind}
               className={cn(
-                "flex min-w-0 flex-col gap-1.5 rounded-md border bg-transparent p-2.5 text-left transition-colors",
+                "flex min-w-0 flex-col gap-1.5 rounded-lg border bg-surface-raised p-3 text-left transition-[background-color,border-color,box-shadow]",
                 CONTROL_FOCUS_CLASS,
                 active
-                  ? "border-ring bg-muted/35 ring-1 ring-ring/25"
-                  : cn(CONTROL_BORDER_CLASS, "hover:bg-muted/25"),
+                  ? "border-primary bg-primary/8 ring-2 ring-primary/20"
+                  : cn(CONTROL_BORDER_CLASS, "hover:bg-list-hover"),
               )}
             >
               <Icon className="size-5 text-foreground" />
@@ -130,7 +130,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
             onPhase={setOAuth}
           />
         ) : (
-          <p className="rounded-md bg-muted/35 px-3 py-2 text-xs text-muted-foreground">
+          <p className="ui-muted-panel ui-panel-padding text-xs text-muted-foreground">
             {t("settings.sync.setup.oauthUnavailable", { name: meta.name })}
           </p>
         )
@@ -257,7 +257,7 @@ function OAuthPanel({
 
   if (phase.step === "device") {
     return (
-      <div className="flex flex-col gap-3 rounded-md bg-muted/35 px-3 py-2.5">
+      <div className="ui-muted-panel ui-panel-padding flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
           {t("settings.sync.setup.deviceCodeHint")}
         </p>
@@ -268,7 +268,7 @@ function OAuthPanel({
           <Button
             size="icon"
             variant="outline"
-            className="size-8"
+            className="size-[var(--control-height-sm)]"
             aria-label={copied ? t("common.copied") : t("common.copy")}
             onClick={() => void copyCode(phase.userCode)}
           >
@@ -298,7 +298,7 @@ function OAuthPanel({
 
   if (phase.step === "browser") {
     return (
-      <div className="flex items-center gap-3 rounded-md bg-muted/35 px-3 py-2.5">
+      <div className="ui-muted-panel ui-panel-padding flex items-center gap-3">
         <Spinner />
         <p className="flex-1 text-sm text-muted-foreground">
           {t("settings.sync.setup.browserWaiting")}
@@ -312,7 +312,7 @@ function OAuthPanel({
 
   if (phase.step === "authorized") {
     return (
-      <div className="flex flex-wrap items-center gap-3 rounded-md bg-muted/35 px-3 py-2.5">
+      <div className="ui-muted-panel ui-panel-padding flex flex-wrap items-center gap-3">
         <Check className="size-4 text-link" />
         <p className="min-w-0 flex-1 text-sm text-foreground">
           {t("settings.sync.setup.authorizedAs", { account: phase.account })}
@@ -373,7 +373,7 @@ function ConnectForm({
         : true;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="ui-content-stack">
       {kind === "webdav" && (
         <>
           <Field

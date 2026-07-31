@@ -8,13 +8,13 @@ export const PANEL_HEADER_ACTION_CLASS = "size-[var(--toolbar-control-size)]";
 export const PANEL_LIST_CLASS = "space-y-0.5";
 
 export const PANEL_LIST_ITEM_CLASS =
-  "group flex min-h-10 items-center gap-2 rounded-md px-2 py-1 outline-none transition-colors hover:bg-list-hover focus-within:bg-list-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60";
+  "group flex min-h-[var(--list-row-height)] items-center gap-2 rounded-md px-2 py-1 outline-none transition-colors hover:bg-list-hover focus-within:bg-list-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45";
 
 export const PANEL_LIST_ICON_CLASS =
-  "flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/45 text-muted-foreground";
+  "flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-md border border-border-subtle bg-muted/25 text-muted-foreground";
 
 export const PANEL_LIST_ACTION_CLASS =
-  "panel-list-action pointer-events-none -ml-2 flex h-6 w-0 shrink-0 items-center justify-center overflow-hidden rounded-md text-muted-foreground opacity-0 transition-[background-color,color,opacity] hover:bg-accent hover:text-accent-foreground group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100";
+  "panel-list-action pointer-events-none -ml-2 flex h-6 w-0 shrink-0 items-center justify-center overflow-hidden rounded-md text-muted-foreground opacity-0 transition-[background-color,color,opacity] hover:bg-accent hover:text-foreground group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100";
 
 export function PanelHeader({
   title,
@@ -31,12 +31,12 @@ export function PanelHeader({
     <div
       data-slot="panel-header"
       className={cn(
-        "flex h-[var(--workbench-bar-height)] shrink-0 items-center justify-between gap-2 border-b border-border pl-3 pr-2",
+        "flex h-[var(--workbench-bar-height)] shrink-0 items-center justify-between gap-2 border-b border-border-subtle bg-surface/70 pl-3 pr-2",
         className,
       )}
     >
       <div className="flex min-w-0 items-center gap-2">
-        <h2 className="min-w-0 truncate text-xs font-semibold leading-snug text-surface-foreground/85">
+        <h2 className="min-w-0 truncate text-xs font-semibold leading-snug tracking-wide text-surface-foreground/85">
           {title}
         </h2>
         {titleAfter}
@@ -96,7 +96,7 @@ export const PanelSectionHeader = forwardRef<
     <div
       ref={ref}
       className={cn(
-        "group flex h-8 items-center rounded-lg transition-colors hover:bg-list-hover focus-within:bg-list-hover",
+        "group flex h-[var(--control-height-sm)] items-center rounded-md transition-colors hover:bg-list-hover focus-within:bg-list-hover",
         className,
       )}
       {...props}
@@ -105,7 +105,7 @@ export const PanelSectionHeader = forwardRef<
         type="button"
         aria-expanded={!collapsed}
         onClick={onToggle}
-        className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+        className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
       >
         {collapsed ? (
           <ChevronRight className="size-3.5 shrink-0" />

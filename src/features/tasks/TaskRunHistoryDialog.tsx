@@ -127,7 +127,7 @@ export function TaskRunHistoryDialog({
           {t("tasks.history.title")}
         </DialogToolbar>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+        <div className="ui-dialog-body">
           {isLoading ? (
             <LoadingState label={t("common.loading")} fill />
           ) : isError ? (
@@ -141,7 +141,7 @@ export function TaskRunHistoryDialog({
             <EmptyState icon={History} title={t("tasks.history.empty")} fill />
           ) : (
             <ScrollArea className="min-h-0 flex-1">
-              <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+              <ul className="ui-divided-list flex flex-col">
                 {entries.map((entry) => (
                   <RunRow
                     key={entry.id}
@@ -185,7 +185,7 @@ function RunRow({
 
   return (
     <li className="group">
-      <div className="flex items-start gap-2 px-3 py-2.5">
+      <div className="ui-list-row flex items-start">
         <button
           type="button"
           onClick={() => steps.length && setOpen((o) => !o)}

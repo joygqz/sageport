@@ -40,7 +40,7 @@ export function ForwardFormDialog({
     <FormDialog
       open={open}
       onClose={onClose}
-      width="w-[480px]"
+      width="w-[var(--dialog-width-md)]"
       title={
         forward ? t("forwards.form.editTitle") : t("forwards.form.newTitle")
       }

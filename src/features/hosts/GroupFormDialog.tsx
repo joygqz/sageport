@@ -34,7 +34,7 @@ export function GroupFormDialog({
     <FormDialog
       open={open}
       onClose={onClose}
-      width="w-[420px]"
+      width="w-[var(--dialog-width-sm)]"
       title={groupId ? t("groupForm.editTitle") : t("groupForm.newTitle")}
     >
       <GroupFormBody

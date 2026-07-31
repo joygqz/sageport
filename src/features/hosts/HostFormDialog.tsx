@@ -74,7 +74,7 @@ export function HostFormDialog({
     <FormDialog
       open={open}
       onClose={onClose}
-      width="w-[560px]"
+      width="w-[var(--dialog-width-lg)]"
       title={hostId ? t("hostForm.editTitle") : t("hostForm.newTitle")}
     >
       <HostFormBody

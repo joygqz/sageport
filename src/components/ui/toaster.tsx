@@ -43,7 +43,7 @@ export function Toaster() {
               if (!open) dismiss(t.id);
             }}
             className={cn(
-              "pointer-events-auto flex gap-3 rounded-lg border border-border/90 bg-popover p-3 shadow-md",
+              "pointer-events-auto flex gap-3 rounded-lg border border-border-strong bg-popover p-3 shadow-md",
               hasDetails ? "items-start" : "items-center",
               "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-right-2 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:slide-out-to-right-2",
               "data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=cancel]:translate-x-0 data-[swipe=cancel]:transition-transform data-[swipe=end]:animate-out data-[swipe=end]:slide-out-to-right-full",
@@ -91,7 +91,7 @@ export function Toaster() {
                 type="button"
                 aria-label={translate("common.close")}
                 className={cn(
-                  "-mr-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                  "-mr-1 flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                   hasDetails && "-mt-1",
                 )}
               >

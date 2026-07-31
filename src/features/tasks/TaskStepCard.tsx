@@ -93,7 +93,7 @@ export function TaskStepCard({
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className="size-[var(--compact-control-size)]"
               disabled={disabled || index === 0}
               onClick={() => onMove(-1)}
             >
@@ -104,7 +104,7 @@ export function TaskStepCard({
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className="size-[var(--compact-control-size)]"
               disabled={disabled || index === total - 1}
               onClick={() => onMove(1)}
             >
@@ -115,7 +115,7 @@ export function TaskStepCard({
             <Button
               size="icon"
               variant="ghost"
-              className="size-6 text-muted-foreground hover:text-danger"
+              className="size-[var(--compact-control-size)] text-muted-foreground hover:text-danger"
               disabled={disabled}
               onClick={onRemove}
             >
@@ -159,7 +159,7 @@ function RetryStepper({
       <Button
         size="icon"
         variant="ghost"
-        className="size-6"
+        className="size-[var(--compact-control-size)]"
         disabled={disabled || value <= 0}
         onClick={() => clamp(value - 1)}
       >
@@ -171,7 +171,7 @@ function RetryStepper({
       <Button
         size="icon"
         variant="ghost"
-        className="size-6"
+        className="size-[var(--compact-control-size)]"
         disabled={disabled || value >= MAX_STEP_RETRIES}
         onClick={() => clamp(value + 1)}
       >

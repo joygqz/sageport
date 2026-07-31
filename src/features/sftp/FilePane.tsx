@@ -318,7 +318,8 @@ export function FilePane({ side }: { side: PaneSide }) {
             el.scrollLeft += e.deltaY;
           }}
           className={cn(
-            "scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface",
+            "scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center overflow-x-auto border-b border-border-subtle bg-surface",
+            pane.tabs.length > 0 && "gap-1",
             WORKBENCH_COMPACT_TAB_STRIP_GUTTER_CLASS,
           )}
         >
@@ -357,7 +358,11 @@ export function FilePane({ side }: { side: PaneSide }) {
           <DropdownMenu>
             <Tooltip content={t("sftp.newTab")}>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="size-6 shrink-0">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-[var(--compact-tab-height)] shrink-0"
+                >
                   <Plus className="size-3.5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -405,12 +410,12 @@ export function FilePane({ side }: { side: PaneSide }) {
             value={active.id}
             className="flex min-h-0 flex-1 flex-col outline-none"
           >
-            <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-surface px-1.5">
+            <div className="flex h-[var(--compact-toolbar-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-border-subtle bg-surface px-1.5">
               <Tooltip content={t("sftp.back")}>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-6"
+                  className="size-[var(--compact-control-size)]"
                   disabled={
                     !activeReady ||
                     (!active.navigationPath && active.historyIndex <= 0)
@@ -434,7 +439,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-6"
+                  className="size-[var(--compact-control-size)]"
                   disabled={
                     !activeReady ||
                     !!active.navigationPath ||
@@ -455,7 +460,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-6"
+                  className="size-[var(--compact-control-size)]"
                   disabled={!activeReady}
                   onClick={() => void refresh(side, active.id)}
                 >
@@ -466,7 +471,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-6"
+                  className="size-[var(--compact-control-size)]"
                   disabled={
                     !activeReady || parentPath(active.cwd) === active.cwd
                   }
@@ -481,7 +486,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-6"
+                  className="size-[var(--compact-control-size)]"
                   disabled={!activeReady}
                   onClick={() =>
                     setCreation({
@@ -498,7 +503,7 @@ export function FilePane({ side }: { side: PaneSide }) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-6"
+                  className="size-[var(--compact-control-size)]"
                   disabled={!activeReady}
                   onClick={() =>
                     setCreation({
@@ -682,7 +687,7 @@ function SftpTabItem({
       }}
       className={cn(
         WORKBENCH_TAB_CLASS,
-        "h-full w-fit min-w-24 max-w-44 gap-1.5 px-2",
+        "h-[var(--compact-tab-height)] w-fit min-w-24 max-w-44 gap-1.5 px-2",
         dragged && "opacity-50",
         active
           ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
@@ -751,7 +756,7 @@ function SftpTabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-1.5 rounded-lg border border-border bg-list-active px-2 text-xs text-list-active-foreground opacity-90 shadow-md"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-1.5 rounded-md border border-border-strong bg-list-active px-2 text-xs text-list-active-foreground opacity-95 shadow-md"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -819,7 +824,7 @@ function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
         setValue(displayedPath);
         scrollToEnd();
       }}
-      className="ml-1 h-7 min-w-0 flex-1 rounded-lg border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-surface/50 focus-visible:bg-surface focus-visible:text-foreground"
+      className="ml-1 h-[var(--compact-row-height)] min-w-0 flex-1 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground shadow-none transition-colors hover:bg-surface-raised focus-visible:bg-surface-raised focus-visible:text-foreground"
     />
   );
 }

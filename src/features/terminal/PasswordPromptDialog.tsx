@@ -24,7 +24,7 @@ export function PasswordPromptDialog() {
     >
       <DialogContent
         showClose={false}
-        className="flex w-[440px] max-w-[92vw] flex-col gap-0 p-0 sm:p-0"
+        className="flex w-[var(--dialog-width-md)] max-w-[92vw] flex-col gap-0 p-0 sm:p-0"
       >
         {shown && (
           <PasswordPromptForm
@@ -80,7 +80,7 @@ function PasswordPromptForm({
   return (
     <>
       <DialogToolbar>{t("ssh.passwordPrompt.title")}</DialogToolbar>
-      <form className="flex flex-col gap-3 p-4" onSubmit={submit}>
+      <form className="ui-dialog-body" onSubmit={submit}>
         <p className="font-mono text-sm leading-relaxed text-muted-foreground">
           {t("ssh.passwordPrompt.description", { host, username })}
         </p>

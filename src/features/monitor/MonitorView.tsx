@@ -75,7 +75,7 @@ export function MonitorView() {
         />
       }
     >
-      <PanelContent className="flex flex-col gap-1">
+      <PanelContent className="flex flex-col gap-1.5">
         {filteredGroups.length === 0 ? (
           <EmptyState
             icon={Gauge}
@@ -210,14 +210,14 @@ function HostCard({
       type="button"
       onClick={() => setActive(primary.id)}
       className={cn(
-        "group flex flex-col gap-2.5 rounded-md bg-muted/25 p-2.5 text-left transition-[background-color,box-shadow] hover:bg-muted/45",
+        "group flex flex-col gap-2.5 rounded-lg border border-border-subtle bg-surface-raised p-2.5 text-left transition-[background-color,border-color,box-shadow] hover:border-border-strong hover:bg-list-hover",
         INTERACTIVE_FOCUS_CLASS,
-        active && "bg-muted/45 ring-1 ring-inset ring-ring/45",
+        active && "border-primary/60 bg-list-active/45",
       )}
     >
       <div className="flex w-full flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <div className="relative flex size-7 shrink-0 items-center justify-center text-link">
+          <div className="relative flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center text-link">
             <Gauge className="size-4" strokeWidth={1.7} />
             <span
               className={cn(

@@ -30,7 +30,7 @@ export const TitleBar = memo(function TitleBar() {
   return (
     <header
       data-tauri-drag-region
-      className="grid h-[var(--titlebar-height)] shrink-0 grid-cols-[1fr_minmax(0,28rem)_1fr] items-center border-b border-border bg-surface/95"
+      className="grid h-[var(--titlebar-height)] shrink-0 grid-cols-[1fr_minmax(0,28rem)_1fr] items-center border-b border-border-subtle bg-surface/95"
     >
       <div
         data-tauri-drag-region
@@ -53,7 +53,7 @@ export const TitleBar = memo(function TitleBar() {
         type="button"
         onClick={() => openPalette("quick")}
         className={cn(
-          "flex h-7 items-center justify-center gap-2 rounded-lg border bg-background/65 px-2.5 text-xs text-muted-foreground transition-[background-color,border-color,color,box-shadow] hover:bg-background hover:text-foreground",
+          "flex h-[var(--toolbar-control-size)] items-center justify-center gap-2 rounded-md border bg-surface-sunken px-2.5 text-xs text-muted-foreground shadow-[inset_0_1px_color-mix(in_oklch,var(--color-foreground)_2%,transparent)] transition-[background-color,border-color,color,box-shadow] hover:bg-background hover:text-foreground",
           CONTROL_INTERACTION_CLASS,
         )}
       >
@@ -121,7 +121,7 @@ function LayoutToggle({
         onClick={onClick}
         aria-label={label}
         aria-pressed={active}
-        className="flex size-[var(--toolbar-control-size)] items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+        className="flex size-[var(--toolbar-control-size)] items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
       >
         {children}
       </button>

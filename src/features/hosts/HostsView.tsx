@@ -806,7 +806,7 @@ function GroupSection({
         depth > 0 ? { marginLeft: `${Math.min(depth, 6) * 12}px` } : undefined
       }
       className={cn(
-        "rounded-lg transition-[background-color,box-shadow]",
+        "rounded-md transition-[background-color,box-shadow]",
         (isHostDropTarget || isGroupDropTarget) &&
           "bg-list-hover ring-1 ring-inset ring-ring/50",
         dragging && "opacity-50",
@@ -1055,7 +1055,7 @@ function HostDragGhost({ dragState }: { dragState: HostDragState }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-lg border border-border bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95 shadow-md"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95 shadow-md"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -1079,7 +1079,7 @@ function GroupDragGhost({ dragState }: { dragState: GroupDragState }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-lg border border-border bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95 shadow-md"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95 shadow-md"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,

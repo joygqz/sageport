@@ -29,7 +29,7 @@ export function SshConfigImportDialog({
     <FormDialog
       open={open}
       onClose={onClose}
-      width="w-[560px]"
+      width="w-[var(--dialog-width-lg)]"
       title={t("hosts.import.title")}
     >
       <ImportBody onClose={onClose} />
@@ -128,7 +128,7 @@ function ImportBody({ onClose }: { onClose: () => void }) {
 
   if (entries.length === 0) {
     return (
-      <div className="flex flex-col gap-3 p-4">
+      <div className="ui-dialog-body">
         <p className="text-sm text-muted-foreground">
           {t("hosts.import.empty")}
         </p>

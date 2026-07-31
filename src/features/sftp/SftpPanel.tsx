@@ -75,7 +75,7 @@ export function SftpPanel({ height }: { height: number }) {
 
   return (
     <div
-      className="flex shrink-0 flex-col overflow-hidden border-t border-border bg-surface"
+      className="flex shrink-0 flex-col overflow-hidden border-t border-border-subtle bg-surface"
       style={{ height }}
     >
       <PanelHeader
@@ -272,7 +272,7 @@ function OperationStrip() {
   if (active.length === 0) return null;
 
   return (
-    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border bg-surface px-2.5">
+    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border-subtle bg-surface/80 px-2.5">
       {active.map((item) => {
         const pct =
           item.total > 0
@@ -295,7 +295,10 @@ function OperationStrip() {
             ? `${formatBytes(item.speedBps)}/s`
             : "—";
         return (
-          <div key={item.id} className="flex h-8 items-center gap-2 text-xs">
+          <div
+            key={item.id}
+            className="flex h-[var(--control-height-sm)] items-center gap-2 text-xs"
+          >
             <span
               className="min-w-0 shrink truncate"
               title={item.currentPath || item.label}

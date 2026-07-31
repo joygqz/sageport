@@ -131,7 +131,7 @@ export function TransferHistoryDialog({
           {t("sftp.history.title")}
         </DialogToolbar>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+        <div className="ui-dialog-body">
           {isLoading ? (
             <LoadingState label={t("common.loading")} fill />
           ) : isError ? (
@@ -145,11 +145,11 @@ export function TransferHistoryDialog({
             <EmptyState icon={History} title={t("sftp.history.empty")} fill />
           ) : (
             <ScrollArea className="min-h-0 flex-1">
-              <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+              <ul className="ui-divided-list flex flex-col">
                 {entries.map((entry) => (
                   <li
                     key={entry.id}
-                    className="group flex items-start gap-3 px-3 py-2.5"
+                    className="ui-list-row group flex items-start"
                   >
                     <ArrowRightLeft className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">

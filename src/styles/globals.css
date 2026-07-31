@@ -39,24 +39,51 @@
   --terminal-background: #12141f;
   --terminal-foreground: #e1e4ee;
 
-  --radius: 0.5rem;
+  --surface-raised: color-mix(in oklch, var(--card) 72%, var(--surface));
+  --surface-sunken: color-mix(in oklch, var(--background) 76%, var(--surface));
+  --border-subtle: color-mix(in oklch, var(--border) 68%, transparent);
+  --border-strong: color-mix(in oklch, var(--input) 78%, var(--border));
+
+  --radius: 0.375rem;
   --titlebar-height: 2.5rem;
   --workbench-bar-height: 2.75rem;
   --compact-toolbar-height: 2.25rem;
+  --workbench-tab-height: calc(var(--workbench-bar-height) - 0.5rem);
+  --compact-tab-height: calc(var(--compact-toolbar-height) - 0.5rem);
   --statusbar-height: 1.5rem;
-  --activitybar-width: 3.25rem;
+  --activitybar-width: 3rem;
   --panel-gutter: 0.5rem;
   --toolbar-control-size: 1.75rem;
+  --compact-control-size: 1.5rem;
+  --activity-control-size: 2.25rem;
   --control-height-sm: 2rem;
   --control-height: 2.25rem;
   --control-height-lg: 2.5rem;
+  --compact-row-height: 1.75rem;
+  --menu-row-height: 2.25rem;
+  --list-row-height: 2.5rem;
+  --settings-row-height: 3.5rem;
+  --empty-state-icon-size: 2.5rem;
+  --empty-state-padding: 2.5rem;
+  --dialog-padding: 1.25rem;
+  --card-padding: 1rem;
+  --panel-padding: 0.75rem;
+  --row-padding-x: 0.75rem;
+  --row-padding-y: 0.625rem;
+  --content-gap: 1rem;
+  --field-gap: 0.75rem;
+  --section-gap: 2rem;
+  --dialog-width-sm: 420px;
+  --dialog-width-md: 480px;
+  --dialog-width-lg: 560px;
+  --dialog-width-xl: 620px;
 
   --elevation-sm:
-    0 1px 2px color-mix(in oklch, var(--foreground) 8%, transparent),
-    0 4px 12px color-mix(in oklch, var(--foreground) 7%, transparent);
+    0 1px 2px color-mix(in oklch, var(--foreground) 7%, transparent),
+    0 6px 18px color-mix(in oklch, var(--foreground) 6%, transparent);
   --elevation-md:
-    0 2px 6px color-mix(in oklch, var(--foreground) 8%, transparent),
-    0 16px 40px color-mix(in oklch, var(--foreground) 14%, transparent);
+    0 2px 6px color-mix(in oklch, var(--foreground) 7%, transparent),
+    0 18px 48px color-mix(in oklch, var(--foreground) 12%, transparent);
 }
 
 .dark {
@@ -115,6 +142,10 @@
 
   --color-terminal-background: var(--terminal-background);
   --color-terminal-foreground: var(--terminal-foreground);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -156,7 +187,9 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     line-height: 1.5;
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow: hidden;
@@ -205,8 +238,8 @@
   }
 
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-thumb {
     background-color: color-mix(
@@ -215,7 +248,7 @@
       transparent
     );
     border-radius: 999px;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
@@ -264,6 +297,79 @@
 }
 
 @layer components {
+  .ui-surface-card {
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius);
+    background: var(--color-surface-raised);
+    box-shadow: inset 0 1px
+      color-mix(in oklch, var(--color-foreground) 3%, transparent);
+  }
+
+  .ui-muted-panel {
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius);
+    background: color-mix(
+      in oklch,
+      var(--color-muted) 42%,
+      var(--color-surface)
+    );
+  }
+
+  .ui-divided-list {
+    overflow: hidden;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius);
+    background: var(--color-surface-raised);
+  }
+
+  .ui-divided-list > * + * {
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .ui-dialog-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--content-gap);
+    padding: var(--dialog-padding);
+  }
+
+  .ui-dialog-footer {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: var(--panel-padding) var(--dialog-padding);
+  }
+
+  .ui-card-padding {
+    padding: var(--card-padding);
+  }
+
+  .ui-panel-padding {
+    padding: var(--panel-padding);
+  }
+
+  .ui-list-row {
+    min-height: var(--list-row-height);
+    gap: var(--field-gap);
+    padding: var(--row-padding-y) var(--row-padding-x);
+  }
+
+  .ui-content-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--content-gap);
+  }
+
+  .ui-section-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--section-gap);
+  }
+
   .ui-checkbox {
     appearance: none;
     display: inline-grid;

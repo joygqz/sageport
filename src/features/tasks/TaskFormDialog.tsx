@@ -58,7 +58,7 @@ export function TaskFormDialog({
     <FormDialog
       open={open}
       onClose={onClose}
-      width="w-[560px]"
+      width="w-[var(--dialog-width-lg)]"
       title={
         task
           ? t("tasks.editTitle")
@@ -92,14 +92,14 @@ export function TaskFormDialog({
 
 const PICKER_INTERACTIVE_CLASS = cn(
   INTERACTIVE_FOCUS_CLASS,
-  "rounded-lg border border-border bg-surface text-left transition-colors hover:border-ring/60 hover:bg-list-hover",
+  "rounded-lg border border-border-subtle bg-surface-raised text-left shadow-sm transition-colors hover:border-ring/60 hover:bg-list-hover",
 );
 
 function TemplatePicker({ onPick }: { onPick: (draft: TaskDraft) => void }) {
   const { t } = useI18n();
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto p-4">
+    <div className="ui-dialog-body overflow-y-auto">
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
@@ -111,7 +111,7 @@ function TemplatePicker({ onPick }: { onPick: (draft: TaskDraft) => void }) {
           )}
         >
           <div className="flex items-center gap-2">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 text-link">
+            <span className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 text-link">
               <Plus className="size-3.5" />
             </span>
           </div>
@@ -141,7 +141,7 @@ function TemplatePicker({ onPick }: { onPick: (draft: TaskDraft) => void }) {
               )}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                <span className="flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
                   <Icon className="size-3.5" strokeWidth={1.7} />
                 </span>
                 <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
@@ -358,7 +358,7 @@ function StepsSection({
       </div>
 
       {steps.length > 0 && (
-        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+        <div className="ui-divided-list">
           {steps.map((step, index) => (
             <TaskStepCard
               key={index}

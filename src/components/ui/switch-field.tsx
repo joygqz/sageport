@@ -86,7 +86,7 @@ export const SwitchField = React.forwardRef<
         <div
           onClick={toggleFromCard}
           className={cn(
-            "flex min-h-[var(--control-height)] items-center justify-between gap-4 rounded-lg bg-muted/35 px-3 text-foreground transition-colors focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/60 hover:bg-muted/55",
+            "flex min-h-[var(--control-height)] items-center justify-between gap-[var(--content-gap)] rounded-md border border-border-subtle bg-surface-raised px-3 text-foreground transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/35 hover:bg-accent/45",
             description ? "py-2.5" : "h-[var(--control-height)]",
             disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
             controlClassName,

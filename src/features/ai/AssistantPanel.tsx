@@ -336,7 +336,7 @@ export function AssistantPanel({ width }: { width: number }) {
             onScroll={onLogScroll}
             className="flex-1 overflow-y-auto"
           >
-            <div className="flex min-h-full flex-col gap-4 px-3 py-4">
+            <div className="flex min-h-full flex-col gap-[var(--content-gap)] px-3 py-4">
               {log.length === 0 ? (
                 <div className="my-auto w-full max-w-md self-center py-8">
                   <div className="mb-2 flex items-center gap-1.5 px-1 text-muted-foreground">
@@ -345,7 +345,7 @@ export function AssistantPanel({ width }: { width: number }) {
                       {t("ai.empty.title")}
                     </h3>
                   </div>
-                  <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/70 bg-muted/20">
+                  <div className="ui-divided-list">
                     {SUGGESTIONS.map((suggestion) => (
                       <button
                         key={suggestion}
@@ -353,7 +353,7 @@ export function AssistantPanel({ width }: { width: number }) {
                         disabled={pending || !model}
                         onClick={() => void sendPrompt(t(suggestion))}
                         className={cn(
-                          "group flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs leading-normal text-foreground/75 transition-colors hover:bg-list-hover hover:text-foreground disabled:opacity-50",
+                          "ui-list-row group flex w-full items-center text-left text-xs leading-normal text-foreground/75 transition-colors hover:bg-list-hover hover:text-foreground disabled:opacity-50",
                           INTERACTIVE_FOCUS_CLASS,
                         )}
                       >
@@ -382,7 +382,7 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
 
           <div className="shrink-0 px-3 pb-3 pt-2">
-            <div className="overflow-hidden rounded-xl border border-input bg-surface transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/40">
+            <div className="overflow-hidden rounded-lg border border-border-strong bg-surface-raised shadow-sm transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/35">
               <Textarea
                 ref={inputRef}
                 rows={1}
@@ -410,7 +410,7 @@ export function AssistantPanel({ width }: { width: number }) {
                   title={t("ai.modelLabel")}
                   disabled={models.length === 0}
                   showChevron={false}
-                  className="h-7 w-auto min-w-0 max-w-[70%] border-0 bg-transparent px-2 text-xs hover:bg-accent focus-visible:ring-0"
+                  className="h-[var(--toolbar-control-size)] w-auto min-w-0 max-w-[70%] border-0 bg-transparent px-2 text-xs shadow-none hover:bg-accent focus-visible:ring-0"
                 />
                 <div className="ml-auto flex items-center gap-1.5">
                   {pending ? (
@@ -418,7 +418,7 @@ export function AssistantPanel({ width }: { width: number }) {
                       <Button
                         size="icon"
                         variant="secondary"
-                        className="size-7 shrink-0"
+                        className="size-[var(--toolbar-control-size)] shrink-0"
                         aria-label={t("ai.stop")}
                         onClick={() => activeId && stop(activeId)}
                       >
@@ -428,7 +428,7 @@ export function AssistantPanel({ width }: { width: number }) {
                   ) : (
                     <Button
                       size="icon"
-                      className="size-7 shrink-0"
+                      className="size-[var(--toolbar-control-size)] shrink-0"
                       aria-label={t("ai.send")}
                       disabled={!input.trim() || !model}
                       onClick={() => void submit()}
@@ -470,14 +470,14 @@ function ContinueRun({
   const { t } = useI18n();
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md bg-muted/45 px-2.5 py-2">
+    <div className="ui-muted-panel flex items-center justify-between gap-3 px-2.5 py-2">
       <span className="min-w-0 truncate text-xs text-muted-foreground">
         {t("ai.stepLimitReached")}
       </span>
       <Button
         size="sm"
         variant="secondary"
-        className="h-7 shrink-0"
+        className="h-[var(--toolbar-control-size)] shrink-0"
         disabled={disabled}
         onClick={onContinue}
       >
@@ -520,7 +520,7 @@ function Bubble({
 }) {
   if (role === "user") {
     return (
-      <div className="ml-auto max-w-[88%] rounded-xl rounded-br-sm bg-muted px-3 py-2">
+      <div className="ml-auto max-w-[88%] rounded-lg rounded-br-sm border border-border-subtle bg-muted/70 px-3 py-2">
         <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
           {content}
         </p>
@@ -670,7 +670,7 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-terminal-background">
+    <div className="overflow-hidden rounded-lg border border-border-subtle bg-terminal-background">
       <div className="flex items-center justify-between border-b border-border px-2 py-1">
         <span className="text-2xs font-medium text-muted-foreground">
           {t("ai.commandLabel")}
@@ -680,7 +680,7 @@ function CodeBlock({ code }: { code: string }) {
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className="size-[var(--compact-control-size)]"
               aria-label={t("snippets.run")}
               onClick={run}
             >
@@ -691,7 +691,7 @@ function CodeBlock({ code }: { code: string }) {
             <Button
               size="icon"
               variant="ghost"
-              className="size-6"
+              className="size-[var(--compact-control-size)]"
               aria-label={copied ? t("common.copied") : t("common.copy")}
               onClick={copy}
             >

@@ -43,7 +43,11 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
     <DropdownMenu>
       <Tooltip content={t("sftp.bookmarks.title")}>
         <DropdownMenuTrigger asChild>
-          <Button size="icon" variant="ghost" className="size-6">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-[var(--compact-control-size)]"
+          >
             <Bookmark
               className="size-3.5"
               fill={current ? "currentColor" : "none"}

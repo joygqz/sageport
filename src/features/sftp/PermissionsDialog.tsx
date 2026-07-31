@@ -41,7 +41,7 @@ export function PermissionsDialog({
     <FormDialog
       open={Boolean(entry)}
       onClose={onClose}
-      width="w-[420px]"
+      width="w-[var(--dialog-width-sm)]"
       title={entry ? t("sftp.permissions.title", { name: entry.name }) : ""}
     >
       {entry && (

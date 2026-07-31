@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { SectionHeader } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-export const SETTINGS_GROUP_STACK_CLASS = "flex flex-col gap-7";
+export const SETTINGS_GROUP_STACK_CLASS = "ui-section-stack";
 
 export function SettingsGroup({
   title,
@@ -21,13 +21,15 @@ export function SettingsGroup({
   contentClassName?: string;
 }) {
   return (
-    <section className={cn("flex flex-col gap-3", className)}>
+    <section className={cn("flex flex-col gap-[var(--field-gap)]", className)}>
       <SectionHeader
         title={title}
         description={description}
         actions={actions}
       />
-      <div className={cn("flex flex-col gap-3", contentClassName)}>
+      <div
+        className={cn("flex flex-col gap-[var(--field-gap)]", contentClassName)}
+      >
         {children}
       </div>
     </section>

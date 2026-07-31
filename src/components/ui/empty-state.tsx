@@ -24,7 +24,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-2.5 px-4 py-8 text-center",
+        "flex flex-col items-center justify-center gap-[var(--field-gap)] px-[var(--dialog-padding)] py-[var(--empty-state-padding)] text-center",
         fill && "flex-1",
         className,
       )}
@@ -32,17 +32,17 @@ export function EmptyState({
       {Icon && (
         <div
           className={cn(
-            "flex size-8 items-center justify-center text-muted-foreground",
+            "flex size-[var(--empty-state-icon-size)] items-center justify-center rounded-lg border border-border-subtle bg-muted/35 text-muted-foreground",
             iconClassName,
           )}
         >
-          <Icon className="size-5" strokeWidth={1.7} />
+          <Icon className="size-5" strokeWidth={1.65} />
         </div>
       )}
-      <div className="space-y-0.5">
+      <div className="space-y-1">
         <p className="text-sm font-medium text-foreground">{title}</p>
         {description && (
-          <p className="mx-auto max-w-xs text-xs leading-normal text-muted-foreground">
+          <p className="mx-auto max-w-xs text-xs leading-relaxed text-muted-foreground">
             {description}
           </p>
         )}
@@ -65,7 +65,7 @@ export function LoadingState({
     <div
       role="status"
       className={cn(
-        "flex items-center justify-center gap-2 px-4 py-8 text-sm text-muted-foreground",
+        "flex items-center justify-center gap-2 px-[var(--dialog-padding)] py-[var(--empty-state-padding)] text-sm text-muted-foreground",
         fill && "flex-1",
         className,
       )}

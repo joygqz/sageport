@@ -24,7 +24,7 @@ export function SegmentedControl<T extends string>({
       value={value}
       onValueChange={(next) => onChange(next as T)}
       className={cn(
-        "grid w-full auto-cols-fr grid-flow-col gap-0.5 rounded-lg bg-muted/55 p-0.5",
+        "grid w-full auto-cols-fr grid-flow-col gap-0.5 rounded-md border border-border-subtle bg-surface-sunken p-0.5",
         className,
       )}
       {...props}
@@ -34,9 +34,9 @@ export function SegmentedControl<T extends string>({
           key={option.value}
           value={option.value}
           className={cn(
-            "min-h-7 rounded-md px-3 py-1 text-sm outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60",
+            "min-h-[var(--toolbar-control-size)] rounded-sm px-3 py-1 text-sm outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
             "text-muted-foreground hover:bg-list-hover hover:text-foreground",
-            "data-[state=checked]:bg-list-active data-[state=checked]:font-medium data-[state=checked]:text-list-active-foreground",
+            "data-[state=checked]:bg-surface-raised data-[state=checked]:font-medium data-[state=checked]:text-foreground data-[state=checked]:shadow-sm",
           )}
         >
           {option.label}

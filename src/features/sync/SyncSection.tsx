@@ -127,8 +127,8 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
     : null;
 
   return (
-    <div className="overflow-hidden rounded-md bg-muted/30">
-      <div className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+    <div className="ui-surface-card overflow-hidden">
+      <div className="ui-list-row flex flex-wrap items-center">
         <Icon className="size-6 shrink-0 text-foreground" />
         <div className="flex min-w-0 flex-1 basis-64 flex-col gap-0.5">
           <span className="text-sm font-semibold text-foreground">
@@ -150,7 +150,7 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
         <Badge variant="primary">{t("settings.sync.connected.badge")}</Badge>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-border/50 px-3 py-2.5">
+      <div className="ui-list-row flex flex-wrap border-t border-border-subtle bg-surface/35">
         <Button variant="outline" onClick={doPush} loading={push.isPending}>
           {t("settings.sync.connected.pushButton")}
         </Button>
@@ -183,7 +183,7 @@ function VersionsCard() {
   const [target, setTarget] = useState<SyncVersion | null>(null);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="ui-content-stack">
       <SectionHeader
         title={t("settings.sync.versions.title")}
         description={t("settings.sync.versions.description")}
@@ -192,7 +192,7 @@ function VersionsCard() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-8"
+              className="size-[var(--control-height-sm)]"
               onClick={() => void refetch()}
               disabled={isFetching}
               aria-label={t("settings.sync.versions.refreshButton")}
@@ -226,11 +226,11 @@ function VersionsCard() {
       )}
 
       {!!versions?.length && (
-        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+        <ul className="ui-divided-list flex flex-col">
           {versions.map((v, idx) => (
             <li
               key={v.id}
-              className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"
+              className="ui-list-row flex flex-wrap items-center justify-between"
             >
               <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
                 <div className="flex items-center gap-2">

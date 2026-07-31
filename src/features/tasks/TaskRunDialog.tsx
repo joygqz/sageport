@@ -39,7 +39,7 @@ export function TaskRunDialog({
     <FormDialog
       open={Boolean(task)}
       onClose={onClose}
-      width="w-[620px]"
+      width="w-[var(--dialog-width-xl)]"
       title={t("tasks.run.title")}
     >
       {task && <RunBody task={task} onClose={onClose} />}
@@ -107,7 +107,7 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex flex-col gap-3 overflow-y-auto p-4">
+      <div className="ui-dialog-body overflow-y-auto">
         <div className="flex min-w-0 flex-col gap-1.5">
           <h3 className="truncate text-base font-semibold leading-tight">
             {task.name}
@@ -151,7 +151,7 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
                 {stepList.length}
               </span>
             </div>
-            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+            <div className="ui-divided-list">
               {stepList.map((step, index) => (
                 <StepRow
                   key={index}
@@ -165,7 +165,7 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-t border-border bg-surface/20 px-4 py-3">
+      <div className="ui-dialog-footer border-t border-border-subtle bg-surface/55">
         <RunSummary run={run} />
         <Button variant="ghost" onClick={onClose}>
           {t("common.close")}

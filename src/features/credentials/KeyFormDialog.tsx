@@ -49,7 +49,7 @@ export function KeyFormDialog({
     <FormDialog
       open={isOpen}
       onClose={onClose}
-      width="w-[520px]"
+      width="w-[var(--dialog-width-lg)]"
       title={
         sshKey
           ? t("credentials.keys.editTitle")

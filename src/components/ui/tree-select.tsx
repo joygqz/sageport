@@ -93,7 +93,7 @@ export function TreeSelect({
         onBlur={onBlur}
         className={cn(
           CONTROL_BASE_CLASS,
-          "flex h-[var(--control-height)] items-center justify-between gap-2 px-3 text-sm",
+          "flex h-[var(--control-height)] items-center justify-between gap-2 px-3 text-sm data-[state=open]:border-ring data-[state=open]:ring-2 data-[state=open]:ring-ring/35",
           className,
         )}
       >

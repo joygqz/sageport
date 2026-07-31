@@ -517,7 +517,7 @@ function StatusOverlay({
         pane={pane}
         target={target}
         icon={
-          <span className="flex size-9 items-center justify-center rounded-full bg-primary/15 text-link">
+          <span className="flex size-[var(--activity-control-size)] items-center justify-center rounded-full bg-primary/15 text-link">
             <PlugZap className="size-4" strokeWidth={1.8} />
           </span>
         }
@@ -548,7 +548,7 @@ function StatusOverlay({
         target={target}
         role="alert"
         icon={
-          <span className="flex size-9 items-center justify-center rounded-full bg-danger/10 text-danger">
+          <span className="flex size-[var(--activity-control-size)] items-center justify-center rounded-full bg-danger/10 text-danger">
             <ServerCrash className="size-4" strokeWidth={1.8} />
           </span>
         }
@@ -585,7 +585,7 @@ function StatusOverlay({
         pane={pane}
         target={target}
         icon={
-          <span className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <span className="flex size-[var(--activity-control-size)] items-center justify-center rounded-full bg-muted text-muted-foreground">
             <PlugZap className="size-4" strokeWidth={1.8} />
           </span>
         }

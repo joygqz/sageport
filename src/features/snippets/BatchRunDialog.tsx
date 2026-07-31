@@ -51,7 +51,7 @@ export function BatchRunDialog({
     <FormDialog
       open={open}
       onClose={onClose}
-      width="w-[620px]"
+      width="w-[var(--dialog-width-xl)]"
       title={t("snippets.batch.title")}
     >
       <BatchBody initialCommand={initialCommand} onClose={onClose} />
@@ -148,7 +148,7 @@ function BatchBody({
   const resultEntries = Object.entries(results);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+    <div className="ui-dialog-body overflow-y-auto">
       <Field label={t("snippets.batch.command")}>
         <Textarea
           rows={2}
@@ -178,7 +178,7 @@ function BatchBody({
             hosts.map((host) => (
               <label
                 key={host.id}
-                className="flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-list-hover"
+                className="ui-list-row flex cursor-pointer items-center justify-between text-sm hover:bg-list-hover"
               >
                 <span className="truncate">{host.label}</span>
                 <Switch
@@ -221,7 +221,7 @@ function ResultRow({ name, result }: { name: string; result: Result }) {
   const body = result.output ?? result.message ?? "";
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+    <div className="ui-surface-card overflow-hidden">
       <button
         type="button"
         onClick={() => body && setOpen((o) => !o)}

@@ -239,7 +239,7 @@ function ThemeFamilyCard({
     <RadioGroupItem
       value={family.id}
       className={cn(
-        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left transition-[border-color,box-shadow]",
+        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-surface-raised text-left shadow-sm transition-[border-color,box-shadow]",
         CONTROL_FOCUS_CLASS,
         active ? "border-primary ring-2 ring-primary/25" : CONTROL_BORDER_CLASS,
       )}
@@ -249,7 +249,7 @@ function ThemeFamilyCard({
           <ThemePreview key={appearance} theme={family.themes[appearance]} />
         ))}
       </div>
-      <div className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5">
+      <div className="ui-list-row flex w-full items-center border-t border-border-subtle">
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold text-card-foreground">
             {family.name}

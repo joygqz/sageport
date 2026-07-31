@@ -20,7 +20,7 @@ export function SnippetFormDialog({
     <FormDialog
       open={open}
       onClose={onClose}
-      width="w-[480px]"
+      width="w-[var(--dialog-width-md)]"
       title={snippet ? t("snippets.editTitle") : t("snippets.newTitle")}
     >
       <SnippetFormBody
