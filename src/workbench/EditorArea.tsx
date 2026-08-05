@@ -259,6 +259,7 @@ export const EditorArea = memo(function EditorArea() {
             },
             {
               label: t("common.save"),
+              loading: pendingTab.saving,
               onSelect: async () => {
                 if (!(await saveFile(pendingTab.id))) return false;
                 close(pendingTab.id, { force: true });

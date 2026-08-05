@@ -152,14 +152,13 @@ pub async fn remote_write(
         file.shutdown().await?;
         if let Some(permissions) = permissions {
             session
-                .set_metadata(
-                    &temp,
-                    Metadata {
-                        permissions: Some(permissions),
-                        ..Metadata::default()
-                    },
-                )
+                .set_metadata(&temp, permission_metadata(permissions))
                 .await?;
+        }
+        if remote_read(session, &temp).await? != data {
+            return Err(crate::error::AppError::Other(
+                "SFTP write verification failed; the original file was not replaced".into(),
+            ));
         }
         Ok::<(), crate::error::AppError>(())
     }
@@ -191,6 +190,13 @@ fn edit_conflict_error() -> crate::error::AppError {
     crate::error::AppError::Conflict(
         "file changed since it was opened; reload it before saving".into(),
     )
+}
+
+fn permission_metadata(permissions: u32) -> Metadata {
+    Metadata {
+        permissions: Some(permissions),
+        ..Metadata::empty()
+    }
 }
 
 pub fn local_read(path: &str) -> AppResult<Vec<u8>> {
@@ -256,16 +262,7 @@ pub fn local_write(path: &str, data: &[u8], expected: Option<&[u8]>) -> AppResul
 pub async fn remote_chmod(session: &SftpSession, path: &str, mode: u32) -> AppResult<()> {
     let current = session.metadata(path).await?;
     let type_bits = current.permissions.unwrap_or(0) & 0o170000;
-    let meta = Metadata {
-        size: None,
-        uid: None,
-        user: None,
-        gid: None,
-        group: None,
-        permissions: Some(type_bits | (mode & 0o7777)),
-        atime: None,
-        mtime: None,
-    };
+    let meta = permission_metadata(type_bits | (mode & 0o7777));
     session.set_metadata(path, meta).await?;
     Ok(())
 }
@@ -389,10 +386,24 @@ pub fn local_size(path: &Path) -> AppResult<u64> {
 
 #[cfg(all(test, unix))]
 mod tests {
-    use super::{local_list, local_read, local_remove, local_size, local_write};
+    use super::{
+        local_list, local_read, local_remove, local_size, local_write, permission_metadata,
+    };
     use crate::error::AppError;
     use std::fs;
     use std::os::unix::fs::symlink;
+
+    #[test]
+    fn permission_metadata_omits_destructive_attributes() {
+        let metadata = permission_metadata(0o100640);
+
+        assert_eq!(metadata.permissions, Some(0o100640));
+        assert_eq!(metadata.size, None);
+        assert_eq!(metadata.uid, None);
+        assert_eq!(metadata.gid, None);
+        assert_eq!(metadata.atime, None);
+        assert_eq!(metadata.mtime, None);
+    }
 
     #[test]
     fn directory_symlinks_are_browsable_but_delete_does_not_follow_them() {
