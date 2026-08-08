@@ -6,6 +6,7 @@ import { IS_MACOS } from "@/lib/platform";
 import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
+import { copyActivePane, pasteActivePane } from "./commands";
 import { useZoomStore } from "./zoom";
 import { findKeybinding, type KeybindingId } from "./keybinding-registry";
 import { useKeybindingStore } from "./keybinding-store";
@@ -69,6 +70,10 @@ function runKeybinding(id: KeybindingId): void {
     if (active?.kind === "terminal") {
       useTerminalSearch.getState().open(active.activePaneId);
     }
+  } else if (id === "terminal.copy") {
+    copyActivePane();
+  } else if (id === "terminal.paste") {
+    pasteActivePane();
   } else if (id === "view.zoomIn") {
     useZoomStore.getState().zoomIn();
   } else if (id === "view.zoomOut") {

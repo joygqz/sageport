@@ -215,6 +215,8 @@ export const en = {
       focusPreviousPane: "Focus previous terminal pane",
       focusNextPane: "Focus next terminal pane",
       search: "Find in terminal",
+      copy: "Copy terminal selection",
+      paste: "Paste into terminal",
     },
     palette: {
       quick: "Open quick connect",
