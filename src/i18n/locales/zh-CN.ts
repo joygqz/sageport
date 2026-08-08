@@ -211,6 +211,8 @@ export const zhCN: Dictionary = {
       focusPreviousPane: "聚焦上一个终端窗格",
       focusNextPane: "聚焦下一个终端窗格",
       search: "在终端中查找",
+      copy: "复制终端选区",
+      paste: "粘贴到终端",
     },
     palette: {
       quick: "打开快速连接",

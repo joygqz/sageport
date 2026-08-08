@@ -1,7 +1,11 @@
 import { useMemo } from "react";
 
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+
 import { useI18n, type TKey } from "@/i18n";
 import { useBroadcastStore } from "@/features/terminal/broadcast";
+import { pasteIntoTerminal } from "@/features/terminal/paste";
+import { getSession } from "@/features/terminal/sessions";
 import { THEMES } from "@/themes";
 import { useTheme } from "@/themes/useTheme";
 import { useLayoutStore, type Activity } from "./layout";
@@ -12,7 +16,7 @@ import {
 } from "./keybinding-registry";
 import { useKeybindingStore } from "./keybinding-store";
 import { useOverlayStore } from "./overlays";
-import { useTabsStore } from "./tabs";
+import { activePane, useTabsStore, type TerminalPane } from "./tabs";
 
 export interface WorkbenchCommand {
   id: string;
@@ -37,6 +41,29 @@ function showActivity(activity: Activity) {
   if (layout.activity !== activity || !layout.sidebarVisible) {
     layout.selectActivity(activity);
   }
+}
+
+function activeTerminalPane(): TerminalPane | undefined {
+  const state = useTabsStore.getState();
+  const active = state.tabs.find((tab) => tab.id === state.activeId);
+  if (active?.kind !== "terminal") return;
+  return activePane(active);
+}
+
+export function copyActivePane(): void {
+  const pane = activeTerminalPane();
+  if (!pane) return;
+  const term = getSession(pane.id)?.term;
+  if (!term?.hasSelection()) return;
+  void writeText(term.getSelection());
+}
+
+export function pasteActivePane(): void {
+  const pane = activeTerminalPane();
+  if (!pane) return;
+  const session = getSession(pane.id);
+  if (!session) return;
+  void pasteIntoTerminal(session.term, { images: pane.target === "local" });
 }
 
 function commandShortcut(
@@ -110,6 +137,20 @@ export function useCommands(): WorkbenchCommand[] {
           keybindingOverrides,
         ),
         run: () => useTabsStore.getState().focusPaneNext(1),
+      },
+      {
+        id: "terminal.copy",
+        categoryKey: "commands.category.terminal",
+        label: t("commands.terminal.copy"),
+        shortcut: commandShortcut("terminal.copy", keybindingOverrides),
+        run: () => copyActivePane(),
+      },
+      {
+        id: "terminal.paste",
+        categoryKey: "commands.category.terminal",
+        label: t("commands.terminal.paste"),
+        shortcut: commandShortcut("terminal.paste", keybindingOverrides),
+        run: () => pasteActivePane(),
       },
       {
         id: "view.toggleSidebar",

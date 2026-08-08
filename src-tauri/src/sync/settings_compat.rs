@@ -104,6 +104,8 @@ fn is_keybinding_id(value: &str) -> bool {
             | "terminal.focusPreviousPane"
             | "terminal.focusNextPane"
             | "terminal.search"
+            | "terminal.copy"
+            | "terminal.paste"
             | "view.toggleSidebar"
             | "view.togglePanel"
             | "view.toggleAssistant"
@@ -257,6 +259,11 @@ mod tests {
         assert!(sanitize(&setting(
             "general.keybindings",
             r#"{"view.toggleSidebar":null,"terminal.search":"mod+shift+f"}"#
+        ))
+        .is_some());
+        assert!(sanitize(&setting(
+            "general.keybindings",
+            r#"{"terminal.copy":"ctrl+shift+c","terminal.paste":"ctrl+shift+v"}"#
         ))
         .is_some());
         assert!(sanitize(&setting("ai.protocol", "anthropic")).is_some());
