@@ -19,6 +19,8 @@ export type KeybindingId =
   | "terminal.focusPreviousPane"
   | "terminal.focusNextPane"
   | "terminal.search"
+  | "terminal.copy"
+  | "terminal.paste"
   | "view.toggleSidebar"
   | "view.togglePanel"
   | "view.toggleAssistant"
@@ -113,6 +115,18 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     categoryKey: "commands.category.terminal",
     labelKey: "commands.terminal.search",
     defaultBindings: ["mod+f"],
+  },
+  {
+    id: "terminal.copy",
+    categoryKey: "commands.category.terminal",
+    labelKey: "commands.terminal.copy",
+    defaultBindings: ["ctrl+shift+c"],
+  },
+  {
+    id: "terminal.paste",
+    categoryKey: "commands.category.terminal",
+    labelKey: "commands.terminal.paste",
+    defaultBindings: ["ctrl+shift+v"],
   },
   {
     id: "view.toggleSidebar",
