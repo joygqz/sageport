@@ -308,7 +308,9 @@ export const useTabsStore = create<TabsState>((set, get) => {
         (active && isTerminal(active)
           ? active.activePaneId
           : closestPaneId(tabs, index));
-      return { tabs, activeId, lastPaneId };
+      const pendingCloseId =
+        s.pendingCloseId === tab.id ? null : s.pendingCloseId;
+      return { tabs, activeId, lastPaneId, pendingCloseId };
     });
   };
 
@@ -536,7 +538,9 @@ export const useTabsStore = create<TabsState>((set, get) => {
         const current = get().tabs.find(
           (item): item is FileTab => item.id === id && item.kind === "file",
         );
-        return Boolean(current && !isFileDirty(current));
+        if (!current || isFileDirty(current)) return false;
+        if (get().pendingCloseId === id) closeTab(current, { force: true });
+        return true;
       } catch (err) {
         patchFile(id, { saving: false });
         toast.error(t("sftp.editor.saveError"), errorMessage(err));

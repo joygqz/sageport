@@ -430,6 +430,37 @@ describe("saveFile", () => {
     expect(current.content).toBe("second edit");
     expect(isFileDirty(current)).toBe(true);
   });
+
+  it("closes a pending tab when an in-flight save succeeds", async () => {
+    let finish: (() => void) | undefined;
+    vi.mocked(ipc.sftp.writeText).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const tab: FileTab = {
+      kind: "file",
+      id: "file",
+      connectionId: null,
+      path: "/tmp/file",
+      title: "file",
+      content: "changed",
+      savedContent: "old",
+      saving: false,
+    };
+    useTabsStore.setState({ tabs: [tab], activeId: tab.id });
+
+    const saving = useTabsStore.getState().saveFile(tab.id);
+    useTabsStore.getState().close(tab.id);
+    expect(useTabsStore.getState().pendingCloseId).toBe(tab.id);
+
+    finish?.();
+
+    await expect(saving).resolves.toBe(true);
+    expect(useTabsStore.getState().tabs).toHaveLength(0);
+    expect(useTabsStore.getState().pendingCloseId).toBeNull();
+  });
 });
 
 describe("activateNext", () => {
