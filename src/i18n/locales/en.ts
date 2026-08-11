@@ -1119,6 +1119,19 @@ export const en = {
         zoomOut: "Zoom out",
         zoomReset: "Reset zoom",
       },
+      highlights: {
+        title: "Output highlights",
+        description:
+          "Highlight matching text in visible terminal output. Rules do not change the data received from the server.",
+        add: "Add highlight",
+        empty: "Add a rule to make important terminal output easier to spot.",
+        pattern: "Text to match",
+        textColor: "Text color",
+        backgroundColor: "Background",
+        caseSensitive: "Match case",
+        enabled: "Enable highlight",
+        remove: "Remove highlight",
+      },
     },
     keybindings: {
       search: "Search shortcuts",

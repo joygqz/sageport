@@ -19,6 +19,8 @@ import {
 } from "@/workbench/keybinding-store";
 import { serializeKeybindingOverrides } from "@/workbench/keybinding-registry";
 import { useZoomStore } from "@/workbench/zoom";
+import { useHighlightStore } from "@/features/terminal/highlight-state";
+import { HIGHLIGHT_RULES_SYNC_KEY } from "@/features/terminal/highlight-rules";
 import { SettingsGroup } from "./SettingsGroup";
 import {
   createJsonSettingsDocument,
@@ -54,6 +56,7 @@ export function JsonSettingsSection() {
   const fontFamily = useFontStore((state) => state.family);
   const zoomLevel = useZoomStore((state) => state.level);
   const keybindings = useKeybindingStore((state) => state.overrides);
+  const highlightRules = useHighlightStore((state) => state.rules);
   const ai = useAiConfig();
   const apiKey = useAiApiKey(Boolean(ai.data?.hasApiKey));
 
@@ -79,6 +82,7 @@ export function JsonSettingsSection() {
     fontFamily,
     zoomLevel,
     keybindings,
+    highlightRules,
     ai: ai.data,
     apiKey: apiKey.data ?? "",
   });
@@ -101,6 +105,9 @@ function JsonSettingsForm({
   const setZoomLevel = useZoomStore((state) => state.setLevel);
   const replaceKeybindings = useKeybindingStore(
     (state) => state.replaceOverrides,
+  );
+  const replaceHighlightRules = useHighlightStore(
+    (state) => state.replaceRules,
   );
   const initialText = stringifyJsonSettings(initialDocument);
   const [savedText, setSavedText] = useState(initialText);
@@ -128,6 +135,7 @@ function JsonSettingsForm({
         fontFamily: next["general.fontFamily"],
         zoomLevel: next["general.zoomLevel"],
         keybindings: next["general.keybindings"],
+        highlightRules: next["general.highlightRules"],
         protocol: next["ai.protocol"],
         baseUrl: next["ai.base_url"],
         apiKey: next["ai.api_key"],
@@ -145,6 +153,10 @@ function JsonSettingsForm({
         KEYBINDINGS_SYNC_KEY,
         serializeKeybindingOverrides(next["general.keybindings"]),
       );
+      cacheSettingValue(
+        HIGHLIGHT_RULES_SYNC_KEY,
+        JSON.stringify(next["general.highlightRules"]),
+      );
       clearModelLimitsCache();
       void queryClient.invalidateQueries({ queryKey: ["ai"] });
 
@@ -161,6 +173,7 @@ function JsonSettingsForm({
       setFontFamily(next["general.fontFamily"]);
       setZoomLevel(next["general.zoomLevel"]);
       replaceKeybindings(next["general.keybindings"]);
+      replaceHighlightRules(next["general.highlightRules"]);
 
       const formatted = stringifyJsonSettings(
         createJsonSettingsDocument(next, defaults),

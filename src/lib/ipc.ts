@@ -1,6 +1,8 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
+import type { HighlightRule } from "@/features/terminal/highlight-rules";
+
 import type {
   AiChatMessage,
   AiChatResult,
@@ -193,6 +195,7 @@ export const ipc = {
       fontFamily: string;
       zoomLevel: number;
       keybindings: Record<string, string | null>;
+      highlightRules: HighlightRule[];
       protocol: AiProtocol;
       baseUrl: string;
       apiKey: string;

@@ -11,6 +11,8 @@ import { attachImagePaste } from "./paste";
 import { hasPasswordPrompt, usePasswordPromptStore } from "./password-prompt";
 import type { TerminalStatusUpdate, TerminalTransport } from "./transport";
 import { attachWebglRenderer, createTerminal } from "./xterm";
+import { HighlightAddon } from "./highlight-addon";
+import type { HighlightRule } from "./highlight-rules";
 
 export const CONNECT_TIMEOUT_MS = 45_000;
 export const MAX_PENDING_INPUT_BYTES = 1024 * 1024;
@@ -31,6 +33,7 @@ export interface TerminalSessionOptions {
   theme: ITheme;
   watchHostKey: boolean;
   imagePaste: boolean;
+  highlightRules?: HighlightRule[];
   onStatus: (event: SessionStatusEvent) => void;
   onUserInput?: (data: string) => void;
   onDispose?: () => void;
@@ -44,6 +47,7 @@ export class TerminalSession {
 
   private readonly fit: FitAddon;
   private readonly transport: TerminalTransport;
+  private readonly highlights: HighlightAddon;
   private readonly opts: TerminalSessionOptions;
   private readonly disposables: Array<() => void> = [];
 
@@ -80,6 +84,8 @@ export class TerminalSession {
     this.term = term;
     this.fit = fit;
     this.search = search;
+    this.highlights = new HighlightAddon(opts.highlightRules ?? []);
+    this.term.loadAddon(this.highlights);
     this.commands = new CommandTracker(term);
 
     const dataSub = term.onData((data) => {
@@ -229,6 +235,10 @@ export class TerminalSession {
 
   setTheme(theme: ITheme) {
     this.term.options.theme = theme;
+  }
+
+  setHighlightRules(rules: HighlightRule[]) {
+    this.highlights.setRules(rules);
   }
 
   readContext(maxLines = 60): string | undefined {

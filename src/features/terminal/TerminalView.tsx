@@ -10,6 +10,7 @@ import {
 } from "@/workbench/tabs";
 import { monoFontFamily } from "@/workbench/font";
 import { terminalFontSize } from "@/workbench/zoom";
+import { useHighlightStore } from "./highlight-state";
 import { createAutocomplete } from "./autocomplete/controller";
 import { broadcastTargets, useBroadcastStore } from "./broadcast";
 import { useHostKeyStore } from "./host-key";
@@ -99,6 +100,7 @@ export function TerminalView({
       theme: terminalTheme(themeRef.current),
       watchHostKey: isSshLike,
       imagePaste: isLocal,
+      highlightRules: useHighlightStore.getState().rules,
       onStatus: (e) => {
         if (isSshLike) {
           if (e.status === "connected") {

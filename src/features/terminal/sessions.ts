@@ -1,4 +1,5 @@
 import type { TerminalSession } from "./session";
+import type { HighlightRule } from "./highlight-rules";
 
 const sessions = new Map<string, TerminalSession>();
 
@@ -32,6 +33,10 @@ export function applyTerminalFontSize(size: number) {
 
 export function applyTerminalFontFamily(family: string) {
   for (const session of sessions.values()) session.setFontFamily(family);
+}
+
+export function applyTerminalHighlightRules(rules: HighlightRule[]) {
+  for (const session of sessions.values()) session.setHighlightRules(rules);
 }
 
 export function readTerminalContext(

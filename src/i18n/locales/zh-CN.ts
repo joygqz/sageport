@@ -1094,6 +1094,18 @@ export const zhCN: Dictionary = {
         zoomOut: "缩小",
         zoomReset: "重置缩放",
       },
+      highlights: {
+        title: "输出高亮",
+        description: "高亮终端可见输出中的匹配文本，不会修改服务器返回的数据。",
+        add: "添加高亮",
+        empty: "添加规则，让重要的终端输出更醒目。",
+        pattern: "匹配文本",
+        textColor: "文字颜色",
+        backgroundColor: "背景颜色",
+        caseSensitive: "区分大小写",
+        enabled: "启用高亮",
+        remove: "移除高亮",
+      },
     },
     keybindings: {
       search: "搜索快捷键",

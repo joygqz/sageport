@@ -34,6 +34,7 @@ import { useKeybindingStore } from "@/workbench/keybinding-store";
 import { AutostartSetting } from "./AutostartSetting";
 import { DraftInput } from "./DraftInput";
 import { SettingsGroup, SETTINGS_GROUP_STACK_CLASS } from "./SettingsGroup";
+import { HighlightRulesSettings } from "./HighlightRulesSettings";
 
 const THEME_DESCRIPTION_KEYS: Record<string, TKey> = {
   midnight: "settings.general.theme.familyMidnight",
@@ -46,6 +47,7 @@ export function GeneralSection() {
     <div className={SETTINGS_GROUP_STACK_CLASS}>
       <ThemeSettings />
       <DisplaySettings />
+      <HighlightRulesSettings />
       <AutostartSetting />
     </div>
   );

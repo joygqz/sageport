@@ -15,6 +15,7 @@ pub struct JsonSettingsInput {
     font_family: String,
     zoom_level: i32,
     keybindings: serde_json::Value,
+    highlight_rules: serde_json::Value,
     protocol: Protocol,
     base_url: String,
     api_key: String,
@@ -32,6 +33,7 @@ fn validate_key(key: &str) -> AppResult<()> {
             | "general.zoomLevel"
             | "general.fontFamily"
             | "general.keybindings"
+            | "general.highlightRules"
     ) {
         Ok(())
     } else {
@@ -73,12 +75,14 @@ pub async fn settings_apply_json(
 
 fn validate_json_settings(input: JsonSettingsInput) -> AppResult<Vec<(String, String)>> {
     let keybindings = serde_json::to_string(&input.keybindings)?;
+    let highlight_rules = serde_json::to_string(&input.highlight_rules)?;
     let general = [
         ("general.locale", input.locale),
         ("general.theme", input.theme),
         ("general.fontFamily", input.font_family),
         ("general.zoomLevel", input.zoom_level.to_string()),
         ("general.keybindings", keybindings),
+        ("general.highlightRules", highlight_rules),
     ];
     let mut entries = general
         .into_iter()
@@ -138,6 +142,7 @@ mod tests {
             font_family: String::new(),
             zoom_level: 0,
             keybindings: serde_json::json!({}),
+            highlight_rules: serde_json::json!([]),
             protocol: Protocol::Openai,
             base_url: "https://example.com/v1".into(),
             api_key: api_key.into(),

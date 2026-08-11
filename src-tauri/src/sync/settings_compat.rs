@@ -10,6 +10,7 @@ const MAX_MODEL_BYTES: usize = 1024;
 const MAX_ENABLED_TOOLS: usize = 256;
 const MAX_TOOL_NAME_BYTES: usize = 128;
 const MAX_KEYBINDINGS: usize = 64;
+const MAX_HIGHLIGHT_RULES: usize = 32;
 
 pub(super) fn sanitize(entry: &SettingEntry) -> Option<SettingEntry> {
     if DateTime::parse_from_rfc3339(&entry.updated_at).is_err() {
@@ -22,6 +23,7 @@ pub(super) fn sanitize(entry: &SettingEntry) -> Option<SettingEntry> {
         "general.zoomLevel" => sanitize_general_value(&entry.key, &entry.value)?,
         "general.fontFamily" => sanitize_general_value(&entry.key, &entry.value)?,
         "general.keybindings" => sanitize_general_value(&entry.key, &entry.value)?,
+        "general.highlightRules" => sanitize_general_value(&entry.key, &entry.value)?,
         "ai.protocol" => one_of(&entry.value, &["openai", "anthropic"])?,
         "ai.base_url" => sanitize_base_url(&entry.value)?,
         "ai.api_key" => bounded_text(&entry.value, MAX_API_KEY_BYTES)?.to_string(),
@@ -72,8 +74,62 @@ pub(crate) fn sanitize_general_value(key: &str, value: &str) -> Option<String> {
         "general.zoomLevel" => sanitize_zoom(value),
         "general.fontFamily" => bounded_text(value, MAX_FONT_FAMILY_BYTES).map(str::to_string),
         "general.keybindings" => sanitize_keybindings(value),
+        "general.highlightRules" => sanitize_highlight_rules(value),
         _ => None,
     }
+}
+
+fn sanitize_highlight_rules(value: &str) -> Option<String> {
+    let rules = serde_json::from_str::<Vec<serde_json::Value>>(value).ok()?;
+    if rules.len() > MAX_HIGHLIGHT_RULES
+        || rules.iter().any(|rule| {
+            let Some(rule) = rule.as_object() else {
+                return true;
+            };
+            let valid_keys = rule.keys().all(|key| {
+                matches!(
+                    key.as_str(),
+                    "id" | "pattern" | "caseSensitive" | "foreground" | "background" | "enabled"
+                )
+            });
+            let valid_id = rule
+                .get("id")
+                .and_then(|value| value.as_str())
+                .is_some_and(|value| !value.is_empty() && value.len() <= 64);
+            let valid_pattern = rule
+                .get("pattern")
+                .and_then(|value| value.as_str())
+                .is_some_and(|value| {
+                    !value.is_empty()
+                        && value.chars().count() <= 128
+                        && !value.chars().any(char::is_control)
+                });
+            let valid_bool = |key: &str| rule.get(key).is_some_and(serde_json::Value::is_boolean);
+            let valid_color = |key: &str| {
+                rule.get(key).is_some_and(|value| {
+                    value.is_null() || value.as_str().is_some_and(is_hex_color)
+                })
+            };
+            !valid_keys
+                || !valid_id
+                || !valid_pattern
+                || !valid_bool("caseSensitive")
+                || !valid_bool("enabled")
+                || !valid_color("foreground")
+                || !valid_color("background")
+        })
+    {
+        return None;
+    }
+    serde_json::to_string(&rules).ok()
+}
+
+fn is_hex_color(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value[1..]
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
 }
 
 fn sanitize_keybindings(value: &str) -> Option<String> {

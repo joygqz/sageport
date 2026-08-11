@@ -96,6 +96,25 @@ describe("JSON settings", () => {
     expect(resolveJsonSettings({}, defaults)).toEqual(defaults);
   });
 
+  it("omits default highlight rules and restores them when removed", () => {
+    const document = createJsonSettingsDocument(defaults, defaults);
+    expect(document).not.toHaveProperty("general.highlightRules");
+
+    const overridden = resolveJsonSettings(
+      { "general.highlightRules": [] },
+      defaults,
+    );
+    expect(overridden["general.highlightRules"]).toEqual([]);
+
+    const restored = resolveJsonSettings({}, defaults);
+    expect(restored["general.highlightRules"]).toEqual(
+      defaults["general.highlightRules"],
+    );
+    expect(createJsonSettingsDocument(restored, defaults)).not.toHaveProperty(
+      "general.highlightRules",
+    );
+  });
+
   it("rejects malformed JSON and unsupported settings", () => {
     expect(parseJsonSettings("{")).toEqual({
       ok: false,

@@ -6,12 +6,14 @@ import { I18nProvider } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { queryClient } from "@/lib/query";
 import { ThemeProvider } from "@/themes";
+import { HighlightRulesSync } from "@/features/terminal/highlight-store";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <ThemeProvider>
+          <HighlightRulesSync />
           <SyncEventBridge />
           <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
         </ThemeProvider>

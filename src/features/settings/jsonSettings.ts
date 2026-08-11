@@ -9,6 +9,12 @@ import type { Locale } from "@/i18n/config";
 import { THEME_FAMILIES, type ThemeMode } from "@/themes";
 import { DEFAULT_THEME_FAMILY_ID, DEFAULT_THEME_MODE } from "@/themes/themes";
 import type { AiConfig, AiProtocol } from "@/types/models";
+import {
+  DEFAULT_HIGHLIGHT_RULES,
+  MAX_HIGHLIGHT_RULES,
+  normalizeHighlightRules,
+  type HighlightRule,
+} from "@/features/terminal/highlight-rules";
 import { ZOOM_LEVEL_MAX, ZOOM_LEVEL_MIN } from "@/workbench/appearance";
 import {
   KEYBINDING_DEFINITIONS,
@@ -22,6 +28,7 @@ export interface JsonSettingsValues {
   "general.fontFamily": string;
   "general.zoomLevel": number;
   "general.keybindings": KeybindingOverrides;
+  "general.highlightRules": HighlightRule[];
   "ai.protocol": AiProtocol;
   "ai.base_url": string;
   "ai.api_key": string;
@@ -49,6 +56,7 @@ const SETTING_KEYS = [
   "general.fontFamily",
   "general.zoomLevel",
   "general.keybindings",
+  "general.highlightRules",
   "ai.protocol",
   "ai.base_url",
   "ai.api_key",
@@ -111,6 +119,7 @@ export function defaultJsonSettings(locale: Locale): JsonSettingsValues {
     "general.fontFamily": "",
     "general.zoomLevel": 0,
     "general.keybindings": {},
+    "general.highlightRules": normalizeHighlightRules(DEFAULT_HIGHLIGHT_RULES),
     "ai.protocol": "openai",
     "ai.base_url": "",
     "ai.api_key": "",
@@ -127,6 +136,7 @@ export function createJsonSettingsValues(input: {
   fontFamily: string;
   zoomLevel: number;
   keybindings: KeybindingOverrides;
+  highlightRules?: HighlightRule[];
   ai: AiConfig;
   apiKey: string;
 }): JsonSettingsValues {
@@ -136,6 +146,9 @@ export function createJsonSettingsValues(input: {
     "general.fontFamily": input.fontFamily,
     "general.zoomLevel": input.zoomLevel,
     "general.keybindings": input.keybindings,
+    "general.highlightRules": normalizeHighlightRules(
+      input.highlightRules ?? DEFAULT_HIGHLIGHT_RULES,
+    ),
     "ai.protocol": input.ai.protocol,
     "ai.base_url": input.ai.baseUrl,
     "ai.api_key": input.apiKey,
@@ -197,6 +210,36 @@ export function jsonSettingsSchema(): Record<string, unknown> {
             },
           ]),
         ),
+      },
+      "general.highlightRules": {
+        type: "array",
+        maxItems: MAX_HIGHLIGHT_RULES,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "id",
+            "pattern",
+            "caseSensitive",
+            "foreground",
+            "background",
+            "enabled",
+          ],
+          properties: {
+            id: { type: "string", minLength: 1, maxLength: 64 },
+            pattern: { type: "string", minLength: 1, maxLength: 128 },
+            caseSensitive: { type: "boolean" },
+            foreground: {
+              type: ["string", "null"],
+              pattern: "^#[0-9a-fA-F]{6}$",
+            },
+            background: {
+              type: ["string", "null"],
+              pattern: "^#[0-9a-fA-F]{6}$",
+            },
+            enabled: { type: "boolean" },
+          },
+        },
       },
       "ai.protocol": {
         type: "string",
@@ -307,6 +350,15 @@ export function parseJsonSettings(text: string): JsonSettingsParseResult {
       return invalid("general.keybindings");
     }
     patch["general.keybindings"] = value;
+  }
+
+  if (has("general.highlightRules")) {
+    const rawValue = raw["general.highlightRules"];
+    const value = normalizeHighlightRules(rawValue);
+    if (!Array.isArray(rawValue) || value.length !== rawValue.length) {
+      return invalid("general.highlightRules");
+    }
+    patch["general.highlightRules"] = value;
   }
 
   if (has("ai.protocol")) {

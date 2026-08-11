@@ -15,6 +15,7 @@ const terminal = vi.hoisted(() => ({
   refresh: vi.fn(),
   write: vi.fn(),
   dispose: vi.fn(),
+  loadAddon: vi.fn(),
 }));
 
 vi.mock("./xterm", () => ({
