@@ -94,6 +94,54 @@ describe("TerminalSession lifecycle", () => {
     session.dispose();
   });
 
+  it("routes key events between workbench shortcuts and the custom handler", async () => {
+    const session = new TerminalSession({
+      id: "session-1",
+      connectionKey: "attempt-1",
+      transport: transport(),
+      fontFamily: "monospace",
+      fontSize: 13,
+      theme: {},
+      watchHostKey: false,
+      imagePaste: false,
+      onStatus: vi.fn(),
+    });
+    const customHandler = vi.fn(() => false);
+    session.setCustomKeyHandler(customHandler);
+
+    session.attach({} as HTMLElement);
+
+    await vi.waitFor(() =>
+      expect(terminal.attachCustomKeyEventHandler).toHaveBeenCalledOnce(),
+    );
+    const handler = terminal.attachCustomKeyEventHandler.mock.calls[0]?.[0] as (
+      event: KeyboardEvent,
+    ) => boolean;
+    const keyEvent = (
+      type: string,
+      key: string,
+      modifiers: Partial<KeyboardEvent> = {},
+    ) =>
+      ({
+        type,
+        key,
+        altKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        ...modifiers,
+      }) as KeyboardEvent;
+    expect(handler(keyEvent("keyup", "Escape"))).toBe(true);
+    const modKey = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+      ? { metaKey: true }
+      : { ctrlKey: true };
+    expect(handler(keyEvent("keydown", "b", modKey))).toBe(false);
+    expect(customHandler).not.toHaveBeenCalled();
+    expect(handler(keyEvent("keydown", "Escape"))).toBe(false);
+    expect(customHandler).toHaveBeenCalledOnce();
+    session.dispose();
+  });
+
   it("disconnects the transport exactly once when disposed repeatedly", () => {
     const current = transport();
     const session = new TerminalSession({
