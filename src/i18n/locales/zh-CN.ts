@@ -905,6 +905,7 @@ export const zhCN: Dictionary = {
     history: "对话历史",
     noSessions: "暂无对话",
     untitledChat: "新对话",
+    deleteChatTitle: "删除此对话？",
     deleteChat: "删除对话",
     thinking: "正在思考",
     stop: "停止生成",

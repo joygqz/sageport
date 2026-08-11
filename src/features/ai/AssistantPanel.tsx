@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowUp,
   Check,
@@ -18,6 +24,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 import {
   Button,
+  ConfirmDialog,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -47,6 +54,7 @@ import { resolveEnabledToolNames } from "./tools/registry";
 import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
 const EMPTY_LOG: AgentLogItem[] = [];
+const STICK_TO_BOTTOM_THRESHOLD = 32;
 const SUGGESTIONS = [
   "ai.suggestion.terminalOutput",
   "ai.suggestion.resourceUsage",
@@ -96,17 +104,26 @@ export function AssistantPanel({ width }: { width: number }) {
 
   const [input, setInput] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deletingSession, setDeletingSession] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const logContentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const enabledToolList = resolveEnabledToolNames(config?.enabledTools);
+  const sessionLoading = Boolean(activeId && !runtime);
 
   const onLogScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
     stickToBottom.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+      el.scrollHeight - el.scrollTop - el.clientHeight <=
+      STICK_TO_BOTTOM_THRESHOLD;
   };
+
+  const scrollLogToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
 
   useEffect(() => {
     if (configured) void loadSessions();
@@ -134,28 +151,38 @@ export function AssistantPanel({ width }: { width: number }) {
     inputRef.current?.focus();
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     stickToBottom.current = true;
-  }, [activeId]);
+    scrollLogToBottom();
+  }, [activeId, scrollLogToBottom]);
 
   useLayoutEffect(() => {
     if (!stickToBottom.current) return;
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [log, pending]);
+    scrollLogToBottom();
+  }, [log, pending, scrollLogToBottom]);
+
+  useEffect(() => {
+    const scrollArea = scrollRef.current;
+    const logContent = logContentRef.current;
+    if (!scrollArea || !logContent) return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottom.current) scrollLogToBottom();
+    });
+    observer.observe(scrollArea);
+    observer.observe(logContent);
+    return () => observer.disconnect();
+  }, [configured, scrollLogToBottom]);
 
   useLayoutEffect(() => {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-    if (stickToBottom.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [input]);
+    if (stickToBottom.current) scrollLogToBottom();
+  }, [input, scrollLogToBottom]);
 
   const sendPrompt = async (prompt: string): Promise<boolean> => {
-    if (!prompt || pending || !model) return false;
+    if (!prompt || pending || !model || sessionLoading) return false;
     if (prompt.length > MAX_AI_PROMPT_CHARS) {
       toast.error(t("ai.error"), t("ai.promptTooLong"));
       return false;
@@ -232,11 +259,7 @@ export function AssistantPanel({ width }: { width: number }) {
                     <MessageCirclePlus className="size-4" />
                   </Button>
                 </Tooltip>
-                <DropdownMenu
-                  onOpenChange={(open) => {
-                    if (!open) setDeleteTargetId(null);
-                  }}
-                >
+                <DropdownMenu>
                   <Tooltip content={t("ai.history")}>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -273,27 +296,13 @@ export function AssistantPanel({ width }: { width: number }) {
                           <button
                             type="button"
                             aria-label={t("ai.deleteChat")}
-                            className={cn(
-                              "rounded text-muted-foreground hover:bg-accent hover:text-danger",
-                              deleteTargetId === s.id
-                                ? "px-2 py-1 text-xs font-medium text-danger"
-                                : "p-1",
-                            )}
+                            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-danger"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (deleteTargetId === s.id) {
-                                setDeleteTargetId(null);
-                                void deleteSession(s.id);
-                              } else {
-                                setDeleteTargetId(s.id);
-                              }
+                              setDeleteTargetId(s.id);
                             }}
                           >
-                            {deleteTargetId === s.id ? (
-                              t("common.delete")
-                            ) : (
-                              <Trash2 className="size-3.5" />
-                            )}
+                            <Trash2 className="size-3.5" />
                           </button>
                         </DropdownMenuItem>
                       ))
@@ -334,10 +343,21 @@ export function AssistantPanel({ width }: { width: number }) {
           <div
             ref={scrollRef}
             onScroll={onLogScroll}
-            className="flex-1 overflow-y-auto"
+            className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
           >
-            <div className="flex min-h-full flex-col gap-[var(--content-gap)] px-3 py-4">
-              {log.length === 0 ? (
+            <div
+              ref={logContentRef}
+              className="flex min-h-full min-w-0 max-w-full flex-col gap-[var(--content-gap)] px-3 py-4"
+            >
+              {sessionLoading ? (
+                <div
+                  className="my-auto text-center text-xs text-muted-foreground"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {t("common.loading")}
+                </div>
+              ) : log.length === 0 ? (
                 <div className="my-auto w-full max-w-md self-center py-8">
                   <div className="mb-2 flex items-center gap-1.5 px-1 text-muted-foreground">
                     <Sparkles className="size-3.5" strokeWidth={1.8} />
@@ -350,7 +370,7 @@ export function AssistantPanel({ width }: { width: number }) {
                       <button
                         key={suggestion}
                         type="button"
-                        disabled={pending || !model}
+                        disabled={pending || !model || sessionLoading}
                         onClick={() => void sendPrompt(t(suggestion))}
                         className={cn(
                           "ui-list-row group flex w-full items-center text-left text-xs leading-normal text-foreground/75 transition-colors hover:bg-list-hover hover:text-foreground disabled:opacity-50",
@@ -388,9 +408,14 @@ export function AssistantPanel({ width }: { width: number }) {
                 rows={1}
                 value={input}
                 maxLength={MAX_AI_PROMPT_CHARS}
+                disabled={sessionLoading}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (
+                    e.key === "Enter" &&
+                    !e.shiftKey &&
+                    !e.nativeEvent.isComposing
+                  ) {
                     e.preventDefault();
                     void submit();
                   }
@@ -430,7 +455,7 @@ export function AssistantPanel({ width }: { width: number }) {
                       size="icon"
                       className="size-[var(--toolbar-control-size)] shrink-0"
                       aria-label={t("ai.send")}
-                      disabled={!input.trim() || !model}
+                      disabled={!input.trim() || !model || sessionLoading}
                       onClick={() => void submit()}
                     >
                       <ArrowUp className="size-4" />
@@ -442,6 +467,37 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
         </>
       )}
+      <ConfirmDialog
+        state={
+          deleteTargetId
+            ? {
+                title: t("ai.deleteChatTitle"),
+                description: t("common.deleteConfirm", {
+                  name:
+                    sessions.find((session) => session.id === deleteTargetId)
+                      ?.title || t("ai.untitledChat"),
+                }),
+                cancelLabel: t("common.cancel"),
+                actions: [
+                  {
+                    label: t("ai.deleteChat"),
+                    variant: "destructive",
+                    loading: deletingSession,
+                    onSelect: async () => {
+                      setDeletingSession(true);
+                      try {
+                        await deleteSession(deleteTargetId);
+                      } finally {
+                        setDeletingSession(false);
+                      }
+                    },
+                  },
+                ],
+              }
+            : null
+        }
+        onClose={() => setDeleteTargetId(null)}
+      />
     </aside>
   );
 }
@@ -528,7 +584,7 @@ function Bubble({
     );
   }
   return (
-    <div className="min-w-0 select-text space-y-2 px-0.5">
+    <div className="min-w-0 max-w-full select-text space-y-2 px-0.5">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={MARKDOWN_COMPONENTS}
@@ -630,7 +686,7 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
   code: ({ node: _node, className: _className, ...props }) => (
     <code
-      className="rounded bg-muted px-1 py-0.5 font-mono text-[0.8em] text-foreground/90"
+      className="break-all rounded bg-muted px-1 py-0.5 font-mono text-[0.8em] text-foreground/90"
       {...props}
     />
   ),

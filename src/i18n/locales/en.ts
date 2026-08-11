@@ -929,6 +929,7 @@ export const en = {
     history: "Chat history",
     noSessions: "No chats yet",
     untitledChat: "New chat",
+    deleteChatTitle: "Delete this chat?",
     deleteChat: "Delete chat",
     thinking: "Thinking",
     stop: "Stop generating",

@@ -129,7 +129,7 @@ export function ToolActivity({
       : (target?.title ?? targetSessionId ?? "");
 
   return (
-    <div className="ui-muted-panel overflow-hidden text-xs">
+    <div className="ui-muted-panel min-w-0 max-w-full overflow-hidden text-xs">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
@@ -152,7 +152,7 @@ export function ToolActivity({
       </button>
 
       {expanded && (
-        <div className="space-y-1.5 px-2.5 pb-2 pt-0.5">
+        <div className="min-w-0 space-y-1.5 px-2.5 pb-2 pt-0.5">
           {command && (
             <>
               {targetSessionId && (
@@ -165,18 +165,18 @@ export function ToolActivity({
                   </span>
                 </div>
               )}
-              <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
+              <pre className="max-h-32 max-w-full select-text overflow-y-auto whitespace-pre-wrap break-all rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
                 {command}
               </pre>
             </>
           )}
           {!command && transfer && (
-            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
+            <pre className="max-h-32 max-w-full select-text overflow-y-auto whitespace-pre-wrap break-all rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
               {transfer}
             </pre>
           )}
           {!command && !transfer && path && (
-            <pre className="select-text overflow-x-auto overflow-y-hidden rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
+            <pre className="max-h-32 max-w-full select-text overflow-y-auto whitespace-pre-wrap break-all rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
               {path}
             </pre>
           )}
@@ -186,7 +186,7 @@ export function ToolActivity({
             </pre>
           )}
           {item.status === "awaiting-approval" && (
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex min-w-0 items-center gap-2 pt-1">
               <span className="mr-auto flex min-w-0 items-center gap-1 text-warning">
                 <ShieldAlert className="size-3.5 shrink-0" />
                 <span className="truncate">
