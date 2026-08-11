@@ -13,6 +13,7 @@ import {
   Tooltip,
 } from "@/components/ui";
 import { LOCALE_LABELS, LOCALES, useI18n, type TKey } from "@/i18n";
+import { IS_MACOS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
   THEME_FAMILIES,
@@ -170,7 +171,7 @@ function ZoomField() {
   const shortcuts = (
     ["view.zoomIn", "view.zoomOut", "view.zoomReset"] as const
   ).flatMap((id) => {
-    const keys = keybindingDisplayKeys(id, keybindingOverrides);
+    const keys = keybindingDisplayKeys(id, keybindingOverrides, IS_MACOS);
     return keys ? [keys] : [];
   });
 

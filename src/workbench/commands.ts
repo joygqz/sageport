@@ -6,6 +6,7 @@ import { useI18n, type TKey } from "@/i18n";
 import { useBroadcastStore } from "@/features/terminal/broadcast";
 import { pasteIntoTerminal } from "@/features/terminal/paste";
 import { getSession } from "@/features/terminal/sessions";
+import { IS_MACOS } from "@/lib/platform";
 import { THEMES } from "@/themes";
 import { useTheme } from "@/themes/useTheme";
 import { useLayoutStore, type Activity } from "./layout";
@@ -70,7 +71,7 @@ function commandShortcut(
   id: KeybindingId,
   overrides: KeybindingOverrides,
 ): string[] | undefined {
-  return keybindingDisplayKeys(id, overrides);
+  return keybindingDisplayKeys(id, overrides, IS_MACOS);
 }
 
 export function useCommands(): WorkbenchCommand[] {

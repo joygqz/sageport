@@ -1,14 +1,16 @@
 import type { IDecoration, Terminal as XTerm } from "@xterm/xterm";
 
 import { ipc } from "@/lib/ipc";
-import { isWorkbenchShortcut } from "@/workbench/shortcuts";
 import { COMMON_COMMANDS } from "./common-commands";
 import { currentInput, extractCommand, suggest } from "./engine";
 
 const DEBOUNCE_MS = 80;
 
 export interface AutocompleteController {
-  attach: (term: XTerm) => void;
+  attach: (
+    term: XTerm,
+    registerKeyHandler: (handler: (event: KeyboardEvent) => boolean) => void,
+  ) => void;
   handleData: (data: string) => void;
   dispose: () => void;
 }
@@ -115,7 +117,10 @@ export function createAutocomplete(opts: {
     return true;
   };
 
-  const attach = (instance: XTerm) => {
+  const attach = (
+    instance: XTerm,
+    registerKeyHandler: (handler: (event: KeyboardEvent) => boolean) => void,
+  ) => {
     if (disposed || term) return;
     term = instance;
     subscriptions.push(
@@ -125,9 +130,7 @@ export function createAutocomplete(opts: {
         schedule();
       }),
     );
-    instance.attachCustomKeyEventHandler((e) => {
-      if (e.type !== "keydown") return true;
-      if (isWorkbenchShortcut(e)) return false;
+    registerKeyHandler((e) => {
       if (e.key === "Escape" && ghost) {
         clearGhost();
         return false;

@@ -7,6 +7,7 @@ import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { useTabsStore } from "./tabs";
 import { copyActivePane, pasteActivePane } from "./commands";
+import { clipboardShortcutShouldDefer } from "./shortcuts";
 import { useZoomStore } from "./zoom";
 import { findKeybinding, type KeybindingId } from "./keybinding-registry";
 import { useKeybindingStore } from "./keybinding-store";
@@ -92,6 +93,15 @@ export function useKeybindings() {
         IS_MACOS,
       );
       if (!id) return;
+      if (
+        clipboardShortcutShouldDefer(
+          id,
+          Boolean(useOverlayStore.getState().overlay),
+          document.activeElement,
+        )
+      ) {
+        return;
+      }
       e.preventDefault();
       runKeybinding(id);
     };

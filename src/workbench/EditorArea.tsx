@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { useDragCursor } from "@/lib/pointerDrag";
+import { IS_MACOS } from "@/lib/platform";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
@@ -652,7 +653,7 @@ function Watermark() {
       ["watermark.settings", "settings.open"],
     ] as const
   ).flatMap(([labelKey, id]) => {
-    const keys = keybindingDisplayKeys(id, keybindingOverrides);
+    const keys = keybindingDisplayKeys(id, keybindingOverrides, IS_MACOS);
     return keys ? [{ label: t(labelKey), keys }] : [];
   });
 

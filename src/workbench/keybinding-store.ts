@@ -2,8 +2,8 @@ import { create } from "zustand";
 
 import {
   deserializeKeybindingOverrides,
-  keybindingDefinition,
   keybindingOverrideWithoutConflict,
+  platformKeybindingDefaults,
   serializeKeybindingOverrides,
   type KeybindingId,
   type KeybindingOverrides,
@@ -15,7 +15,7 @@ interface KeybindingState {
   overrides: KeybindingOverrides;
   replaceOverrides: (overrides: KeybindingOverrides) => void;
   load: (value: string) => void;
-  set: (id: KeybindingId, binding: string) => void;
+  set: (id: KeybindingId, binding: string, isMacOS: boolean) => void;
   replace: (
     id: KeybindingId,
     binding: string,
@@ -35,9 +35,10 @@ function assign(
   overrides: KeybindingOverrides,
   id: KeybindingId,
   binding: string,
+  isMacOS: boolean,
 ): KeybindingOverrides {
   const next = { ...overrides };
-  if (keybindingDefinition(id).defaultBindings.includes(binding)) {
+  if (platformKeybindingDefaults(id, isMacOS).includes(binding)) {
     delete next[id];
   } else {
     next[id] = binding;
@@ -66,14 +67,17 @@ export const useKeybindingStore = create<KeybindingState>((set) => ({
   overrides: {},
   replaceOverrides: (overrides) => set({ overrides }),
   load: (value) => set({ overrides: deserializeKeybindingOverrides(value) }),
-  set: (id, binding) =>
-    set((state) => ({ overrides: assign(state.overrides, id, binding) })),
+  set: (id, binding, isMacOS) =>
+    set((state) => ({
+      overrides: assign(state.overrides, id, binding, isMacOS),
+    })),
   replace: (id, binding, conflictId, isMacOS) =>
     set((state) => ({
       overrides: assign(
         removeConflict(state.overrides, binding, conflictId, isMacOS),
         id,
         binding,
+        isMacOS,
       ),
     })),
   removeConflict: (binding, conflictId, isMacOS) =>

@@ -25,6 +25,7 @@ export const TitleBar = memo(function TitleBar() {
   const quickConnectKeys = keybindingDisplayKeys(
     "palette.quick",
     keybindingOverrides,
+    IS_MACOS,
   );
 
   return (

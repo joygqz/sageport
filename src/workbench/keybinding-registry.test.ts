@@ -10,6 +10,7 @@ import {
   keybindingOverrideWithoutConflict,
   parseKeybinding,
   parseKeybindingOverrides,
+  platformKeybindingDefaults,
   serializeKeybindingOverrides,
 } from "./keybinding-registry";
 
@@ -65,6 +66,19 @@ describe("keybinding registry", () => {
     expect(findKeybinding(key("b", { ctrlKey: true }), {}, false)).toBe(
       "view.toggleSidebar",
     );
+    expect(
+      findKeybinding(key("C", { ctrlKey: true, shiftKey: true }), {}, false),
+    ).toBe("terminal.copy");
+    expect(
+      findKeybinding(key("V", { ctrlKey: true, shiftKey: true }), {}, false),
+    ).toBe("terminal.paste");
+    expect(findKeybinding(key("c", { metaKey: true }), {}, true)).toBe(
+      "terminal.copy",
+    );
+    expect(findKeybinding(key("v", { metaKey: true }), {}, true)).toBe(
+      "terminal.paste",
+    );
+    expect(findKeybinding(key("C", { shiftKey: true }), {}, true)).toBeNull();
     const custom = { "view.toggleSidebar": "mod+shift+s" } as const;
     expect(
       findKeybinding(key("b", { ctrlKey: true }), custom, false),
@@ -119,16 +133,39 @@ describe("keybinding registry", () => {
     );
     expect(deserializeKeybindingOverrides(serialized)).toEqual(overrides);
     expect(parseKeybindingOverrides({ unknown: "mod+k" })).toBeNull();
-    expect(effectiveKeybindings("view.toggleSidebar", overrides ?? {})).toEqual(
-      [],
-    );
-    expect(keybindingDisplayKeys("terminal.search", overrides ?? {})).toEqual([
-      "mod",
-      "shift",
-      "f",
-    ]);
     expect(
-      keybindingDisplayKeys("view.toggleSidebar", overrides ?? {}),
+      effectiveKeybindings("view.toggleSidebar", overrides ?? {}, false),
+    ).toEqual([]);
+    expect(
+      keybindingDisplayKeys("terminal.search", overrides ?? {}, false),
+    ).toEqual(["mod", "shift", "f"]);
+    expect(
+      keybindingDisplayKeys("view.toggleSidebar", overrides ?? {}, false),
     ).toBeUndefined();
+  });
+
+  it("uses platform-specific default bindings for copy and paste", () => {
+    expect(platformKeybindingDefaults("terminal.copy", false)).toEqual([
+      "ctrl+shift+c",
+    ]);
+    expect(platformKeybindingDefaults("terminal.copy", true)).toEqual([
+      "mod+c",
+    ]);
+    expect(platformKeybindingDefaults("terminal.paste", true)).toEqual([
+      "mod+v",
+    ]);
+    expect(effectiveKeybindings("terminal.copy", {}, true)).toEqual(["mod+c"]);
+    expect(effectiveKeybindings("terminal.paste", {}, false)).toEqual([
+      "ctrl+shift+v",
+    ]);
+    expect(keybindingDisplayKeys("terminal.copy", {}, true)).toEqual([
+      "mod",
+      "c",
+    ]);
+    expect(keybindingDisplayKeys("terminal.copy", {}, false)).toEqual([
+      "ctrl",
+      "shift",
+      "c",
+    ]);
   });
 });

@@ -6,6 +6,7 @@ interface KeybindingDefinition {
   labelKey: TKey;
   labelParams?: TParams;
   defaultBindings: readonly string[];
+  macBindings?: readonly string[];
 }
 
 export type KeybindingId =
@@ -121,12 +122,14 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     categoryKey: "commands.category.terminal",
     labelKey: "commands.terminal.copy",
     defaultBindings: ["ctrl+shift+c"],
+    macBindings: ["mod+c"],
   },
   {
     id: "terminal.paste",
     categoryKey: "commands.category.terminal",
     labelKey: "commands.terminal.paste",
     defaultBindings: ["ctrl+shift+v"],
+    macBindings: ["mod+v"],
   },
   {
     id: "view.toggleSidebar",
@@ -273,12 +276,13 @@ export function parseKeybinding(value: string): ParsedKeybinding | null {
 export function effectiveKeybindings(
   id: KeybindingId,
   overrides: KeybindingOverrides,
+  isMacOS: boolean,
 ): readonly string[] {
   if (Object.prototype.hasOwnProperty.call(overrides, id)) {
     const override = overrides[id];
     return override ? [override] : [];
   }
-  return KEYBINDING_BY_ID.get(id)?.defaultBindings ?? [];
+  return platformKeybindingDefaults(id, isMacOS);
 }
 
 export function keybindingKeys(value: string): string[] {
@@ -296,9 +300,20 @@ export function keybindingKeys(value: string): string[] {
 export function keybindingDisplayKeys(
   id: KeybindingId,
   overrides: KeybindingOverrides,
+  isMacOS: boolean,
 ): string[] | undefined {
-  const binding = effectiveKeybindings(id, overrides)[0];
+  const binding = effectiveKeybindings(id, overrides, isMacOS)[0];
   return binding ? keybindingKeys(binding) : undefined;
+}
+
+export function platformKeybindingDefaults(
+  id: KeybindingId,
+  isMacOS: boolean,
+): readonly string[] {
+  const definition = keybindingDefinition(id);
+  return isMacOS && definition.macBindings
+    ? definition.macBindings
+    : definition.defaultBindings;
 }
 
 function keyboardEventKey(event: KeyboardEvent): string {
@@ -395,7 +410,7 @@ export function findKeybinding(
 ): KeybindingId | null {
   for (const definition of KEYBINDING_DEFINITIONS) {
     if (
-      effectiveKeybindings(definition.id, overrides).some((binding) =>
+      effectiveKeybindings(definition.id, overrides, isMacOS).some((binding) =>
         matchesKeybinding(event, binding, isMacOS),
       )
     ) {
@@ -437,7 +452,7 @@ export function keybindingOverrideWithoutConflict(
   isMacOS: boolean,
 ): string | null {
   return (
-    effectiveKeybindings(id, overrides).find(
+    effectiveKeybindings(id, overrides, isMacOS).find(
       (binding) => !keybindingsMatch(binding, value, isMacOS),
     ) ?? null
   );
@@ -453,7 +468,7 @@ export function findKeybindingConflict(
   for (const definition of KEYBINDING_DEFINITIONS) {
     if (definition.id === id) continue;
     if (
-      effectiveKeybindings(definition.id, overrides).some(
+      effectiveKeybindings(definition.id, overrides, isMacOS).some(
         (binding) =>
           platformKeybindingSignature(binding, isMacOS) === signature,
       )

@@ -12,6 +12,7 @@ import {
   keybindingFromKeyboardEvent,
   keybindingKeys,
   KEYBINDING_DEFINITIONS,
+  platformKeybindingDefaults,
   type KeybindingId,
 } from "@/workbench/keybinding-registry";
 import { useKeybindingStore } from "@/workbench/keybinding-store";
@@ -71,7 +72,7 @@ export function KeybindingsSection() {
     id: KeybindingId,
     currentOverrides: typeof overrides = overrides,
   ) => {
-    for (const defaultBinding of keybindingDefinition(id).defaultBindings) {
+    for (const defaultBinding of platformKeybindingDefaults(id, IS_MACOS)) {
       const conflictId = findKeybindingConflict(
         id,
         defaultBinding,
@@ -141,7 +142,7 @@ export function KeybindingsSection() {
         return;
       }
 
-      setBinding(editingId, binding);
+      setBinding(editingId, binding, IS_MACOS);
       setEditingId(null);
       setInvalidId(null);
       setPending(null);
@@ -178,7 +179,11 @@ export function KeybindingsSection() {
             />
             <div className="ui-divided-list">
               {definitions.map((definition) => {
-                const bindings = effectiveKeybindings(definition.id, overrides);
+                const bindings = effectiveKeybindings(
+                  definition.id,
+                  overrides,
+                  IS_MACOS,
+                );
                 const binding = bindings[0];
                 const editing = editingId === definition.id;
                 const conflict = pending?.id === definition.id ? pending : null;

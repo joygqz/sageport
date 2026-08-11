@@ -137,7 +137,9 @@ export function TerminalView({
       },
     });
     sessionRef.current = session;
-    autocomplete.attach(session.term);
+    autocomplete.attach(session.term, (handler) =>
+      session.setCustomKeyHandler(handler),
+    );
     registerSession(sessionId, session);
     session.attach(containerRef.current!);
 

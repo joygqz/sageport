@@ -1,5 +1,6 @@
 import {
   findKeybinding,
+  type KeybindingId,
   type KeybindingOverrides,
 } from "./keybinding-registry";
 import { useKeybindingStore } from "./keybinding-store";
@@ -11,4 +12,21 @@ export function isWorkbenchShortcut(
   overrides: KeybindingOverrides = useKeybindingStore.getState().overrides,
 ): boolean {
   return findKeybinding(event, overrides, isMacOS) !== null;
+}
+
+export function clipboardShortcutShouldDefer(
+  id: KeybindingId,
+  overlayOpen: boolean,
+  activeElement: Element | null,
+): boolean {
+  if (id !== "terminal.copy" && id !== "terminal.paste") return false;
+  if (overlayOpen) return true;
+  if (!activeElement) return false;
+  if (activeElement.closest(".xterm")) return false;
+  const tag = activeElement.tagName.toLowerCase();
+  return (
+    tag === "input" ||
+    tag === "textarea" ||
+    (activeElement as HTMLElement).isContentEditable === true
+  );
 }

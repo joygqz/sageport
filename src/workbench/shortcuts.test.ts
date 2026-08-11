@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isWorkbenchShortcut } from "./shortcuts";
+import { clipboardShortcutShouldDefer, isWorkbenchShortcut } from "./shortcuts";
 
 function key(
   value: string,
@@ -73,5 +73,48 @@ describe("isWorkbenchShortcut", () => {
         "view.toggleSidebar": "mod+shift+s",
       }),
     ).toBe(true);
+  });
+});
+
+describe("clipboardShortcutShouldDefer", () => {
+  const input = {
+    tagName: "INPUT",
+    closest: () => null,
+  } as unknown as Element;
+  const terminalTextarea = {
+    tagName: "TEXTAREA",
+    closest: (selector: string) =>
+      selector === ".xterm" ? ({} as Element) : null,
+  } as unknown as Element;
+  const body = { tagName: "BODY", closest: () => null } as unknown as Element;
+
+  it("defers copy and paste while an overlay is open", () => {
+    expect(clipboardShortcutShouldDefer("terminal.copy", true, input)).toBe(
+      true,
+    );
+    expect(clipboardShortcutShouldDefer("terminal.paste", true, body)).toBe(
+      true,
+    );
+  });
+
+  it("defers when focus is in a non-terminal editable field", () => {
+    expect(clipboardShortcutShouldDefer("terminal.copy", false, input)).toBe(
+      true,
+    );
+  });
+
+  it("keeps the shortcut when the terminal is focused", () => {
+    expect(
+      clipboardShortcutShouldDefer("terminal.paste", false, terminalTextarea),
+    ).toBe(false);
+  });
+
+  it("does not defer other commands or non-editable focus", () => {
+    expect(
+      clipboardShortcutShouldDefer("view.toggleSidebar", false, input),
+    ).toBe(false);
+    expect(clipboardShortcutShouldDefer("terminal.copy", false, body)).toBe(
+      false,
+    );
   });
 });

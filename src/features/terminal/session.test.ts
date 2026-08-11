@@ -10,6 +10,7 @@ const terminal = vi.hoisted(() => ({
   onData: vi.fn(() => ({ dispose: vi.fn() })),
   onResize: vi.fn(() => ({ dispose: vi.fn() })),
   open: vi.fn(),
+  attachCustomKeyEventHandler: vi.fn(),
   focus: vi.fn(),
   refresh: vi.fn(),
   write: vi.fn(),

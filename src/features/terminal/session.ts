@@ -4,6 +4,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 
 import { errorCode, errorMessage } from "@/lib/toast";
 import type { TerminalStatus } from "@/workbench/tabs";
+import { isWorkbenchShortcut } from "@/workbench/shortcuts";
 import { CommandTracker } from "./commands";
 import { hasHostKeyPrompt, useHostKeyStore } from "./host-key";
 import { attachImagePaste } from "./paste";
@@ -64,6 +65,7 @@ export class TerminalSession {
   private opened = false;
   private opening = false;
   private pendingFocus = false;
+  private customKeyHandler: ((event: KeyboardEvent) => boolean) | null = null;
 
   constructor(opts: TerminalSessionOptions) {
     this.opts = opts;
@@ -119,6 +121,12 @@ export class TerminalSession {
     this.container = null;
   }
 
+  setCustomKeyHandler(
+    handler: ((event: KeyboardEvent) => boolean) | null,
+  ): void {
+    this.customKeyHandler = handler;
+  }
+
   private async open() {
     try {
       try {
@@ -130,6 +138,11 @@ export class TerminalSession {
 
       const container = this.container;
       this.term.open(container);
+      this.term.attachCustomKeyEventHandler((event) => {
+        if (event.type !== "keydown") return true;
+        if (isWorkbenchShortcut(event)) return false;
+        return this.customKeyHandler?.(event) ?? true;
+      });
       attachWebglRenderer(this.term);
       if (this.opts.imagePaste) {
         this.disposables.push(attachImagePaste(this.term));
