@@ -109,6 +109,15 @@ describe("clipboardShortcutShouldDefer", () => {
     ).toBe(false);
   });
 
+  it("defers copy when page text is selected", () => {
+    expect(
+      clipboardShortcutShouldDefer("terminal.copy", false, body, true),
+    ).toBe(true);
+    expect(
+      clipboardShortcutShouldDefer("terminal.paste", false, body, true),
+    ).toBe(false);
+  });
+
   it("does not defer other commands or non-editable focus", () => {
     expect(
       clipboardShortcutShouldDefer("view.toggleSidebar", false, input),
