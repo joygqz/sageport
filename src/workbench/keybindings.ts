@@ -98,6 +98,7 @@ export function useKeybindings() {
           id,
           Boolean(useOverlayStore.getState().overlay),
           document.activeElement,
+          Boolean(window.getSelection()?.toString()),
         )
       ) {
         return;

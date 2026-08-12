@@ -47,6 +47,7 @@ import {
 import { useTabsStore } from "@/workbench/tabs";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
 import { safeExternalUrl } from "./links";
+import { shouldSubmitPrompt } from "./input";
 import { useAiStore } from "./store";
 import { MAX_AI_PROMPT_CHARS, type AgentLogItem } from "./transcript";
 import { askUserOptions, askUserQuestion } from "./tools";
@@ -109,6 +110,7 @@ export function AssistantPanel({ width }: { width: number }) {
   const logContentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const compositionActive = useRef(false);
   const enabledToolList = resolveEnabledToolNames(config?.enabledTools);
   const sessionLoading = Boolean(activeId && !runtime);
 
@@ -410,11 +412,15 @@ export function AssistantPanel({ width }: { width: number }) {
                 maxLength={MAX_AI_PROMPT_CHARS}
                 disabled={sessionLoading}
                 onChange={(e) => setInput(e.target.value)}
+                onCompositionStart={() => {
+                  compositionActive.current = true;
+                }}
+                onCompositionEnd={() => {
+                  compositionActive.current = false;
+                }}
                 onKeyDown={(e) => {
                   if (
-                    e.key === "Enter" &&
-                    !e.shiftKey &&
-                    !e.nativeEvent.isComposing
+                    shouldSubmitPrompt(e.nativeEvent, compositionActive.current)
                   ) {
                     e.preventDefault();
                     void submit();
