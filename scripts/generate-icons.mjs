@@ -18,6 +18,9 @@ const source = process.argv[2] ?? join(root, "scripts", "logo.svg");
 const outDir = join(root, "src-tauri", "icons");
 
 const GLYPH_VIEWBOX = "212 212 600 600";
+const MACOS_ICON_INSET = 100;
+const MACOS_ICON_SIZE = 824;
+const MACOS_ICON_RADIUS = 185;
 const TRAY_SIZE = 32;
 const MACOS_TRAY_SIZE = 36;
 const PUBLIC_LOGO_SIZE = 256;
@@ -36,6 +39,7 @@ log(`source: ${source}`);
 const fullSvg = readFileSync(source, "utf8");
 const glyphSvg = toGlyphSvg(fullSvg);
 const templateSvg = glyphSvg.replace(/#[0-9a-fA-F]{3,8}\b/g, "#000000");
+const macosSvg = toMacosSvg(fullSvg);
 
 function toGlyphSvg(svg) {
   const withoutBg = svg.replace(/[ \t]*<[^>]*\bid="bg"[^>]*>\n?/, "");
@@ -44,6 +48,24 @@ function toGlyphSvg(svg) {
   return withoutBg.replace(
     /<svg\b[^>]*>/,
     `<svg width="${size}" height="${size}" viewBox="${GLYPH_VIEWBOX}" fill="none" xmlns="http://www.w3.org/2000/svg">`,
+  );
+}
+
+function toMacosSvg(svg) {
+  const background = new RegExp(`<rect\\s+id="bg"[^>]*/>`);
+  if (!background.test(svg))
+    fail(`no self-closing background with id="bg" in ${source}`);
+  return svg.replace(background, (element) =>
+    element
+      .replace(
+        /\bwidth="[^"]*"/,
+        `x="${MACOS_ICON_INSET}" width="${MACOS_ICON_SIZE}"`,
+      )
+      .replace(
+        /\bheight="[^"]*"/,
+        `y="${MACOS_ICON_INSET}" height="${MACOS_ICON_SIZE}"`,
+      )
+      .replace(/\/>$/, ` rx="${MACOS_ICON_RADIUS}"/>`),
   );
 }
 
@@ -66,6 +88,16 @@ try {
     stdio: "inherit",
     cwd: root,
   });
+
+  const macosDir = join(tmp, "macos");
+  const macosPath = join(tmp, "macos.svg");
+  writeFileSync(macosPath, macosSvg);
+  execFileSync("pnpm", ["tauri", "icon", macosPath, "--output", macosDir], {
+    stdio: "inherit",
+    cwd: root,
+  });
+  copyFileSync(join(macosDir, "icon.icns"), join(outDir, "icon.icns"));
+  log("macOS safe area → src-tauri/icons/icon.icns");
 
   copyFileSync(
     rasterize(glyphSvg, "tray", TRAY_SIZE),
