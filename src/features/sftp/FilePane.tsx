@@ -9,18 +9,26 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  CircleX,
   FilePlus,
   FolderPlus,
   HardDrive,
+  PlugZap,
   Plus,
   RefreshCw,
   Server,
+  SquareX,
   X,
 } from "lucide-react";
 
 import {
   Button,
   ConfirmDialog,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -85,6 +93,7 @@ export function FilePane({ side }: { side: PaneSide }) {
   const addLocalTab = useSftpStore((s) => s.addLocalTab);
   const addRemoteTab = useSftpStore((s) => s.addRemoteTab);
   const closeTab = useSftpStore((s) => s.closeTab);
+  const reconnectTab = useSftpStore((s) => s.reconnectTab);
   const moveTab = useSftpStore((s) => s.moveTab);
   const setActive = useSftpStore((s) => s.setActive);
   const navigate = useSftpStore((s) => s.navigate);
@@ -214,6 +223,20 @@ export function FilePane({ side }: { side: PaneSide }) {
     });
   };
 
+  const closeOtherTabs = (tabId: string) => {
+    for (const tab of pane.tabs) {
+      if (tab.id !== tabId) closeTab(side, tab.id);
+    }
+  };
+
+  const closeAllTabs = () => {
+    for (const tab of pane.tabs) closeTab(side, tab.id);
+  };
+
+  const handleTabMenuOpen = (tabId: string) => {
+    if (tabId !== pane.activeTabId) setActive(side, tabId);
+  };
+
   const onCreate = async (
     tab: SftpTab,
     kind: "file" | "folder",
@@ -335,6 +358,12 @@ export function FilePane({ side }: { side: PaneSide }) {
                 dragged={dragState?.id === tab.id}
                 label={tab.kind === "local" ? t("sftp.local") : tab.title}
                 onClose={() => closeTab(side, tab.id)}
+                onCloseOthers={() => closeOtherTabs(tab.id)}
+                onCloseAll={closeAllTabs}
+                canCloseOthers={pane.tabs.length > 1}
+                onMenuOpen={() => handleTabMenuOpen(tab.id)}
+                onReconnect={() => reconnectTab(side, tab.id)}
+                onRefresh={() => void refresh(side, tab.id)}
                 onReopen={() => {
                   if (tab.kind === "local") {
                     void addLocalTab(side);
@@ -597,6 +626,12 @@ function SftpTabItem({
   dragged,
   label,
   onClose,
+  onCloseOthers,
+  onCloseAll,
+  canCloseOthers,
+  onMenuOpen,
+  onReconnect,
+  onRefresh,
   onReopen,
   onDragStart,
   onDragMove,
@@ -608,6 +643,12 @@ function SftpTabItem({
   dragged: boolean;
   label: string;
   onClose: () => void;
+  onCloseOthers: () => void;
+  onCloseAll: () => void;
+  canCloseOthers: boolean;
+  onMenuOpen: () => void;
+  onReconnect: () => void;
+  onRefresh: () => void;
   onReopen: () => void;
   onDragStart: (pointer: SftpTabDragPointer) => void;
   onDragMove: (clientX: number, clientY: number) => void;
@@ -621,6 +662,11 @@ function SftpTabItem({
     startY: number;
     active: boolean;
   } | null>(null);
+  const canReconnect =
+    tab.kind === "remote" &&
+    (tab.status === "error" || tab.status === "closed");
+  const canRefresh =
+    Boolean(tab.cwd) && (tab.kind === "local" || tab.status === "connected");
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (
@@ -672,74 +718,105 @@ function SftpTabItem({
   };
 
   return (
-    <div
-      data-sftp-tab-id={tab.id}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={finishPointerDrag}
-      onPointerCancel={finishPointerDrag}
-      onDoubleClick={(event) => {
-        if ((event.target as HTMLElement).closest("[data-tab-close]")) return;
-        onReopen();
+    <ContextMenu
+      onOpenChange={(open) => {
+        if (open) onMenuOpen();
       }}
-      onAuxClick={(event) => {
-        if (event.button === 1) onClose();
-      }}
-      className={cn(
-        WORKBENCH_TAB_CLASS,
-        "h-[var(--compact-tab-height)] w-fit min-w-24 max-w-44 gap-1.5 px-2",
-        dragged && "opacity-50",
-        active
-          ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
-          : WORKBENCH_TAB_INACTIVE_CLASS,
-      )}
     >
-      <TabsTrigger
-        value={tab.id}
-        className="flex min-w-0 flex-1 items-center justify-start gap-1.5 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
-        onKeyDown={(event) => {
-          if (
-            event.altKey &&
-            (event.key === "ArrowLeft" || event.key === "ArrowRight")
-          ) {
-            event.preventDefault();
-            onKeyboardMove(event.key === "ArrowLeft" ? -1 : 1);
-          }
-        }}
-      >
-        <span className="relative flex shrink-0 items-center justify-center">
-          {tab.kind === "local" ? (
-            <HardDrive className="size-3" />
-          ) : (
-            <Server className="size-3" />
+      <ContextMenuTrigger asChild>
+        <div
+          data-sftp-tab-id={tab.id}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishPointerDrag}
+          onPointerCancel={finishPointerDrag}
+          onDoubleClick={(event) => {
+            if ((event.target as HTMLElement).closest("[data-tab-close]"))
+              return;
+            onReopen();
+          }}
+          onAuxClick={(event) => {
+            if (event.button === 1) onClose();
+          }}
+          className={cn(
+            WORKBENCH_TAB_CLASS,
+            "h-[var(--compact-tab-height)] w-fit min-w-24 max-w-44 gap-1.5 px-2",
+            dragged && "opacity-50",
+            active
+              ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
+              : WORKBENCH_TAB_INACTIVE_CLASS,
           )}
-          <span
+        >
+          <TabsTrigger
+            value={tab.id}
+            className="flex min-w-0 flex-1 items-center justify-start gap-1.5 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+            onKeyDown={(event) => {
+              if (
+                event.altKey &&
+                (event.key === "ArrowLeft" || event.key === "ArrowRight")
+              ) {
+                event.preventDefault();
+                onKeyboardMove(event.key === "ArrowLeft" ? -1 : 1);
+              }
+            }}
+          >
+            <span className="relative flex shrink-0 items-center justify-center">
+              {tab.kind === "local" ? (
+                <HardDrive className="size-3" />
+              ) : (
+                <Server className="size-3" />
+              )}
+              <span
+                className={cn(
+                  "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-[var(--tab-background)]",
+                  STATUS_DOT_CLASS[tab.status],
+                )}
+              />
+            </span>
+            <span className="min-w-0 max-w-28 truncate text-left">{label}</span>
+          </TabsTrigger>
+          <button
+            data-tab-close
+            type="button"
+            tabIndex={active ? 0 : -1}
+            aria-label={t("editor.closeTab")}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClose();
+            }}
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-[var(--tab-background)]",
-              STATUS_DOT_CLASS[tab.status],
+              WORKBENCH_TAB_CLOSE_CLASS,
+              "size-4",
+              !active && WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
             )}
-          />
-        </span>
-        <span className="min-w-0 max-w-28 truncate text-left">{label}</span>
-      </TabsTrigger>
-      <button
-        data-tab-close
-        type="button"
-        tabIndex={active ? 0 : -1}
-        aria-label={t("editor.closeTab")}
-        onClick={(event) => {
-          event.stopPropagation();
-          onClose();
-        }}
-        className={cn(
-          WORKBENCH_TAB_CLOSE_CLASS,
-          "size-4",
-          !active && WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {canReconnect && (
+          <ContextMenuItem onSelect={onReconnect}>
+            <PlugZap /> {t("terminal.reconnect")}
+          </ContextMenuItem>
         )}
-      >
-        <X className="size-3" />
-      </button>
-    </div>
+        {canRefresh && (
+          <ContextMenuItem onSelect={onRefresh}>
+            <RefreshCw /> {t("sftp.refresh")}
+          </ContextMenuItem>
+        )}
+        {(canReconnect || canRefresh) && <ContextMenuSeparator />}
+        <ContextMenuItem onSelect={onClose}>
+          <X /> {t("editor.closeTab")}
+        </ContextMenuItem>
+        <ContextMenuItem disabled={!canCloseOthers} onSelect={onCloseOthers}>
+          <CircleX /> {t("editor.closeOtherTabs")}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={onCloseAll}>
+          <SquareX /> {t("editor.closeAllTabs")}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

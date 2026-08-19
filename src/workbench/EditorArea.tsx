@@ -10,8 +10,26 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { FileText, Plus, TerminalSquare, X } from "lucide-react";
+import {
+  CircleX,
+  FileText,
+  PlugZap,
+  Plus,
+  Save,
+  SquareSplitHorizontal,
+  SquareSplitVertical,
+  SquareX,
+  TerminalSquare,
+  X,
+} from "lucide-react";
 
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui";
 import { type ConfirmState } from "@/components/ui/confirm-dialog";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
@@ -92,6 +110,9 @@ export const EditorArea = memo(function EditorArea() {
     activeTab?.kind === "terminal" ? activeTab.activePaneId : null;
   const stripRef = useRef<HTMLDivElement>(null);
   const preserveTabFocusRef = useRef(false);
+  const suppressPaneFocusRef = useRef(false);
+  const bulkCloseQueueRef = useRef<string[] | null>(null);
+  const bulkClosePendingRef = useRef<string | null>(null);
   const [dragState, setDragState] = useState<TabDragState | null>(null);
   const isDragging = dragState !== null;
   const dropIndexRef = useRef<number | null>(null);
@@ -195,6 +216,57 @@ export const EditorArea = memo(function EditorArea() {
     });
   };
 
+  const processBulkClose = () => {
+    const queue = bulkCloseQueueRef.current;
+    if (!queue) return;
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      const tab = useTabsStore.getState().tabs.find((item) => item.id === id);
+      if (!tab) continue;
+      useTabsStore.getState().close(id);
+      if (useTabsStore.getState().pendingCloseId === id) {
+        bulkClosePendingRef.current = id;
+        return;
+      }
+    }
+    bulkCloseQueueRef.current = null;
+    bulkClosePendingRef.current = null;
+  };
+
+  const closeOtherTabs = (id: string) => {
+    bulkCloseQueueRef.current = tabs
+      .filter((tab) => tab.id !== id)
+      .map((tab) => tab.id);
+    processBulkClose();
+  };
+
+  const closeAllTabs = () => {
+    bulkCloseQueueRef.current = tabs.map((tab) => tab.id);
+    processBulkClose();
+  };
+
+  useEffect(() => {
+    if (pendingCloseId !== null) return;
+    const queue = bulkCloseQueueRef.current;
+    if (!queue || queue.length === 0) return;
+    const pendingId = bulkClosePendingRef.current;
+    bulkClosePendingRef.current = null;
+    if (
+      pendingId &&
+      useTabsStore.getState().tabs.some((tab) => tab.id === pendingId)
+    ) {
+      bulkCloseQueueRef.current = null;
+      return;
+    }
+    processBulkClose();
+  }, [pendingCloseId, tabs]);
+
+  const handleTabMenuOpen = (id: string) => {
+    if (id === activeId) return;
+    suppressPaneFocusRef.current = true;
+    setActive(id);
+  };
+
   const draggedTab = dragState
     ? tabs.find((tab) => tab.id === dragState.id)
     : undefined;
@@ -276,8 +348,9 @@ export const EditorArea = memo(function EditorArea() {
     stripRef.current
       ?.querySelector(`[data-tab-id="${CSS.escape(activeId)}"]`)
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-    if (preserveTabFocusRef.current) {
+    if (preserveTabFocusRef.current || suppressPaneFocusRef.current) {
       preserveTabFocusRef.current = false;
+      suppressPaneFocusRef.current = false;
       return;
     }
     if (activePaneId) focusTerminal(activePaneId);
@@ -323,6 +396,10 @@ export const EditorArea = memo(function EditorArea() {
                   active={tab.id === activeId}
                   dragged={dragState?.id === tab.id}
                   onClose={() => close(tab.id)}
+                  onCloseOthers={() => closeOtherTabs(tab.id)}
+                  onCloseAll={closeAllTabs}
+                  canCloseOthers={tabs.length > 1}
+                  onMenuOpen={() => handleTabMenuOpen(tab.id)}
                   onDragStart={(pointer) => handleTabDragStart(tab.id, pointer)}
                   onDragMove={(clientX, clientY) =>
                     handleTabDragMove(tab.id, clientX, clientY)
@@ -418,6 +495,10 @@ function TabItem({
   active,
   dragged,
   onClose,
+  onCloseOthers,
+  onCloseAll,
+  canCloseOthers,
+  onMenuOpen,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -427,6 +508,10 @@ function TabItem({
   active: boolean;
   dragged: boolean;
   onClose: () => void;
+  onCloseOthers: () => void;
+  onCloseAll: () => void;
+  canCloseOthers: boolean;
+  onMenuOpen: () => void;
   onDragStart: (pointer: TabDragPointer) => void;
   onDragMove: (clientX: number, clientY: number) => void;
   onDragEnd: (didDrag: boolean) => void;
@@ -436,6 +521,9 @@ function TabItem({
   const openTerminal = useTabsStore((s) => s.openTerminal);
   const openLocalTerminal = useTabsStore((s) => s.openLocalTerminal);
   const openAdhocTerminal = useTabsStore((s) => s.openAdhocTerminal);
+  const reconnectTerminal = useTabsStore((s) => s.reconnectTerminal);
+  const splitPane = useTabsStore((s) => s.splitPane);
+  const saveFile = useTabsStore((s) => s.saveFile);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -446,6 +534,10 @@ function TabItem({
   const title = tabTitle(tab);
   const dirty = tab.kind === "file" && isFileDirty(tab);
   const pane = tab.kind === "terminal" ? activePane(tab) : null;
+  const canReconnect =
+    pane !== null &&
+    pane.target !== "local" &&
+    (pane.status === "closed" || pane.status === "error");
 
   const reopen = pane
     ? pane.target === "local"
@@ -508,92 +600,145 @@ function TabItem({
   };
 
   return (
-    <div
-      data-tab-id={tab.id}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={finishPointerDrag}
-      onPointerCancel={(event) => finishPointerDrag(event, true)}
-      onLostPointerCapture={(event) => finishPointerDrag(event, true)}
-      onDoubleClick={(event) => {
-        if ((event.target as HTMLElement).closest("[data-tab-close]")) return;
-        reopen?.();
+    <ContextMenu
+      onOpenChange={(open) => {
+        if (open) onMenuOpen();
       }}
-      onAuxClick={(e) => {
-        if (e.button === 1) {
-          e.preventDefault();
-          onClose();
-        }
-      }}
-      className={cn(
-        WORKBENCH_TAB_CLASS,
-        "h-[var(--workbench-tab-height)] w-fit min-w-24 max-w-52 gap-2 px-3",
-        dragged && "opacity-50",
-        active
-          ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
-          : WORKBENCH_TAB_INACTIVE_CLASS,
-      )}
     >
-      <TabsTrigger
-        value={tab.id}
-        className="flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
-        onKeyDown={(e) => {
-          if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) {
-            return;
-          }
-          e.preventDefault();
-          onKeyboardMove(e.key === "ArrowLeft" ? -1 : 1);
-        }}
-      >
-        {tab.kind === "terminal" && pane ? (
-          <span className="relative flex shrink-0 items-center justify-center">
-            <TerminalSquare className="size-3.5" />
-            <span
-              className={cn(
-                "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2",
-                "ring-[var(--tab-background)]",
-                STATUS_DOT_CLASS[pane.status],
-              )}
-            />
-          </span>
-        ) : (
-          <FileText className="size-3.5 shrink-0" />
-        )}
+      <ContextMenuTrigger asChild>
+        <div
+          data-tab-id={tab.id}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishPointerDrag}
+          onPointerCancel={(event) => finishPointerDrag(event, true)}
+          onLostPointerCapture={(event) => finishPointerDrag(event, true)}
+          onDoubleClick={(event) => {
+            if ((event.target as HTMLElement).closest("[data-tab-close]"))
+              return;
+            reopen?.();
+          }}
+          onAuxClick={(e) => {
+            if (e.button === 1) {
+              e.preventDefault();
+              onClose();
+            }
+          }}
+          className={cn(
+            WORKBENCH_TAB_CLASS,
+            "h-[var(--workbench-tab-height)] w-fit min-w-24 max-w-52 gap-2 px-3",
+            dragged && "opacity-50",
+            active
+              ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
+              : WORKBENCH_TAB_INACTIVE_CLASS,
+          )}
+        >
+          <TabsTrigger
+            value={tab.id}
+            className="flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+            onKeyDown={(e) => {
+              if (
+                !e.altKey ||
+                (e.key !== "ArrowLeft" && e.key !== "ArrowRight")
+              ) {
+                return;
+              }
+              e.preventDefault();
+              onKeyboardMove(e.key === "ArrowLeft" ? -1 : 1);
+            }}
+          >
+            {tab.kind === "terminal" && pane ? (
+              <span className="relative flex shrink-0 items-center justify-center">
+                <TerminalSquare className="size-3.5" />
+                <span
+                  className={cn(
+                    "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-2",
+                    "ring-[var(--tab-background)]",
+                    STATUS_DOT_CLASS[pane.status],
+                  )}
+                />
+              </span>
+            ) : (
+              <FileText className="size-3.5 shrink-0" />
+            )}
 
-        <span className="min-w-0 max-w-36 truncate text-left">{title}</span>
+            <span className="min-w-0 max-w-36 truncate text-left">{title}</span>
 
-        {tab.kind === "terminal" && tab.panes.length > 1 && (
-          <span className="shrink-0 rounded-sm bg-accent px-1 font-mono text-[10px] leading-4 text-muted-foreground">
-            {tab.panes.length}
-          </span>
-        )}
+            {tab.kind === "terminal" && tab.panes.length > 1 && (
+              <span className="shrink-0 rounded-sm bg-accent px-1 font-mono text-[10px] leading-4 text-muted-foreground">
+                {tab.panes.length}
+              </span>
+            )}
 
-        {dirty && (
-          <span
-            aria-label={t("editor.unsavedIndicator")}
-            className="size-1.5 shrink-0 rounded-full bg-foreground/70"
-          />
-        )}
-      </TabsTrigger>
+            {dirty && (
+              <span
+                aria-label={t("editor.unsavedIndicator")}
+                className="size-1.5 shrink-0 rounded-full bg-foreground/70"
+              />
+            )}
+          </TabsTrigger>
 
-      <button
-        data-tab-close
-        type="button"
-        tabIndex={active ? 0 : -1}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        aria-label={t("editor.closeTab")}
-        className={cn(
-          WORKBENCH_TAB_CLOSE_CLASS,
-          "size-5",
-          !active && WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
+          <button
+            data-tab-close
+            type="button"
+            tabIndex={active ? 0 : -1}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            aria-label={t("editor.closeTab")}
+            className={cn(
+              WORKBENCH_TAB_CLOSE_CLASS,
+              "size-5",
+              !active && WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
+            )}
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {tab.kind === "terminal" && pane && (
+          <>
+            {canReconnect && (
+              <ContextMenuItem onSelect={() => reconnectTerminal(pane.id)}>
+                <PlugZap /> {t("terminal.reconnect")}
+              </ContextMenuItem>
+            )}
+            <ContextMenuItem onSelect={() => reopen?.()}>
+              <Plus /> {t("editor.newSession")}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => splitPane(pane.id, "right")}>
+              <SquareSplitHorizontal /> {t("commands.terminal.splitRight")}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => splitPane(pane.id, "down")}>
+              <SquareSplitVertical /> {t("commands.terminal.splitDown")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
         )}
-      >
-        <X className="size-3.5" />
-      </button>
-    </div>
+        {tab.kind === "file" && (
+          <>
+            <ContextMenuItem
+              disabled={!dirty || tab.saving}
+              onSelect={() => void saveFile(tab.id)}
+            >
+              <Save /> {t("common.save")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
+        <ContextMenuItem onSelect={onClose}>
+          <X /> {t("editor.closeTab")}
+        </ContextMenuItem>
+        <ContextMenuItem disabled={!canCloseOthers} onSelect={onCloseOthers}>
+          <CircleX /> {t("editor.closeOtherTabs")}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={onCloseAll}>
+          <SquareX /> {t("editor.closeAllTabs")}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

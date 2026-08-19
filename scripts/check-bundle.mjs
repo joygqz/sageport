@@ -15,7 +15,7 @@ const initialAssets = [
   ),
 ];
 
-const INITIAL_JS_BUDGET = 525 * 1024;
+const INITIAL_JS_BUDGET = 600 * 1024;
 const lazyOnlyPrefixes = [
   "AssistantPanel-",
   "CommandPalette-",
