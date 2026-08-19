@@ -1,4 +1,10 @@
-import { useMemo, useState, type FocusEventHandler } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEventHandler,
+} from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 
@@ -43,6 +49,10 @@ export function TreeSelect({
   className?: string;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const previousValueRef = useRef(value);
+  useEffect(() => {
+    previousValueRef.current = value;
+  }, [value]);
   const rows = useMemo(
     () => buildTreeSelectRows(nodes, collapsed),
     [collapsed, nodes],
@@ -83,7 +93,10 @@ export function TreeSelect({
   return (
     <SelectPrimitive.Root
       value={encodeValue(value)}
-      onValueChange={(next) => onValueChange(decodeValue(next))}
+      onValueChange={(next) => {
+        const decoded = decodeValue(next);
+        if (decoded !== previousValueRef.current) onValueChange(decoded);
+      }}
       onOpenChange={(open) => {
         if (open) revealSelection();
       }}
