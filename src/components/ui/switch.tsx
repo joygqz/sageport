@@ -2,6 +2,7 @@ import * as React from "react";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 
 import { cn } from "@/lib/utils";
+import { INTERACTIVE_FOCUS_CLASS } from "./styles";
 
 export const Switch = React.forwardRef<
   React.ComponentRef<typeof SwitchPrimitive.Root>,
@@ -11,7 +12,7 @@ export const Switch = React.forwardRef<
     ref={ref}
     className={cn(
       "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+      INTERACTIVE_FOCUS_CLASS,
       "disabled:cursor-not-allowed disabled:opacity-50",
       "data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
       className,

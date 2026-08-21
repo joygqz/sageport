@@ -272,7 +272,7 @@ function OperationStrip() {
   if (active.length === 0) return null;
 
   return (
-    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border-subtle bg-surface/80 px-2.5">
+    <div className="flex max-h-28 flex-col overflow-y-auto border-t border-border-subtle bg-surface px-2.5">
       {active.map((item) => {
         const pct =
           item.total > 0

@@ -102,7 +102,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
               key={p.kind}
               value={p.kind}
               className={cn(
-                "flex min-w-0 flex-col gap-1.5 rounded-lg border bg-surface-raised p-3 text-left transition-[background-color,border-color,box-shadow]",
+                "flex min-w-0 flex-col gap-1.5 rounded-lg border bg-surface-raised p-3 text-left transition-colors",
                 CONTROL_FOCUS_CLASS,
                 active
                   ? "border-primary bg-primary/8 ring-2 ring-primary/20"

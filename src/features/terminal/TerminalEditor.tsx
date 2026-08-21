@@ -668,7 +668,7 @@ function Shell({
     <div
       className={cn(
         "absolute inset-0 z-10 overflow-auto",
-        opaque ? "bg-terminal-background" : "bg-background/85 backdrop-blur-sm",
+        opaque ? "bg-terminal-background" : "bg-background",
       )}
     >
       <div className="flex min-h-full w-full flex-col items-center justify-center gap-3 p-3">

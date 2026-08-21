@@ -28,7 +28,7 @@ export function SideBarFilter({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="h-[var(--control-height-sm)] bg-background/70 pl-8 text-xs"
+          className="h-[var(--control-height-sm)] bg-surface-sunken pl-8 text-xs"
         />
       </div>
     </div>

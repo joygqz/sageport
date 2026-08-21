@@ -71,7 +71,7 @@ export function FormBody({
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
     >
       <div className="ui-dialog-body overflow-y-auto">{children}</div>
-      <div className="ui-dialog-footer border-t border-border-subtle bg-surface/55">
+      <div className="ui-dialog-footer border-t border-border-subtle bg-surface-sunken">
         {footerStart && <div className="mr-auto">{footerStart}</div>}
         <Button type="button" variant="ghost" onClick={onClose}>
           {t("common.cancel")}

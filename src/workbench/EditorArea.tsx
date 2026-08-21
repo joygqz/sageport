@@ -29,6 +29,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  INTERACTIVE_FOCUS_CLASS,
 } from "@/components/ui";
 import { type ConfirmState } from "@/components/ui/confirm-dialog";
 import { Kbd } from "@/components/ui/kbd";
@@ -415,7 +416,10 @@ export const EditorArea = memo(function EditorArea() {
               <button
                 type="button"
                 onClick={() => openPalette("quick")}
-                className="flex size-[var(--workbench-tab-height)] shrink-0 items-center justify-center self-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/45"
+                className={cn(
+                  "flex size-[var(--workbench-tab-height)] shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                  INTERACTIVE_FOCUS_CLASS,
+                )}
               >
                 <Plus className="size-4" />
               </button>
@@ -635,7 +639,10 @@ function TabItem({
         >
           <TabsTrigger
             value={tab.id}
-            className="flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+            className={cn(
+              "flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-md text-left",
+              INTERACTIVE_FOCUS_CLASS,
+            )}
             onKeyDown={(e) => {
               if (
                 !e.altKey ||
@@ -755,7 +762,7 @@ function TabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-list-active px-2.5 text-xs text-list-active-foreground opacity-95 shadow-md"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-list-active px-2.5 text-xs text-list-active-foreground"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -803,7 +810,7 @@ function Watermark() {
   });
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background [background-image:radial-gradient(circle_at_50%_42%,color-mix(in_oklch,var(--color-primary)_7%,transparent),transparent_32%)]">
+    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
       <div className="m-auto grid min-w-max grid-cols-[auto_auto] items-center gap-x-4 gap-y-2.5 p-3">
         {hints.map((hint) => (
           <Fragment key={hint.label}>

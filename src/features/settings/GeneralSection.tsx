@@ -242,7 +242,7 @@ function ThemeFamilyCard({
     <RadioGroupItem
       value={family.id}
       className={cn(
-        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-surface-raised text-left shadow-sm transition-[border-color,box-shadow]",
+        "group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-surface-raised text-left transition-colors",
         CONTROL_FOCUS_CLASS,
         active ? "border-primary ring-2 ring-primary/25" : CONTROL_BORDER_CLASS,
       )}

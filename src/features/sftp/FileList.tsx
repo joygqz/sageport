@@ -418,7 +418,7 @@ export function FileList({
               setToolbarVisible(true);
             }}
             className={cn(
-              "absolute inset-x-0 top-0 z-10 flex h-[var(--control-height)] items-center gap-1 border-b border-border-subtle bg-surface/95 px-1.5 transition-transform duration-200 ease-out motion-reduce:transition-none",
+              "absolute inset-x-0 top-0 z-10 flex h-[var(--control-height)] items-center gap-1 border-b border-border-subtle bg-surface px-1.5 transition-transform duration-200 ease-out motion-reduce:transition-none",
               toolbarVisible
                 ? "translate-y-0"
                 : "pointer-events-none -translate-y-full",
@@ -856,7 +856,7 @@ function FileDragGhost({ dragState }: { dragState: FileDragState }) {
       {previewEntries.map((entry, index) => (
         <div
           key={entry.path}
-          className="flex w-full items-center gap-2 rounded-md border border-border-strong bg-popover px-2 text-xs text-popover-foreground opacity-95 shadow-md"
+          className="flex w-full items-center gap-2 rounded-md border border-border-strong bg-popover px-2 text-xs text-popover-foreground opacity-95"
           style={{ height: dragState.rect.height }}
         >
           <EntryIcon entry={entry} />

@@ -19,6 +19,7 @@ import {
   DialogToolbar,
   ErrorState,
   Field,
+  INTERACTIVE_FOCUS_CLASS,
   LoadingState,
   ScrollArea,
   Select,
@@ -172,7 +173,7 @@ function SettingsPage({
   return (
     <div className="settings-page min-h-0 flex-1 overflow-hidden bg-background">
       <div className="flex h-full min-w-0 flex-col sm:flex-row">
-        <aside className="flex shrink-0 flex-col border-b border-border-subtle bg-surface/65 px-2 py-2 sm:w-48 sm:border-b-0 sm:border-r sm:px-2.5 sm:py-3">
+        <aside className="flex shrink-0 flex-col border-b border-border-subtle bg-surface-sunken px-2 py-2 sm:w-48 sm:border-b-0 sm:border-r sm:px-2.5 sm:py-3">
           <nav
             className="scrollbar-none flex gap-1 overflow-x-auto sm:flex-col sm:overflow-visible"
             aria-label={t("settings.title")}
@@ -187,7 +188,8 @@ function SettingsPage({
                   aria-current={active ? "page" : undefined}
                   onClick={() => onSectionChange(item.id)}
                   className={cn(
-                    "flex h-[var(--control-height)] shrink-0 items-center gap-2.5 rounded-md px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 sm:w-full",
+                    INTERACTIVE_FOCUS_CLASS,
+                    "flex h-[var(--control-height)] shrink-0 items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors sm:w-full",
                     active
                       ? "bg-list-active font-medium text-list-active-foreground"
                       : "text-muted-foreground hover:bg-list-hover hover:text-foreground",
@@ -511,7 +513,7 @@ function ToolTreeGroup({
           <button
             type="button"
             aria-label={groupLabel}
-            className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className={cn("shrink-0 rounded-sm", INTERACTIVE_FOCUS_CLASS)}
           >
             <ChevronRight
               className={cn(
@@ -531,7 +533,10 @@ function ToolTreeGroup({
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left",
+              INTERACTIVE_FOCUS_CLASS,
+            )}
           >
             <span className="min-w-0 flex-1 truncate text-xs font-medium">
               {groupLabel}

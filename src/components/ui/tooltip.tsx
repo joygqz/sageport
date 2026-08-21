@@ -39,7 +39,7 @@ function TooltipContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "pointer-events-none z-50 max-w-72 select-none overflow-hidden rounded-md bg-foreground px-2.5 py-1.5 text-center text-xs font-medium leading-snug text-background shadow-sm",
+          "pointer-events-none z-50 max-w-72 select-none overflow-hidden rounded-md bg-foreground px-2.5 py-1.5 text-center text-xs font-medium leading-snug text-background",
           "data-[state=delayed-open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=delayed-open]:fade-in-0",
           className,
         )}

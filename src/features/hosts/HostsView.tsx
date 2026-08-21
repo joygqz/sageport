@@ -578,13 +578,13 @@ export function HostsView() {
       <PanelContent
         data-group-root-drop-target
         className={cn(
-          "relative space-y-[var(--panel-gutter)] transition-shadow",
+          "relative space-y-[var(--panel-gutter)]",
           (groupDropTarget === GROUP_ROOT || dropTarget === UNGROUPED) &&
             "ring-1 ring-inset ring-ring/50",
         )}
       >
         {(groupDropTarget === GROUP_ROOT || dropTarget === UNGROUPED) && (
-          <div className="pointer-events-none absolute right-2 top-2 z-10 !m-0 rounded-md bg-popover px-2 py-1 text-2xs text-popover-foreground shadow-sm">
+          <div className="pointer-events-none absolute right-2 top-2 z-10 !m-0 rounded-md bg-popover px-2 py-1 text-2xs text-popover-foreground">
             {groupDropTarget === GROUP_ROOT
               ? t("hosts.moveGroup.toTopLevel")
               : t("hosts.move.toUngrouped")}
@@ -806,7 +806,7 @@ function GroupSection({
         depth > 0 ? { marginLeft: `${Math.min(depth, 6) * 12}px` } : undefined
       }
       className={cn(
-        "rounded-md transition-[background-color,box-shadow]",
+        "rounded-md transition-colors",
         (isHostDropTarget || isGroupDropTarget) &&
           "bg-list-hover ring-1 ring-inset ring-ring/50",
         dragging && "opacity-50",
@@ -1055,7 +1055,7 @@ function HostDragGhost({ dragState }: { dragState: HostDragState }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95 shadow-md"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -1079,7 +1079,7 @@ function GroupDragGhost({ dragState }: { dragState: GroupDragState }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95 shadow-md"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,

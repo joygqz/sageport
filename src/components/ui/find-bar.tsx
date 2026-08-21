@@ -31,7 +31,7 @@ export function FindBar({
         onDismiss();
       }}
       className={cn(
-        "absolute right-3 top-2 z-30 rounded-lg border border-border-strong bg-popover p-1 shadow-sm",
+        "absolute right-3 top-2 z-30 rounded-lg border border-border-strong bg-popover p-1",
         className,
       )}
     >

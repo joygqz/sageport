@@ -92,7 +92,7 @@ export function TaskFormDialog({
 
 const PICKER_INTERACTIVE_CLASS = cn(
   INTERACTIVE_FOCUS_CLASS,
-  "rounded-lg border border-border-subtle bg-surface-raised text-left shadow-sm transition-colors hover:border-ring/60 hover:bg-list-hover",
+  "rounded-lg border border-border-subtle bg-surface-raised text-left transition-colors hover:border-ring/60 hover:bg-list-hover",
 );
 
 function TemplatePicker({ onPick }: { onPick: (draft: TaskDraft) => void }) {

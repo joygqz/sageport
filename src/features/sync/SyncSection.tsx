@@ -150,7 +150,7 @@ function ConnectedCard({ status }: { status: SyncStatus }) {
         <Badge variant="primary">{t("settings.sync.connected.badge")}</Badge>
       </div>
 
-      <div className="ui-list-row flex flex-wrap border-t border-border-subtle bg-surface/35">
+      <div className="ui-list-row flex flex-wrap border-t border-border-subtle bg-surface-sunken">
         <Button variant="outline" onClick={doPush} loading={push.isPending}>
           {t("settings.sync.connected.pushButton")}
         </Button>

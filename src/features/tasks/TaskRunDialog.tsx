@@ -165,7 +165,7 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
         )}
       </div>
 
-      <div className="ui-dialog-footer border-t border-border-subtle bg-surface/55">
+      <div className="ui-dialog-footer border-t border-border-subtle bg-surface-sunken">
         <RunSummary run={run} />
         <Button variant="ghost" onClick={onClose}>
           {t("common.close")}

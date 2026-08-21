@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   Input,
+  INTERACTIVE_FOCUS_CLASS,
   Tabs,
   TabsContent,
   TabsList,
@@ -749,7 +750,7 @@ function SftpTabItem({
         >
           <TabsTrigger
             value={tab.id}
-            className="flex min-w-0 flex-1 items-center justify-start gap-1.5 self-stretch rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+            className={`flex min-w-0 flex-1 items-center justify-start gap-1.5 self-stretch rounded-md text-left ${INTERACTIVE_FOCUS_CLASS}`}
             onKeyDown={(event) => {
               if (
                 event.altKey &&
@@ -833,7 +834,7 @@ function SftpTabDragGhost({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[1001] flex items-center gap-1.5 rounded-md border border-border-strong bg-list-active px-2 text-xs text-list-active-foreground opacity-95 shadow-md"
+      className="pointer-events-none fixed z-[1001] flex items-center gap-1.5 rounded-md border border-border-strong bg-list-active px-2 text-xs text-list-active-foreground opacity-95"
       style={{
         left: dragState.clientX,
         top: dragState.clientY,
@@ -901,7 +902,7 @@ function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
         setValue(displayedPath);
         scrollToEnd();
       }}
-      className="ml-1 h-[var(--compact-row-height)] min-w-0 flex-1 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground shadow-none transition-colors hover:bg-surface-raised focus-visible:bg-surface-raised focus-visible:text-foreground"
+      className="ml-1 h-[var(--compact-row-height)] min-w-0 flex-1 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-surface-raised focus-visible:bg-surface-raised focus-visible:text-foreground"
     />
   );
 }

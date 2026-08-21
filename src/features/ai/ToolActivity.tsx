@@ -181,7 +181,7 @@ export function ToolActivity({
             </pre>
           )}
           {details && (
-            <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap rounded bg-muted/60 p-1.5 font-mono text-2xs text-muted-foreground">
+            <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap rounded bg-muted p-1.5 font-mono text-2xs text-muted-foreground">
               {details}
             </pre>
           )}

@@ -3,6 +3,7 @@ import { Copy, Minus, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { useI18n } from "@/i18n";
+import { INTERACTIVE_FOCUS_CLASS } from "@/components/ui";
 import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -46,8 +47,10 @@ export function WindowControls() {
     );
   };
 
-  const buttonClass =
-    "flex h-full w-11 items-center justify-center text-surface-foreground/70 outline-none transition-colors hover:bg-black/[0.06] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60 dark:hover:bg-white/10";
+  const buttonClass = cn(
+    "flex h-full w-11 items-center justify-center text-surface-foreground/70 transition-colors hover:bg-black/[0.06] dark:hover:bg-white/10",
+    INTERACTIVE_FOCUS_CLASS,
+  );
 
   return (
     <div className="flex h-full items-center">

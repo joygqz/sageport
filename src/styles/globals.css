@@ -77,24 +77,11 @@
   --dialog-width-md: 480px;
   --dialog-width-lg: 560px;
   --dialog-width-xl: 620px;
-
-  --elevation-sm:
-    0 1px 2px color-mix(in oklch, var(--foreground) 7%, transparent),
-    0 6px 18px color-mix(in oklch, var(--foreground) 6%, transparent);
-  --elevation-md:
-    0 2px 6px color-mix(in oklch, var(--foreground) 7%, transparent),
-    0 18px 48px color-mix(in oklch, var(--foreground) 12%, transparent);
 }
 
 .dark {
   color-scheme: dark;
   --tab-active: color-mix(in oklch, var(--list-active) 65%, var(--surface));
-  --elevation-sm:
-    0 1px 2px color-mix(in oklch, black 34%, transparent),
-    0 6px 18px color-mix(in oklch, black 26%, transparent);
-  --elevation-md:
-    0 3px 8px color-mix(in oklch, black 36%, transparent),
-    0 20px 48px color-mix(in oklch, black 44%, transparent);
 }
 
 @theme inline {
@@ -151,9 +138,6 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-
-  --shadow-sm: var(--elevation-sm);
-  --shadow-md: var(--elevation-md);
 
   --font-sans:
     "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
@@ -301,8 +285,6 @@
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius);
     background: var(--color-surface-raised);
-    box-shadow: inset 0 1px
-      color-mix(in oklch, var(--color-foreground) 3%, transparent);
   }
 
   .ui-muted-panel {

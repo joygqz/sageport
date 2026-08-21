@@ -11,6 +11,7 @@ import {
 import { memo, type ButtonHTMLAttributes } from "react";
 
 import { useI18n } from "@/i18n";
+import { INTERACTIVE_FOCUS_CLASS } from "@/components/ui";
 import { cn, formatBytes } from "@/lib/utils";
 import { useBroadcastStore } from "@/features/terminal/broadcast";
 import { statsPercents, useMonitorStore } from "@/features/terminal/monitor";
@@ -29,7 +30,7 @@ export const StatusBar = memo(function StatusBar() {
   const { t } = useI18n();
 
   return (
-    <footer className="flex h-[var(--statusbar-height)] shrink-0 select-none items-center justify-between border-t border-border-subtle bg-surface/95 text-2xs text-muted-foreground">
+    <footer className="flex h-[var(--statusbar-height)] shrink-0 select-none items-center justify-between border-t border-border-subtle bg-surface text-2xs text-muted-foreground">
       <div className="flex h-full min-w-0 items-center overflow-hidden">
         <SessionItem />
         <MonitorItem />
@@ -64,7 +65,8 @@ function StatusBarItem({
       title={title}
       className={cn(
         STATUS_BAR_ITEM_LAYOUT_CLASS,
-        "outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60",
+        "transition-colors hover:bg-accent hover:text-accent-foreground",
+        INTERACTIVE_FOCUS_CLASS,
         className,
       )}
     >

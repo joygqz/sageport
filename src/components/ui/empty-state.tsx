@@ -32,7 +32,7 @@ export function EmptyState({
       {Icon && (
         <div
           className={cn(
-            "flex size-[var(--empty-state-icon-size)] items-center justify-center rounded-lg border border-border-subtle bg-muted/35 text-muted-foreground",
+            "flex size-[var(--empty-state-icon-size)] items-center justify-center rounded-lg border border-border-subtle bg-muted text-muted-foreground",
             iconClassName,
           )}
         >

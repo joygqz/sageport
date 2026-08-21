@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RotateCcw, Search, Unlink } from "lucide-react";
 
 import { Button, Input, Kbd, SectionHeader, Tooltip } from "@/components/ui";
+import { INTERACTIVE_FOCUS_CLASS } from "@/components/ui/styles";
 import { useI18n } from "@/i18n";
 import { IS_MACOS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -210,7 +211,8 @@ export function KeybindingsSection() {
                           command: label,
                         })}
                         className={cn(
-                          "flex h-[var(--control-height-sm)] min-w-36 items-center justify-center rounded-md border px-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40",
+                          "flex h-[var(--control-height-sm)] min-w-36 items-center justify-center rounded-md border px-2 text-xs transition-colors",
+                          INTERACTIVE_FOCUS_CLASS,
                           editing
                             ? "border-primary bg-primary/10 text-foreground"
                             : "border-border-strong bg-surface hover:bg-muted",

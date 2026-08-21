@@ -11,6 +11,7 @@ import type { LucideIcon } from "lucide-react";
 import { memo } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
+import { INTERACTIVE_FOCUS_CLASS } from "@/components/ui/styles";
 import { useI18n, type TKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type Activity } from "./layout";
@@ -29,8 +30,10 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "monitor", icon: Gauge, labelKey: "activityBar.monitor" },
 ];
 
-const ACTIVITY_BUTTON_CLASS =
-  "flex size-[var(--activity-control-size)] items-center justify-center rounded-md outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45";
+const ACTIVITY_BUTTON_CLASS = cn(
+  "flex size-[var(--activity-control-size)] items-center justify-center rounded-md transition-colors",
+  INTERACTIVE_FOCUS_CLASS,
+);
 
 export const ActivityBar = memo(function ActivityBar() {
   const { t } = useI18n();
@@ -40,7 +43,7 @@ export const ActivityBar = memo(function ActivityBar() {
   const openSettings = useOverlayStore((s) => s.openSettings);
 
   return (
-    <nav className="flex w-[var(--activitybar-width)] shrink-0 flex-col items-center justify-between border-r border-border-subtle bg-surface/95 py-1.5">
+    <nav className="flex w-[var(--activitybar-width)] shrink-0 flex-col items-center justify-between border-r border-border-subtle bg-surface py-1.5">
       <div className="flex flex-col items-center gap-1">
         {ACTIVITIES.map((item) => {
           const Icon = item.icon;

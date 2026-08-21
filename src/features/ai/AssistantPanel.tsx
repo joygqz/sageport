@@ -404,7 +404,7 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
 
           <div className="shrink-0 px-3 pb-3 pt-2">
-            <div className="overflow-hidden rounded-lg border border-border-strong bg-surface-raised shadow-sm transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/35">
+            <div className="overflow-hidden rounded-lg border border-border-strong bg-surface-raised transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/35">
               <Textarea
                 ref={inputRef}
                 rows={1}
@@ -441,7 +441,7 @@ export function AssistantPanel({ width }: { width: number }) {
                   title={t("ai.modelLabel")}
                   disabled={models.length === 0}
                   showChevron={false}
-                  className="h-[var(--toolbar-control-size)] w-auto min-w-0 max-w-[70%] border-0 bg-transparent px-2 text-xs shadow-none hover:bg-accent focus-visible:ring-0"
+                  className="h-[var(--toolbar-control-size)] w-auto min-w-0 max-w-[70%] border-0 bg-transparent px-2 text-xs hover:bg-accent focus-visible:ring-0"
                 />
                 <div className="ml-auto flex items-center gap-1.5">
                   {pending ? (
@@ -582,7 +582,7 @@ function Bubble({
 }) {
   if (role === "user") {
     return (
-      <div className="ml-auto max-w-[88%] rounded-lg rounded-br-sm border border-border-subtle bg-muted/70 px-3 py-2">
+      <div className="ml-auto max-w-[88%] rounded-lg rounded-br-sm border border-border-subtle bg-muted px-3 py-2">
         <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
           {content}
         </p>

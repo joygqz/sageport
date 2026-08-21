@@ -210,7 +210,7 @@ function HostCard({
       type="button"
       onClick={() => setActive(primary.id)}
       className={cn(
-        "group flex flex-col gap-2.5 rounded-lg border border-border-subtle bg-surface-raised p-2.5 text-left transition-[background-color,border-color,box-shadow] hover:border-border-strong hover:bg-list-hover",
+        "group flex flex-col gap-2.5 rounded-lg border border-border-subtle bg-surface-raised p-2.5 text-left transition-colors hover:border-border-strong hover:bg-list-hover",
         INTERACTIVE_FOCUS_CLASS,
         active && "border-primary/60 bg-list-active/45",
       )}
