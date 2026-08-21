@@ -67,7 +67,11 @@ export function AssistantPanel({ width }: { width: number }) {
   const { data: config } = useAiConfig();
   const setModel = useSetAiModel();
   const configured = Boolean(config?.baseUrl.trim());
-  const { data: fetchedModels, error: modelsError } = useAiModels(configured);
+  const {
+    data: fetchedModels,
+    error: modelsError,
+    isLoading: modelsLoading,
+  } = useAiModels(configured);
   const toggleAux = useLayoutStore((s) => s.toggleAux);
   const openSettings = useOverlayStore((s) => s.openSettings);
 
@@ -437,7 +441,13 @@ export function AssistantPanel({ width }: { width: number }) {
                     value: item,
                     label: item,
                   }))}
-                  placeholder={t("ai.modelLoading")}
+                  placeholder={
+                    modelsLoading
+                      ? t("ai.modelLoading")
+                      : models.length === 0
+                        ? t("ai.modelEmpty")
+                        : undefined
+                  }
                   title={t("ai.modelLabel")}
                   disabled={models.length === 0}
                   showChevron={false}

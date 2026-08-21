@@ -926,6 +926,7 @@ export const zhCN: Dictionary = {
     deny: "拒绝",
     modelLabel: "模型",
     modelLoading: "正在加载模型…",
+    modelEmpty: "无可用模型",
     promptTooLong: "消息过长，无法发送。",
     autonomousMode: "自动",
     autonomousModeHint:

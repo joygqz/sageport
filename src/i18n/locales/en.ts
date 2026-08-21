@@ -950,6 +950,7 @@ export const en = {
     deny: "Deny",
     modelLabel: "Model",
     modelLoading: "Loading models…",
+    modelEmpty: "No models available",
     promptTooLong: "The message is too long to send.",
     autonomousMode: "Autonomous",
     autonomousModeHint:
