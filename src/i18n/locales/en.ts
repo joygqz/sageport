@@ -243,6 +243,8 @@ export const en = {
     newSession: "New session",
     tabList: "Open sessions",
     closeTab: "Close tab",
+    closeOtherTabs: "Close other tabs",
+    closeAllTabs: "Close all tabs",
     tabLimitReached: "You can open up to {count} terminal sessions",
     fileTabLimitReached: "You can open up to {count} files",
     unsavedTitle: "Save changes?",
