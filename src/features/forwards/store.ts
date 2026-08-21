@@ -7,9 +7,9 @@ interface ForwardRuntime {
   status: ForwardStatusKind;
   message?: string;
   code?: string;
+  reconnectAttempt?: number;
   generation: number;
   sequence: number;
-  publicBindRestricted: boolean;
 }
 
 interface ForwardState {
@@ -24,9 +24,9 @@ function fromEvent(event: ForwardStatusEvent): ForwardRuntime {
     status: event.status,
     message: event.message,
     code: event.code,
+    reconnectAttempt: event.reconnectAttempt,
     generation: event.generation,
     sequence: event.sequence,
-    publicBindRestricted: event.publicBindRestricted,
   };
 }
 

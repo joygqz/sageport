@@ -151,8 +151,9 @@ pub async fn forward_start(
 #[tauri::command]
 pub async fn forward_stop(app: AppHandle, state: State<'_, AppState>, id: String) -> AppResult<()> {
     forward_repo::get(&state.db, &id).await?;
-    state.forwards.stop(&id).await;
-    state.forwards.report_stopped(&app, &id);
+    if !state.forwards.stop(&id).await {
+        state.forwards.report_stopped(&app, &id);
+    }
     Ok(())
 }
 
@@ -161,19 +162,28 @@ pub async fn start_auto_forwards(app: &AppHandle) {
     let Ok(forwards) = forward_repo::list_auto_start(&state.db).await else {
         return;
     };
-    let mut starts = JoinSet::new();
+    let mut by_host = std::collections::HashMap::<String, Vec<PortForward>>::new();
     for forward in forwards {
+        by_host
+            .entry(forward.host_id.clone())
+            .or_default()
+            .push(forward);
+    }
+    let mut starts = JoinSet::new();
+    for forwards in by_host.into_values() {
         let task_app = app.clone();
         starts.spawn(async move {
-            let state = task_app.state::<AppState>();
-            match build_spec(&state, &forward).await {
-                Ok(spec) => {
-                    let _ = state
-                        .forwards
-                        .start(task_app.clone(), state.connection_prompts.clone(), spec)
-                        .await;
+            for forward in forwards {
+                let state = task_app.state::<AppState>();
+                match build_spec(&state, &forward).await {
+                    Ok(spec) => {
+                        let _ = state
+                            .forwards
+                            .start(task_app.clone(), state.connection_prompts.clone(), spec)
+                            .await;
+                    }
+                    Err(error) => state.forwards.report_error(&task_app, &forward.id, &error),
                 }
-                Err(error) => state.forwards.report_error(&task_app, &forward.id, &error),
             }
         });
     }

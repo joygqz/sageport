@@ -36,9 +36,6 @@ async function findForward(id: string): Promise<PortForward | undefined> {
   return forwards.find((f) => f.id === id);
 }
 
-const GATEWAY_PORTS_NOTE =
-  "Note: the SSH server restricts public binds (GatewayPorts), so the remote listener is only reachable via loopback on the server.";
-
 async function forwardRuntime(
   id: string,
 ): Promise<ForwardStatusEvent | undefined> {
@@ -69,7 +66,12 @@ async function listForwards(): Promise<ToolExecutionResult> {
               : undefined,
           status: state?.status ?? "stopped",
           error: state?.status === "error" ? state.message : undefined,
-          gatewayPortsRestricted: state?.publicBindRestricted || undefined,
+          reconnectError:
+            state?.status === "reconnecting" ? state.message : undefined,
+          reconnectAttempt:
+            state?.status === "reconnecting"
+              ? state.reconnectAttempt
+              : undefined,
           autoStart: Boolean(f.autoStart),
         };
       }),
@@ -158,11 +160,7 @@ async function startForward(
     }
     const state = await forwardRuntime(id);
     if (state?.status === "active") {
-      return toolSuccess(
-        state.publicBindRestricted
-          ? `Started forward ${id}. ${GATEWAY_PORTS_NOTE}`
-          : `Started forward ${id}.`,
-      );
+      return toolSuccess(`Started forward ${id}.`);
     }
     if (state?.status === "error") {
       return toolFailure(
@@ -177,7 +175,7 @@ async function startForward(
     await sleep(250);
   }
   return toolSuccess(
-    `Forward ${id} is still starting. Check list_forwards for its status.`,
+    `Forward ${id} is still starting or reconnecting. Check list_forwards for its status.`,
   );
 }
 
@@ -253,7 +251,7 @@ export const forwardTools: AiTool[] = [
     spec: {
       name: "list_forwards",
       description:
-        "List saved port forwards with their bind/target and runtime status (active, starting, error, stopped), including any error message. gatewayPortsRestricted means the SSH server limits remote binds to loopback.",
+        "List saved port forwards with their bind, target, and runtime status (active, starting, reconnecting, error, or stopped), including errors and reconnect attempts.",
       parameters: {
         type: "object",
         properties: {},

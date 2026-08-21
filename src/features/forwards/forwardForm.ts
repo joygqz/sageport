@@ -37,8 +37,8 @@ export function isLoopbackBindHost(host: string): boolean {
   );
 }
 
-export function defaultBindHost(kind: ForwardKind): string {
-  return kind === "remote" ? "0.0.0.0" : "127.0.0.1";
+export function defaultBindHost(_kind: ForwardKind): string {
+  return "127.0.0.1";
 }
 
 function normalizeForwardHost(host: string): string {

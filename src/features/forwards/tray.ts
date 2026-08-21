@@ -12,7 +12,11 @@ export function activeForwardItems(
   return forwards
     .filter((forward) => {
       const status = runtime[forward.id]?.status;
-      return status === "active" || status === "starting";
+      return (
+        status === "active" ||
+        status === "starting" ||
+        status === "reconnecting"
+      );
     })
     .sort((a, b) => a.label.localeCompare(b.label))
     .map((forward) => ({

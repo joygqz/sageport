@@ -22,14 +22,12 @@ import { bridgeForwardEvents, useForwardStore } from "./store";
 function event(
   status: ForwardStatusEvent["status"],
   sequence: number,
-  publicBindRestricted = false,
 ): ForwardStatusEvent {
   return {
     forwardId: "forward",
     status,
     generation: 1,
     sequence,
-    publicBindRestricted,
   };
 }
 
@@ -60,14 +58,16 @@ describe("forward runtime state", () => {
     await bridge;
 
     expect(useForwardStore.getState().runtime.forward?.status).toBe("active");
-    useForwardStore.getState().apply(event("active", 3, true));
-    expect(
-      useForwardStore.getState().runtime.forward?.publicBindRestricted,
-    ).toBe(true);
+    useForwardStore.getState().apply(event("reconnecting", 3));
+    expect(useForwardStore.getState().runtime.forward?.status).toBe(
+      "reconnecting",
+    );
     expect(mocks.onStatus).toHaveBeenCalledTimes(2);
 
     useForwardStore.getState().apply(event("stopped", 1));
-    expect(useForwardStore.getState().runtime.forward?.status).toBe("active");
+    expect(useForwardStore.getState().runtime.forward?.status).toBe(
+      "reconnecting",
+    );
     useForwardStore.getState().remove("forward");
     expect(useForwardStore.getState().runtime.forward).toBeUndefined();
   });

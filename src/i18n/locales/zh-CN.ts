@@ -108,6 +108,7 @@ export const zhCN: Dictionary = {
     start: "启动",
     stop: "停止",
     starting: "正在启动…",
+    reconnecting: "正在重连 · 第 {attempt} 次",
     startError: "启动端口转发失败",
     stopError: "停止端口转发失败",
     statusError: "监听端口转发状态失败",
@@ -147,15 +148,6 @@ export const zhCN: Dictionary = {
       action: "删除端口转发",
       error: "删除端口转发失败",
     },
-    gatewayPorts: {
-      title: "配置 SSH 公网转发",
-      description:
-        "SSH 服务器不允许“{name}”监听 {endpoint}。请让管理员在服务器上运行以下命令，使远程转发可以自行选择监听地址，回环地址仍保持仅本机可见。",
-      restartHint: "命令执行成功后，请重新启动此端口转发。",
-      copyCommand: "复制配置命令",
-      commandCopied: "已复制配置命令",
-      copyError: "复制配置命令失败",
-    },
     form: {
       newTitle: "新建端口转发",
       editTitle: "编辑端口转发",
@@ -164,13 +156,39 @@ export const zhCN: Dictionary = {
       targetRequired: "请输入目标主机",
       invalidTargetPort: "请输入 1 到 65535 之间的目标端口",
       saveError: "保存端口转发失败",
-      publicSocks: {
-        title: "公开 SOCKS 代理？",
-        description:
-          "任何能访问 {endpoint} 的用户都可以通过这个无认证代理，经由 SSH 主机访问其他服务。",
-        hint: "此地址会将无认证 SOCKS 代理暴露给本机以外的设备。",
+      bindHint: {
+        local: "使用回环地址时，只有本机可以访问此端口。",
+        remote: "SSH 服务器将在此地址上监听。",
+        dynamic: "使用回环地址时，只有本机可以使用此代理。",
+      },
+      targetHint: {
+        local: "由 SSH 主机连接此目标。",
+        remote: "由本机连接此目标。",
+      },
+      exposedBind: {
+        title: {
+          local: "公开本地端口转发？",
+          remote: "公开远程端口转发？",
+          dynamic: "公开 SOCKS 代理？",
+        },
+        description: {
+          local: "其他能访问 {endpoint} 的设备可以使用此 SSH 端口转发。",
+          remote:
+            "其他能访问 SSH 服务器上 {endpoint} 的设备可以连接目标服务。SSH 服务器必须允许此监听地址。",
+          dynamic:
+            "任何能访问 {endpoint} 的用户都可以通过这个无认证代理，经由 SSH 主机访问其他服务。",
+        },
+        hint: {
+          local: "此地址允许其他设备使用该端口转发。",
+          remote: "此地址可能通过 SSH 服务器公开目标服务。",
+          dynamic: "此地址会向其他设备公开无认证代理。",
+        },
         cancel: "继续编辑",
-        action: "公开 SOCKS 代理",
+        action: {
+          local: "公开端口转发",
+          remote: "公开端口转发",
+          dynamic: "公开 SOCKS 代理",
+        },
       },
     },
   },

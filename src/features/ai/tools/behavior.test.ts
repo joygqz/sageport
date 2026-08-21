@@ -165,7 +165,6 @@ describe("list_forwards", () => {
         message: "bind failed",
         generation: 1,
         sequence: 2,
-        publicBindRestricted: true,
       },
     ]);
 
@@ -175,18 +174,17 @@ describe("list_forwards", () => {
       id: "f1",
       status: "error",
       error: "bind failed",
-      gatewayPortsRestricted: true,
       target: "10.0.0.1:80",
     });
     expect(parsed[1]).toMatchObject({ id: "f2", status: "stopped" });
     expect(parsed[1].target).toBeUndefined();
     expect(parsed[1].error).toBeUndefined();
-    expect(parsed[1].gatewayPortsRestricted).toBeUndefined();
+    expect(parsed[1].reconnectAttempt).toBeUndefined();
   });
 });
 
 describe("start_forward", () => {
-  it("waits for the runtime state and surfaces the GatewayPorts restriction", async () => {
+  it("waits for the runtime state to become active", async () => {
     forwardsStart.mockResolvedValue(undefined);
     forwardsRuntime.mockResolvedValue([
       {
@@ -194,13 +192,12 @@ describe("start_forward", () => {
         status: "active",
         generation: 1,
         sequence: 1,
-        publicBindRestricted: true,
       },
     ]);
 
     const result = await getTool("start_forward")!.execute!({ id: "f1" }, {});
     expect(result.isError).toBe(false);
-    expect(result.content).toContain("GatewayPorts");
+    expect(result.content).toContain("Started forward f1");
   });
 
   it("reports the runtime error message when the forward fails", async () => {
@@ -212,7 +209,6 @@ describe("start_forward", () => {
         message: "address already in use",
         generation: 1,
         sequence: 1,
-        publicBindRestricted: false,
       },
     ]);
 

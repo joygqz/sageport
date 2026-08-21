@@ -110,16 +110,17 @@ export interface PortForwardInput {
   autoStart?: boolean;
 }
 
-export type ForwardStatusKind = "starting" | "active" | "error" | "stopped";
+export type ForwardStatusKind =
+  "starting" | "active" | "reconnecting" | "error" | "stopped";
 
 export interface ForwardStatusEvent {
   forwardId: string;
   status: ForwardStatusKind;
   message?: string;
   code?: string;
+  reconnectAttempt?: number;
   generation: number;
   sequence: number;
-  publicBindRestricted: boolean;
 }
 
 export interface SshConfigHost {

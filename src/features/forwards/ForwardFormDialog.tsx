@@ -76,8 +76,9 @@ function ForwardFormBody({
     forward?.targetPort ? String(forward.targetPort) : "",
   );
   const [autoStart, setAutoStart] = useState(Boolean(forward?.autoStart));
-  const [publicSocksInput, setPublicSocksInput] =
-    useState<PortForwardInput | null>(null);
+  const [exposedInput, setExposedInput] = useState<PortForwardInput | null>(
+    null,
+  );
 
   const save = async (input: PortForwardInput) => {
     try {
@@ -111,17 +112,14 @@ function ForwardFormBody({
     if (!("input" in result)) {
       return toast.error(t(`forwards.form.${result.error}`));
     }
-    if (
-      result.input.kind === "dynamic" &&
-      !isLoopbackBindHost(result.input.bindHost ?? "127.0.0.1")
-    ) {
-      setPublicSocksInput(result.input);
+    if (!isLoopbackBindHost(result.input.bindHost ?? "127.0.0.1")) {
+      setExposedInput(result.input);
       return;
     }
     await save(result.input);
   };
 
-  const publicSocksPending = createForward.isPending || updateForward.isPending;
+  const savePending = createForward.isPending || updateForward.isPending;
 
   return (
     <>
@@ -129,7 +127,7 @@ function ForwardFormBody({
         onClose={onClose}
         onSubmit={submit}
         submitLabel={forward ? t("common.saveChanges") : t("common.create")}
-        pending={publicSocksPending}
+        pending={savePending}
       >
         <div className="space-y-2">
           <SegmentedControl
@@ -174,10 +172,9 @@ function ForwardFormBody({
           <Field
             label={t("forwards.bindHost")}
             hint={
-              kind === "dynamic" &&
               !isLoopbackBindHost(bindHost.trim() || defaultBindHost(kind))
-                ? t("forwards.form.publicSocks.hint")
-                : undefined
+                ? t(`forwards.form.exposedBind.hint.${kind}`)
+                : t(`forwards.form.bindHint.${kind}`)
             }
           >
             <Input
@@ -200,7 +197,11 @@ function ForwardFormBody({
 
         {kind !== "dynamic" && (
           <div className="grid grid-cols-[1fr_7rem] gap-3">
-            <Field label={t("forwards.targetHost")} required>
+            <Field
+              label={t("forwards.targetHost")}
+              hint={t(`forwards.form.targetHint.${kind}`)}
+              required
+            >
               <Input
                 value={targetHost}
                 onChange={(e) => setTargetHost(e.target.value)}
@@ -228,28 +229,34 @@ function ForwardFormBody({
       </FormBody>
       <ConfirmDialog
         state={
-          publicSocksInput
+          exposedInput
             ? {
-                title: t("forwards.form.publicSocks.title"),
-                description: t("forwards.form.publicSocks.description", {
-                  endpoint: formatForwardEndpoint(
-                    publicSocksInput.bindHost ?? "127.0.0.1",
-                    publicSocksInput.bindPort,
-                  ),
-                }),
-                cancelLabel: t("forwards.form.publicSocks.cancel"),
+                title: t(
+                  `forwards.form.exposedBind.title.${exposedInput.kind}`,
+                ),
+                description: t(
+                  `forwards.form.exposedBind.description.${exposedInput.kind}`,
+                  {
+                    endpoint: formatForwardEndpoint(
+                      exposedInput.bindHost ?? "127.0.0.1",
+                      exposedInput.bindPort,
+                    ),
+                  },
+                ),
+                cancelLabel: t("forwards.form.exposedBind.cancel"),
                 actions: [
                   {
-                    label: t("forwards.form.publicSocks.action"),
-                    loading: publicSocksPending,
-                    onSelect: async () =>
-                      (await save(publicSocksInput)) || false,
+                    label: t(
+                      `forwards.form.exposedBind.action.${exposedInput.kind}`,
+                    ),
+                    loading: savePending,
+                    onSelect: async () => (await save(exposedInput)) || false,
                   },
                 ],
               }
             : null
         }
-        onClose={() => setPublicSocksInput(null)}
+        onClose={() => setExposedInput(null)}
       />
     </>
   );

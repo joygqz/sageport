@@ -55,7 +55,7 @@ describe("forwardInput", () => {
 
   it("defaults an empty bind host per kind", () => {
     expect(forwardInput({ ...values, kind: "remote" })).toMatchObject({
-      input: { bindHost: "0.0.0.0" },
+      input: { bindHost: "127.0.0.1" },
     });
     expect(
       forwardInput({

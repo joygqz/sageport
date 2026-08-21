@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Network, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
+import {
+  Network,
+  Pencil,
+  Play,
+  Plus,
+  RefreshCw,
+  Square,
+  Trash2,
+} from "lucide-react";
 
 import { useHostKeyStore } from "@/features/terminal/host-key";
 import { usePasswordPromptStore } from "@/features/terminal/password-prompt";
@@ -35,16 +43,8 @@ import { SideBarView } from "@/workbench/SideBarView";
 import { SideBarFilter } from "@/workbench/SideBarFilter";
 import { useForwards, useDeleteForward } from "./api";
 import { ForwardFormDialog } from "./ForwardFormDialog";
-import { describeForward, formatForwardEndpoint } from "./forwardForm";
+import { describeForward } from "./forwardForm";
 import { bridgeForwardEvents, useForwardStore } from "./store";
-
-const PUBLIC_FORWARDING_ADMIN_COMMAND = `test "$(id -u)" = 0 && sageport_run= || sageport_run=sudo
-$sageport_run install -d -m 0755 /etc/ssh/sshd_config.d &&
-echo 'GatewayPorts clientspecified' | $sageport_run tee /etc/ssh/sshd_config.d/00-00-sageport-gateway-ports.conf >/dev/null &&
-$sageport_run sshd -t &&
-$sageport_run sshd -T | grep -qx 'gatewayports clientspecified' &&
-$sageport_run sh -c 'systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || service sshd reload 2>/dev/null || service ssh reload'`;
-const promptedPublicForwardingGenerations = new Map<string, number>();
 
 export function ForwardsView() {
   const { t } = useI18n();
@@ -57,6 +57,7 @@ export function ForwardsView() {
     forward: PortForward | null;
   }>({ open: false, forward: null });
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState("");
   const searching = query.trim().length > 0;
 
@@ -66,78 +67,16 @@ export function ForwardsView() {
     });
   }, [t]);
 
-  useEffect(() => {
-    if (confirmState) return;
-    const forward = forwards.find((candidate) => {
-      const state = runtime[candidate.id];
-      return (
-        (state?.status === "active" || state?.status === "error") &&
-        state.publicBindRestricted &&
-        promptedPublicForwardingGenerations.get(candidate.id) !==
-          state.generation
-      );
-    });
-    if (!forward) return;
-    const state = runtime[forward.id];
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      promptedPublicForwardingGenerations.set(forward.id, state.generation);
-      setConfirmState({
-        title: t("forwards.gatewayPorts.title"),
-        description: (
-          <span className="block min-w-0 max-w-full space-y-3">
-            <span className="block break-words">
-              {t("forwards.gatewayPorts.description", {
-                name: forward.label,
-                endpoint: formatForwardEndpoint(
-                  forward.bindHost,
-                  forward.bindPort,
-                ),
-              })}
-            </span>
-            <code className="block max-h-64 w-full min-w-0 max-w-full select-text overflow-auto whitespace-pre rounded-md bg-terminal-background p-3 text-left font-mono text-xs leading-relaxed text-terminal-foreground">
-              {PUBLIC_FORWARDING_ADMIN_COMMAND}
-            </code>
-            <span className="block">
-              {t("forwards.gatewayPorts.restartHint")}
-            </span>
-          </span>
-        ),
-        cancelLabel: t("common.close"),
-        contentClassName: "max-w-2xl overflow-x-hidden",
-        actions: [
-          {
-            label: t("forwards.gatewayPorts.copyCommand"),
-            onSelect: async () => {
-              try {
-                await navigator.clipboard.writeText(
-                  PUBLIC_FORWARDING_ADMIN_COMMAND,
-                );
-                toast.success(t("forwards.gatewayPorts.commandCopied"));
-              } catch (err) {
-                toast.error(
-                  t("forwards.gatewayPorts.copyError"),
-                  errorMessage(err),
-                );
-                return false;
-              }
-            },
-          },
-        ],
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [confirmState, forwards, runtime, t]);
-
   const isActive = (id: string) => {
     const status = runtime[id]?.status;
-    return status === "active" || status === "starting";
+    return (
+      status === "active" || status === "starting" || status === "reconnecting"
+    );
   };
 
   const toggle = async (forward: PortForward) => {
+    if (pendingIds.has(forward.id)) return;
+    setPendingIds((current) => new Set(current).add(forward.id));
     if (isActive(forward.id)) {
       useHostKeyStore.getState().rejectSession(forward.id);
       usePasswordPromptStore.getState().cancelSession(forward.id);
@@ -145,6 +84,12 @@ export function ForwardsView() {
         await ipc.forwards.stop(forward.id);
       } catch (err) {
         toast.error(t("forwards.stopError"), errorMessage(err));
+      } finally {
+        setPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(forward.id);
+          return next;
+        });
       }
     } else {
       try {
@@ -152,6 +97,12 @@ export function ForwardsView() {
       } catch (err) {
         if (errorCode(err) === "cancelled") return;
         toast.error(t("forwards.startError"), errorMessage(err));
+      } finally {
+        setPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(forward.id);
+          return next;
+        });
       }
     }
   };
@@ -244,15 +195,18 @@ export function ForwardsView() {
           filteredForwards.map((forward) => {
             const active = isActive(forward.id);
             const errored = runtime[forward.id]?.status === "error";
+            const reconnecting = runtime[forward.id]?.status === "reconnecting";
             const statusMessage = errored
               ? runtime[forward.id]?.message
               : undefined;
+            const statusDetails = runtime[forward.id]?.message;
+            const pending = pendingIds.has(forward.id);
             return (
               <ContextMenu key={forward.id}>
                 <ContextMenuTrigger asChild>
                   <div
                     className={cn(PANEL_LIST_ITEM_CLASS, "cursor-pointer")}
-                    title={statusMessage}
+                    title={statusDetails}
                     onDoubleClick={(event) => {
                       if ((event.target as HTMLElement).closest("button"))
                         return;
@@ -264,6 +218,7 @@ export function ForwardsView() {
                         PANEL_LIST_ICON_CLASS,
                         "relative",
                         active && "bg-success/10 text-success",
+                        reconnecting && "bg-warning/10 text-warning",
                         errored && "bg-danger/10 text-danger",
                       )}
                     >
@@ -271,11 +226,13 @@ export function ForwardsView() {
                       <span
                         className={cn(
                           "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface group-hover:ring-list-hover group-focus-within:ring-list-hover",
-                          active
-                            ? "bg-success"
-                            : errored
-                              ? "bg-destructive"
-                              : "bg-muted-foreground/55",
+                          reconnecting
+                            ? "bg-warning"
+                            : active
+                              ? "bg-success"
+                              : errored
+                                ? "bg-destructive"
+                                : "bg-muted-foreground/55",
                         )}
                       />
                     </div>
@@ -293,7 +250,12 @@ export function ForwardsView() {
                         {statusMessage ??
                           (runtime[forward.id]?.status === "starting"
                             ? t("forwards.starting")
-                            : describeForward(forward))}
+                            : reconnecting
+                              ? t("forwards.reconnecting", {
+                                  attempt:
+                                    runtime[forward.id]?.reconnectAttempt ?? 1,
+                                })
+                              : describeForward(forward))}
                       </p>
                     </div>
                     <Tooltip
@@ -304,12 +266,15 @@ export function ForwardsView() {
                       <button
                         type="button"
                         onClick={() => void toggle(forward)}
+                        disabled={pending}
                         className={PANEL_LIST_ACTION_CLASS}
                         aria-label={
                           active ? t("forwards.stop") : t("forwards.start")
                         }
                       >
-                        {active ? (
+                        {pending || reconnecting ? (
+                          <RefreshCw className="size-3.5 animate-spin" />
+                        ) : active ? (
                           <Square className="size-3.5" />
                         ) : (
                           <Play className="size-3.5" />

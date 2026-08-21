@@ -14,6 +14,14 @@ use super::{
 
 const HOST_KEY_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
+pub struct ForwardedTcpIp {
+    pub channel: Channel<Msg>,
+    pub connected_address: String,
+    pub connected_port: u32,
+    pub originator_address: String,
+    pub originator_port: u32,
+}
+
 struct HostKeyPromptGuard {
     app: AppHandle,
     prompts: HostKeyPrompts,
@@ -41,7 +49,7 @@ pub struct ClientHandler {
     pub host: String,
     pub port: u16,
     pub host_key_activity: watch::Sender<bool>,
-    pub forwarded_tcpip: Option<mpsc::Sender<Channel<Msg>>>,
+    pub forwarded_tcpip: Option<mpsc::Sender<ForwardedTcpIp>>,
 }
 
 impl client::Handler for ClientHandler {
@@ -99,10 +107,10 @@ impl client::Handler for ClientHandler {
     async fn server_channel_open_forwarded_tcpip(
         &mut self,
         channel: Channel<Msg>,
-        _connected_address: &str,
-        _connected_port: u32,
-        _originator_address: &str,
-        _originator_port: u32,
+        connected_address: &str,
+        connected_port: u32,
+        originator_address: &str,
+        originator_port: u32,
         reply: ChannelOpenHandle,
         _session: &mut client::Session,
     ) -> Result<(), Self::Error> {
@@ -113,7 +121,13 @@ impl client::Handler for ClientHandler {
             return Ok(());
         };
         reply.accept().await;
-        permit.send(channel);
+        permit.send(ForwardedTcpIp {
+            channel,
+            connected_address: connected_address.to_string(),
+            connected_port,
+            originator_address: originator_address.to_string(),
+            originator_port,
+        });
         Ok(())
     }
 }
