@@ -4,7 +4,10 @@ use crate::error::AppResult;
 use crate::state::AppState;
 
 fn validate_session_id(session_id: &str) -> AppResult<()> {
-    if session_id.trim().is_empty() || session_id.len() > 128 {
+    if session_id.trim().is_empty()
+        || session_id.len() > 128
+        || session_id.chars().any(char::is_control)
+    {
         return Err(crate::error::AppError::Invalid(
             "invalid monitor session id".into(),
         ));
@@ -44,6 +47,7 @@ mod tests {
     fn rejects_invalid_session_ids() {
         assert!(validate_session_id("").is_err());
         assert!(validate_session_id("   ").is_err());
+        assert!(validate_session_id("terminal\0id").is_err());
         assert!(validate_session_id(&"x".repeat(129)).is_err());
         assert!(validate_session_id("terminal-1").is_ok());
     }

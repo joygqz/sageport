@@ -5,6 +5,7 @@ import type { ForwardStatusEvent } from "@/types/models";
 const mocks = vi.hoisted(() => ({
   runtime: vi.fn(),
   onStatus: vi.fn(),
+  unlisten: vi.fn(),
   handler: undefined as ((event: ForwardStatusEvent) => void) | undefined,
 }));
 
@@ -37,6 +38,16 @@ describe("forward runtime state", () => {
     mocks.onStatus.mockRejectedValueOnce(new Error("listen failed"));
     await expect(bridgeForwardEvents()).rejects.toThrow("listen failed");
 
+    mocks.onStatus.mockImplementationOnce(
+      async (handler: (next: ForwardStatusEvent) => void) => {
+        mocks.handler = handler;
+        return mocks.unlisten;
+      },
+    );
+    mocks.runtime.mockRejectedValueOnce(new Error("snapshot failed"));
+    await expect(bridgeForwardEvents()).rejects.toThrow("snapshot failed");
+    expect(mocks.unlisten).toHaveBeenCalledOnce();
+
     let resolveSnapshot: ((events: ForwardStatusEvent[]) => void) | undefined;
     mocks.onStatus.mockImplementation(
       async (handler: (next: ForwardStatusEvent) => void) => {
@@ -62,7 +73,7 @@ describe("forward runtime state", () => {
     expect(useForwardStore.getState().runtime.forward?.status).toBe(
       "reconnecting",
     );
-    expect(mocks.onStatus).toHaveBeenCalledTimes(2);
+    expect(mocks.onStatus).toHaveBeenCalledTimes(3);
 
     useForwardStore.getState().apply(event("stopped", 1));
     expect(useForwardStore.getState().runtime.forward?.status).toBe(

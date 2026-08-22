@@ -594,6 +594,10 @@ async fn run_remote_forward(
                 connection.handle.tcpip_forward(spec.bind_host.clone(), spec.bind_port as u32),
             ) => match result {
                 Ok(Ok(_)) => Ok(()),
+                Ok(Err(russh::Error::RequestDenied)) => Err(AppError::Other(format!(
+                    "server rejected remote bind {}:{}; try 127.0.0.1 with an unprivileged unused port, or verify AllowTcpForwarding, PermitListen, and GatewayPorts",
+                    spec.bind_host, spec.bind_port
+                ))),
                 Ok(Err(error)) => Err(AppError::Ssh(error)),
                 Err(_) => Err(AppError::Timeout(format!("requesting remote bind {}:{} timed out", spec.bind_host, spec.bind_port))),
             },

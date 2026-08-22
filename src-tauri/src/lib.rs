@@ -3,6 +3,7 @@ mod commands;
 mod crypto;
 mod db;
 mod domain;
+mod durable_fs;
 mod error;
 mod legacy;
 #[cfg(target_os = "macos")]

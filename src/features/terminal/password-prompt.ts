@@ -54,15 +54,19 @@ export const usePasswordPromptStore = create<PasswordPromptState>(
 export async function listenPasswordPrompts(): Promise<() => void> {
   let syncing = true;
   const closedDuringSync = new Set<string>();
-  const [unlistenPrompt, unlistenClosed] = await Promise.all([
-    ipc.ssh.onPassword((event) =>
-      usePasswordPromptStore.getState().push(event),
-    ),
-    ipc.ssh.onPasswordClosed((event) => {
+  const unlistenPrompt = await ipc.ssh.onPassword((event) =>
+    usePasswordPromptStore.getState().push(event),
+  );
+  let unlistenClosed: (() => void) | undefined;
+  try {
+    unlistenClosed = await ipc.ssh.onPasswordClosed((event) => {
       if (syncing) closedDuringSync.add(event.promptId);
       usePasswordPromptStore.getState().dismiss(event.promptId);
-    }),
-  ]);
+    });
+  } catch (error) {
+    unlistenPrompt();
+    throw error;
+  }
 
   try {
     const pending = await ipc.ssh.pendingPasswords();
@@ -77,7 +81,7 @@ export async function listenPasswordPrompts(): Promise<() => void> {
   }
   return () => {
     unlistenPrompt();
-    unlistenClosed();
+    unlistenClosed?.();
   };
 }
 

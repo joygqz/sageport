@@ -11,9 +11,11 @@ import { useTaskFocusStore } from "@/features/tasks/focus";
 import { scheduledTaskItems } from "@/features/tasks/tray";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
+import { errorMessage, toast } from "@/lib/toast";
 import type { Activity } from "@/workbench/layout";
 import { useLayoutStore } from "@/workbench/layout";
 import type { TrayMenuData } from "@/types/models";
+import { installWindowListener } from "./window-listener";
 
 const TICK_MS = 30 * 1000;
 
@@ -58,37 +60,22 @@ export function useTrayMenu(): void {
   }, [tasks, forwards, runtime, t, locale]);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    void ipc.tray
-      .onOpenTask((taskId) => {
-        revealActivity("tasks");
-        useTaskFocusStore.getState().focus(taskId);
-      })
-      .then((fn) => {
-        if (disposed) fn();
-        else unlisten = fn;
-      });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
+    return installWindowListener(
+      () =>
+        ipc.tray.onOpenTask((taskId) => {
+          revealActivity("tasks");
+          useTaskFocusStore.getState().focus(taskId);
+        }),
+      (error) =>
+        toast.error(t("windowControls.listenerError"), errorMessage(error)),
+    );
+  }, [t]);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    void ipc.tray
-      .onOpenForward(() => {
-        revealActivity("forwards");
-      })
-      .then((fn) => {
-        if (disposed) fn();
-        else unlisten = fn;
-      });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
+    return installWindowListener(
+      () => ipc.tray.onOpenForward(() => revealActivity("forwards")),
+      (error) =>
+        toast.error(t("windowControls.listenerError"), errorMessage(error)),
+    );
+  }, [t]);
 }

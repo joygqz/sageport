@@ -24,7 +24,10 @@ fn valid_port(port: i64) -> AppResult<u16> {
 }
 
 fn validate_session_id(session_id: &str) -> AppResult<()> {
-    if session_id.trim().is_empty() || session_id.len() > 128 {
+    if session_id.trim().is_empty()
+        || session_id.len() > 128
+        || session_id.chars().any(char::is_control)
+    {
         return Err(AppError::Invalid("invalid SSH session id".into()));
     }
     Ok(())
@@ -121,7 +124,9 @@ pub async fn ssh_connect_adhoc(
     let username = username.trim().to_string();
     if host.is_empty()
         || host.len() > 1024
-        || host.chars().any(char::is_whitespace)
+        || host
+            .chars()
+            .any(|character| character.is_whitespace() || character.is_control())
         || host.contains(['@', '[', ']'])
     {
         state.ssh.abandon(&session_id, attempt);
@@ -129,7 +134,9 @@ pub async fn ssh_connect_adhoc(
     }
     if username.is_empty()
         || username.len() > 256
-        || username.chars().any(char::is_whitespace)
+        || username
+            .chars()
+            .any(|character| character.is_whitespace() || character.is_control())
         || username.contains(['@', ':'])
     {
         state.ssh.abandon(&session_id, attempt);
@@ -174,6 +181,7 @@ pub async fn ssh_send(
     state
         .ssh
         .send_input(&session_id, attempt, data.into_bytes())
+        .await
 }
 
 #[tauri::command]
@@ -333,6 +341,7 @@ mod tests {
     fn rejects_invalid_session_ids() {
         assert!(validate_session_id("").is_err());
         assert!(validate_session_id("   ").is_err());
+        assert!(validate_session_id("terminal\0id").is_err());
         assert!(validate_session_id(&"x".repeat(129)).is_err());
         assert!(validate_session_id("terminal-1").is_ok());
     }

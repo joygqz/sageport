@@ -37,11 +37,21 @@ import {
 const aiConnByHost = new Map<string, string>();
 const connStatus = new Map<string, SftpStatusKind>();
 let bridged = false;
+let bridgePromise: Promise<void> | null = null;
 
-function bridgeAiSftp(): void {
-  if (bridged) return;
-  bridged = true;
-  void ipc.sftp.onStatus((e) => connStatus.set(e.connectionId, e.status));
+function bridgeAiSftp(): Promise<void> {
+  if (bridged) return Promise.resolve();
+  if (bridgePromise) return bridgePromise;
+  bridgePromise = ipc.sftp
+    .onStatus((event) => connStatus.set(event.connectionId, event.status))
+    .then(() => {
+      bridged = true;
+    })
+    .catch((error) => {
+      bridgePromise = null;
+      throw error;
+    });
+  return bridgePromise;
 }
 
 function reuseTabConnection(hostId: string): string | undefined {
@@ -80,7 +90,13 @@ async function resolveSftpConnection(
   const reused = reuseTabConnection(targetHostId);
   if (reused) return { connectionId: reused, hostId: targetHostId };
 
-  bridgeAiSftp();
+  try {
+    await bridgeAiSftp();
+  } catch (error) {
+    return {
+      error: `Error: could not listen for SFTP connection status: ${errorMessage(error)}`,
+    };
+  }
   const existing = aiConnByHost.get(targetHostId);
   if (existing && connStatus.get(existing) === "connected") {
     return { connectionId: existing, hostId: targetHostId };
@@ -120,12 +136,18 @@ async function resolveSftpConnection(
       return { connectionId: id, hostId: targetHostId };
     if (status === "error" || status === "closed") {
       aiConnByHost.delete(targetHostId);
+      connStatus.delete(id);
       return {
         error:
           "Error: the SFTP connection failed or closed. Open a Files tab for this host to complete host-key trust or authentication, then retry.",
       };
     }
     await sleep(250);
+  }
+  if (aiConnByHost.get(targetHostId) === id) {
+    aiConnByHost.delete(targetHostId);
+    connStatus.delete(id);
+    void ipc.sftp.disconnect(id).catch(() => {});
   }
   return {
     error:

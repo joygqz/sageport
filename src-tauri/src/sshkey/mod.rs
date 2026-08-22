@@ -119,6 +119,7 @@ fn write_key_file(path: &Path, key: &str, mode: u32) -> AppResult<()> {
         } else {
             std::fs::rename(&temp, path)?;
         }
+        crate::durable_fs::sync_parent(path)?;
         Ok(())
     })();
     if write_result.is_err() {

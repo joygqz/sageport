@@ -65,7 +65,7 @@ export function bridgeForwardEvents(): Promise<void> {
   bridgePromise = (async () => {
     let syncing = true;
     const queued: ForwardStatusEvent[] = [];
-    await ipc.forwards.onStatus((event) => {
+    const unlisten = await ipc.forwards.onStatus((event) => {
       if (syncing) queued.push(event);
       else useForwardStore.getState().apply(event);
     });
@@ -73,11 +73,12 @@ export function bridgeForwardEvents(): Promise<void> {
     try {
       const snapshot = await ipc.forwards.runtime();
       useForwardStore.getState().hydrate(snapshot);
-    } catch {
-    } finally {
-      for (const event of queued) useForwardStore.getState().apply(event);
-      syncing = false;
+    } catch (error) {
+      unlisten();
+      throw error;
     }
+    for (const event of queued) useForwardStore.getState().apply(event);
+    syncing = false;
   })().catch((error) => {
     bridgePromise = null;
     throw error;

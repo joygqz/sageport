@@ -75,6 +75,7 @@ export function selectRunningRunForTask(
 }
 
 let transferBridged = false;
+let transferBridgePromise: Promise<void> | null = null;
 
 export const useTaskRunStore = create<TaskRunState>((set, get) => {
   const patchStep = (
@@ -179,26 +180,35 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
     get().dismissRun(requestId);
   };
 
-  const ensureTransferBridge = () => {
-    if (transferBridged) return;
-    transferBridged = true;
-    void ipc.sftp.onTransfer((event) => {
-      const runs = get().runs;
-      for (const run of Object.values(runs)) {
-        const prefix = `task:${run.requestId}-s`;
-        if (!event.transferId.startsWith(prefix)) continue;
-        const index = Number.parseInt(
-          event.transferId.slice(prefix.length),
-          10,
-        );
-        if (Number.isNaN(index)) continue;
-        patchStep(run.requestId, index, {
-          transferred: event.transferred,
-          total: event.total,
-        });
-        return;
-      }
-    });
+  const ensureTransferBridge = (): Promise<void> => {
+    if (transferBridged) return Promise.resolve();
+    if (transferBridgePromise) return transferBridgePromise;
+    transferBridgePromise = ipc.sftp
+      .onTransfer((event) => {
+        const runs = get().runs;
+        for (const run of Object.values(runs)) {
+          const prefix = `task:${run.requestId}-s`;
+          if (!event.transferId.startsWith(prefix)) continue;
+          const index = Number.parseInt(
+            event.transferId.slice(prefix.length),
+            10,
+          );
+          if (Number.isNaN(index)) continue;
+          patchStep(run.requestId, index, {
+            transferred: event.transferred,
+            total: event.total,
+          });
+          return;
+        }
+      })
+      .then(() => {
+        transferBridged = true;
+      })
+      .catch((error) => {
+        transferBridgePromise = null;
+        throw error;
+      });
+    return transferBridgePromise;
   };
 
   return {
@@ -206,7 +216,6 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
     attachedId: null,
 
     startRun: (task, hostId) => {
-      ensureTransferBridge();
       const requestId = crypto.randomUUID();
       const steps = parseTaskSteps(task);
       const run: TaskRun = {
@@ -223,6 +232,7 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
 
       const completion = (async () => {
         try {
+          await ensureTransferBridge().catch(() => {});
           await ipc.tasks.run(
             task.id,
             hostId,

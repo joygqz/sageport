@@ -1,6 +1,7 @@
 use std::path::Path;
+use std::time::Duration;
 
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sqlx::SqlitePool;
 
 use crate::error::AppResult;
@@ -18,6 +19,8 @@ pub async fn init(path: &Path) -> AppResult<SqlitePool> {
         .filename(path)
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .busy_timeout(Duration::from_secs(5))
         .foreign_keys(true);
 
     let pool = SqlitePoolOptions::new()
@@ -80,6 +83,14 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
+        let synchronous: i64 = sqlx::query_scalar("PRAGMA synchronous")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let busy_timeout: i64 = sqlx::query_scalar("PRAGMA busy_timeout")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         let tables: Vec<String> =
             sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
                 .fetch_all(&pool)
@@ -100,6 +111,8 @@ mod tests {
         assert_eq!(count, 0);
         assert_eq!(foreign_keys, 1);
         assert_eq!(journal_mode, "wal");
+        assert_eq!(synchronous, 1);
+        assert_eq!(busy_timeout, 5_000);
         for table in [
             "groups",
             "keys",

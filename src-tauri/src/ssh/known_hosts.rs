@@ -2,7 +2,10 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use parking_lot::Mutex;
 use russh::keys::ssh_key::{HashAlg, PublicKey};
+
+static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 pub enum KnownHostStatus {
     Trusted,
@@ -66,6 +69,7 @@ fn remember_path(
     port: u16,
     key: &PublicKey,
 ) -> Result<(), russh::keys::Error> {
+    let _write_guard = WRITE_LOCK.lock();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
         #[cfg(unix)]
@@ -127,7 +131,10 @@ fn write_atomic_private(path: &Path, contents: &[u8]) -> std::io::Result<()> {
         drop(file);
 
         #[cfg(not(windows))]
-        fs::rename(&temp, path)?;
+        {
+            fs::rename(&temp, path)?;
+            crate::durable_fs::sync_parent(path)?;
+        }
         #[cfg(windows)]
         if path.exists() {
             let backup = parent.join(format!(

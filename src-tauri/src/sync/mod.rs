@@ -368,6 +368,7 @@ pub fn write_envelope_file(path: &Path, envelope: &EncryptedEnvelope) -> AppResu
         } else {
             std::fs::rename(&temp, path)?;
         }
+        crate::durable_fs::sync_parent(path)?;
         Ok(())
     })();
     if write_result.is_err() {
@@ -636,11 +637,10 @@ async fn repair_cycles(
          WHERE id = ? AND deleted_at IS NULL"
     );
     for id in breakers {
-        let updated_at = next_sync_timestamp(
-            timestamps
-                .get(&id)
-                .expect("cycle breaker came from the queried records"),
-        )?;
+        let timestamp = timestamps
+            .get(&id)
+            .ok_or_else(|| AppError::Other("sync cycle record is missing".into()))?;
+        let updated_at = next_sync_timestamp(timestamp)?;
         sqlx::query(sqlx::AssertSqlSafe(sql.clone()))
             .bind(&updated_at)
             .bind(id)

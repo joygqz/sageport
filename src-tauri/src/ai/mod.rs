@@ -149,16 +149,19 @@ impl Endpoint<'_> {
     }
 }
 
-fn http_client() -> &'static reqwest::Client {
-    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
+fn http_client() -> AppResult<&'static reqwest::Client> {
+    static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
+    match CLIENT.get_or_init(|| {
         reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(15))
             .timeout(REQUEST_TIMEOUT)
             .redirect(reqwest::redirect::Policy::none())
             .build()
-            .expect("valid AI HTTP client configuration")
-    })
+            .map_err(|error| format!("could not initialize AI HTTP client: {error}"))
+    }) {
+        Ok(client) => Ok(client),
+        Err(error) => Err(AppError::Other(error.clone())),
+    }
 }
 
 pub async fn list_models(ep: &Endpoint<'_>) -> AppResult<Vec<String>> {
@@ -167,7 +170,7 @@ pub async fn list_models(ep: &Endpoint<'_>) -> AppResult<Vec<String>> {
         Protocol::Anthropic => "/v1/models",
     };
     let req = ep
-        .authorize(http_client().get(ep.url(path)))
+        .authorize(http_client()?.get(ep.url(path)))
         .timeout(METADATA_TIMEOUT);
     let bytes = send(req).await?;
     let parsed: ModelsResponse = serde_json::from_slice(&bytes)?;
@@ -198,9 +201,10 @@ pub async fn model_limits(ep: &Endpoint<'_>, model: &str) -> ModelLimits {
     };
     segments.push(model);
     drop(segments);
-    let req = ep
-        .authorize(http_client().get(url))
-        .timeout(METADATA_TIMEOUT);
+    let Ok(client) = http_client() else {
+        return ModelLimits::default();
+    };
+    let req = ep.authorize(client.get(url)).timeout(METADATA_TIMEOUT);
     let Ok(bytes) = send(req).await else {
         return ModelLimits::default();
     };
@@ -246,7 +250,7 @@ pub async fn chat(
     };
     body["stream"] = serde_json::json!(true);
 
-    let req = ep.authorize(http_client().post(ep.url(path)).json(&body));
+    let req = ep.authorize(http_client()?.post(ep.url(path)).json(&body));
     let mut response = req
         .send()
         .await

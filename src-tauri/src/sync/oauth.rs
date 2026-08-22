@@ -510,7 +510,10 @@ async fn run_loopback(
             respond(&mut stream, 400, "Bad request").await;
             continue;
         }
-        let target = target.expect("checked above");
+        let Some(target) = target else {
+            respond(&mut stream, 400, "Bad request").await;
+            continue;
+        };
 
         let url = match Url::parse(&format!("http://localhost{target}")) {
             Ok(u) => u,

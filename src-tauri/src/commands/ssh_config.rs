@@ -237,9 +237,11 @@ async fn apply_import(
             if let Some(id) = key_by_path.get(identity) {
                 key_id = Some(id.clone());
             } else {
-                let contents = key_contents_by_path
-                    .get(identity)
-                    .expect("identity files are preloaded");
+                let contents = key_contents_by_path.get(identity).ok_or_else(|| {
+                    AppError::Other(format!(
+                        "identity file {identity} was not prepared for import"
+                    ))
+                })?;
                 let normalized = contents.trim().to_string();
                 let id = if let Some(id) = key_by_content.get(&normalized) {
                     id.clone()

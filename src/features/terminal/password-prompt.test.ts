@@ -13,6 +13,7 @@ interface PasswordPrompt {
 const mocks = vi.hoisted(() => ({
   pendingPasswords: vi.fn(),
   respondPassword: vi.fn(() => Promise.resolve()),
+  passwordUnlisten: vi.fn(),
   passwordListener: undefined as ((event: PasswordPrompt) => void) | undefined,
   passwordClosedListener: undefined as
     ((event: { promptId: string }) => void) | undefined,
@@ -23,7 +24,7 @@ vi.mock("@/lib/ipc", () => ({
     ssh: {
       onPassword: vi.fn((listener: (event: PasswordPrompt) => void) => {
         mocks.passwordListener = listener;
-        return Promise.resolve(vi.fn());
+        return Promise.resolve(mocks.passwordUnlisten);
       }),
       onPasswordClosed: vi.fn(
         (listener: (event: { promptId: string }) => void) => {
@@ -42,6 +43,7 @@ import {
   listenPasswordPrompts,
   usePasswordPromptStore,
 } from "./password-prompt";
+import { ipc } from "@/lib/ipc";
 
 const prompt = (promptId: string, sessionId = "session-1"): PasswordPrompt => ({
   promptId,
@@ -71,6 +73,17 @@ describe("password prompts", () => {
       prompt("pending"),
     ]);
     expect(hasPasswordPrompt("session-1")).toBe(true);
+  });
+
+  it("removes the first listener when the second listener fails", async () => {
+    vi.mocked(ipc.ssh.onPasswordClosed).mockRejectedValueOnce(
+      new Error("listen failed"),
+    );
+
+    await expect(listenPasswordPrompts()).rejects.toThrow("listen failed");
+
+    expect(mocks.passwordUnlisten).toHaveBeenCalledOnce();
+    expect(mocks.pendingPasswords).not.toHaveBeenCalled();
   });
 
   it("deduplicates a prompt seen through both the event and pending query", async () => {

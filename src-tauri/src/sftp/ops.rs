@@ -236,7 +236,10 @@ pub fn local_write(path: &str, data: &[u8], expected: Option<&[u8]>) -> AppResul
             fs::set_permissions(&temp, metadata.permissions())?;
         }
         #[cfg(not(windows))]
-        fs::rename(&temp, target)?;
+        {
+            fs::rename(&temp, target)?;
+            crate::durable_fs::sync_parent(target)?;
+        }
         #[cfg(windows)]
         {
             if target.exists() {

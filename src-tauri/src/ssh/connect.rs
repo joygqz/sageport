@@ -110,13 +110,24 @@ pub async fn establish_with_forwarded_tcpip(
                 .await?
             }
             Some(prev) => {
-                let channel = with_ssh_timeout(prev.channel_open_direct_tcpip(
-                    hop.host.clone(),
-                    hop.port as u32,
-                    "127.0.0.1",
-                    0,
-                ))
-                .await?;
+                let channel = with_ssh_timeout(
+                    prev.channel_open_direct_tcpip(
+                        hop.host.clone(),
+                        hop.port as u32,
+                        "127.0.0.1",
+                        0,
+                    ),
+                )
+                .await
+                .map_err(|error| match error {
+                    AppError::Ssh(russh::Error::RequestDenied) => AppError::Other(format!(
+                        "jump host {} rejected the connection to {}:{}; verify AllowTcpForwarding and PermitOpen on the jump host",
+                        hops[index - 1].host,
+                        hop.host,
+                        hop.port
+                    )),
+                    error => error,
+                })?;
                 jumps.push(prev);
                 with_host_key_aware_timeout(
                     client::connect_stream(config.clone(), channel.into_stream(), handler),

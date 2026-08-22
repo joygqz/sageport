@@ -7,7 +7,7 @@ use parking_lot::Mutex;
 use russh::ChannelMsg;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::{mpsc, oneshot, watch};
 
 use super::connect::{establish, SshConnection};
 use super::{ConnectParams, ConnectionPrompts, EVENT_DATA, EVENT_STATUS, TERM};
@@ -20,21 +20,25 @@ struct ConnectionEntry {
 
 type ConnectionMap = Arc<Mutex<HashMap<String, ConnectionEntry>>>;
 
+const INPUT_QUEUE_CAPACITY: usize = 32;
+
 enum SessionCommand {
     Input(Vec<u8>),
-    Resize(u32, u32),
-    Close,
 }
 
 struct SessionEntry {
-    tx: UnboundedSender<SessionCommand>,
+    input_tx: mpsc::Sender<SessionCommand>,
+    resize_tx: watch::Sender<(u32, u32)>,
+    close_tx: Option<oneshot::Sender<()>>,
     attempt: u32,
 }
 
 pub struct SessionReservation {
     id: String,
     attempt: u32,
-    rx: UnboundedReceiver<SessionCommand>,
+    input_rx: mpsc::Receiver<SessionCommand>,
+    resize_rx: watch::Receiver<(u32, u32)>,
+    close_rx: oneshot::Receiver<()>,
 }
 
 #[derive(Serialize, Clone)]
@@ -76,7 +80,9 @@ impl SessionManager {
     }
 
     pub fn reserve(&self, id: String, attempt: u32) -> Option<SessionReservation> {
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (input_tx, input_rx) = mpsc::channel(INPUT_QUEUE_CAPACITY);
+        let (resize_tx, resize_rx) = watch::channel((0, 0));
+        let (close_tx, close_rx) = oneshot::channel();
 
         let previous = {
             let mut sessions = self.sessions.lock();
@@ -86,12 +92,28 @@ impl SessionManager {
             {
                 return None;
             }
-            sessions.insert(id.clone(), SessionEntry { tx, attempt })
+            sessions.insert(
+                id.clone(),
+                SessionEntry {
+                    input_tx,
+                    resize_tx,
+                    close_tx: Some(close_tx),
+                    attempt,
+                },
+            )
         };
-        if let Some(entry) = previous {
-            let _ = entry.tx.send(SessionCommand::Close);
+        if let Some(mut entry) = previous {
+            if let Some(close_tx) = entry.close_tx.take() {
+                let _ = close_tx.send(());
+            }
         }
-        Some(SessionReservation { id, attempt, rx })
+        Some(SessionReservation {
+            id,
+            attempt,
+            input_rx,
+            resize_rx,
+            close_rx,
+        })
     }
 
     pub fn abandon(&self, id: &str, attempt: u32) {
@@ -119,7 +141,7 @@ impl SessionManager {
         let sessions = self.sessions.clone();
         let connections = self.connections.clone();
         tokio::spawn(async move {
-            run_session(app, prompts, params, reservation.rx, connections.clone()).await;
+            run_session(app, prompts, params, reservation, connections.clone()).await;
             remove_connection(&connections, &id, attempt);
             let mut sessions = sessions.lock();
             if sessions
@@ -131,12 +153,38 @@ impl SessionManager {
         });
     }
 
-    pub fn send_input(&self, id: &str, attempt: u32, data: Vec<u8>) -> AppResult<()> {
-        self.dispatch(id, attempt, SessionCommand::Input(data))
+    pub async fn send_input(&self, id: &str, attempt: u32, data: Vec<u8>) -> AppResult<()> {
+        let tx = {
+            let sessions = self.sessions.lock();
+            let entry = sessions
+                .get(id)
+                .ok_or_else(|| AppError::NotFound(format!("session {id}")))?;
+            if entry.attempt != attempt {
+                return Ok(());
+            }
+            entry.input_tx.clone()
+        };
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            tx.send(SessionCommand::Input(data)),
+        )
+        .await
+        .map_err(|_| AppError::Timeout("terminal input queue is busy".into()))?
+        .map_err(|_| AppError::Other("session is no longer running".into()))
     }
 
     pub fn resize(&self, id: &str, attempt: u32, cols: u32, rows: u32) -> AppResult<()> {
-        self.dispatch(id, attempt, SessionCommand::Resize(cols, rows))
+        let sessions = self.sessions.lock();
+        let entry = sessions
+            .get(id)
+            .ok_or_else(|| AppError::NotFound(format!("session {id}")))?;
+        if entry.attempt != attempt {
+            return Ok(());
+        }
+        entry
+            .resize_tx
+            .send((cols, rows))
+            .map_err(|_| AppError::Other("session is no longer running".into()))
     }
 
     pub fn close(&self, id: &str, attempt: Option<u32>) -> AppResult<()> {
@@ -151,30 +199,20 @@ impl SessionManager {
                 None
             }
         };
-        if let Some(entry) = entry {
-            let _ = entry.tx.send(SessionCommand::Close);
+        if let Some(mut entry) = entry {
+            if let Some(close_tx) = entry.close_tx.take() {
+                let _ = close_tx.send(());
+            }
         }
         Ok(())
     }
 
     pub fn close_all(&self) {
-        for (_, entry) in self.sessions.lock().drain() {
-            let _ = entry.tx.send(SessionCommand::Close);
+        for (_, mut entry) in self.sessions.lock().drain() {
+            if let Some(close_tx) = entry.close_tx.take() {
+                let _ = close_tx.send(());
+            }
         }
-    }
-
-    fn dispatch(&self, id: &str, attempt: u32, cmd: SessionCommand) -> AppResult<()> {
-        let sessions = self.sessions.lock();
-        let entry = sessions
-            .get(id)
-            .ok_or_else(|| AppError::NotFound(format!("session {id}")))?;
-        if entry.attempt != attempt {
-            return Ok(());
-        }
-        entry
-            .tx
-            .send(cmd)
-            .map_err(|_| AppError::Other("session is no longer running".into()))
     }
 }
 
@@ -205,14 +243,14 @@ async fn run_session(
     app: AppHandle,
     prompts: ConnectionPrompts,
     params: ConnectParams,
-    rx: UnboundedReceiver<SessionCommand>,
+    reservation: SessionReservation,
     connections: ConnectionMap,
 ) {
     let id = params.session_id.clone();
     let attempt = params.attempt;
     emit_status(&app, &id, attempt, "connecting", None);
 
-    match run_session_inner(&app, &prompts, params, rx, &connections).await {
+    match run_session_inner(&app, &prompts, params, reservation, &connections).await {
         Ok(()) => emit_status(&app, &id, attempt, "closed", None),
         Err(e) => emit_status(&app, &id, attempt, "error", Some(&e)),
     }
@@ -222,9 +260,15 @@ async fn run_session_inner(
     app: &AppHandle,
     prompts: &ConnectionPrompts,
     params: ConnectParams,
-    mut rx: UnboundedReceiver<SessionCommand>,
+    reservation: SessionReservation,
     connections: &ConnectionMap,
 ) -> AppResult<()> {
+    let SessionReservation {
+        mut input_rx,
+        mut resize_rx,
+        mut close_rx,
+        ..
+    } = reservation;
     let ConnectParams {
         session_id: id,
         attempt,
@@ -236,7 +280,7 @@ async fn run_session_inner(
 
     let conn = tokio::select! {
         result = establish(app, prompts, &id, &hops) => Arc::new(result?),
-        _ = wait_close(&mut rx) => return Ok(()),
+        _ = &mut close_rx => return Ok(()),
     };
     drop(hops);
     let open_channel = async {
@@ -252,7 +296,7 @@ async fn run_session_inner(
             result
                 .map_err(|_| AppError::Timeout("opening the SSH shell timed out".into()))??
         }
-        _ = wait_close(&mut rx) => return Ok(()),
+        _ = &mut close_rx => return Ok(()),
     };
 
     connections.lock().insert(
@@ -273,6 +317,8 @@ async fn run_session_inner(
 
     loop {
         tokio::select! {
+            biased;
+            _ = &mut close_rx => break,
             msg = channel.wait() => {
                 match msg {
                     Some(ChannelMsg::Data { data }) => emit_data(app, &id, attempt, &data),
@@ -282,15 +328,21 @@ async fn run_session_inner(
                     _ => {}
                 }
             }
-            cmd = rx.recv() => {
+            cmd = input_rx.recv() => {
                 match cmd {
                     Some(SessionCommand::Input(data)) => {
                         channel.data(&data[..]).await?;
                     }
-                    Some(SessionCommand::Resize(cols, rows)) => {
-                        channel.window_change(cols, rows, 0, 0).await?;
-                    }
-                    Some(SessionCommand::Close) | None => break,
+                    None => break,
+                }
+            }
+            changed = resize_rx.changed() => {
+                if changed.is_err() {
+                    break;
+                }
+                let (cols, rows) = *resize_rx.borrow_and_update();
+                if cols > 0 && rows > 0 {
+                    channel.window_change(cols, rows, 0, 0).await?;
                 }
             }
         }
@@ -299,15 +351,6 @@ async fn run_session_inner(
     remove_connection(connections, &id, attempt);
     drop(conn);
     Ok(())
-}
-
-async fn wait_close(rx: &mut UnboundedReceiver<SessionCommand>) {
-    loop {
-        match rx.recv().await {
-            Some(SessionCommand::Close) | None => return,
-            Some(_) => {}
-        }
-    }
 }
 
 fn emit_data(app: &AppHandle, id: &str, attempt: u32, data: &[u8]) {
@@ -323,7 +366,7 @@ fn emit_data(app: &AppHandle, id: &str, attempt: u32, data: &[u8]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{SessionCommand, SessionManager};
+    use super::{SessionCommand, SessionManager, INPUT_QUEUE_CAPACITY};
 
     #[test]
     fn newer_reservation_cancels_the_previous_attempt() {
@@ -332,7 +375,10 @@ mod tests {
 
         let second = manager.reserve("session".into(), 2).unwrap();
 
-        assert!(matches!(first.rx.try_recv(), Ok(SessionCommand::Close)));
+        assert!(matches!(
+            first.close_rx.try_recv(),
+            Ok(()) | Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+        ));
         assert_eq!(second.attempt, 2);
     }
 
@@ -342,24 +388,67 @@ mod tests {
         let mut current = manager.reserve("session".into(), 2).unwrap();
 
         manager.close("session", Some(1)).unwrap();
-        assert!(current.rx.try_recv().is_err());
+        assert!(matches!(
+            current.close_rx.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        ));
 
         manager.close("session", Some(2)).unwrap();
-        assert!(matches!(current.rx.try_recv(), Ok(SessionCommand::Close)));
+        assert!(matches!(
+            current.close_rx.try_recv(),
+            Ok(()) | Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+        ));
     }
 
-    #[test]
-    fn stale_input_is_not_dispatched_to_the_new_attempt() {
+    #[tokio::test]
+    async fn stale_input_is_not_dispatched_to_the_new_attempt() {
         let manager = SessionManager::new();
         let mut current = manager.reserve("session".into(), 2).unwrap();
 
-        manager.send_input("session", 1, b"old".to_vec()).unwrap();
-        assert!(current.rx.try_recv().is_err());
+        manager
+            .send_input("session", 1, b"old".to_vec())
+            .await
+            .unwrap();
+        assert!(current.input_rx.try_recv().is_err());
 
-        manager.send_input("session", 2, b"new".to_vec()).unwrap();
+        manager
+            .send_input("session", 2, b"new".to_vec())
+            .await
+            .unwrap();
         assert!(matches!(
-            current.rx.try_recv(),
+            current.input_rx.try_recv(),
             Ok(SessionCommand::Input(data)) if data == b"new"
         ));
+    }
+
+    #[tokio::test]
+    async fn close_bypasses_a_full_input_queue() {
+        let manager = SessionManager::new();
+        let mut current = manager.reserve("session".into(), 2).unwrap();
+        for _ in 0..INPUT_QUEUE_CAPACITY {
+            manager
+                .send_input("session", 2, b"x".to_vec())
+                .await
+                .unwrap();
+        }
+
+        manager.close("session", Some(2)).unwrap();
+
+        assert!(matches!(
+            current.close_rx.try_recv(),
+            Ok(()) | Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+        ));
+    }
+
+    #[test]
+    fn resize_keeps_only_the_latest_dimensions() {
+        let manager = SessionManager::new();
+        let mut current = manager.reserve("session".into(), 2).unwrap();
+
+        manager.resize("session", 2, 80, 24).unwrap();
+        manager.resize("session", 2, 120, 40).unwrap();
+
+        assert!(current.resize_rx.has_changed().unwrap());
+        assert_eq!(*current.resize_rx.borrow_and_update(), (120, 40));
     }
 }

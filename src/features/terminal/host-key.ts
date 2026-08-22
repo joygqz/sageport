@@ -50,13 +50,19 @@ export const useHostKeyStore = create<HostKeyState>((set, get) => ({
 export async function listenHostKeyEvents(): Promise<() => void> {
   let syncing = true;
   const closedDuringSync = new Set<string>();
-  const [unlistenPrompt, unlistenClosed] = await Promise.all([
-    ipc.ssh.onHostKey((event) => useHostKeyStore.getState().push(event)),
-    ipc.ssh.onHostKeyClosed((event) => {
+  const unlistenPrompt = await ipc.ssh.onHostKey((event) =>
+    useHostKeyStore.getState().push(event),
+  );
+  let unlistenClosed: (() => void) | undefined;
+  try {
+    unlistenClosed = await ipc.ssh.onHostKeyClosed((event) => {
       if (syncing) closedDuringSync.add(event.promptId);
       useHostKeyStore.getState().dismiss(event.promptId);
-    }),
-  ]);
+    });
+  } catch (error) {
+    unlistenPrompt();
+    throw error;
+  }
   try {
     const pending = await ipc.ssh.pendingHostKeys();
     for (const event of pending) {
@@ -70,7 +76,7 @@ export async function listenHostKeyEvents(): Promise<() => void> {
   }
   return () => {
     unlistenPrompt();
-    unlistenClosed();
+    unlistenClosed?.();
   };
 }
 

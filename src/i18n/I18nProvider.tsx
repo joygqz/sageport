@@ -18,7 +18,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectLocale);
 
   const applyLocale = useCallback((next: Locale) => {
-    void loadLocale(next).then(() => setLocaleState(next));
+    void loadLocale(next)
+      .then(() => setLocaleState(next))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

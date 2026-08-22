@@ -14,9 +14,14 @@ export function loadLocale(locale: Locale): Promise<void> {
 
   let task = pending.get(locale);
   if (!task) {
-    task = loaders[locale]().then((dictionary) => {
-      dictionaries.set(locale, dictionary);
-    });
+    task = loaders[locale]()
+      .then((dictionary) => {
+        dictionaries.set(locale, dictionary);
+      })
+      .catch((error) => {
+        pending.delete(locale);
+        throw error;
+      });
     pending.set(locale, task);
   }
   return task;

@@ -101,8 +101,10 @@ fn merge_tool_results(messages: &mut Vec<Value>) {
             if let Some(last) = merged.last_mut() {
                 if is_tool_result_message(last) {
                     let block = msg["content"][0].clone();
-                    last["content"].as_array_mut().unwrap().push(block);
-                    continue;
+                    if let Some(content) = last["content"].as_array_mut() {
+                        content.push(block);
+                        continue;
+                    }
                 }
             }
         }
