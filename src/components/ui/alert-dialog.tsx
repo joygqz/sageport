@@ -2,7 +2,11 @@ import type * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
 import { cn } from "@/lib/utils";
-import { DIALOG_CONTENT_CLASS, DIALOG_OVERLAY_CLASS } from "./dialog";
+import {
+  DIALOG_CONTENT_CLASS,
+  DIALOG_OVERLAY_CLASS,
+  DIALOG_VIEWPORT_CLASS,
+} from "./dialog";
 
 function AlertDialog(
   props: React.ComponentProps<typeof AlertDialogPrimitive.Root>,
@@ -23,16 +27,14 @@ function AlertDialogContent({
         data-slot="alert-dialog-overlay"
         className={DIALOG_OVERLAY_CLASS}
       />
-      <AlertDialogPrimitive.Content
-        ref={ref}
-        data-slot="alert-dialog-content"
-        className={cn(
-          DIALOG_CONTENT_CLASS,
-          "-translate-x-1/2 -translate-y-1/2 overflow-y-auto",
-          className,
-        )}
-        {...props}
-      />
+      <div data-slot="alert-dialog-viewport" className={DIALOG_VIEWPORT_CLASS}>
+        <AlertDialogPrimitive.Content
+          ref={ref}
+          data-slot="alert-dialog-content"
+          className={cn(DIALOG_CONTENT_CLASS, "overflow-y-auto", className)}
+          {...props}
+        />
+      </div>
     </AlertDialogPrimitive.Portal>
   );
 }

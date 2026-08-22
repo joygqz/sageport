@@ -9,8 +9,11 @@ import { GHOST_ICON_BUTTON_CLASS } from "./styles";
 export const DIALOG_OVERLAY_CLASS =
   "fixed inset-0 z-50 bg-black/35 dark:bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 
+export const DIALOG_VIEWPORT_CLASS =
+  "pointer-events-none fixed inset-0 z-50 grid place-items-center p-4";
+
 export const DIALOG_CONTENT_CLASS =
-  "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-[var(--content-gap)] overscroll-contain rounded-lg border border-border-strong bg-popover p-[var(--dialog-padding)] text-popover-foreground data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
+  "pointer-events-auto relative grid max-h-[calc(100dvh-2rem)] w-full max-w-lg gap-[var(--content-gap)] overscroll-contain rounded-lg border border-border-strong bg-popover p-[var(--dialog-padding)] text-popover-foreground data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 
 const DIALOG_CLOSE_CLASS = cn(GHOST_ICON_BUTTON_CLASS, "shrink-0");
 
@@ -115,31 +118,30 @@ function DialogContent({
   return (
     <DialogPortal>
       <DialogOverlay />
-      <DialogPrimitive.Content
-        ref={setRefs}
-        data-slot="dialog-content"
-        onPointerDown={onPointerDown}
-
-        style={{
-          translate: `calc(-50% + ${offset.x}px) calc(-50% + ${offset.y}px)`,
-        }}
-        className={cn(
-          DIALOG_CONTENT_CLASS,
-          scrollMode === "dialog" ? "overflow-y-auto" : "overflow-hidden",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        {showClose && (
-          <DialogPrimitive.Close
-            className={cn("absolute right-3 top-3", DIALOG_CLOSE_CLASS)}
-          >
-            <X aria-hidden="true" className="size-4" />
-            <span className="sr-only">{t("common.close")}</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
+      <div data-slot="dialog-viewport" className={DIALOG_VIEWPORT_CLASS}>
+        <DialogPrimitive.Content
+          ref={setRefs}
+          data-slot="dialog-content"
+          onPointerDown={onPointerDown}
+          style={{ translate: `${offset.x}px ${offset.y}px` }}
+          className={cn(
+            DIALOG_CONTENT_CLASS,
+            scrollMode === "dialog" ? "overflow-y-auto" : "overflow-hidden",
+            className,
+          )}
+          {...props}
+        >
+          {children}
+          {showClose && (
+            <DialogPrimitive.Close
+              className={cn("absolute right-3 top-3", DIALOG_CLOSE_CLASS)}
+            >
+              <X aria-hidden="true" className="size-4" />
+              <span className="sr-only">{t("common.close")}</span>
+            </DialogPrimitive.Close>
+          )}
+        </DialogPrimitive.Content>
+      </div>
     </DialogPortal>
   );
 }
