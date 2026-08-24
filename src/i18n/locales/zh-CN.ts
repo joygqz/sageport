@@ -12,6 +12,7 @@ export const zhCN: Dictionary = {
     delete: "删除",
     edit: "编辑",
     rename: "重命名",
+    reloadApp: "重新加载应用",
     retry: "重试",
     save: "保存",
     saveChanges: "保存更改",
@@ -93,6 +94,7 @@ export const zhCN: Dictionary = {
     uptimeHm: "{h} 小时 {m} 分钟",
     uptimeM: "{m} 分钟",
     collecting: "正在采集统计信息…",
+    listenerError: "监控初始化失败",
     unsupported: "该系统暂不支持统计信息。",
     empty: {
       title: "暂无活动会话",

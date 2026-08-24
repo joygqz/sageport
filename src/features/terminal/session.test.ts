@@ -95,6 +95,37 @@ describe("TerminalSession lifecycle", () => {
     session.dispose();
   });
 
+  it("contains errors thrown by the status handler", async () => {
+    const current = transport();
+    const error = new Error("status failed");
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const session = new TerminalSession({
+      id: "session-1",
+      connectionKey: "attempt-1",
+      transport: current,
+      fontFamily: "monospace",
+      fontSize: 13,
+      theme: {},
+      watchHostKey: false,
+      imagePaste: false,
+      onStatus: () => {
+        throw error;
+      },
+    });
+
+    session.attach({} as HTMLElement);
+
+    await vi.waitFor(() => expect(current.connect).toHaveBeenCalledOnce());
+    expect(consoleError).toHaveBeenCalledWith(
+      "Terminal status handler failed:",
+      error,
+    );
+    consoleError.mockRestore();
+    session.dispose();
+  });
+
   it("routes key events between workbench shortcuts and the custom handler", async () => {
     const session = new TerminalSession({
       id: "session-1",

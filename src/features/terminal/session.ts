@@ -162,7 +162,11 @@ export class TerminalSession {
         this.term.focus();
       }
       this.observe(container);
-      void this.start();
+      void this.start().catch((error) => {
+        console.error("Failed to start terminal session:", error);
+        if (!this.disposed) this.ended = true;
+        this.disconnectTransport();
+      });
     } catch (err) {
       if (!this.disposed) {
         this.ended = true;
@@ -346,7 +350,11 @@ export class TerminalSession {
   }
 
   private emitStatus(event: SessionStatusEvent) {
-    this.opts.onStatus(event);
+    try {
+      this.opts.onStatus(event);
+    } catch (error) {
+      console.error("Terminal status handler failed:", error);
+    }
   }
 
   private flushInput() {

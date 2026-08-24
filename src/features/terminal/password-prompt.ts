@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { ipc } from "@/lib/ipc";
 import type { PasswordPromptEvent } from "@/types/models";
+import { recoverPendingPrompts } from "./prompt-recovery";
 
 interface PasswordPromptState {
   queue: PasswordPromptEvent[];
@@ -69,13 +70,16 @@ export async function listenPasswordPrompts(): Promise<() => void> {
   }
 
   try {
-    const pending = await ipc.ssh.pendingPasswords();
-    for (const event of pending) {
-      if (!closedDuringSync.has(event.promptId)) {
-        usePasswordPromptStore.getState().push(event);
-      }
-    }
-  } catch {
+    await recoverPendingPrompts(
+      () => ipc.ssh.pendingPasswords(),
+      (event) => {
+        if (!closedDuringSync.has(event.promptId)) {
+          usePasswordPromptStore.getState().push(event);
+        }
+      },
+      (error) =>
+        console.warn("Failed to recover pending password prompts:", error),
+    );
   } finally {
     syncing = false;
   }

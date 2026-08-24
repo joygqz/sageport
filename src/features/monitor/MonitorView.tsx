@@ -18,6 +18,7 @@ import {
   useMonitorStore,
 } from "@/features/terminal/monitor";
 import { useI18n, type TFunction, type TKey } from "@/i18n";
+import { errorMessage, toast } from "@/lib/toast";
 import { cn, formatBytes, formatUsage } from "@/lib/utils";
 import type { Host, HostStats } from "@/types/models";
 import { PanelContent } from "@/workbench/PanelHeader";
@@ -38,8 +39,10 @@ export function MonitorView() {
   const searching = query.trim().length > 0;
 
   useEffect(() => {
-    void bridgeMonitorEvents().catch(() => {});
-  }, []);
+    void bridgeMonitorEvents().catch((error) =>
+      toast.error(t("monitor.listenerError"), errorMessage(error)),
+    );
+  }, [t]);
 
   const groups = groupByHost(
     terminalPanes(tabs).filter((pane) => pane.target !== "local"),

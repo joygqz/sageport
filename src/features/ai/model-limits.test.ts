@@ -6,7 +6,11 @@ vi.mock("@/lib/ipc", () => ({
   ipc: { ai: { modelLimits } },
 }));
 
-import { clearModelLimitsCache, resolveModelLimits } from "./model-limits";
+import {
+  clearModelLimitsCache,
+  MAX_MODEL_LIMIT_CACHE_ENTRIES,
+  resolveModelLimits,
+} from "./model-limits";
 
 beforeEach(() => {
   clearModelLimitsCache();
@@ -53,5 +57,21 @@ describe("resolveModelLimits", () => {
     await expect(resolveModelLimits("offline-model")).resolves.toBeNull();
 
     expect(modelLimits).toHaveBeenCalledTimes(1);
+  });
+
+  it("evicts the least recently used model after reaching the cache limit", async () => {
+    modelLimits.mockResolvedValue({
+      contextWindow: 128_000,
+      maxOutputTokens: 16_000,
+    });
+
+    for (let index = 0; index <= MAX_MODEL_LIMIT_CACHE_ENTRIES; index += 1) {
+      await resolveModelLimits(`model-${index}`);
+    }
+    await resolveModelLimits("model-0");
+
+    expect(modelLimits).toHaveBeenCalledTimes(
+      MAX_MODEL_LIMIT_CACHE_ENTRIES + 2,
+    );
   });
 });

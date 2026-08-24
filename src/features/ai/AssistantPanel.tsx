@@ -714,13 +714,22 @@ const MARKDOWN_COMPONENTS: Components = {
 function CodeBlock({ code }: { code: string }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendToTerminal = useTabsStore((s) => s.sendToTerminal);
+
+  useEffect(
+    () => () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    },
+    [],
+  );
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 1500);
     } catch (err) {
       toast.error(t("ai.error"), errorMessage(err));
     }

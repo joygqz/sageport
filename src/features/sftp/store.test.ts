@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/ipc", () => ({
   ipc: {
@@ -9,6 +9,8 @@ vi.mock("@/lib/ipc", () => ({
       cancelTransfer: vi.fn(() => Promise.resolve()),
       deleteBatch: vi.fn(() => Promise.resolve()),
       cancelDelete: vi.fn(() => Promise.resolve()),
+      connect: vi.fn(() => Promise.resolve()),
+      disconnect: vi.fn(() => Promise.resolve()),
     },
   },
 }));
@@ -34,6 +36,8 @@ import {
 } from "./store";
 
 const refreshDirectory = useSftpStore.getState().refresh;
+
+afterEach(() => useSftpStore.getState().cancelConflict());
 
 const loadedTab = (): SftpTab => ({
   id: "local-tab",
@@ -366,6 +370,120 @@ describe("SFTP transfer refresh", () => {
       totalBytes: 1024,
       status: "active",
     });
+  });
+});
+
+describe("SFTP connection races", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSftpStore.setState({
+      panes: {
+        left: {
+          tabs: [transferTab("remote", "connection-1", "")],
+          activeTabId: "remote",
+        },
+        right: { tabs: [], activeTabId: null },
+      },
+      transfers: {},
+      deletions: {},
+      pendingConflict: null,
+    });
+    useSftpStore.setState((state) => ({
+      panes: {
+        ...state.panes,
+        left: {
+          ...state.panes.left,
+          tabs: state.panes.left.tabs.map((tab) => ({
+            ...tab,
+            hostId: "host-1",
+            status: "connecting" as const,
+          })),
+        },
+      },
+    }));
+  });
+
+  it("does not reconnect a tab after it is closed", async () => {
+    let finishDisconnect: (() => void) | undefined;
+    vi.mocked(ipc.sftp.disconnect).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDisconnect = resolve;
+        }),
+    );
+
+    useSftpStore.getState().reconnectTab("left", "remote");
+    useSftpStore.getState().closeTab("left", "remote");
+    finishDisconnect?.();
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ipc.sftp.connect).not.toHaveBeenCalled();
+  });
+
+  it("ignores home directory recovery from an earlier connection", async () => {
+    let finishHome: ((path: string) => void) | undefined;
+    vi.mocked(ipc.sftp.home).mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finishHome = resolve;
+        }),
+    );
+
+    useSftpStore.getState().applyStatus("connection-1", "connected");
+    useSftpStore.getState().reconnectTab("left", "remote");
+    finishHome?.("/stale-home");
+
+    await vi.waitFor(() => expect(ipc.sftp.home).toHaveBeenCalled());
+    expect(ipc.sftp.list).not.toHaveBeenCalled();
+    expect(useSftpStore.getState().panes.left.tabs[0]?.cwd).toBe("");
+  });
+});
+
+describe("SFTP conflict lifecycle", () => {
+  it("cancels a waiting transfer when an involved tab closes", async () => {
+    const entry: FileEntry = {
+      name: "report.txt",
+      path: "/source/report.txt",
+      kind: "file",
+      size: 10,
+      modified: null,
+      permissions: null,
+      isSymlink: false,
+    };
+    const destination = { ...entry, path: "/destination/report.txt" };
+    useSftpStore.setState({
+      panes: {
+        left: {
+          tabs: [
+            { ...transferTab("source", null, "/source"), entries: [entry] },
+          ],
+          activeTabId: "source",
+        },
+        right: {
+          tabs: [
+            {
+              ...transferTab("destination", null, "/destination"),
+              entries: [destination],
+            },
+          ],
+          activeTabId: "destination",
+        },
+      },
+      transfers: {},
+      deletions: {},
+      pendingConflict: null,
+    });
+
+    const transfer = useSftpStore.getState().transfer("left", [entry]);
+    await vi.waitFor(() =>
+      expect(useSftpStore.getState().pendingConflict).not.toBeNull(),
+    );
+    useSftpStore.getState().closeTab("right", "destination");
+    await transfer;
+
+    expect(useSftpStore.getState().pendingConflict).toBeNull();
+    expect(ipc.sftp.transfer).not.toHaveBeenCalled();
   });
 });
 

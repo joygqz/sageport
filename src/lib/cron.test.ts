@@ -30,6 +30,8 @@ describe("parseCron", () => {
       "5-1 * * * *",
       "abc * * * *",
       "5/10 * * * *",
+      "*/2/3 * * * *",
+      "1-2-3 * * * *",
       "* * * * 1-",
     ]) {
       expect(isValidCron(expr), expr).toBe(false);

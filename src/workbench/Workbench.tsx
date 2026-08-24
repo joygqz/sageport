@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ResizeHandle } from "@/components/ui/resize-handle";
 import { useDialogSnapshot } from "@/components/ui/use-dialog-snapshot";
 import { Spinner } from "@/components/ui/spinner";
@@ -316,9 +317,11 @@ export function Workbench() {
                 showLine={false}
                 highlightOffset={0.5}
               />
-              <Suspense fallback={<FeatureLoading height={panelHeight} />}>
-                <SftpPanel height={panelHeight} />
-              </Suspense>
+              <ErrorBoundary>
+                <Suspense fallback={<FeatureLoading height={panelHeight} />}>
+                  <SftpPanel height={panelHeight} />
+                </Suspense>
+              </ErrorBoundary>
             </>
           )}
         </div>
@@ -335,9 +338,11 @@ export function Workbench() {
               showLine={false}
               highlightOffset={-0.5}
             />
-            <Suspense fallback={<FeatureLoading width={auxWidth} />}>
-              <AssistantPanel width={auxWidth} />
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={<FeatureLoading width={auxWidth} />}>
+                <AssistantPanel width={auxWidth} />
+              </Suspense>
+            </ErrorBoundary>
           </>
         )}
       </div>
@@ -345,57 +350,71 @@ export function Workbench() {
       <StatusBar />
 
       {shownOverlay?.type === "host-form" && (
-        <Suspense fallback={null}>
-          <HostFormDialog
-            open={overlay?.type === "host-form"}
-            hostId={shownOverlay.hostId}
-            initialGroupId={shownOverlay.groupId}
-            onClose={closeOverlay}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <HostFormDialog
+              open={overlay?.type === "host-form"}
+              hostId={shownOverlay.hostId}
+              initialGroupId={shownOverlay.groupId}
+              onClose={closeOverlay}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {shownOverlay?.type === "group-form" && (
-        <Suspense fallback={null}>
-          <GroupFormDialog
-            open={overlay?.type === "group-form"}
-            groupId={shownOverlay.groupId}
-            initialParentId={shownOverlay.parentId}
-            onClose={closeOverlay}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <GroupFormDialog
+              open={overlay?.type === "group-form"}
+              groupId={shownOverlay.groupId}
+              initialParentId={shownOverlay.parentId}
+              onClose={closeOverlay}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {shownOverlay?.type === "palette" && (
-        <Suspense fallback={null}>
-          <CommandPalette
-            open={overlay?.type === "palette"}
-            initialMode={shownOverlay.mode}
-            onClose={closeOverlay}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <CommandPalette
+              open={overlay?.type === "palette"}
+              initialMode={shownOverlay.mode}
+              onClose={closeOverlay}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {shownOverlay?.type === "settings" && (
-        <Suspense fallback={null}>
-          <SettingsDialog
-            open={overlay?.type === "settings"}
-            section={shownOverlay.section}
-            onSectionChange={setSettingsSection}
-            onClose={closeOverlay}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <SettingsDialog
+              open={overlay?.type === "settings"}
+              section={shownOverlay.section}
+              onSectionChange={setSettingsSection}
+              onClose={closeOverlay}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {hostKeyMounted && (
-        <Suspense fallback={null}>
-          <HostKeyDialog />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <HostKeyDialog />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {passwordMounted && (
-        <Suspense fallback={null}>
-          <PasswordPromptDialog />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <PasswordPromptDialog />
+          </Suspense>
+        </ErrorBoundary>
       )}
-      <Suspense fallback={null}>
-        <UpdateNotifier />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={null}>
+          <UpdateNotifier />
+        </Suspense>
+      </ErrorBoundary>
       <LazyToaster />
     </div>
   );
@@ -411,9 +430,11 @@ function LazyToaster() {
   const hasToasts = useToastStore((state) => state.toasts.length > 0);
   if (!hasToasts) return null;
   return (
-    <Suspense fallback={null}>
-      <Toaster />
-    </Suspense>
+    <ErrorBoundary fallback={null}>
+      <Suspense fallback={null}>
+        <Toaster />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
