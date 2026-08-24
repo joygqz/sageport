@@ -81,10 +81,12 @@ export async function startMonitor(sessionId: string, attempt: number) {
   if (current && current.attempt !== attempt) {
     useMonitorStore.getState().clear(sessionId);
   }
-  void bridgeMonitorEvents()
-    .catch(() => bridgeMonitorEvents())
-    .catch(() => {});
   try {
+    try {
+      await bridgeMonitorEvents();
+    } catch {
+      await bridgeMonitorEvents();
+    }
     await ipc.monitor.start(sessionId, attempt);
   } catch (error) {
     if (started.get(sessionId) === attempt) started.delete(sessionId);

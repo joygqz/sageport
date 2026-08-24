@@ -1,5 +1,6 @@
 import { lazy, memo, Suspense } from "react";
 
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Spinner } from "@/components/ui/spinner";
 import { useLayoutStore } from "./layout";
 
@@ -47,20 +48,22 @@ export const SideBar = memo(function SideBar({ width }: { width: number }) {
       style={{ width }}
       className="flex shrink-0 flex-col overflow-hidden bg-surface"
     >
-      <Suspense
-        fallback={
-          <div className="flex flex-1 items-center justify-center">
-            <Spinner />
-          </div>
-        }
-      >
-        {activity === "hosts" && <HostsView />}
-        {activity === "credentials" && <CredentialsView />}
-        {activity === "snippets" && <SnippetsView />}
-        {activity === "tasks" && <TasksView />}
-        {activity === "forwards" && <ForwardsView />}
-        {activity === "monitor" && <MonitorView />}
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense
+          fallback={
+            <div className="flex flex-1 items-center justify-center">
+              <Spinner />
+            </div>
+          }
+        >
+          {activity === "hosts" && <HostsView />}
+          {activity === "credentials" && <CredentialsView />}
+          {activity === "snippets" && <SnippetsView />}
+          {activity === "tasks" && <TasksView />}
+          {activity === "forwards" && <ForwardsView />}
+          {activity === "monitor" && <MonitorView />}
+        </Suspense>
+      </ErrorBoundary>
     </aside>
   );
 });

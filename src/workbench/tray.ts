@@ -33,8 +33,10 @@ export function useTrayMenu(): void {
   const lastPushed = useRef<string | null>(null);
 
   useEffect(() => {
-    void bridgeForwardEvents().catch(() => {});
-  }, []);
+    void bridgeForwardEvents().catch((error) =>
+      toast.error(t("forwards.statusError"), errorMessage(error)),
+    );
+  }, [t]);
 
   useEffect(() => {
     const push = () => {

@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { ipc } from "@/lib/ipc";
 import type { HostKeyDecision, HostKeyEvent } from "@/types/models";
+import { recoverPendingPrompts } from "./prompt-recovery";
 
 interface HostKeyState {
   queue: HostKeyEvent[];
@@ -64,13 +65,16 @@ export async function listenHostKeyEvents(): Promise<() => void> {
     throw error;
   }
   try {
-    const pending = await ipc.ssh.pendingHostKeys();
-    for (const event of pending) {
-      if (!closedDuringSync.has(event.promptId)) {
-        useHostKeyStore.getState().push(event);
-      }
-    }
-  } catch {
+    await recoverPendingPrompts(
+      () => ipc.ssh.pendingHostKeys(),
+      (event) => {
+        if (!closedDuringSync.has(event.promptId)) {
+          useHostKeyStore.getState().push(event);
+        }
+      },
+      (error) =>
+        console.warn("Failed to recover pending host key prompts:", error),
+    );
   } finally {
     syncing = false;
   }

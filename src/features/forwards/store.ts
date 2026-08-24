@@ -74,7 +74,9 @@ export function bridgeForwardEvents(): Promise<void> {
       const snapshot = await ipc.forwards.runtime();
       useForwardStore.getState().hydrate(snapshot);
     } catch (error) {
-      unlisten();
+      try {
+        unlisten();
+      } catch {}
       throw error;
     }
     for (const event of queued) useForwardStore.getState().apply(event);

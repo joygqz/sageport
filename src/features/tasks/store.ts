@@ -232,7 +232,9 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
 
       const completion = (async () => {
         try {
-          await ensureTransferBridge().catch(() => {});
+          await ensureTransferBridge().catch((error) =>
+            console.warn("Failed to initialize task transfer progress:", error),
+          );
           await ipc.tasks.run(
             task.id,
             hostId,

@@ -32,6 +32,7 @@ import {
   INTERACTIVE_FOCUS_CLASS,
 } from "@/components/ui";
 import { type ConfirmState } from "@/components/ui/confirm-dialog";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -358,6 +359,24 @@ export const EditorArea = memo(function EditorArea() {
     else focusFileEditor(activeId);
   }, [activeId, activePaneId]);
 
+  useEffect(() => {
+    const tabStrip = stripRef.current;
+    if (!tabStrip) return;
+    const handleWheel = (event: WheelEvent) => {
+      if (
+        tabStrip.scrollWidth <= tabStrip.clientWidth ||
+        event.deltaX !== 0 ||
+        event.deltaY === 0
+      ) {
+        return;
+      }
+      event.preventDefault();
+      tabStrip.scrollLeft += event.deltaY;
+    };
+    tabStrip.addEventListener("wheel", handleWheel, { passive: false });
+    return () => tabStrip.removeEventListener("wheel", handleWheel);
+  }, [tabs.length]);
+
   if (tabs.length === 0) return <Watermark />;
 
   return (
@@ -374,13 +393,6 @@ export const EditorArea = memo(function EditorArea() {
         <div className="relative shrink-0 bg-surface">
           <div
             ref={stripRef}
-            onWheel={(e) => {
-              const el = stripRef.current;
-              if (!el || el.scrollWidth <= el.clientWidth || e.deltaX !== 0) {
-                return;
-              }
-              el.scrollLeft += e.deltaY;
-            }}
             className={cn(
               "scrollbar-none flex h-[var(--workbench-bar-height)] gap-1 overflow-x-auto overflow-y-hidden",
               WORKBENCH_TAB_STRIP_GUTTER_CLASS,
@@ -458,28 +470,32 @@ export const EditorArea = memo(function EditorArea() {
                   tab.id !== activeId && "invisible opacity-0",
                 )}
               >
-                <Suspense fallback={<EditorLoading />}>
-                  {tab.kind === "terminal" ? (
-                    <TerminalEditor tab={tab} active={tab.id === activeId} />
-                  ) : (
-                    <FileEditor tab={tab} />
-                  )}
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<EditorLoading />}>
+                    {tab.kind === "terminal" ? (
+                      <TerminalEditor tab={tab} active={tab.id === activeId} />
+                    ) : (
+                      <FileEditor tab={tab} />
+                    )}
+                  </Suspense>
+                </ErrorBoundary>
               </div>
             </TabsContent>
           ))}
         </div>
 
         {(pendingWindowClose || pendingTab) && (
-          <Suspense fallback={null}>
-            <ConfirmDialog
-              state={confirmState}
-              onClose={() => {
-                if (pendingWindowClose) clearPendingWindowClose();
-                else clearPendingClose();
-              }}
-            />
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense fallback={null}>
+              <ConfirmDialog
+                state={confirmState}
+                onClose={() => {
+                  if (pendingWindowClose) clearPendingWindowClose();
+                  else clearPendingClose();
+                }}
+              />
+            </Suspense>
+          </ErrorBoundary>
         )}
       </div>
     </Tabs>

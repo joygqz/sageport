@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import { useI18n } from "@/i18n";
+import { errorMessage, toast } from "@/lib/toast";
 import { useTheme } from "@/themes/useTheme";
 import {
   terminalPanes,
@@ -15,7 +16,7 @@ import { createAutocomplete } from "./autocomplete/controller";
 import { broadcastTargets, useBroadcastStore } from "./broadcast";
 import { useHostKeyStore } from "./host-key";
 import { usePasswordPromptStore } from "./password-prompt";
-import { bridgeMonitorEvents, startMonitor, stopMonitor } from "./monitor";
+import { startMonitor, stopMonitor } from "./monitor";
 import { TerminalSession } from "./session";
 import { disposeSession, getSession, registerSession } from "./sessions";
 import { localTransport, sshAdhocTransport, sshTransport } from "./transport";
@@ -72,8 +73,6 @@ export function TerminalView({
       : target === "ssh-adhoc" && adhoc
         ? sshAdhocTransport(sessionId, attempt, adhoc)
         : sshTransport(sessionId, hostId, attempt);
-    if (isSshLike) void bridgeMonitorEvents().catch(() => {});
-
     const describeError = (code?: string | null, message?: string) => {
       const translate = translateRef.current;
       if (code === "invalid") return translate("ssh.credentialsMissing");
@@ -104,7 +103,12 @@ export function TerminalView({
       onStatus: (e) => {
         if (isSshLike) {
           if (e.status === "connected") {
-            void startMonitor(sessionId, attempt).catch(() => {});
+            void startMonitor(sessionId, attempt).catch((error) =>
+              toast.error(
+                translateRef.current("monitor.listenerError"),
+                errorMessage(error),
+              ),
+            );
           } else if (e.status === "closed" || e.status === "error") {
             stopMonitor(sessionId, attempt);
             useHostKeyStore.getState().rejectSession(sessionId);

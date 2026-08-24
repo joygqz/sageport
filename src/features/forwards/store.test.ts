@@ -45,6 +45,9 @@ describe("forward runtime state", () => {
       },
     );
     mocks.runtime.mockRejectedValueOnce(new Error("snapshot failed"));
+    mocks.unlisten.mockImplementationOnce(() => {
+      throw new Error("cleanup failed");
+    });
     await expect(bridgeForwardEvents()).rejects.toThrow("snapshot failed");
     expect(mocks.unlisten).toHaveBeenCalledOnce();
 

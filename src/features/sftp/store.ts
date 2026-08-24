@@ -98,6 +98,8 @@ interface SftpState {
     name: string;
     remaining: number;
     applyToRemaining: boolean;
+    sourceTabId: string;
+    destinationTabId: string;
   } | null;
 
   setRatio: (r: number) => void;
@@ -105,6 +107,7 @@ interface SftpState {
   toggleFileToolbar: () => void;
   setConflictApplyToRemaining: (value: boolean) => void;
   resolveConflict: (decision: ConflictAction) => void;
+  cancelConflict: () => void;
 
   ensureLocalTab: (side: PaneSide) => Promise<void>;
   addLocalTab: (side: PaneSide) => Promise<void>;
@@ -149,7 +152,10 @@ const otherSide = (side: PaneSide): PaneSide =>
   side === "left" ? "right" : "left";
 
 type ConflictAction = "skip" | "rename" | "overwrite";
-type ConflictDecision = { action: ConflictAction; applyToRemaining: boolean };
+type ConflictDecision = {
+  action: ConflictAction | "cancel";
+  applyToRemaining: boolean;
+};
 
 let conflictResolver: ((decision: ConflictDecision) => void) | null = null;
 
@@ -266,6 +272,7 @@ export function bridgeSftpEvents(): Promise<void> {
 
 export const useSftpStore = create<SftpState>((set, get) => {
   const navigationRequests = new Map<string, number>();
+  const connectionRequests = new Map<string, symbol>();
 
   const canAddTab = (notify = true) => {
     const { left, right } = get().panes;
@@ -305,6 +312,13 @@ export const useSftpStore = create<SftpState>((set, get) => {
       if (tab) return { side, tab };
     }
     return null;
+  };
+
+  const cancelConflict = () => {
+    const resolve = conflictResolver;
+    conflictResolver = null;
+    set({ pendingConflict: null });
+    resolve?.({ action: "cancel", applyToRemaining: false });
   };
 
   const loadEntries = async (
@@ -385,6 +399,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
       set({ pendingConflict: null });
       resolve?.({ action: decision, applyToRemaining });
     },
+    cancelConflict,
 
     ensureLocalTab: async (side) => {
       if (get().panes[side].tabs.length > 0 || !canAddTab(false)) return;
@@ -458,6 +473,11 @@ export const useSftpStore = create<SftpState>((set, get) => {
       const tab = get().panes[side].tabs.find((item) => item.id === tabId);
       if (!tab || tab.kind !== "remote" || !tab.connectionId || !tab.hostId)
         return;
+      const connectionId = tab.connectionId;
+      const hostId = tab.hostId;
+      const request = Symbol(tabId);
+      connectionRequests.set(tabId, request);
+      navigationRequests.set(tabId, (navigationRequests.get(tabId) ?? 0) + 1);
       patchTab(side, tabId, {
         status: "connecting",
         loading: true,
@@ -467,10 +487,24 @@ export const useSftpStore = create<SftpState>((set, get) => {
         selected: [],
       });
       void ipc.sftp
-        .disconnect(tab.connectionId)
+        .disconnect(connectionId)
         .catch(() => {})
-        .then(() => ipc.sftp.connect(tab.connectionId!, tab.hostId!))
+        .then(() => {
+          const current = get().panes[side].tabs.find(
+            (item) => item.id === tabId,
+          );
+          if (
+            connectionRequests.get(tabId) !== request ||
+            current?.kind !== "remote" ||
+            current.connectionId !== connectionId ||
+            current.hostId !== hostId
+          ) {
+            return;
+          }
+          return ipc.sftp.connect(connectionId, hostId);
+        })
         .catch((err) => {
+          if (connectionRequests.get(tabId) !== request) return;
           patchTab(side, tabId, {
             status: "error",
             loading: false,
@@ -483,6 +517,14 @@ export const useSftpStore = create<SftpState>((set, get) => {
       const pane = get().panes[side];
       const tab = pane.tabs.find((t) => t.id === tabId);
       navigationRequests.delete(tabId);
+      connectionRequests.delete(tabId);
+      const pendingConflict = get().pendingConflict;
+      if (
+        pendingConflict?.sourceTabId === tabId ||
+        pendingConflict?.destinationTabId === tabId
+      ) {
+        cancelConflict();
+      }
       if (tab?.kind === "remote" && tab.connectionId) {
         for (const transfer of Object.values(get().transfers)) {
           if (
@@ -572,17 +614,28 @@ export const useSftpStore = create<SftpState>((set, get) => {
       const { side, tab } = found;
 
       if (status === "connected" && !tab.cwd) {
+        const request = connectionRequests.get(tab.id);
+        const isCurrentConnection = () => {
+          const current = get().panes[side].tabs.find(
+            (candidate) => candidate.id === tab.id,
+          );
+          return (
+            current?.connectionId === connectionId &&
+            current.status === "connecting" &&
+            connectionRequests.get(tab.id) === request
+          );
+        };
         void (async () => {
           let error: string | undefined;
           try {
             const home = await ipc.sftp.home(connectionId);
+            if (!isCurrentConnection()) return;
             await loadEntries(side, tab.id, home);
           } catch (err) {
             error = errorMessage(err);
           }
 
-          const current = get().panes[side].tabs.find((x) => x.id === tab.id);
-          if (!current || current.status !== "connecting") return;
+          if (!isCurrentConnection()) return;
           patchTab(side, tab.id, {
             status: "connected",
             loading: false,
@@ -794,9 +847,12 @@ export const useSftpStore = create<SftpState>((set, get) => {
                     name: item.name,
                     remaining: items.length - index - 1,
                     applyToRemaining: false,
+                    sourceTabId: srcTab.id,
+                    destinationTabId: dstTab.id,
                   },
                 });
               });
+          if (decision.action === "cancel") return;
           if (decision.applyToRemaining) batchDecision = decision.action;
           if (decision.action === "skip") continue;
           if (decision.action === "rename") {

@@ -45,6 +45,7 @@ export function SftpPanel({ height }: { height: number }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const pendingConflict = useSftpStore((s) => s.pendingConflict);
   const resolveConflict = useSftpStore((s) => s.resolveConflict);
+  const cancelConflict = useSftpStore((s) => s.cancelConflict);
   const setConflictApplyToRemaining = useSftpStore(
     (s) => s.setConflictApplyToRemaining,
   );
@@ -54,6 +55,8 @@ export function SftpPanel({ height }: { height: number }) {
   useEffect(() => {
     void ensureLocalTab("left");
   }, [ensureLocalTab]);
+
+  useEffect(() => () => cancelConflict(), [cancelConflict]);
 
   const bodyWidth = () => bodyRef.current?.getBoundingClientRect().width ?? 0;
 

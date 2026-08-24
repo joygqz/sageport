@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostKeyEvent } from "@/types/models";
 
@@ -58,6 +58,8 @@ describe("host key prompts", () => {
     useHostKeyStore.setState({ queue: [] });
   });
 
+  afterEach(() => vi.useRealTimers());
+
   it("recovers and deduplicates a prompt emitted before listening", async () => {
     mocks.pendingHostKeys.mockImplementation(async () => {
       mocks.promptListener?.(prompt("pending"));
@@ -68,6 +70,20 @@ describe("host key prompts", () => {
 
     expect(useHostKeyStore.getState().queue).toEqual([prompt("pending")]);
     expect(hasHostKeyPrompt("session-1")).toBe(true);
+  });
+
+  it("retries a failed pending host key query", async () => {
+    vi.useFakeTimers();
+    mocks.pendingHostKeys
+      .mockRejectedValueOnce(new Error("temporarily unavailable"))
+      .mockResolvedValueOnce([prompt("recovered")]);
+
+    const listening = listenHostKeyEvents();
+    await vi.runAllTimersAsync();
+    await listening;
+
+    expect(mocks.pendingHostKeys).toHaveBeenCalledTimes(2);
+    expect(useHostKeyStore.getState().queue).toEqual([prompt("recovered")]);
   });
 
   it("removes the first listener when the second listener fails", async () => {

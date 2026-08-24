@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import {
   Check,
@@ -331,14 +331,23 @@ function KeyRow({
 }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tag = algorithmTag(sshKey.publicKey);
+
+  useEffect(
+    () => () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    },
+    [],
+  );
 
   const copyPublicKey = async () => {
     if (!sshKey.publicKey) return;
     try {
       await navigator.clipboard.writeText(sshKey.publicKey);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 1500);
     } catch (err) {
       toast.error(t("credentials.keys.copyError"), errorMessage(err));
     }

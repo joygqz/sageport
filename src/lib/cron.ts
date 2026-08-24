@@ -25,7 +25,9 @@ function parseField(field: string, range: FieldRange): Set<number> | null {
   if (field === "") return null;
   const values = new Set<number>();
   for (const part of field.split(",")) {
-    const [rangePart, stepPart] = part.split("/");
+    const stepParts = part.split("/");
+    if (stepParts.length > 2) return null;
+    const [rangePart, stepPart] = stepParts;
     let step = 1;
     if (stepPart !== undefined) {
       if (!/^\d+$/.test(stepPart)) return null;
@@ -36,7 +38,9 @@ function parseField(field: string, range: FieldRange): Set<number> | null {
     let start = range.min;
     let end = range.max;
     if (rangePart.includes("-")) {
-      const [a, b] = rangePart.split("-");
+      const rangeParts = rangePart.split("-");
+      if (rangeParts.length !== 2) return null;
+      const [a, b] = rangeParts;
       if (!/^\d+$/.test(a) || !/^\d+$/.test(b)) return null;
       start = Number(a);
       end = Number(b);

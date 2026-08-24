@@ -10,6 +10,7 @@ export const en = {
     delete: "Delete",
     edit: "Edit",
     rename: "Rename",
+    reloadApp: "Reload app",
     retry: "Retry",
     save: "Save",
     saveChanges: "Save changes",
@@ -96,6 +97,7 @@ export const en = {
     uptimeHm: "{h}h {m}m",
     uptimeM: "{m}m",
     collecting: "Collecting statistics…",
+    listenerError: "Failed to initialize monitoring",
     unsupported: "Statistics aren't available on this system.",
     empty: {
       title: "No active sessions",

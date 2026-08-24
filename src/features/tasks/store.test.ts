@@ -47,6 +47,21 @@ describe("task runs", () => {
     useToastStore.setState({ toasts: [] });
   });
 
+  it("continues a run and reports a transfer listener failure", async () => {
+    const error = new Error("listener failed");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(ipc.sftp.onTransfer).mockRejectedValueOnce(error);
+
+    await useTaskRunStore.getState().startRun(task(), "h1").completion;
+
+    expect(ipc.tasks.run).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      "Failed to initialize task transfer progress:",
+      error,
+    );
+    warn.mockRestore();
+  });
+
   it("reports the finished run to callers that never attached", async () => {
     vi.mocked(ipc.tasks.run).mockImplementation(
       async (_id, _hostId, onEvent: (event: TaskRunEvent) => void) => {
