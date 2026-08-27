@@ -44,7 +44,7 @@ base64 = "0.23"
 png = "0.18"
 zeroize = "1"
 
-russh = "0.62.2"
+russh = "0.63.1"
 russh-sftp = "2.3.0"
 
 ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "ecdsa", "p256", "p384", "p521", "encryption", "std", "getrandom"] }
