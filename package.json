@@ -1,7 +1,7 @@
 {
   "name": "sageport",
   "private": true,
-  "version": "2.6.6",
+  "version": "2.7.0",
   "author": "Quincy Zhang",
   "license": "GPL-3.0-only",
   "type": "module",
