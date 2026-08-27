@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use russh::client::{self, ChannelOpenHandle, Msg};
-use russh::keys::ssh_key::PublicKey;
+use russh::keys::PublicKeyOrCertificate;
 use russh::Channel;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, oneshot, watch};
@@ -55,8 +55,12 @@ pub struct ClientHandler {
 impl client::Handler for ClientHandler {
     type Error = russh::Error;
 
-    async fn check_server_key(&mut self, key: &PublicKey) -> Result<bool, Self::Error> {
-        let status = match known_hosts::evaluate(&self.host, self.port, key) {
+    async fn check_server_key(
+        &mut self,
+        key_or_certificate: &PublicKeyOrCertificate,
+    ) -> Result<bool, Self::Error> {
+        let key = key_or_certificate.public_key();
+        let status = match known_hosts::evaluate(&self.host, self.port, &key) {
             KnownHostStatus::Trusted => return Ok(true),
             KnownHostStatus::Unknown => "unknown",
             KnownHostStatus::Changed => "changed",
@@ -71,7 +75,7 @@ impl client::Handler for ClientHandler {
             host: self.host.clone(),
             port: self.port,
             key_type: key.algorithm().to_string(),
-            fingerprint: known_hosts::fingerprint(key),
+            fingerprint: known_hosts::fingerprint(&key),
             status: status.to_string(),
         };
         self.prompts.lock().insert(
@@ -98,7 +102,7 @@ impl client::Handler for ClientHandler {
             HostKeyDecision::Reject => Ok(false),
             HostKeyDecision::AcceptOnce => Ok(true),
             HostKeyDecision::AcceptRemember => {
-                known_hosts::learn(&self.host, self.port, key).map_err(russh::Error::from)?;
+                known_hosts::learn(&self.host, self.port, &key).map_err(russh::Error::from)?;
                 Ok(true)
             }
         }

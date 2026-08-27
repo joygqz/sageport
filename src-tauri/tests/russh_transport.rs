@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use russh::client::{self, AuthResult};
-use russh::keys::{decode_secret_key, ssh_key, PrivateKeyWithHashAlg};
+use russh::keys::{decode_secret_key, PrivateKeyWithHashAlg, PublicKeyOrCertificate};
 use russh::server::{self, Auth, Handler as ServerHandler, Msg, Session};
 use russh::{Channel, ChannelId, ChannelMsg};
 use tokio::net::TcpListener;
@@ -80,7 +80,10 @@ struct AcceptAllClient;
 
 impl client::Handler for AcceptAllClient {
     type Error = russh::Error;
-    async fn check_server_key(&mut self, _key: &ssh_key::PublicKey) -> Result<bool, Self::Error> {
+    async fn check_server_key(
+        &mut self,
+        _key: &PublicKeyOrCertificate,
+    ) -> Result<bool, Self::Error> {
         Ok(true)
     }
 }
