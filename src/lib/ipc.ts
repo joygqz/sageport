@@ -502,6 +502,8 @@ export const ipc = {
     list: () => invoke<SftpBookmark[]>("bookmarks_list"),
     create: (input: SftpBookmarkInput) =>
       invoke<SftpBookmark>("bookmarks_create", { input }),
+    update: (id: string, label: string) =>
+      invoke<SftpBookmark>("bookmarks_update", { id, label }),
     remove: (id: string) => invoke<void>("bookmarks_delete", { id }),
   },
   forwards: {

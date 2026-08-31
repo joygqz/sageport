@@ -438,6 +438,39 @@ describe("SFTP connection races", () => {
     expect(ipc.sftp.list).not.toHaveBeenCalled();
     expect(useSftpStore.getState().panes.left.tabs[0]?.cwd).toBe("");
   });
+
+  it("keeps and reloads the last directory when reconnecting", async () => {
+    useSftpStore.setState((state) => ({
+      panes: {
+        ...state.panes,
+        left: {
+          ...state.panes.left,
+          tabs: state.panes.left.tabs.map((tab) => ({
+            ...tab,
+            cwd: "/srv/app",
+            history: ["/home/test", "/srv/app"],
+            historyIndex: 1,
+            status: "error" as const,
+          })),
+        },
+      },
+    }));
+
+    useSftpStore.getState().reconnectTab("left", "remote");
+
+    expect(useSftpStore.getState().panes.left.tabs[0]).toMatchObject({
+      cwd: "/srv/app",
+      history: ["/home/test", "/srv/app"],
+      historyIndex: 1,
+      status: "connecting",
+    });
+
+    useSftpStore.getState().applyStatus("connection-1", "connected");
+    await vi.waitFor(() =>
+      expect(ipc.sftp.list).toHaveBeenCalledWith("connection-1", "/srv/app"),
+    );
+    expect(ipc.sftp.home).not.toHaveBeenCalled();
+  });
 });
 
 describe("SFTP conflict lifecycle", () => {

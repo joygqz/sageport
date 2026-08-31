@@ -13,6 +13,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   CircleX,
   FileText,
+  FolderOpen,
   PlugZap,
   Plus,
   Save,
@@ -43,10 +44,12 @@ import { IS_MACOS } from "@/lib/platform";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
-import { focusTerminal } from "@/features/terminal/sessions";
+import { useSftpStore } from "@/features/sftp/store";
+import { focusTerminal, getSession } from "@/features/terminal/sessions";
 import { useOverlayStore } from "./overlays";
 import { keybindingDisplayKeys } from "./keybinding-registry";
 import { useKeybindingStore } from "./keybinding-store";
+import { useLayoutStore } from "./layout";
 import { getTabDropTarget } from "./tab-drag";
 import {
   STATUS_DOT_CLASS,
@@ -544,6 +547,8 @@ function TabItem({
   const reconnectTerminal = useTabsStore((s) => s.reconnectTerminal);
   const splitPane = useTabsStore((s) => s.splitPane);
   const saveFile = useTabsStore((s) => s.saveFile);
+  const addRemoteFileTab = useSftpStore((s) => s.addRemoteTab);
+  const setPanelVisible = useLayoutStore((s) => s.setPanelVisible);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -566,6 +571,22 @@ function TabItem({
         ? () => openAdhocTerminal(pane.adhoc!)
         : () => openTerminal({ id: pane.hostId, label: pane.title })
     : undefined;
+
+  const openFiles =
+    pane?.target === "ssh"
+      ? () => {
+          const directory = getSession(pane.id)?.currentDirectory();
+          setPanelVisible(true);
+          const opened = addRemoteFileTab(
+            "right",
+            { id: pane.hostId, label: pane.title },
+            directory,
+          );
+          if (opened && !directory) {
+            toast.info(t("sftp.currentDirectoryUnavailable"));
+          }
+        }
+      : undefined;
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (
@@ -726,6 +747,11 @@ function TabItem({
             {canReconnect && (
               <ContextMenuItem onSelect={() => reconnectTerminal(pane.id)}>
                 <PlugZap /> {t("terminal.reconnect")}
+              </ContextMenuItem>
+            )}
+            {openFiles && (
+              <ContextMenuItem onSelect={openFiles}>
+                <FolderOpen /> {t("sftp.openFromTerminal")}
               </ContextMenuItem>
             )}
             <ContextMenuItem onSelect={() => reopen?.()}>

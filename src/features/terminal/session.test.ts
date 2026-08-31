@@ -16,6 +16,7 @@ const terminal = vi.hoisted(() => ({
   write: vi.fn(),
   dispose: vi.fn(),
   loadAddon: vi.fn(),
+  parser: { registerOscHandler: vi.fn(() => ({ dispose: vi.fn() })) },
 }));
 
 vi.mock("./xterm", () => ({
@@ -34,7 +35,20 @@ import {
   CONNECT_TIMEOUT_MS,
   MAX_PENDING_INPUT_BYTES,
   TerminalSession,
+  parseTerminalDirectory,
 } from "./session";
+
+describe("terminal directory metadata", () => {
+  it("reads absolute paths from OSC 7 file URLs", () => {
+    expect(parseTerminalDirectory("file://server/home/test/My%20Files")).toBe(
+      "/home/test/My Files",
+    );
+    expect(parseTerminalDirectory("https://server/home/test")).toBeUndefined();
+    expect(
+      parseTerminalDirectory("file://server/relative%00path"),
+    ).toBeUndefined();
+  });
+});
 
 function transport(
   overrides: Partial<TerminalTransport> = {},

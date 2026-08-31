@@ -215,6 +215,7 @@ pub fn run() {
             commands::forwards::forward_stop,
             commands::bookmarks::bookmarks_list,
             commands::bookmarks::bookmarks_create,
+            commands::bookmarks::bookmarks_update,
             commands::bookmarks::bookmarks_delete,
             commands::monitor::monitor_start,
             commands::monitor::monitor_stop,

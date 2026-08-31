@@ -18,6 +18,18 @@ export const CONNECT_TIMEOUT_MS = 45_000;
 export const MAX_PENDING_INPUT_BYTES = 1024 * 1024;
 const COLUMN_RESIZE_DEBOUNCE_MS = 100;
 
+export function parseTerminalDirectory(data: string): string | undefined {
+  try {
+    const url = new URL(data);
+    if (url.protocol !== "file:") return undefined;
+    const path = decodeURIComponent(url.pathname);
+    if (!path.startsWith("/") || path.includes("\0")) return undefined;
+    return path;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface SessionStatusEvent {
   status: TerminalStatus;
   code?: string | null;
@@ -70,6 +82,7 @@ export class TerminalSession {
   private opening = false;
   private pendingFocus = false;
   private customKeyHandler: ((event: KeyboardEvent) => boolean) | null = null;
+  private directory: string | undefined;
 
   constructor(opts: TerminalSessionOptions) {
     this.opts = opts;
@@ -88,6 +101,13 @@ export class TerminalSession {
     this.term.loadAddon(this.highlights);
     this.commands = new CommandTracker(term);
 
+    const directorySub = this.term.parser.registerOscHandler(7, (data) => {
+      const directory = parseTerminalDirectory(data);
+      if (!directory) return false;
+      this.directory = directory;
+      return true;
+    });
+
     const dataSub = term.onData((data) => {
       this.send(data);
       opts.onUserInput?.(data);
@@ -100,6 +120,7 @@ export class TerminalSession {
     this.disposables.push(
       () => dataSub.dispose(),
       () => resizeSub.dispose(),
+      () => directorySub.dispose(),
     );
   }
 
@@ -255,6 +276,10 @@ export class TerminalSession {
     }
     const text = lines.join("\n").replace(/\s+$/, "");
     return text || undefined;
+  }
+
+  currentDirectory(): string | undefined {
+    return this.directory;
   }
 
   dispose() {

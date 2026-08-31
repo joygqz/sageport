@@ -111,7 +111,11 @@ interface SftpState {
 
   ensureLocalTab: (side: PaneSide) => Promise<void>;
   addLocalTab: (side: PaneSide) => Promise<void>;
-  addRemoteTab: (side: PaneSide, host: Host) => void;
+  addRemoteTab: (
+    side: PaneSide,
+    host: Pick<Host, "id" | "label">,
+    initialPath?: string,
+  ) => boolean;
   reconnectTab: (side: PaneSide, tabId: string) => void;
   closeTab: (side: PaneSide, tabId: string) => void;
   moveTab: (side: PaneSide, tabId: string, toIndex: number) => void;
@@ -437,8 +441,8 @@ export const useSftpStore = create<SftpState>((set, get) => {
       }
     },
 
-    addRemoteTab: (side, host) => {
-      if (!canAddTab()) return;
+    addRemoteTab: (side, host, initialPath) => {
+      if (!canAddTab()) return false;
       const id = crypto.randomUUID();
       const tab: SftpTab = {
         id,
@@ -446,7 +450,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
         connectionId: id,
         hostId: host.id,
         title: host.label,
-        cwd: "",
+        cwd: initialPath ?? "",
         status: "connecting",
         entries: [],
         selected: [],
@@ -467,6 +471,7 @@ export const useSftpStore = create<SftpState>((set, get) => {
           error: describeConnectError(errorCode(err), errorMessage(err)),
         });
       });
+      return true;
     },
 
     reconnectTab: (side, tabId) => {
@@ -482,8 +487,6 @@ export const useSftpStore = create<SftpState>((set, get) => {
         status: "connecting",
         loading: true,
         error: undefined,
-        cwd: "",
-        entries: [],
         selected: [],
       });
       void ipc.sftp
@@ -613,34 +616,35 @@ export const useSftpStore = create<SftpState>((set, get) => {
       if (!found) return;
       const { side, tab } = found;
 
-      if (status === "connected" && !tab.cwd) {
+      if (status === "connected") {
         const request = connectionRequests.get(tab.id);
+        patchTab(side, tab.id, {
+          status: "connected",
+          loading: true,
+          error: undefined,
+        });
         const isCurrentConnection = () => {
           const current = get().panes[side].tabs.find(
             (candidate) => candidate.id === tab.id,
           );
           return (
             current?.connectionId === connectionId &&
-            current.status === "connecting" &&
+            current.status === "connected" &&
             connectionRequests.get(tab.id) === request
           );
         };
         void (async () => {
           let error: string | undefined;
           try {
-            const home = await ipc.sftp.home(connectionId);
+            const path = tab.cwd || (await ipc.sftp.home(connectionId));
             if (!isCurrentConnection()) return;
-            await loadEntries(side, tab.id, home);
+            await loadEntries(side, tab.id, path);
           } catch (err) {
             error = errorMessage(err);
           }
 
           if (!isCurrentConnection()) return;
-          patchTab(side, tab.id, {
-            status: "connected",
-            loading: false,
-            ...(error ? { error } : null),
-          });
+          if (error) patchTab(side, tab.id, { loading: false, error });
         })();
         return;
       }

@@ -7,23 +7,28 @@ const MAX_LABEL_BYTES: usize = 255;
 const MAX_PATH_BYTES: usize = 32 * 1024;
 const MAX_HOST_ID_BYTES: usize = 128;
 
+fn normalize_label(label: String) -> AppResult<String> {
+    let label = label.trim().to_string();
+    if label.is_empty() {
+        return Err(AppError::Invalid("bookmark label is required".into()));
+    }
+    if label.len() > MAX_LABEL_BYTES || label.chars().any(char::is_control) {
+        return Err(AppError::Invalid(format!(
+            "bookmark label exceeds {MAX_LABEL_BYTES} bytes"
+        )));
+    }
+    Ok(label)
+}
+
 pub(crate) fn normalize(mut input: SftpBookmarkInput) -> AppResult<SftpBookmarkInput> {
-    input.label = input.label.trim().to_string();
+    input.label = normalize_label(input.label)?;
     input.path = input.path.trim().to_string();
     input.host_id = input
         .host_id
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
-    if input.label.is_empty() {
-        return Err(AppError::Invalid("bookmark label is required".into()));
-    }
     if input.path.is_empty() {
         return Err(AppError::Invalid("bookmark path is required".into()));
-    }
-    if input.label.len() > MAX_LABEL_BYTES || input.label.chars().any(char::is_control) {
-        return Err(AppError::Invalid(format!(
-            "bookmark label exceeds {MAX_LABEL_BYTES} bytes"
-        )));
     }
     if input.path.len() > MAX_PATH_BYTES || input.path.contains('\0') {
         return Err(AppError::Invalid("invalid bookmark path".into()));
@@ -118,11 +123,29 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     Ok(())
 }
 
+pub async fn update_label(pool: &SqlitePool, id: &str, label: String) -> AppResult<SftpBookmark> {
+    let label = normalize_label(label)?;
+    let ts = now();
+    let bookmark = sqlx::query_as::<_, SftpBookmark>(
+        "UPDATE sftp_bookmarks
+         SET label = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND deleted_at IS NULL
+         RETURNING *",
+    )
+    .bind(label)
+    .bind(ts)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("bookmark {id}")))?;
+    Ok(bookmark)
+}
+
 #[cfg(test)]
 mod tests {
     use sqlx::sqlite::SqlitePoolOptions;
 
-    use super::{create, list, normalize};
+    use super::{create, list, normalize, update_label};
     use crate::domain::SftpBookmarkInput;
 
     #[test]
@@ -167,5 +190,42 @@ mod tests {
 
         assert_eq!(first.id, second.id);
         assert_eq!(list(&pool).await.expect("list bookmarks").len(), 1);
+    }
+
+    #[tokio::test]
+    async fn updating_a_bookmark_label_preserves_its_location() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE sftp_bookmarks (
+                id TEXT PRIMARY KEY, host_id TEXT, label TEXT NOT NULL, path TEXT NOT NULL,
+                sort_order INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                deleted_at TEXT, revision INTEGER NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let bookmark = create(
+            &pool,
+            SftpBookmarkInput {
+                host_id: None,
+                label: "Logs".into(),
+                path: "/var/log".into(),
+            },
+        )
+        .await
+        .unwrap();
+
+        let updated = update_label(&pool, &bookmark.id, "  Production logs  ".into())
+            .await
+            .unwrap();
+
+        assert_eq!(updated.label, "Production logs");
+        assert_eq!(updated.path, "/var/log");
+        assert_eq!(updated.revision, 2);
     }
 }

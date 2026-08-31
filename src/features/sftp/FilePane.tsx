@@ -29,11 +29,6 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   EmptyState,
   Input,
   INTERACTIVE_FOCUS_CLASS,
@@ -50,7 +45,6 @@ import { useDragCursor } from "@/lib/pointerDrag";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { FileEntry } from "@/types/models";
-import { useHosts } from "@/features/hosts/api";
 import { getTabDropTarget } from "@/workbench/tab-drag";
 import {
   STATUS_DOT_CLASS,
@@ -66,6 +60,7 @@ import { FileList } from "./FileList";
 import { BookmarkMenu } from "./BookmarkMenu";
 import { DEFAULT_FILE_SORT, type FileSort } from "./file-list-layout";
 import { PermissionsDialog } from "./PermissionsDialog";
+import { NewTabMenu } from "./NewTabMenu";
 import {
   joinPath,
   isValidEntryName,
@@ -103,7 +98,6 @@ export function FilePane({ side }: { side: PaneSide }) {
   const refresh = useSftpStore((s) => s.refresh);
   const applyStatus = useSftpStore((s) => s.applyStatus);
   const deleteEntries = useSftpStore((s) => s.deleteEntries);
-  const { data: hosts = [] } = useHosts();
 
   const tabStripRef = useRef<HTMLDivElement>(null);
   const [dragState, setDragState] = useState<SftpTabDragState | null>(null);
@@ -370,8 +364,9 @@ export function FilePane({ side }: { side: PaneSide }) {
                     void addLocalTab(side);
                     return;
                   }
-                  const host = hosts.find((h) => h.id === tab.hostId);
-                  if (host) addRemoteTab(side, host);
+                  if (tab.hostId) {
+                    addRemoteTab(side, { id: tab.hostId, label: tab.title });
+                  }
                 }}
                 onDragStart={(pointer) => handleTabDragStart(tab.id, pointer)}
                 onDragMove={(clientX, clientY) =>
@@ -385,36 +380,15 @@ export function FilePane({ side }: { side: PaneSide }) {
             ))}
           </TabsList>
 
-          <DropdownMenu>
-            <Tooltip content={t("sftp.newTab")}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-[var(--compact-tab-height)] shrink-0"
-                >
-                  <Plus className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-            </Tooltip>
-            <DropdownMenuContent
-              align="start"
-              className="max-h-80 overflow-auto"
+          <NewTabMenu side={side} tooltip={t("sftp.newTab")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-[var(--compact-tab-height)] shrink-0"
             >
-              <DropdownMenuItem onSelect={() => void addLocalTab(side)}>
-                <HardDrive /> {t("sftp.local")}
-              </DropdownMenuItem>
-              {hosts.length > 0 && <DropdownMenuSeparator />}
-              {hosts.map((host) => (
-                <DropdownMenuItem
-                  key={host.id}
-                  onSelect={() => addRemoteTab(side, host)}
-                >
-                  <Server /> {host.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <Plus className="size-3.5" />
+            </Button>
+          </NewTabMenu>
         </div>
 
         {dragState &&
@@ -575,30 +549,11 @@ export function FilePane({ side }: { side: PaneSide }) {
               icon={HardDrive}
               title={t("sftp.noTabTitle")}
               action={
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="secondary">
-                      <Plus /> {t("sftp.newTab")}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="center"
-                    className="max-h-80 overflow-auto"
-                  >
-                    <DropdownMenuItem onSelect={() => void addLocalTab(side)}>
-                      <HardDrive /> {t("sftp.local")}
-                    </DropdownMenuItem>
-                    {hosts.length > 0 && <DropdownMenuSeparator />}
-                    {hosts.map((host) => (
-                      <DropdownMenuItem
-                        key={host.id}
-                        onSelect={() => addRemoteTab(side, host)}
-                      >
-                        <Server /> {host.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <NewTabMenu side={side} align="center">
+                  <Button size="sm" variant="secondary">
+                    <Plus /> {t("sftp.newTab")}
+                  </Button>
+                </NewTabMenu>
               }
             />
           </div>

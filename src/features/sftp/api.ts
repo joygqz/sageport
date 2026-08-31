@@ -26,6 +26,15 @@ export function useDeleteBookmark() {
   });
 }
 
+export function useUpdateBookmark() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) =>
+      ipc.bookmarks.update(id, label),
+    onSuccess: () => qc.invalidateQueries({ queryKey: bookmarkKey }),
+  });
+}
+
 export function useTransferHistory(enabled: boolean) {
   return useQuery({
     queryKey: transferHistoryKey,

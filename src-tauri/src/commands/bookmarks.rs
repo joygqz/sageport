@@ -29,6 +29,18 @@ pub async fn bookmarks_create(
 }
 
 #[tauri::command]
+pub async fn bookmarks_update(
+    state: State<'_, AppState>,
+    id: String,
+    label: String,
+) -> AppResult<SftpBookmark> {
+    if id.trim().is_empty() || id.len() > 128 {
+        return Err(AppError::Invalid("invalid bookmark id".into()));
+    }
+    bookmark_repo::update_label(&state.db, &id, label).await
+}
+
+#[tauri::command]
 pub async fn bookmarks_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
     if id.trim().is_empty() || id.len() > 128 {
         return Err(AppError::Invalid("invalid bookmark id".into()));
