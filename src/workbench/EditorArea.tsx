@@ -749,11 +749,6 @@ function TabItem({
                 <PlugZap /> {t("terminal.reconnect")}
               </ContextMenuItem>
             )}
-            {openFiles && (
-              <ContextMenuItem onSelect={openFiles}>
-                <FolderOpen /> {t("sftp.openFromTerminal")}
-              </ContextMenuItem>
-            )}
             <ContextMenuItem onSelect={() => reopen?.()}>
               <Plus /> {t("editor.newSession")}
             </ContextMenuItem>
@@ -763,6 +758,11 @@ function TabItem({
             <ContextMenuItem onSelect={() => splitPane(pane.id, "down")}>
               <SquareSplitVertical /> {t("commands.terminal.splitDown")}
             </ContextMenuItem>
+            {openFiles && (
+              <ContextMenuItem onSelect={openFiles}>
+                <FolderOpen /> {t("sftp.openFromTerminal")}
+              </ContextMenuItem>
+            )}
             <ContextMenuSeparator />
           </>
         )}
