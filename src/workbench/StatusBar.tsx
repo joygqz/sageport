@@ -7,17 +7,30 @@ import {
   HardDrive,
   MemoryStick,
   Radio,
+  Route,
+  Settings,
 } from "lucide-react";
 import { memo, type ButtonHTMLAttributes } from "react";
 
 import { useI18n } from "@/i18n";
-import { INTERACTIVE_FOCUS_CLASS } from "@/components/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  INTERACTIVE_FOCUS_CLASS,
+} from "@/components/ui";
 import { cn, formatBytes } from "@/lib/utils";
 import { useBroadcastStore } from "@/features/terminal/broadcast";
 import { statsPercents, useMonitorStore } from "@/features/terminal/monitor";
 import { useSyncStatus } from "@/features/sync/api";
 import { useSftpStore } from "@/features/sftp/store";
 import { useUpdateStatus } from "@/features/updates/api";
+import { useProxyState, useSetActiveProxy } from "@/features/proxies/api";
+import { errorMessage, toast } from "@/lib/toast";
 import { useLayoutStore } from "./layout";
 import { useOverlayStore } from "./overlays";
 import { STATUS_DOT_CLASS } from "./tab-styles";
@@ -39,6 +52,7 @@ export const StatusBar = memo(function StatusBar() {
       </div>
       <div className="flex h-full shrink-0 items-center">
         <UpdateItem />
+        <ProxyItem />
         <SyncItem />
         <span className="flex h-full shrink-0 items-center whitespace-nowrap px-2 tabular-nums">
           {t("statusBar.version", { version: __APP_VERSION__ })}
@@ -55,7 +69,7 @@ function StatusBarItem({
   children,
   ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> & {
-  onClick: () => void;
+  onClick?: () => void;
 }) {
   return (
     <button
@@ -72,6 +86,72 @@ function StatusBarItem({
     >
       {children}
     </button>
+  );
+}
+
+function ProxyItem() {
+  const { t } = useI18n();
+  const { data } = useProxyState();
+  const setActive = useSetActiveProxy();
+  const openSettings = useOverlayStore((state) => state.openSettings);
+  const active = data?.profiles.find(
+    (profile) => profile.id === data.activeProxyId,
+  );
+
+  if (!data) return null;
+
+  const select = async (value: string) => {
+    try {
+      await setActive.mutateAsync(value === "direct" ? null : value);
+    } catch (error) {
+      toast.error(t("settings.proxy.switchError"), errorMessage(error));
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <StatusBarItem
+          aria-haspopup="menu"
+          title={
+            active
+              ? t("statusBar.proxyActiveHint", { name: active.name })
+              : t("statusBar.proxyDirectHint")
+          }
+        >
+          <Route className={cn("size-3", active && "text-link")} />
+          <span>
+            {active
+              ? t("statusBar.proxyOn", { name: active.name })
+              : t("statusBar.proxyOff")}
+          </span>
+        </StatusBarItem>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top" className="min-w-52">
+        <DropdownMenuRadioGroup
+          value={active?.id ?? "direct"}
+          onValueChange={(value) => void select(value)}
+        >
+          <DropdownMenuRadioItem value="direct" disabled={setActive.isPending}>
+            {t("settings.proxy.direct")}
+          </DropdownMenuRadioItem>
+          {data.profiles.map((profile) => (
+            <DropdownMenuRadioItem
+              key={profile.id}
+              value={profile.id}
+              disabled={setActive.isPending}
+            >
+              <span className="max-w-48 truncate">{profile.name}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => openSettings("network")}>
+          <Settings className="size-3.5" />
+          {t("settings.proxy.manage")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

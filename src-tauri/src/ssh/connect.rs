@@ -5,8 +5,7 @@ use std::time::Duration;
 use russh::client::{self, AuthResult, Config, Handle, KeyboardInteractiveAuthResponse};
 use russh::keys::{decode_secret_key, PrivateKeyWithHashAlg};
 use russh::MethodKind;
-use tauri::{AppHandle, Emitter};
-use tokio::net::TcpStream;
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, oneshot, watch};
 
 use super::agent;
@@ -19,6 +18,8 @@ use super::{
     JUMP_DEPTH_LIMIT,
 };
 use crate::error::{AppError, AppResult};
+use crate::repository::proxy_repo;
+use crate::state::AppState;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const PASSWORD_PROMPT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
@@ -83,6 +84,7 @@ pub async fn establish_with_forwarded_tcpip(
     }
 
     let config = client_config();
+    let proxy = proxy_repo::active(&app.state::<AppState>().db).await?;
     let mut jumps: Vec<Handle<ClientHandler>> = Vec::new();
     let mut current: Option<Handle<ClientHandler>> = None;
 
@@ -102,7 +104,7 @@ pub async fn establish_with_forwarded_tcpip(
 
         let mut next = match current.take() {
             None => {
-                let stream = connect_tcp(&hop.host, hop.port).await?;
+                let stream = super::proxy::connect(&hop.host, hop.port, proxy.as_ref()).await?;
                 with_host_key_aware_timeout(
                     client::connect_stream(config.clone(), stream, handler),
                     activity_rx,
@@ -207,33 +209,6 @@ async fn authenticate_with_agent(handle: &mut Handle<ClientHandler>, username: &
     tokio::time::timeout(CONNECT_TIMEOUT, agent::try_authenticate(handle, username))
         .await
         .unwrap_or(AgentAuth::Failure)
-}
-
-async fn connect_tcp(host: &str, port: u16) -> AppResult<TcpStream> {
-    let connect = async {
-        let addrs: Vec<_> = tokio::net::lookup_host((host, port))
-            .await
-            .map_err(|error| AppError::Dns(format!("could not resolve {host}: {error}")))?
-            .collect();
-        if addrs.is_empty() {
-            return Err(AppError::Dns(format!("no address resolved for {host}")));
-        }
-        let mut last_error = None;
-        for addr in addrs {
-            match TcpStream::connect(addr).await {
-                Ok(stream) => {
-                    let _ = stream.set_nodelay(true);
-                    return Ok(stream);
-                }
-                Err(error) => last_error = Some(AppError::Io(error)),
-            }
-        }
-        Err(last_error.unwrap_or_else(|| AppError::Network(format!("could not reach {host}"))))
-    };
-
-    tokio::time::timeout(CONNECT_TIMEOUT, connect)
-        .await
-        .map_err(|_| AppError::Timeout(format!("connection to {host} timed out")))?
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -36,6 +36,9 @@ import type {
   PtyDataEvent,
   PtyExitEvent,
   PortForwardInput,
+  ProxyProfile,
+  ProxyProfileInput,
+  ProxyState,
   ForwardStatusEvent,
   SftpStatusEvent,
   SftpBookmark,
@@ -204,6 +207,18 @@ export const ipc = {
       enabledTools: string[];
       maxHistoryTokens: number | null;
     }) => invoke<void>("settings_apply_json", { input }),
+  },
+  proxies: {
+    state: () => invoke<ProxyState>("proxies_state"),
+    revealPassword: (id: string) =>
+      invoke<string>("proxies_reveal_password", { id }),
+    create: (input: ProxyProfileInput) =>
+      invoke<ProxyProfile>("proxies_create", { input }),
+    update: (id: string, input: ProxyProfileInput) =>
+      invoke<ProxyProfile>("proxies_update", { id, input }),
+    remove: (id: string) => invoke<void>("proxies_delete", { id }),
+    setActive: (id: string | null) =>
+      invoke<void>("proxies_set_active", { id }),
   },
   ssh: {
     connect: (params: {

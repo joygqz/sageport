@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::io;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -7,11 +6,11 @@ use serde::Serialize;
 use tauri::State;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
-use tokio::{net, time};
+use tokio::time;
 
-use crate::domain::{Host, HostInput, HostView};
+use crate::domain::{Host, HostInput, HostView, ProxyProfile};
 use crate::error::{AppError, AppResult};
-use crate::repository::host_repo;
+use crate::repository::{host_repo, proxy_repo};
 use crate::state::AppState;
 
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(3);
@@ -129,16 +128,18 @@ pub async fn hosts_check_health(
     };
 
     let limit = Arc::new(Semaphore::new(HEALTH_CONCURRENCY));
+    let proxy = proxy_repo::active(&state.db).await?;
     let mut tasks = JoinSet::new();
     for host in selected {
         let limit = limit.clone();
+        let proxy = proxy.clone();
         tasks.spawn(async move {
             let _permit = limit
                 .acquire_owned()
                 .await
                 .map_err(|err| AppError::Other(format!("health check failed: {err}")))?;
 
-            Ok::<_, AppError>(check_host_health(host).await)
+            Ok::<_, AppError>(check_host_health(host, proxy.as_ref()).await)
         });
     }
 
@@ -152,7 +153,7 @@ pub async fn hosts_check_health(
     Ok(results)
 }
 
-async fn check_host_health(host: Host) -> HostHealthCheck {
+async fn check_host_health(host: Host, proxy: Option<&ProxyProfile>) -> HostHealthCheck {
     let checked_at = crate::domain::now();
 
     let port = match u16::try_from(host.port) {
@@ -169,7 +170,7 @@ async fn check_host_health(host: Host) -> HostHealthCheck {
         }
     };
 
-    match time::timeout(HEALTH_TIMEOUT, probe_host(&host.address, port)).await {
+    match time::timeout(HEALTH_TIMEOUT, probe_host(&host.address, port, proxy)).await {
         Ok(Ok(elapsed)) => HostHealthCheck {
             host_id: host.id,
             status: HostHealthStatus::Online,
@@ -209,41 +210,23 @@ fn offline_health(
     }
 }
 
-async fn probe_host(address: &str, port: u16) -> Result<Duration, io::Error> {
-    let addrs = net::lookup_host((address, port))
-        .await?
-        .take(4)
-        .collect::<Vec<_>>();
-    if addrs.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "no address resolved",
-        ));
-    }
-    let mut last_error = None;
-    for addr in addrs {
-        let started = Instant::now();
-        match net::TcpStream::connect(addr).await {
-            Ok(stream) => {
-                drop(stream);
-                return Ok(started.elapsed());
-            }
-            Err(err) => last_error = Some(err),
-        }
-    }
-
-    Err(last_error.unwrap_or_else(|| io::Error::other("connection failed")))
+async fn probe_host(address: &str, port: u16, proxy: Option<&ProxyProfile>) -> AppResult<Duration> {
+    let started = Instant::now();
+    let stream = crate::ssh::proxy::connect(address, port, proxy).await?;
+    drop(stream);
+    Ok(started.elapsed())
 }
 
-fn classify_health_error(err: &io::Error) -> HostHealthErrorKind {
-    match err.kind() {
-        io::ErrorKind::TimedOut => HostHealthErrorKind::Timeout,
-        io::ErrorKind::ConnectionRefused => HostHealthErrorKind::Refused,
-        io::ErrorKind::AddrNotAvailable | io::ErrorKind::NotFound => HostHealthErrorKind::Dns,
-        io::ErrorKind::NetworkUnreachable
-        | io::ErrorKind::HostUnreachable
-        | io::ErrorKind::ConnectionAborted
-        | io::ErrorKind::ConnectionReset => HostHealthErrorKind::Network,
+fn classify_health_error(err: &AppError) -> HostHealthErrorKind {
+    match err {
+        AppError::Timeout(_) | AppError::Ssh(russh::Error::ConnectionTimeout) => {
+            HostHealthErrorKind::Timeout
+        }
+        AppError::Dns(_) => HostHealthErrorKind::Dns,
+        AppError::Io(error) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+            HostHealthErrorKind::Refused
+        }
+        error if error.code() == "network" => HostHealthErrorKind::Network,
         _ => HostHealthErrorKind::Unknown,
     }
 }
@@ -278,7 +261,7 @@ mod tests {
 
     #[tokio::test]
     async fn health_check_rejects_an_invalid_port_without_network_io() {
-        let result = check_host_health(host("127.0.0.1".to_string(), 70_000)).await;
+        let result = check_host_health(host("127.0.0.1".to_string(), 70_000), None).await;
         assert!(matches!(result.status, HostHealthStatus::Offline));
         assert!(matches!(
             result.error_kind,

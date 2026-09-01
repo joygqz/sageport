@@ -110,6 +110,36 @@ export interface PortForwardInput {
   autoStart?: boolean;
 }
 
+export type ProxyKind = "socks5" | "http";
+
+export interface ProxyProfile {
+  id: string;
+  name: string;
+  kind: ProxyKind;
+  host: string;
+  port: number;
+  username: string | null;
+  hasPassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  revision: number;
+}
+
+export interface ProxyProfileInput {
+  name: string;
+  kind: ProxyKind;
+  host: string;
+  port: number;
+  username?: string | null;
+  password?: string | null;
+}
+
+export interface ProxyState {
+  profiles: ProxyProfile[];
+  activeProxyId: string | null;
+}
+
 export type ForwardStatusKind =
   "starting" | "active" | "reconnecting" | "error" | "stopped";
 

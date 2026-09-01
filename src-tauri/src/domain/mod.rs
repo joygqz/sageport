@@ -6,6 +6,7 @@ mod history;
 mod host;
 mod identity;
 mod key;
+mod proxy;
 mod snippet;
 mod task;
 
@@ -16,6 +17,7 @@ pub use history::*;
 pub use host::*;
 pub use identity::*;
 pub use key::*;
+pub use proxy::*;
 pub use snippet::*;
 pub use task::*;
 

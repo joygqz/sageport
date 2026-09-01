@@ -6,6 +6,7 @@ pub mod history_repo;
 pub mod host_repo;
 pub mod identity_repo;
 pub mod key_repo;
+pub mod proxy_repo;
 pub mod settings_repo;
 pub mod snippet_repo;
 pub mod task_repo;

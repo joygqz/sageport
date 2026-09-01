@@ -206,14 +206,14 @@ export function useCommands(): WorkbenchCommand[] {
         shortcut: commandShortcut("settings.open", keybindingOverrides),
         run: () => overlays().openSettings(),
       },
-      ...(["general", "keybindings", "ai", "sync", "about"] as const).map(
-        (section) => ({
-          id: `settings.${section}`,
-          categoryKey: "commands.category.preferences" as TKey,
-          label: t(`settings.nav.${section}`),
-          run: () => overlays().openSettings(section),
-        }),
-      ),
+      ...(
+        ["general", "network", "keybindings", "ai", "sync", "about"] as const
+      ).map((section) => ({
+        id: `settings.${section}`,
+        categoryKey: "commands.category.preferences" as TKey,
+        label: t(`settings.nav.${section}`),
+        run: () => overlays().openSettings(section),
+      })),
       ...THEMES.map((theme) => ({
         id: `theme.${theme.id}`,
         categoryKey: "commands.category.theme" as TKey,

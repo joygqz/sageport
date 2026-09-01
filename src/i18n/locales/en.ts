@@ -312,6 +312,11 @@ export const en = {
     broadcast: "Broadcasting input",
     broadcastHint: "Input is sent to every connected terminal.",
     monitorHint: "CPU load, memory, and disk usage on the active host",
+    proxyOn: "Proxy: {name}",
+    proxyOff: "Proxy off",
+    proxyActiveHint:
+      "New remote connections use {name}. Existing connections are unchanged.",
+    proxyDirectHint: "New remote connections connect directly.",
   },
 
   terminal: {
@@ -1098,6 +1103,7 @@ export const en = {
     },
     nav: {
       general: "General",
+      network: "Network",
       keybindings: "Shortcuts",
       ai: "AI",
       sync: "Sync",
@@ -1121,6 +1127,58 @@ export const en = {
         root: "Use an object at the top level.",
         unknown: '"{key}" is not a supported setting. Remove it before saving.',
         invalid: 'Enter a valid value for "{key}" before saving.',
+      },
+    },
+    proxy: {
+      title: "Connection proxy",
+      description:
+        "Route new remote connections through one proxy. Existing connections keep their current route. Proxy profiles are included in encrypted sync and backups.",
+      add: "Add proxy",
+      empty:
+        "Add a proxy profile to route connections through another network.",
+      loadError: "Failed to load proxy profiles",
+      switchError: "Failed to switch proxy",
+      use: "Use proxy",
+      disable: "Disable proxy",
+      direct: "No proxy",
+      manage: "Manage proxies",
+      edit: "Edit proxy",
+      editNamed: "Edit {name}",
+      deleteNamed: "Delete {name}",
+      kind: {
+        socks5: "SOCKS5",
+        http: "HTTP CONNECT",
+      },
+      form: {
+        newTitle: "Add proxy",
+        editTitle: "Edit proxy",
+        create: "Create proxy",
+        name: "Name",
+        namePlaceholder: "Office proxy",
+        nameRequired: "Enter a proxy name.",
+        kind: "Proxy type",
+        kindHint: {
+          socks5: "Target hostnames are resolved by the proxy.",
+          http: "Basic authentication is not encrypted. Use a trusted proxy network.",
+        },
+        host: "Host",
+        hostRequired: "Enter a proxy host.",
+        port: "Port",
+        portInvalid: "Enter a port from 1 to 65535.",
+        username: "Username",
+        password: "Password",
+        authHint: "Leave blank if the proxy does not require authentication.",
+        passwordSavedHint:
+          "A password is saved. Enter a new password to replace it.",
+        passwordRevealError: "Failed to reveal the proxy password",
+        saveError: "Failed to save the proxy",
+      },
+      delete: {
+        title: "Delete {name} proxy?",
+        description:
+          "This removes the saved proxy profile. Existing connections are not affected.",
+        action: "Delete proxy",
+        error: "Failed to delete the proxy",
       },
     },
     general: {

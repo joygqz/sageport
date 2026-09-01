@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type SettingsSection =
-  "general" | "keybindings" | "ai" | "sync" | "about";
+  "general" | "network" | "keybindings" | "ai" | "sync" | "about";
 
 type SettingsSectionInput = SettingsSection | "appearance";
 

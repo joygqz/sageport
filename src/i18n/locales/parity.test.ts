@@ -54,6 +54,7 @@ describe("locale parity", () => {
       "Anthropic",
       "Anthropic-compatible",
       "AWS",
+      "CONNECT",
       "CPU",
       "D",
       "Docker",

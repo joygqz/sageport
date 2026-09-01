@@ -123,6 +123,7 @@ mod tests {
             "ai_sessions",
             "sftp_transfers",
             "port_forwards",
+            "proxy_profiles",
             "sftp_bookmarks",
             "command_history",
         ] {

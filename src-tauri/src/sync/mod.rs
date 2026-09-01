@@ -20,16 +20,16 @@ use sqlx::{Executor, Sqlite, SqlitePool};
 use crate::crypto::{self, EncryptedEnvelope};
 use crate::domain::{
     now, Group, GroupInput, Host, HostInput, Identity, IdentityInput, PortForward,
-    PortForwardInput, SftpBookmark, SftpBookmarkInput, Snippet, SnippetInput, SshKey, SshKeyInput,
-    Task, TaskInput,
+    PortForwardInput, ProxyProfile, ProxyProfileInput, SftpBookmark, SftpBookmarkInput, Snippet,
+    SnippetInput, SshKey, SshKeyInput, Task, TaskInput,
 };
 use crate::error::{AppError, AppResult};
 use crate::repository::{
-    bookmark_repo, forward_repo, group_repo, host_repo, identity_repo, key_repo, settings_repo,
-    snippet_repo, task_repo,
+    bookmark_repo, forward_repo, group_repo, host_repo, identity_repo, key_repo, proxy_repo,
+    settings_repo, snippet_repo, task_repo,
 };
 
-const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["security.", "sync.", "update."];
+const EXCLUDED_SETTINGS_PREFIXES: &[&str] = &["proxy.active_", "security.", "sync.", "update."];
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_ENVELOPE_FILE_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_RECORDS_PER_KIND: usize = 100_000;
@@ -65,6 +65,8 @@ pub struct VaultSnapshot {
     #[serde(default)]
     pub port_forwards: Vec<PortForward>,
     #[serde(default)]
+    pub proxy_profiles: Vec<ProxyProfile>,
+    #[serde(default)]
     pub sftp_bookmarks: Vec<SftpBookmark>,
 }
 
@@ -79,6 +81,7 @@ impl VaultSnapshot {
                 + self.tasks.len()
                 + self.settings.len()
                 + self.port_forwards.len()
+                + self.proxy_profiles.len()
                 + self.sftp_bookmarks.len(),
         );
         out.extend(self.groups.iter().map(|value| fingerprint("g", value)));
@@ -92,6 +95,11 @@ impl VaultSnapshot {
             self.port_forwards
                 .iter()
                 .map(|value| fingerprint("f", value)),
+        );
+        out.extend(
+            self.proxy_profiles
+                .iter()
+                .map(|value| fingerprint("p", value)),
         );
         out.extend(
             self.sftp_bookmarks
@@ -119,6 +127,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     let snippets = fetch_all::<Snippet, _>(&mut *tx, "snippets").await?;
     let tasks = fetch_all::<Task, _>(&mut *tx, "tasks").await?;
     let port_forwards = fetch_all::<PortForward, _>(&mut *tx, "port_forwards").await?;
+    let proxy_profiles = fetch_all::<ProxyProfile, _>(&mut *tx, "proxy_profiles").await?;
     let sftp_bookmarks = fetch_all::<SftpBookmark, _>(&mut *tx, "sftp_bookmarks").await?;
     let settings = settings_repo::all_excluding_prefixes(&mut *tx, EXCLUDED_SETTINGS_PREFIXES)
         .await?
@@ -143,6 +152,7 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
         tasks,
         settings,
         port_forwards,
+        proxy_profiles,
         sftp_bookmarks,
     };
     validate_snapshot(&snapshot)?;
@@ -185,6 +195,9 @@ pub(crate) async fn import_snapshot_in(
     }
     for f in &snapshot.port_forwards {
         merge_forward(&mut **tx, f).await?;
+    }
+    for p in &snapshot.proxy_profiles {
+        merge_proxy(&mut **tx, p).await?;
     }
     for b in &snapshot.sftp_bookmarks {
         merge_bookmark(&mut **tx, b).await?;
@@ -261,6 +274,9 @@ pub(crate) async fn restore_snapshot_in(
     sqlx::query("DELETE FROM port_forwards")
         .execute(&mut **tx)
         .await?;
+    sqlx::query("DELETE FROM proxy_profiles")
+        .execute(&mut **tx)
+        .await?;
     sqlx::query("DELETE FROM hosts").execute(&mut **tx).await?;
     sqlx::query("DELETE FROM identities")
         .execute(&mut **tx)
@@ -294,6 +310,9 @@ pub(crate) async fn restore_snapshot_in(
     }
     for f in &snapshot.port_forwards {
         merge_forward(&mut **tx, f).await?;
+    }
+    for p in &snapshot.proxy_profiles {
+        merge_proxy(&mut **tx, p).await?;
     }
     for b in &snapshot.sftp_bookmarks {
         merge_bookmark(&mut **tx, b).await?;
@@ -414,6 +433,7 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
         ("tasks", snapshot.tasks.len()),
         ("settings", snapshot.settings.len()),
         ("port forwards", snapshot.port_forwards.len()),
+        ("proxy profiles", snapshot.proxy_profiles.len()),
         ("SFTP bookmarks", snapshot.sftp_bookmarks.len()),
     ] {
         if len > MAX_RECORDS_PER_KIND {
@@ -511,6 +531,17 @@ fn validate_snapshot(snapshot: &VaultSnapshot) -> AppResult<()> {
     records!(&snapshot.port_forwards, "port forward");
     for forward in &snapshot.port_forwards {
         normalized_forward(forward)?;
+    }
+    records!(&snapshot.proxy_profiles, "proxy profile");
+    for profile in &snapshot.proxy_profiles {
+        proxy_repo::normalize(ProxyProfileInput {
+            name: profile.name.clone(),
+            kind: profile.kind.clone(),
+            host: profile.host.clone(),
+            port: profile.port,
+            username: profile.username.clone(),
+            password: profile.password.clone(),
+        })?;
     }
     records!(&snapshot.sftp_bookmarks, "SFTP bookmark");
     for bookmark in &snapshot.sftp_bookmarks {
@@ -804,6 +835,45 @@ where
     Ok(())
 }
 
+async fn merge_proxy<'e, E>(executor: E, p: &ProxyProfile) -> AppResult<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let input = proxy_repo::normalize(ProxyProfileInput {
+        name: p.name.clone(),
+        kind: p.kind.clone(),
+        host: p.host.clone(),
+        port: p.port,
+        username: p.username.clone(),
+        password: p.password.clone(),
+    })?;
+    let password = input.password.as_deref().filter(|value| !value.is_empty());
+    sqlx::query(
+        "INSERT INTO proxy_profiles
+           (id, name, kind, host, port, username, password, created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name, kind = excluded.kind, host = excluded.host,
+           port = excluded.port, username = excluded.username, password = excluded.password,
+           updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, revision = excluded.revision
+         WHERE excluded.updated_at > proxy_profiles.updated_at",
+    )
+    .bind(&p.id)
+    .bind(&input.name)
+    .bind(&input.kind)
+    .bind(&input.host)
+    .bind(input.port)
+    .bind(&input.username)
+    .bind(password)
+    .bind(&p.created_at)
+    .bind(&p.updated_at)
+    .bind(&p.deleted_at)
+    .bind(p.revision)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
 async fn merge_host<'e, E>(executor: E, h: &Host) -> AppResult<()>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -949,6 +1019,7 @@ mod tests {
             tasks: Vec::new(),
             settings,
             port_forwards: Vec::new(),
+            proxy_profiles: Vec::new(),
             sftp_bookmarks: Vec::new(),
         }
     }
@@ -968,6 +1039,9 @@ mod tests {
             .await
             .unwrap();
         settings_repo::set(&pool, "sync.connection", "local-connection")
+            .await
+            .unwrap();
+        settings_repo::set(&pool, proxy_repo::ACTIVE_PROXY_KEY, "proxy-1")
             .await
             .unwrap();
 
@@ -996,6 +1070,47 @@ mod tests {
                 .as_deref(),
             Some("local-connection")
         );
+        assert_eq!(
+            settings_repo::get(&pool, proxy_repo::ACTIVE_PROXY_KEY)
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("proxy-1")
+        );
+    }
+
+    #[tokio::test]
+    async fn proxy_profiles_sync_but_the_active_selection_stays_local() {
+        let source = test_pool().await;
+        let profile = proxy_repo::create(
+            &source,
+            ProxyProfileInput {
+                name: "Office".into(),
+                kind: "socks5".into(),
+                host: "proxy.example.com".into(),
+                port: 1080,
+                username: Some("alice".into()),
+                password: Some("secret".into()),
+            },
+        )
+        .await
+        .unwrap();
+        proxy_repo::set_active(&source, Some(&profile.id))
+            .await
+            .unwrap();
+
+        let snapshot = export_snapshot(&source).await.unwrap();
+        assert_eq!(snapshot.proxy_profiles.len(), 1);
+        assert!(snapshot
+            .settings
+            .iter()
+            .all(|setting| setting.key != proxy_repo::ACTIVE_PROXY_KEY));
+
+        let destination = test_pool().await;
+        import_snapshot(&destination, &snapshot).await.unwrap();
+        let imported = proxy_repo::list(&destination).await.unwrap();
+        assert_eq!(imported[0].password.as_deref(), Some("secret"));
+        assert!(proxy_repo::active_id(&destination).await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -1143,6 +1258,29 @@ mod tests {
             target_host: Some("db.internal\nspoofed".into()),
             target_port: Some(5432),
             auto_start: 2,
+            created_at: BACKUP_TIMESTAMP.into(),
+            updated_at: BACKUP_TIMESTAMP.into(),
+            deleted_at: None,
+            revision: 1,
+        });
+
+        assert!(matches!(
+            validate_snapshot(&snapshot),
+            Err(AppError::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_proxy_profiles_before_import() {
+        let mut snapshot = empty_snapshot(Vec::new());
+        snapshot.proxy_profiles.push(ProxyProfile {
+            id: "proxy-1".into(),
+            name: "Office".into(),
+            kind: "socks5".into(),
+            host: "proxy.example.com\r\nInjected: true".into(),
+            port: 1080,
+            username: None,
+            password: None,
             created_at: BACKUP_TIMESTAMP.into(),
             updated_at: BACKUP_TIMESTAMP.into(),
             deleted_at: None,

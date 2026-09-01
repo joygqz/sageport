@@ -6,6 +6,7 @@ pub mod forward;
 pub mod handler;
 pub mod known_hosts;
 pub mod monitor;
+pub(crate) mod proxy;
 pub mod session;
 
 use std::collections::HashMap;

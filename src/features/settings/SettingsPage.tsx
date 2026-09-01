@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Info,
   Keyboard,
+  Network,
   RefreshCw,
   Settings2,
   Sparkles,
@@ -45,6 +46,7 @@ import {
   TOOL_GROUPS,
 } from "@/features/ai/tools";
 import { SyncSection } from "@/features/sync/SyncSection";
+import { ProxySettings } from "@/features/proxies/ProxySettings";
 import { AboutSection } from "./AboutSection";
 import { DraftInput } from "./DraftInput";
 import { GeneralSection } from "./GeneralSection";
@@ -61,6 +63,11 @@ const NAV: {
     id: "general",
     labelKey: "settings.nav.general",
     icon: Settings2,
+  },
+  {
+    id: "network",
+    labelKey: "settings.nav.network",
+    icon: Network,
   },
   {
     id: "keybindings",
@@ -206,6 +213,7 @@ function SettingsPage({
         <ScrollArea className="min-h-0 min-w-0 flex-1">
           <main className="settings-content mx-auto flex w-full max-w-3xl flex-col p-5 sm:p-8">
             {section === "general" && <GeneralSection />}
+            {section === "network" && <ProxySettings />}
             {section === "keybindings" && <KeybindingsSection />}
             {section === "ai" && <AiSection />}
             {section === "sync" && <SyncSection />}
