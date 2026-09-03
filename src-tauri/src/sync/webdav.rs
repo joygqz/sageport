@@ -201,10 +201,10 @@ fn parse_hrefs(xml: &str) -> AppResult<Vec<String>> {
     let mut href: Option<String> = None;
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) if e.local_name().as_ref() == b"href" => {
+            Ok(Event::Start(e)) if e.local_name().as_ref() == "href" => {
                 href = Some(String::new());
             }
-            Ok(Event::End(e)) if e.local_name().as_ref() == b"href" => {
+            Ok(Event::End(e)) if e.local_name().as_ref() == "href" => {
                 if let Some(href) = href.take() {
                     let basename = href.trim_end_matches('/').rsplit('/').next().unwrap_or("");
                     let decoded = percent_decode(basename);
@@ -215,7 +215,7 @@ fn parse_hrefs(xml: &str) -> AppResult<Vec<String>> {
             }
             Ok(Event::Text(t)) => {
                 if let Some(href) = href.as_mut() {
-                    href.push_str(&t.decode().map_err(xml_err)?);
+                    href.push_str(t.as_ref());
                 }
             }
             Ok(Event::GeneralRef(r)) => {
@@ -223,8 +223,8 @@ fn parse_hrefs(xml: &str) -> AppResult<Vec<String>> {
                     if let Some(ch) = r.resolve_char_ref().map_err(xml_err)? {
                         href.push(ch);
                     } else {
-                        let name = r.decode().map_err(xml_err)?;
-                        let resolved = resolve_predefined_entity(&name)
+                        let name = r.as_ref();
+                        let resolved = resolve_predefined_entity(name)
                             .ok_or_else(|| xml_err(format!("unknown entity &{name};")))?;
                         href.push_str(resolved);
                     }
@@ -309,5 +309,12 @@ mod tests {
         let names = parse_hrefs(xml).unwrap();
         assert!(names.contains(&"vault".to_string()));
         assert!(names.contains(&"sageport-vault-20260101T000000000Z.json".to_string()));
+    }
+
+    #[test]
+    fn decodes_entities_in_webdav_hrefs() {
+        let xml = r#"<d:multistatus xmlns:d="DAV:"><d:response><d:href>/vault/a&amp;b&#45;c.json</d:href></d:response></d:multistatus>"#;
+        let names = parse_hrefs(xml).unwrap();
+        assert_eq!(names, ["a&b-c.json"]);
     }
 }
