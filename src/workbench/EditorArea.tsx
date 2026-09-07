@@ -1,5 +1,4 @@
 import {
-  Fragment,
   lazy,
   memo,
   Suspense,
@@ -34,21 +33,17 @@ import {
 } from "@/components/ui";
 import { type ConfirmState } from "@/components/ui/confirm-dialog";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
 import { useDragCursor } from "@/lib/pointerDrag";
-import { IS_MACOS } from "@/lib/platform";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { focusFileEditor } from "@/features/sftp/editor-registry";
 import { useSftpStore } from "@/features/sftp/store";
 import { focusTerminal, getSession } from "@/features/terminal/sessions";
 import { useOverlayStore } from "./overlays";
-import { keybindingDisplayKeys } from "./keybinding-registry";
-import { useKeybindingStore } from "./keybinding-store";
 import { useLayoutStore } from "./layout";
 import { getTabDropTarget } from "./tab-drag";
 import {
@@ -380,7 +375,9 @@ export const EditorArea = memo(function EditorArea() {
     return () => tabStrip.removeEventListener("wheel", handleWheel);
   }, [tabs.length]);
 
-  if (tabs.length === 0) return <Watermark />;
+  if (tabs.length === 0) {
+    return <div className="min-h-0 min-w-0 flex-1 bg-background" />;
+  }
 
   return (
     <Tabs
@@ -831,38 +828,6 @@ function TabDragGhost({
       ) : (
         <X className="size-3.5 shrink-0 opacity-60" />
       )}
-    </div>
-  );
-}
-
-function Watermark() {
-  const { t } = useI18n();
-  const keybindingOverrides = useKeybindingStore((state) => state.overrides);
-  const hints = (
-    [
-      ["watermark.quickConnect", "palette.quick"],
-      ["watermark.commands", "palette.commands"],
-      ["watermark.newHost", "host.new"],
-      ["watermark.newLocal", "terminal.newLocal"],
-      ["watermark.settings", "settings.open"],
-    ] as const
-  ).flatMap(([labelKey, id]) => {
-    const keys = keybindingDisplayKeys(id, keybindingOverrides, IS_MACOS);
-    return keys ? [{ label: t(labelKey), keys }] : [];
-  });
-
-  return (
-    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-      <div className="m-auto grid min-w-max grid-cols-[auto_auto] items-center gap-x-4 gap-y-2.5 p-3">
-        {hints.map((hint) => (
-          <Fragment key={hint.label}>
-            <span className="text-right text-sm text-muted-foreground">
-              {hint.label}
-            </span>
-            <Kbd keys={hint.keys} />
-          </Fragment>
-        ))}
-      </div>
     </div>
   );
 }

@@ -61,12 +61,14 @@ export const en = {
   },
 
   titleBar: {
+    toggleSidebar: "Toggle sidebar",
     commandCenter: "Search hosts",
     togglePanel: "Toggle files panel",
     toggleAssistant: "Toggle AI assistant",
   },
 
   activityBar: {
+    navigation: "Workspace navigation",
     hosts: "Hosts",
     credentials: "Credentials",
     snippets: "Snippets",

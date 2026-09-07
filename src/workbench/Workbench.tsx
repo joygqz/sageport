@@ -265,7 +265,7 @@ export function Workbench() {
   const passwordMounted = useKeepMounted(hasPasswordPrompt);
 
   return (
-    <div className="flex h-full flex-col bg-surface text-surface-foreground">
+    <div className="workbench flex h-full flex-col bg-surface text-surface-foreground">
       <TitleBar />
 
       <div className="flex min-h-0 flex-1">
@@ -284,7 +284,7 @@ export function Workbench() {
 
         <div
           className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col border-border",
+            "workspace-editor flex min-h-0 min-w-0 flex-1 flex-col border-border-subtle",
             sidebarVisible && "border-l",
             auxVisible && "border-r",
           )}

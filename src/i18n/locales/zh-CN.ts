@@ -58,12 +58,14 @@ export const zhCN: Dictionary = {
   },
 
   titleBar: {
+    toggleSidebar: "切换侧边栏",
     commandCenter: "搜索主机",
     togglePanel: "切换文件面板",
     toggleAssistant: "切换 AI 助手",
   },
 
   activityBar: {
+    navigation: "工作台导航",
     hosts: "主机",
     credentials: "凭据",
     snippets: "命令片段",

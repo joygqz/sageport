@@ -21,7 +21,12 @@ export function SettingsGroup({
   contentClassName?: string;
 }) {
   return (
-    <section className={cn("flex flex-col gap-[var(--field-gap)]", className)}>
+    <section
+      className={cn(
+        "settings-group flex flex-col gap-4 rounded-xl border border-border-subtle bg-card p-5",
+        className,
+      )}
+    >
       <SectionHeader
         title={title}
         description={description}

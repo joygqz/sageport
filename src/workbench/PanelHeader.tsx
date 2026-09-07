@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 export const PANEL_HEADER_ACTION_CLASS = "size-[var(--toolbar-control-size)]";
 
-export const PANEL_LIST_CLASS = "space-y-0.5";
+export const PANEL_LIST_CLASS = "space-y-1";
 
 export const PANEL_LIST_ITEM_CLASS = `group flex min-h-[var(--list-row-height)] items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-list-hover focus-within:bg-list-hover ${INTERACTIVE_FOCUS_CLASS}`;
 
@@ -36,7 +36,7 @@ export function PanelHeader({
       )}
     >
       <div className="flex min-w-0 items-center gap-2">
-        <h2 className="min-w-0 truncate text-xs font-semibold leading-snug tracking-wide text-surface-foreground/85">
+        <h2 className="min-w-0 truncate text-sm font-semibold leading-snug text-surface-foreground">
           {title}
         </h2>
         {titleAfter}

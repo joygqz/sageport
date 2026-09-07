@@ -223,8 +223,12 @@ function HostCard({
           <div className="relative flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center text-link">
             <Gauge className="size-4" strokeWidth={1.7} />
             <span
+              role="img"
+              aria-label={t(
+                `terminal.status.${connected ? "connected" : primary.status}`,
+              )}
               className={cn(
-                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface",
+                "absolute bottom-0 right-0 size-1.5 rounded-full",
                 STATUS_DOT_CLASS[connected ? "connected" : primary.status],
               )}
             />
