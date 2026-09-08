@@ -36,7 +36,12 @@ export const TitleBar = memo(function TitleBar() {
   return (
     <header
       data-tauri-drag-region
-      className="grid h-[var(--titlebar-height)] shrink-0 grid-cols-[1fr_minmax(0,28rem)_1fr] items-center border-b border-border-subtle bg-surface"
+      className={cn(
+        "grid h-[var(--titlebar-height)] shrink-0 items-center border-b border-border-subtle bg-surface",
+        IS_MACOS
+          ? "grid-cols-[minmax(8rem,1fr)_minmax(0,28rem)_minmax(8rem,1fr)]"
+          : "grid-cols-[minmax(16rem,1fr)_minmax(0,28rem)_minmax(16rem,1fr)]",
+      )}
     >
       <div
         data-tauri-drag-region
@@ -53,19 +58,13 @@ export const TitleBar = memo(function TitleBar() {
             className="pointer-events-none size-4 shrink-0 select-none"
           />
         )}
-        <span
-          data-tauri-drag-region
-          className="text-xs font-semibold tracking-tight"
-        >
-          Sageport
-        </span>
       </div>
 
       <button
         type="button"
         onClick={() => openPalette("quick")}
         className={cn(
-          "flex h-[var(--toolbar-control-size)] items-center justify-center gap-2 rounded-md border bg-surface-sunken px-2.5 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground",
+          "flex h-[var(--compact-control-size)] min-w-0 items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface-sunken px-2.5 text-xs text-muted-foreground transition-colors hover:border-border-strong hover:bg-background hover:text-foreground",
           CONTROL_INTERACTION_CLASS,
         )}
       >

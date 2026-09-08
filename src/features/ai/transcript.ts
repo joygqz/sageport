@@ -1,4 +1,4 @@
-import type { AiChatMessage } from "@/types/models";
+import type { AiChatMessage, AiImageAttachment } from "@/types/models";
 import {
   normalizeArgs,
   redactToolArguments,
@@ -38,7 +38,7 @@ export function completedToolStatus(
 export type AgentActivity = "thinking" | "responding" | null;
 
 export type AgentLogItem =
-  | { id: string; kind: "user"; content: string }
+  | { id: string; kind: "user"; content: string; images?: AiImageAttachment[] }
   | { id: string; kind: "assistant"; content: string }
   | {
       id: string;
@@ -145,6 +145,7 @@ export function buildLogFromHistory(messages: AiChatMessage[]): AgentLogItem[] {
         id: crypto.randomUUID(),
         kind: "user",
         content: m.content ?? "",
+        images: m.images,
       });
     } else if (m.role === "assistant") {
       if (m.content) {

@@ -7,13 +7,13 @@ import { cn } from "@/lib/utils";
 import { GHOST_ICON_BUTTON_CLASS } from "./styles";
 
 export const DIALOG_OVERLAY_CLASS =
-  "fixed inset-0 z-50 bg-black/35 dark:bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
+  "fixed inset-0 z-50 bg-black/35 dark:bg-black/60";
 
 export const DIALOG_VIEWPORT_CLASS =
   "pointer-events-none fixed inset-0 z-50 grid place-items-center p-4";
 
 export const DIALOG_CONTENT_CLASS =
-  "pointer-events-auto relative grid max-h-[calc(100dvh-2rem)] w-full max-w-lg gap-[var(--content-gap)] overscroll-contain rounded-lg border border-border-strong bg-popover p-[var(--dialog-padding)] text-popover-foreground data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
+  "pointer-events-auto relative grid max-h-[calc(100dvh-2rem)] w-full max-w-lg gap-[var(--content-gap)] overscroll-contain rounded-lg border border-border bg-popover p-[var(--dialog-padding)] text-popover-foreground";
 
 const DIALOG_CLOSE_CLASS = cn(GHOST_ICON_BUTTON_CLASS, "shrink-0");
 
@@ -63,11 +63,14 @@ function DialogContent({
 
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
 
-  const setRefs = (node: HTMLDivElement | null) => {
-    contentRef.current = node;
-    if (typeof ref === "function") ref(node);
-    else if (ref) ref.current = node;
-  };
+  const setRefs = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      contentRef.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref],
+  );
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;

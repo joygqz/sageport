@@ -361,14 +361,16 @@ function Meter({
       >
         <div
           className={cn(
-            "h-full rounded-full transition-[width] duration-500",
+            "ui-progress-fill",
             percent >= 90
               ? "bg-destructive"
               : percent >= 75
                 ? "bg-warning"
                 : "bg-primary",
           )}
-          style={{ width: `${Math.min(percent, 100)}%` }}
+          style={{
+            transform: `scaleX(${Math.max(0, Math.min(percent, 100)) / 100})`,
+          }}
         />
       </div>
     </div>

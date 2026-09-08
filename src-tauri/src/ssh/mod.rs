@@ -20,8 +20,6 @@ pub use connect::{establish, SshConnection};
 pub use exec::exec_capture;
 pub use session::SessionManager;
 
-pub const EVENT_DATA: &str = "ssh://data";
-pub const EVENT_STATUS: &str = "ssh://status";
 pub const EVENT_HOST_KEY: &str = "ssh://host-key";
 pub const EVENT_HOST_KEY_CLOSED: &str = "ssh://host-key-closed";
 pub const EVENT_PASSWORD: &str = "ssh://password";

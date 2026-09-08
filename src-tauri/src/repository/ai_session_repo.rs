@@ -12,10 +12,17 @@ pub struct AiSessionRow {
     pub updated_at: String,
 }
 
-pub async fn list(pool: &SqlitePool) -> AppResult<Vec<AiSessionRow>> {
-    let rows = sqlx::query_as::<_, AiSessionRow>(
-        "SELECT id, title, messages, created_at, updated_at FROM ai_sessions
-         ORDER BY updated_at DESC",
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct AiSessionMetadataRow {
+    pub id: String,
+    pub title: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub async fn list(pool: &SqlitePool) -> AppResult<Vec<AiSessionMetadataRow>> {
+    let rows = sqlx::query_as::<_, AiSessionMetadataRow>(
+        "SELECT id, title, created_at, updated_at FROM ai_sessions ORDER BY updated_at DESC",
     )
     .fetch_all(pool)
     .await?;
@@ -52,7 +59,7 @@ pub async fn save(
     id: &str,
     messages_json: &str,
     title: Option<&str>,
-) -> AppResult<AiSessionRow> {
+) -> AppResult<AiSessionMetadataRow> {
     let ts = now();
     let affected = if let Some(title) = title {
         sqlx::query("UPDATE ai_sessions SET messages = ?, title = ?, updated_at = ? WHERE id = ?")
@@ -75,7 +82,13 @@ pub async fn save(
     if affected == 0 {
         return Err(AppError::NotFound(format!("ai session {id}")));
     }
-    get(pool, id).await
+    sqlx::query_as::<_, AiSessionMetadataRow>(
+        "SELECT id, title, created_at, updated_at FROM ai_sessions WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .map_err(AppError::from)
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {

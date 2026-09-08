@@ -543,7 +543,7 @@ export function FilePane({ side }: { side: PaneSide }) {
             />
           </TabsContent>
         ) : (
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 overflow-auto">
             <EmptyState
               className="m-auto p-3"
               icon={HardDrive}

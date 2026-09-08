@@ -11,6 +11,8 @@ import {
   Copy,
   History,
   KeyRound,
+  ImagePlus,
+  Loader2,
   MessageCirclePlus,
   Sparkles,
   Square,
@@ -25,6 +27,10 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Button,
   ConfirmDialog,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -44,13 +50,27 @@ import {
   PanelHeader,
   PANEL_HEADER_ACTION_CLASS,
 } from "@/workbench/PanelHeader";
-import { useTabsStore } from "@/workbench/tabs";
+import { findPane, targetPaneId, useTabsStore } from "@/workbench/tabs";
+import { getSession } from "@/features/terminal/sessions";
+import type { AiImageAttachment } from "@/types/models";
+import {
+  IMAGE_ACCEPT,
+  MAX_MESSAGE_IMAGES,
+  ImageAttachmentError,
+  imageDataUrl,
+  imageHistoryError,
+  prepareImage,
+} from "./images";
 import { useAiConfig, useAiModels, useSetAiModel } from "./api";
 import { safeExternalUrl } from "./links";
 import { shouldSubmitPrompt } from "./input";
 import { useAiStore } from "./store";
 import { MAX_AI_PROMPT_CHARS, type AgentLogItem } from "./transcript";
-import { askUserOptions, askUserQuestion } from "./tools";
+import {
+  askUserOptions,
+  askUserQuestion,
+  terminalTargetDisplay,
+} from "./tools";
 import { resolveEnabledToolNames } from "./tools/registry";
 import { QuestionPrompt, ToolActivity } from "./ToolActivity";
 
@@ -108,6 +128,15 @@ export function AssistantPanel({ width }: { width: number }) {
     pending && activity === "thinking" && !awaitingUser && !toolRunning;
 
   const [input, setInput] = useState("");
+  const [imageDraft, setImageDraft] = useState<{
+    sessionId: string | null;
+    items: AiImageAttachment[];
+  }>({ sessionId: null, items: [] });
+  const images = imageDraft.sessionId === activeId ? imageDraft.items : [];
+  const [preparingImages, setPreparingImages] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const attachmentBusy = useRef(false);
+  const submitting = useRef(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deletingSession, setDeletingSession] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -117,6 +146,13 @@ export function AssistantPanel({ width }: { width: number }) {
   const compositionActive = useRef(false);
   const enabledToolList = resolveEnabledToolNames(config?.enabledTools);
   const sessionLoading = Boolean(activeId && !runtime);
+  const currentTarget = useTabsStore((state) => {
+    const id = targetPaneId(state);
+    const target = id ? terminalTargetDisplay(state.tabs, id) : undefined;
+    return target
+      ? `${target.title}${target.paneIndex ? ` · ${target.paneIndex}/${target.paneCount}` : ""}`
+      : null;
+  });
 
   const onLogScroll = () => {
     const el = scrollRef.current;
@@ -187,13 +223,63 @@ export function AssistantPanel({ width }: { width: number }) {
     if (stickToBottom.current) scrollLogToBottom();
   }, [input, scrollLogToBottom]);
 
-  const sendPrompt = async (prompt: string): Promise<boolean> => {
-    if (!prompt || pending || !model || sessionLoading) return false;
+  const addImages = async (files: File[]) => {
+    if (!files.length || attachmentBusy.current || sessionLoading) return;
+    if (images.length + files.length > MAX_MESSAGE_IMAGES) {
+      toast.error(t("ai.error"), t("ai.images.tooMany"));
+      return;
+    }
+    attachmentBusy.current = true;
+    setPreparingImages(true);
+    try {
+      const added: AiImageAttachment[] = [];
+      for (const file of files) added.push(await prepareImage(file));
+      setImageDraft((current) => ({
+        sessionId: activeId,
+        items: [
+          ...(current.sessionId === activeId ? current.items : []),
+          ...added,
+        ],
+      }));
+    } catch (error) {
+      toast.error(
+        t("ai.error"),
+        t(
+          error instanceof ImageAttachmentError
+            ? error.key
+            : "ai.images.invalid",
+        ),
+      );
+    } finally {
+      attachmentBusy.current = false;
+      setPreparingImages(false);
+    }
+  };
+
+  const sendPrompt = async (
+    prompt: string,
+    attachments: AiImageAttachment[] = [],
+  ): Promise<boolean> => {
+    if (
+      (!prompt && !attachments.length) ||
+      pending ||
+      !model ||
+      sessionLoading ||
+      attachmentBusy.current ||
+      submitting.current
+    )
+      return false;
+    const imageError = imageHistoryError(runtime?.history ?? [], attachments);
+    if (imageError) {
+      toast.error(t("ai.error"), t(imageError));
+      return false;
+    }
     if (prompt.length > MAX_AI_PROMPT_CHARS) {
       toast.error(t("ai.error"), t("ai.promptTooLong"));
       return false;
     }
     stickToBottom.current = true;
+    submitting.current = true;
     try {
       const sessionId = activeId ?? (await newSession());
       void send(
@@ -203,18 +289,26 @@ export function AssistantPanel({ width }: { width: number }) {
         config?.autoApprove ?? false,
         enabledToolList,
         config?.maxHistoryTokens,
+        attachments,
       );
       return true;
     } catch (err) {
       toast.error(t("ai.error"), errorMessage(err));
       return false;
+    } finally {
+      submitting.current = false;
     }
   };
 
   const submit = async () => {
     const prompt = input.trim();
-    if (!prompt) return;
-    if (await sendPrompt(prompt)) setInput("");
+    if (!prompt && !images.length) return;
+    if (await sendPrompt(prompt, images)) {
+      setInput((current) => (current.trim() === prompt ? "" : current));
+      setImageDraft((current) =>
+        current.items === images ? { ...current, items: [] } : current,
+      );
+    }
   };
 
   const continueRun = () => {
@@ -408,7 +502,41 @@ export function AssistantPanel({ width }: { width: number }) {
           </div>
 
           <div className="shrink-0 px-3 pb-3 pt-2">
+            <div className="mb-1.5 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
+              <TerminalIcon className="size-3 shrink-0" />
+              <span className="truncate" title={currentTarget ?? undefined}>
+                {currentTarget
+                  ? t("ai.commandTarget", { name: currentTarget })
+                  : t("ai.noTerminal")}
+              </span>
+            </div>
             <div className="overflow-hidden rounded-lg border border-border-strong bg-surface-raised transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/35">
+              {images.length > 0 && (
+                <div className="px-2.5 pt-2.5">
+                  <MessageImages
+                    images={images}
+                    onRemove={(id) =>
+                      setImageDraft((current) => ({
+                        ...current,
+                        items: current.items.filter((image) => image.id !== id),
+                      }))
+                    }
+                  />
+                </div>
+              )}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept={IMAGE_ACCEPT}
+                multiple
+                className="hidden"
+                aria-label={t("ai.images.attach")}
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files ?? []);
+                  event.currentTarget.value = "";
+                  void addImages(files);
+                }}
+              />
               <Textarea
                 ref={inputRef}
                 rows={1}
@@ -416,6 +544,14 @@ export function AssistantPanel({ width }: { width: number }) {
                 maxLength={MAX_AI_PROMPT_CHARS}
                 disabled={sessionLoading}
                 onChange={(e) => setInput(e.target.value)}
+                onPaste={(event) => {
+                  const files = Array.from(event.clipboardData.files);
+                  if (files.length) {
+                    if (!event.clipboardData.getData("text/plain"))
+                      event.preventDefault();
+                    void addImages(files);
+                  }
+                }}
                 onCompositionStart={() => {
                   compositionActive.current = true;
                 }}
@@ -430,10 +566,37 @@ export function AssistantPanel({ width }: { width: number }) {
                     void submit();
                   }
                 }}
+                aria-label={t("ai.inputPlaceholder")}
                 placeholder={t("ai.inputPlaceholder")}
                 className="max-h-40 min-h-0 resize-none rounded-none border-0 bg-transparent px-3 pb-1.5 pt-2.5 focus-visible:ring-0"
               />
               <div className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-1">
+                <Tooltip
+                  content={
+                    preparingImages
+                      ? t("ai.images.preparing")
+                      : t("ai.images.hint")
+                  }
+                >
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-[var(--toolbar-control-size)] shrink-0"
+                    aria-label={t("ai.images.attach")}
+                    disabled={
+                      preparingImages ||
+                      sessionLoading ||
+                      images.length >= MAX_MESSAGE_IMAGES
+                    }
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    {preparingImages ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <ImagePlus className="size-4" />
+                    )}
+                  </Button>
+                </Tooltip>
                 <Select
                   value={model}
                   onValueChange={changeModel}
@@ -455,7 +618,7 @@ export function AssistantPanel({ width }: { width: number }) {
                 />
                 <div className="ml-auto flex items-center gap-1.5">
                   {pending ? (
-                    <Tooltip content={t("ai.stop")}>
+                    <Tooltip content={t("ai.stopHint")}>
                       <Button
                         size="icon"
                         variant="secondary"
@@ -471,7 +634,12 @@ export function AssistantPanel({ width }: { width: number }) {
                       size="icon"
                       className="size-[var(--toolbar-control-size)] shrink-0"
                       aria-label={t("ai.send")}
-                      disabled={!input.trim() || !model || sessionLoading}
+                      disabled={
+                        (!input.trim() && !images.length) ||
+                        !model ||
+                        sessionLoading ||
+                        preparingImages
+                      }
                       onClick={() => void submit()}
                     >
                       <ArrowUp className="size-4" />
@@ -527,7 +695,7 @@ function ThinkingStatus() {
       role="status"
       aria-live="polite"
     >
-      <span className="ai-thinking-shimmer">{t("ai.thinking")}</span>
+      <span className="ai-thinking-label">{t("ai.thinking")}</span>
     </div>
   );
 }
@@ -580,22 +748,33 @@ function LogEntry({
     }
     return <ToolActivity item={item} onApprove={onApprove} onDeny={onDeny} />;
   }
-  return <Bubble role={item.kind} content={item.content} />;
+  return (
+    <Bubble
+      role={item.kind}
+      content={item.content}
+      images={item.kind === "user" ? item.images : undefined}
+    />
+  );
 }
 
 function Bubble({
   role,
   content,
+  images,
 }: {
   role: "user" | "assistant";
   content: string;
+  images?: AiImageAttachment[];
 }) {
   if (role === "user") {
     return (
-      <div className="ml-auto max-w-[88%] rounded-lg rounded-br-sm border border-border-subtle bg-muted px-3 py-2">
-        <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
-          {content}
-        </p>
+      <div className="ml-auto max-w-[88%] space-y-2 rounded-lg rounded-br-sm border border-border-subtle bg-muted px-3 py-2">
+        {images?.length ? <MessageImages images={images} /> : null}
+        {content && (
+          <p className="select-text whitespace-pre-wrap break-words text-sm text-foreground/90">
+            {content}
+          </p>
+        )}
       </div>
     );
   }
@@ -706,16 +885,46 @@ const MARKDOWN_COMPONENTS: Components = {
       {...props}
     />
   ),
-  pre: ({ node }) => (
-    <CodeBlock code={nodeText(node?.children?.[0]).replace(/\n$/, "")} />
-  ),
+  pre: ({ node }) => {
+    const child = node?.children?.[0];
+    const classes = child?.type === "element" ? child.properties.className : [];
+    const language = Array.isArray(classes)
+      ? String(
+          classes.find((value) => String(value).startsWith("language-")) ?? "",
+        ).replace(/^language-/, "")
+      : "";
+    return (
+      <CodeBlock
+        code={nodeText(child).replace(/\n$/, "")}
+        language={language}
+      />
+    );
+  },
 };
 
-function CodeBlock({ code }: { code: string }) {
+function CodeBlock({ code, language }: { code: string; language: string }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sendToTerminal = useTabsStore((s) => s.sendToTerminal);
+  const pending = useAiStore((state) =>
+    state.activeId ? (state.runtime[state.activeId]?.pending ?? false) : false,
+  );
+  const [review, setReview] = useState<{
+    id: string;
+    name: string;
+    code: string;
+    session: NonNullable<ReturnType<typeof getSession>>;
+    attempt: number;
+  } | null>(null);
+  const shell = [
+    "sh",
+    "bash",
+    "zsh",
+    "shell",
+    "fish",
+    "powershell",
+    "pwsh",
+  ].includes(language.toLowerCase());
 
   useEffect(
     () => () => {
@@ -736,17 +945,36 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   const run = () => {
-    const result = sendToTerminal(code);
-    if (result === "sent") {
+    const state = useTabsStore.getState();
+    const id = targetPaneId(state);
+    const pane = findPane(state.tabs, id);
+    const session = getSession(id);
+    if (!pane || !session || pane.status !== "connected") {
+      toast.error(t(pane ? "snippets.notConnected" : "snippets.noTerminal"));
+      return;
+    }
+    const target = terminalTargetDisplay(state.tabs, pane.id);
+    const name = target?.paneIndex
+      ? `${target.title} · ${target.paneIndex}/${target.paneCount}`
+      : pane.title;
+    setReview({ id: pane.id, name, code, session, attempt: pane.attempt });
+  };
+
+  const executeReviewedCommand = () => {
+    if (!review) return;
+    const state = useTabsStore.getState();
+    const pane = findPane(state.tabs, review.id);
+    if (
+      pane?.status !== "connected" ||
+      pane.attempt !== review.attempt ||
+      getSession(review.id) !== review.session
+    ) {
+      toast.error(t("snippets.notConnected"));
+      return;
+    }
+    state.focusPane(review.id);
+    if (useTabsStore.getState().sendToTerminal(review.code) === "sent") {
       toast.success(t("snippets.sent"));
-    } else {
-      toast.error(
-        t(
-          result === "not-connected"
-            ? "snippets.notConnected"
-            : "snippets.noTerminal",
-        ),
-      );
     }
   };
 
@@ -754,20 +982,23 @@ function CodeBlock({ code }: { code: string }) {
     <div className="overflow-hidden rounded-lg border border-border-subtle bg-terminal-background">
       <div className="flex items-center justify-between border-b border-border px-2 py-1">
         <span className="text-2xs font-medium text-muted-foreground">
-          {t("ai.commandLabel")}
+          {language || t("ai.codeLabel")}
         </span>
         <div className="flex gap-1">
-          <Tooltip content={t("snippets.run")}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-[var(--compact-control-size)]"
-              aria-label={t("snippets.run")}
-              onClick={run}
-            >
-              <TerminalIcon className="size-3.5" />
-            </Button>
-          </Tooltip>
+          {shell && (
+            <Tooltip content={t("ai.runCommand")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-[var(--compact-control-size)]"
+                aria-label={t("ai.runCommand")}
+                disabled={pending}
+                onClick={run}
+              >
+                <TerminalIcon className="size-3.5" />
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip content={copied ? t("common.copied") : t("common.copy")}>
             <Button
               size="icon"
@@ -788,6 +1019,101 @@ function CodeBlock({ code }: { code: string }) {
       <pre className="select-text overflow-x-auto p-2.5 font-mono text-xs leading-relaxed text-terminal-foreground">
         {code}
       </pre>
+      <ConfirmDialog
+        state={
+          review
+            ? {
+                title: t("ai.confirmRun"),
+                description: (
+                  <>
+                    <span className="block">
+                      {t("ai.runCommandDescription", { name: review.name })}
+                    </span>
+                    <span className="mt-2 block max-h-64 select-text overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
+                      {review.code}
+                    </span>
+                  </>
+                ),
+                cancelLabel: t("common.cancel"),
+                actions: [
+                  {
+                    label: t("ai.runCommand"),
+                    disabled: pending,
+                    onSelect: executeReviewedCommand,
+                  },
+                ],
+              }
+            : null
+        }
+        onClose={() => setReview(null)}
+      />
     </div>
+  );
+}
+
+function MessageImages({
+  images,
+  onRemove,
+}: {
+  images: AiImageAttachment[];
+  onRemove?: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const [preview, setPreview] = useState<AiImageAttachment | null>(null);
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        {images.map((image) => (
+          <div key={image.id} className="relative">
+            <button
+              type="button"
+              className={cn(
+                "block overflow-hidden rounded-md border border-border-subtle",
+                INTERACTIVE_FOCUS_CLASS,
+              )}
+              aria-label={t("ai.images.preview", { name: image.name })}
+              onClick={() => setPreview(image)}
+            >
+              <img
+                src={imageDataUrl(image)}
+                alt={image.name}
+                className="size-14 object-cover"
+              />
+            </button>
+            {onRemove && (
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="absolute -right-1 -top-1 size-5 rounded-full"
+                aria-label={t("ai.images.remove", { name: image.name })}
+                onClick={() => onRemove(image.id)}
+              >
+                <X className="size-3" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+      <Dialog
+        open={!!preview}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{preview?.name || t("ai.images.attach")}</DialogTitle>
+          </DialogHeader>
+          {preview && (
+            <img
+              src={imageDataUrl(preview)}
+              alt={preview.name}
+              className="max-h-[70vh] w-full object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

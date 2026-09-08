@@ -58,10 +58,20 @@ pub(super) fn request_body(
 
 fn message_to_json(m: &ChatMessage) -> Option<Value> {
     Some(match m.role {
-        Role::User => json!({
-            "role": "user",
-            "content": m.content.clone().unwrap_or_default(),
-        }),
+        Role::User => {
+            if m.images.is_empty() {
+                json!({ "role": "user", "content": m.content.clone().unwrap_or_default() })
+            } else {
+                let mut blocks: Vec<Value> = m.images.iter().map(|image| json!({
+                    "type": "image",
+                    "source": { "type": "base64", "media_type": image.mime_type, "data": image.data },
+                })).collect();
+                if let Some(text) = m.content.as_ref().filter(|text| !text.is_empty()) {
+                    blocks.push(json!({ "type": "text", "text": text }));
+                }
+                json!({ "role": "user", "content": blocks })
+            }
+        }
         Role::Assistant => {
             let mut blocks: Vec<Value> = Vec::new();
             if let Some(text) = &m.content {
@@ -385,6 +395,7 @@ mod tests {
                 tool_call_id: Some("call-1".into()),
                 tool_error: Some(true),
                 untrusted_source: Some(true),
+                images: vec![],
             }],
             &[],
             4096,
@@ -410,6 +421,7 @@ mod tests {
                 tool_call_id: None,
                 tool_error: None,
                 untrusted_source: None,
+                images: vec![],
             }],
             &[],
             4096,
@@ -430,5 +442,22 @@ mod tests {
             )
             .expect_err("oversized stream index");
         assert!(error.to_string().contains("too many"));
+    }
+    #[test]
+    fn includes_user_images_in_provider_content() {
+        let message: ChatMessage = serde_json::from_value(json!({
+            "role": "user", "content": "Explain this screenshot",
+            "images": [{ "id": "image-1", "name": "screen.png", "mimeType": "image/png", "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=", "width": 1, "height": 1 }]
+        })).unwrap();
+        let body = request_body("vision-model", "system", None, &[message], &[], 4096);
+        assert_eq!(body["messages"][0]["content"][0]["type"], "image");
+        assert_eq!(
+            body["messages"][0]["content"][0]["source"]["media_type"],
+            "image/png"
+        );
+        assert_eq!(
+            body["messages"][0]["content"][1]["text"],
+            "Explain this screenshot"
+        );
     }
 }

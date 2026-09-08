@@ -318,13 +318,18 @@ export async function executeTool(
       `Error: ${name} is handled by the chat UI and should not reach the executor.`,
     );
   }
+  if (context.isCancelled?.()) {
+    return toolFailure(
+      "Error: the assistant run was stopped before the operation started.",
+    );
+  }
   return tool.execute(args, context);
 }
 
 export async function prepareTool(
   name: string,
   args: Record<string, unknown>,
-  meta: { userPrompt: string },
+  meta: { userPrompt: string; defaultTerminalId?: string | null },
 ): Promise<PreparedCall> {
   const tool = TOOLS_BY_NAME.get(name);
   if (!tool?.prepare) return { args };

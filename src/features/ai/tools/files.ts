@@ -174,10 +174,16 @@ async function withConn(
   }
 }
 
-function prepareSftpTarget(args: Record<string, unknown>): PreparedCall {
+function prepareSftpTarget(
+  args: Record<string, unknown>,
+  meta?: { defaultTerminalId?: string | null },
+): PreparedCall {
   const requested = optionalStr(args, "hostId");
   if (requested) return { args: { ...args, hostId: requested } };
-  const hostId = resolveTerminalPane()?.hostId || undefined;
+  const hostId =
+    meta?.defaultTerminalId === null
+      ? undefined
+      : resolveTerminalPane(meta?.defaultTerminalId)?.hostId || undefined;
   if (!hostId) {
     return {
       args,

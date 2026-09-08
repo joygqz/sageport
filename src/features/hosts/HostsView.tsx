@@ -1007,7 +1007,7 @@ function HostRow({
               {host.address}
             </p>
           </div>
-          <div className="host-list-actions pointer-events-none -ml-2 flex w-0 shrink-0 items-center overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100">
+          <div className="host-list-actions pointer-events-none flex w-6 shrink-0 items-center overflow-hidden opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
             <Tooltip content={t("hosts.connect")}>
               <button
                 type="button"

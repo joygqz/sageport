@@ -1,87 +1,176 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Channel } from "@tauri-apps/api/core";
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PtyDataEvent, PtyExitEvent } from "@/types/models";
+import type { TerminalStreamEvent } from "@/types/models";
+import { localTransport, sshAdhocTransport, sshTransport } from "./transport";
 
-const mocks = vi.hoisted(() => ({
-  open: vi.fn(() => Promise.resolve()),
-  write: vi.fn(() => Promise.resolve()),
-  resize: vi.fn(() => Promise.resolve()),
-  close: vi.fn(() => Promise.resolve()),
-  dataHandlers: [] as Array<(event: PtyDataEvent) => void>,
-  exitHandlers: [] as Array<(event: PtyExitEvent) => void>,
-}));
+const requests: Array<{ command: string; args: Record<string, unknown> }> = [];
 
-vi.mock("@/lib/ipc", () => ({
-  ipc: {
-    pty: {
-      open: mocks.open,
-      write: mocks.write,
-      resize: mocks.resize,
-      close: mocks.close,
-      onData: vi.fn((handler: (event: PtyDataEvent) => void) => {
-        mocks.dataHandlers.push(handler);
-        return Promise.resolve(() => {});
-      }),
-      onExit: vi.fn((handler: (event: PtyExitEvent) => void) => {
-        mocks.exitHandlers.push(handler);
-        return Promise.resolve(() => {});
-      }),
-    },
-  },
-}));
+function stream(index = 0): Channel<TerminalStreamEvent> {
+  return requests[index]!.args.onEvent as Channel<TerminalStreamEvent>;
+}
 
-import { localTransport } from "./transport";
+function deliver(
+  channel: Channel<TerminalStreamEvent>,
+  index: number,
+  message: TerminalStreamEvent,
+) {
+  const internals = (
+    window as unknown as {
+      __TAURI_INTERNALS__: {
+        runCallback(id: number, data: unknown): void;
+      };
+    }
+  ).__TAURI_INTERNALS__;
+  internals.runCallback(channel.id, { index, message });
+}
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.dataHandlers.length = 0;
-  mocks.exitHandlers.length = 0;
+  requests.length = 0;
+  vi.stubGlobal("window", { crypto: globalThis.crypto });
+  mockIPC((command, args) => {
+    requests.push({ command, args: args as Record<string, unknown> });
+  });
 });
 
-describe("localTransport", () => {
-  it("routes every operation through the current attempt", async () => {
-    const transport = localTransport("local-1", 3);
-    const statuses: string[] = [];
-    await transport.onStatus((event) => statuses.push(event.status));
+afterEach(() => {
+  clearMocks();
+  vi.unstubAllGlobals();
+});
 
-    await transport.connect({ cols: 90, rows: 30 });
-    await transport.send("echo ok\r");
-    await transport.resize(100, 40);
-    await transport.disconnect();
+describe("terminal streams", () => {
+  it.each([
+    ["local", () => localTransport("session", 3), "pty_open"],
+    ["SSH", () => sshTransport("session", "host", 3), "ssh_connect"],
+    [
+      "ad hoc SSH",
+      () =>
+        sshAdhocTransport("session", 3, {
+          host: "localhost",
+          port: 22,
+          username: "tester",
+        }),
+      "ssh_connect_adhoc",
+    ],
+  ] as const)(
+    "opens an isolated channel for %s",
+    async (_, create, command) => {
+      const transport = create();
+      await transport.onData(() => {});
+      await transport.onStatus(() => {});
+      expect(requests).toEqual([]);
 
-    expect(mocks.open).toHaveBeenCalledWith({
-      sessionId: "local-1",
-      attempt: 3,
-      cols: 90,
-      rows: 30,
-    });
-    expect(mocks.write).toHaveBeenCalledWith("local-1", 3, "echo ok\r");
-    expect(mocks.resize).toHaveBeenCalledWith("local-1", 3, 100, 40);
-    expect(mocks.close).toHaveBeenCalledWith("local-1", 3);
-    expect(statuses).toEqual(["connected"]);
+      await transport.connect({ cols: 90, rows: 30 });
+
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toEqual({
+        command,
+        args: expect.objectContaining({
+          sessionId: "session",
+          attempt: 3,
+          cols: 90,
+          rows: 30,
+          onEvent: expect.objectContaining({ onmessage: expect.any(Function) }),
+        }),
+      });
+    },
+  );
+
+  it("preserves binary bytes and delivers trailing output before closed", async () => {
+    const transport = localTransport("local", 1);
+    const received: Array<string | number[]> = [];
+    await transport.onData((bytes) => received.push([...bytes]));
+    await transport.onStatus((event) => received.push(event.status));
+    await transport.connect({ cols: 80, rows: 24 });
+
+    deliver(stream(), 2, { status: "closed" });
+    deliver(stream(), 0, { status: "connected" });
+    expect(received).toEqual(["connected"]);
+    deliver(stream(), 1, new Uint8Array([0, 255, 0xe4, 0xb8, 0xad]).buffer);
+
+    expect(received).toEqual([
+      "connected",
+      [0, 255, 0xe4, 0xb8, 0xad],
+      "closed",
+    ]);
   });
 
-  it("ignores output and exit events from stale attempts", async () => {
-    const transport = localTransport("local-1", 4);
-    const data: number[][] = [];
-    const statuses: string[] = [];
-    await transport.onData((bytes) => data.push([...bytes]));
-    await transport.onStatus((event) => statuses.push(event.status));
+  it("isolates attempts and stops delivering after disconnect", async () => {
+    const first = localTransport("local", 1);
+    const second = localTransport("local", 2);
+    const firstData = vi.fn();
+    const secondData = vi.fn();
+    const firstStatus = vi.fn();
+    await first.onData(firstData);
+    await first.onStatus(firstStatus);
+    await second.onData(secondData);
+    await first.connect({ cols: 80, rows: 24 });
+    await second.connect({ cols: 80, rows: 24 });
+    const previous = stream(0);
+    const current = stream(1);
 
-    mocks.dataHandlers[0]!({
-      id: "local-1",
-      attempt: 3,
-      data: "b2xk",
-    });
-    mocks.exitHandlers[0]!({ id: "local-1", attempt: 3, code: 0 });
-    mocks.dataHandlers[0]!({
-      id: "local-1",
-      attempt: 4,
-      data: "bmV3",
-    });
-    mocks.exitHandlers[0]!({ id: "local-1", attempt: 4, code: 0 });
+    await first.disconnect();
+    deliver(previous, 0, new Uint8Array([1]).buffer);
+    deliver(previous, 1, { status: "closed" });
+    deliver(current, 0, new Uint8Array([2]).buffer);
 
-    expect(data).toEqual([[110, 101, 119]]);
-    expect(statuses).toEqual(["closed"]);
+    expect(firstData).not.toHaveBeenCalled();
+    expect(firstStatus).not.toHaveBeenCalled();
+    expect(secondData).toHaveBeenCalledExactlyOnceWith(new Uint8Array([2]));
+    expect(requests.at(-1)).toEqual({
+      command: "pty_close",
+      args: { sessionId: "local", attempt: 1 },
+    });
   });
+
+  it("releases subscriptions without detaching a replacement handler", async () => {
+    const transport = sshTransport("session", "host", 1);
+    const previous = vi.fn();
+    const current = vi.fn();
+    const unlistenPrevious = await transport.onData(previous);
+    const unlistenCurrent = await transport.onData(current);
+    unlistenPrevious();
+    await transport.connect({ cols: 80, rows: 24 });
+    deliver(stream(), 0, new Uint8Array([1]).buffer);
+    unlistenCurrent();
+    deliver(stream(), 1, new Uint8Array([2]).buffer);
+
+    expect(previous).not.toHaveBeenCalled();
+    expect(current).toHaveBeenCalledExactlyOnceWith(new Uint8Array([1]));
+  });
+
+  it.each([
+    [
+      () => localTransport("session", 3),
+      "pty_write",
+      "pty_resize",
+      "pty_close",
+    ],
+    [
+      () => sshTransport("session", "host", 3),
+      "ssh_send",
+      "ssh_resize",
+      "ssh_disconnect",
+    ],
+  ] as const)(
+    "routes input, resize and close through the current attempt",
+    async (create, send, resize, close) => {
+      const transport = create();
+      await transport.send("echo ok\r");
+      await transport.resize(100, 40);
+      await transport.disconnect();
+      expect(requests).toEqual([
+        {
+          command: send,
+          args: { sessionId: "session", attempt: 3, data: "echo ok\r" },
+        },
+        {
+          command: resize,
+          args: { sessionId: "session", attempt: 3, cols: 100, rows: 40 },
+        },
+        { command: close, args: { sessionId: "session", attempt: 3 } },
+      ]);
+    },
+  );
 });

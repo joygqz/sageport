@@ -1,4 +1,4 @@
-use tauri::{AppHandle, State};
+use tauri::{ipc::Channel, State};
 
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -39,17 +39,17 @@ fn validate_input(data: &str) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn pty_open(
-    app: AppHandle,
     state: State<'_, AppState>,
     session_id: String,
     attempt: u32,
     cols: u32,
     rows: u32,
+    on_event: Channel,
 ) -> AppResult<()> {
     validate_session_id(&session_id)?;
     validate_dimensions(cols, rows)?;
     let pty = state.pty.clone();
-    run_blocking(move || pty.open(app, session_id, attempt, cols, rows)).await
+    run_blocking(move || pty.open(on_event, session_id, attempt, cols, rows)).await
 }
 
 #[tauri::command]

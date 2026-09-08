@@ -66,7 +66,10 @@ export function estimateMessageTokens(message: AiChatMessage): number {
   const cached = messageTokenCache.get(message);
   if (cached !== undefined) return cached;
 
-  let tokens = 12 + estimateTextTokens(message.content ?? "");
+  let tokens =
+    12 +
+    estimateTextTokens(message.content ?? "") +
+    (message.images?.length ?? 0) * 4096;
   for (const call of message.toolCalls ?? []) {
     tokens +=
       12 +

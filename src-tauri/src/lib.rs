@@ -18,6 +18,7 @@ mod ssh;
 mod sshkey;
 mod state;
 mod sync;
+mod terminal_output;
 #[cfg(desktop)]
 mod tray;
 mod update;

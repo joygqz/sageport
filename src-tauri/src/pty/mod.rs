@@ -2,17 +2,12 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
 use parking_lot::Mutex;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
-use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::ipc::Channel;
 
 use crate::error::{AppError, AppResult};
-
-pub const EVENT_DATA: &str = "pty://data";
-pub const EVENT_EXIT: &str = "pty://exit";
+use crate::terminal_output::TerminalOutput;
 
 const TERM: &str = "xterm-256color";
 
@@ -23,22 +18,6 @@ struct PtyEntry {
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     killer: Box<dyn ChildKiller + Send + Sync>,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct DataEvent {
-    id: String,
-    attempt: u32,
-    data: String,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct ExitEvent {
-    id: String,
-    attempt: u32,
-    code: u32,
 }
 
 #[derive(Clone, Default)]
@@ -53,7 +32,7 @@ impl PtyManager {
 
     pub fn open(
         &self,
-        app: AppHandle,
+        on_event: Channel,
         id: String,
         attempt: u32,
         cols: u32,
@@ -109,17 +88,23 @@ impl PtyManager {
             let _ = previous.killer.kill();
         }
 
-        spawn_reader(app.clone(), id.clone(), attempt, reader);
+        let output = Arc::new(TerminalOutput::new(on_event));
+        if let Err(error) = output.status("connected", None) {
+            self.close(&id, Some(attempt))?;
+            return Err(error);
+        }
+        let reader = spawn_reader(output.clone(), reader);
 
         let ptys = self.ptys.clone();
         std::thread::spawn(move || {
-            let code = child.wait().map(|s| s.exit_code()).unwrap_or(1);
+            let _ = child.wait();
             let mut ptys = ptys.lock();
             if ptys.get(&id).is_some_and(|entry| entry.attempt == attempt) {
                 ptys.remove(&id);
             }
             drop(ptys);
-            let _ = app.emit(EVENT_EXIT, ExitEvent { id, attempt, code });
+            let _ = reader.join();
+            let _ = output.status("closed", None);
         });
 
         Ok(())
@@ -192,25 +177,23 @@ impl PtyManager {
     }
 }
 
-fn spawn_reader(app: AppHandle, id: String, attempt: u32, mut reader: Box<dyn Read + Send>) {
+fn spawn_reader(
+    output: Arc<TerminalOutput>,
+    mut reader: Box<dyn Read + Send>,
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
-                    let _ = app.emit(
-                        EVENT_DATA,
-                        DataEvent {
-                            id: id.clone(),
-                            attempt,
-                            data: STANDARD.encode(&buf[..n]),
-                        },
-                    );
+                    if output.write(&buf[..n]).is_err() {
+                        break;
+                    }
                 }
             }
         }
-    });
+    })
 }
 
 fn home_dir() -> Option<std::ffi::OsString> {

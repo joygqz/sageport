@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::ai::{self, Endpoint, Protocol};
 use crate::error::{AppError, AppResult};
-use crate::repository::ai_session_repo::{self, AiSessionRow};
+use crate::repository::ai_session_repo::{self, AiSessionMetadataRow, AiSessionRow};
 use crate::repository::settings_repo;
 use crate::state::{AppState, CancelEntry};
 
@@ -224,7 +224,24 @@ fn validate_messages(
 
     let mut known_tool_calls = std::collections::HashSet::new();
     let mut pending_tool_calls = std::collections::HashSet::new();
+    let mut image_characters = 0usize;
     for message in messages {
+        if message.images.len() > 4
+            || (message.role != ai::Role::User && !message.images.is_empty())
+        {
+            return Err(AppError::Invalid(
+                "only user messages may contain up to 4 images".into(),
+            ));
+        }
+        for image in &message.images {
+            image.validate()?;
+            image_characters += image.data.len();
+            if image_characters > 8 * 1024 * 1024 {
+                return Err(AppError::Invalid(
+                    "chat image storage is full; start a new chat to send more images".into(),
+                ));
+            }
+        }
         if message.role == ai::Role::System {
             return Err(AppError::Invalid(
                 "system messages are managed by Sageport".into(),
@@ -576,8 +593,8 @@ impl AiSession {
     }
 }
 
-impl From<AiSessionRow> for AiSessionSummary {
-    fn from(row: AiSessionRow) -> Self {
+impl From<AiSessionMetadataRow> for AiSessionSummary {
+    fn from(row: AiSessionMetadataRow) -> Self {
         Self {
             id: row.id,
             title: row.title,
@@ -697,6 +714,7 @@ mod tests {
                 tool_call_id: None,
                 tool_error: None,
                 untrusted_source: None,
+                images: vec![],
             }],
             false,
             false,
@@ -710,6 +728,7 @@ mod tests {
                 tool_call_id: None,
                 tool_error: None,
                 untrusted_source: None,
+                images: vec![],
             }],
             false,
             false,
@@ -730,6 +749,7 @@ mod tests {
             tool_call_id: None,
             tool_error: None,
             untrusted_source: None,
+            images: vec![],
         };
         assert!(validate_messages(std::slice::from_ref(&assistant), false, true).is_ok());
         assert!(validate_messages(std::slice::from_ref(&assistant), false, false).is_err());
@@ -741,7 +761,26 @@ mod tests {
             tool_call_id: Some("call-1".into()),
             tool_error: Some(false),
             untrusted_source: Some(true),
+            images: vec![],
         };
         assert!(validate_messages(&[assistant, tool], false, false).is_ok());
+    }
+    #[test]
+    fn validates_and_round_trips_image_only_messages() {
+        let mut message: ai::ChatMessage = serde_json::from_value(serde_json::json!({
+            "role": "user", "images": [{ "id": "image-1", "name": "screen.png", "mimeType": "image/png", "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=", "width": 1, "height": 1 }]
+        })).unwrap();
+        assert!(validate_messages(std::slice::from_ref(&message), false, false).is_ok());
+        let encoded = serde_json::to_string(&message).unwrap();
+        let restored: ai::ChatMessage = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(restored.images[0].data, message.images[0].data);
+        message.role = ai::Role::Assistant;
+        assert!(validate_messages(std::slice::from_ref(&message), false, false).is_err());
+        message.role = ai::Role::User;
+        message.images[0].mime_type = "image/svg+xml".into();
+        assert!(validate_messages(std::slice::from_ref(&message), false, false).is_err());
+        message.images[0].mime_type = "image/png".into();
+        message.images[0].data = "not base64".into();
+        assert!(validate_messages(std::slice::from_ref(&message), false, false).is_err());
     }
 }

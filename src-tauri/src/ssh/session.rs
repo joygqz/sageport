@@ -1,17 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
 use parking_lot::Mutex;
 use russh::ChannelMsg;
-use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{ipc::Channel, AppHandle};
 use tokio::sync::{mpsc, oneshot, watch};
 
 use super::connect::{establish, SshConnection};
-use super::{ConnectParams, ConnectionPrompts, EVENT_DATA, EVENT_STATUS, TERM};
+use super::{ConnectParams, ConnectionPrompts, TERM};
 use crate::error::{AppError, AppResult};
+use crate::terminal_output::TerminalOutput;
 
 struct ConnectionEntry {
     attempt: u32,
@@ -39,26 +37,6 @@ pub struct SessionReservation {
     input_rx: mpsc::Receiver<SessionCommand>,
     resize_rx: watch::Receiver<(u32, u32)>,
     close_rx: oneshot::Receiver<()>,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct DataEvent {
-    id: String,
-    attempt: u32,
-    data: String,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct StatusEvent {
-    id: String,
-    attempt: u32,
-    status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    message: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    code: Option<String>,
 }
 
 #[derive(Default)]
@@ -132,6 +110,7 @@ impl SessionManager {
         prompts: ConnectionPrompts,
         params: ConnectParams,
         reservation: SessionReservation,
+        on_event: Channel,
     ) {
         let id = params.session_id.clone();
         let attempt = params.attempt;
@@ -141,7 +120,15 @@ impl SessionManager {
         let sessions = self.sessions.clone();
         let connections = self.connections.clone();
         tokio::spawn(async move {
-            run_session(app, prompts, params, reservation, connections.clone()).await;
+            run_session(
+                app,
+                prompts,
+                params,
+                reservation,
+                connections.clone(),
+                TerminalOutput::new(on_event),
+            )
+            .await;
             remove_connection(&connections, &id, attempt);
             let mut sessions = sessions.lock();
             if sessions
@@ -226,33 +213,24 @@ fn remove_connection(connections: &ConnectionMap, id: &str, attempt: u32) {
     }
 }
 
-fn emit_status(app: &AppHandle, id: &str, attempt: u32, status: &str, err: Option<&AppError>) {
-    let _ = app.emit(
-        EVENT_STATUS,
-        StatusEvent {
-            id: id.to_string(),
-            attempt,
-            status: status.to_string(),
-            message: err.map(|e| e.to_string()),
-            code: err.map(|e| e.code().to_string()),
-        },
-    );
-}
-
 async fn run_session(
     app: AppHandle,
     prompts: ConnectionPrompts,
     params: ConnectParams,
     reservation: SessionReservation,
     connections: ConnectionMap,
+    output: TerminalOutput,
 ) {
-    let id = params.session_id.clone();
-    let attempt = params.attempt;
-    emit_status(&app, &id, attempt, "connecting", None);
-
-    match run_session_inner(&app, &prompts, params, reservation, &connections).await {
-        Ok(()) => emit_status(&app, &id, attempt, "closed", None),
-        Err(e) => emit_status(&app, &id, attempt, "error", Some(&e)),
+    if output.status("connecting", None).is_err() {
+        return;
+    }
+    match run_session_inner(&app, &prompts, params, reservation, &connections, &output).await {
+        Ok(()) => {
+            let _ = output.status("closed", None);
+        }
+        Err(error) => {
+            let _ = output.status("error", Some(&error));
+        }
     }
 }
 
@@ -262,6 +240,7 @@ async fn run_session_inner(
     params: ConnectParams,
     reservation: SessionReservation,
     connections: &ConnectionMap,
+    output: &TerminalOutput,
 ) -> AppResult<()> {
     let SessionReservation {
         mut input_rx,
@@ -306,7 +285,7 @@ async fn run_session_inner(
             connection: conn.clone(),
         },
     );
-    emit_status(app, &id, attempt, "connected", None);
+    output.status("connected", None)?;
 
     if let Some(command) = &startup_command {
         if !command.trim().is_empty() {
@@ -317,12 +296,11 @@ async fn run_session_inner(
 
     loop {
         tokio::select! {
-            biased;
             _ = &mut close_rx => break,
             msg = channel.wait() => {
                 match msg {
-                    Some(ChannelMsg::Data { data }) => emit_data(app, &id, attempt, &data),
-                    Some(ChannelMsg::ExtendedData { data, .. }) => emit_data(app, &id, attempt, &data),
+                    Some(ChannelMsg::Data { data }) => output.write(&data)?,
+                    Some(ChannelMsg::ExtendedData { data, .. }) => output.write(&data)?,
                     Some(ChannelMsg::Eof) => {}
                     Some(ChannelMsg::Close) | None => break,
                     _ => {}
@@ -351,17 +329,6 @@ async fn run_session_inner(
     remove_connection(connections, &id, attempt);
     drop(conn);
     Ok(())
-}
-
-fn emit_data(app: &AppHandle, id: &str, attempt: u32, data: &[u8]) {
-    let _ = app.emit(
-        EVENT_DATA,
-        DataEvent {
-            id: id.to_string(),
-            attempt,
-            data: STANDARD.encode(data),
-        },
-    );
 }
 
 #[cfg(test)]

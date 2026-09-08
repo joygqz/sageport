@@ -80,7 +80,7 @@ export function BookmarkMenu({ side, tab }: { side: PaneSide; tab: SftpTab }) {
               onSelect={() => void navigate(side, tab.id, bookmark.path)}
             >
               <span className="min-w-0 flex-1 truncate">{bookmark.label}</span>
-              <span className="bookmark-action pointer-events-none -ml-2 flex w-0 shrink-0 items-center gap-1 overflow-hidden opacity-0 transition-[width,opacity] group-hover/bm:pointer-events-auto group-hover/bm:ml-0 group-hover/bm:w-9 group-hover/bm:opacity-100 group-focus-within/bm:pointer-events-auto group-focus-within/bm:ml-0 group-focus-within/bm:w-9 group-focus-within/bm:opacity-100 group-focus/bm:pointer-events-auto group-focus/bm:ml-0 group-focus/bm:w-9 group-focus/bm:opacity-100">
+              <span className="bookmark-action pointer-events-none flex w-9 shrink-0 items-center gap-1 overflow-hidden opacity-0 transition-opacity group-hover/bm:pointer-events-auto group-hover/bm:opacity-100 group-focus-within/bm:pointer-events-auto group-focus-within/bm:opacity-100 group-focus/bm:pointer-events-auto group-focus/bm:opacity-100">
                 <button
                   type="button"
                   aria-label={t("sftp.bookmarks.rename")}

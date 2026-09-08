@@ -190,6 +190,7 @@ export const snippetTools: AiTool[] = [
     requiresApproval: true,
     confirmKey: "ai.confirmRun",
     prepare: (args) => prepareRunSnippet(args),
+    untrustedResult: true,
     execute: executeTerminalCommand,
   },
   {
@@ -220,6 +221,7 @@ export const snippetTools: AiTool[] = [
     requiresApproval: true,
     confirmKey: "ai.confirmRun",
     prepare: (args) => prepareRunSnippetOnHosts(args),
+    untrustedResult: true,
     execute: runCommandOnHosts,
   },
   {

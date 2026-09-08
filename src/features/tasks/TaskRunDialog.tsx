@@ -307,8 +307,8 @@ function TransferProgress({ state }: { state: StepRunState }) {
     <div className="flex items-center gap-2 border-t border-border px-3 py-2">
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
         <div
-          className="h-full rounded-full bg-primary transition-[width]"
-          style={{ width: `${percent}%` }}
+          className="ui-progress-fill bg-primary"
+          style={{ transform: `scaleX(${Math.max(0, percent) / 100})` }}
         />
       </div>
       <span className="shrink-0 font-mono text-2xs text-muted-foreground">

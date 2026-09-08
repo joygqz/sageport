@@ -6,8 +6,8 @@ export const SIDEBAR_DEFAULT = 260;
 export const PANEL_DEFAULT = 280;
 export const AUX_DEFAULT = 300;
 
-export const ACTIVITY_BAR_W = 45;
-export const TITLE_BAR_H = 45;
+export const ACTIVITY_BAR_W = 41.25;
+export const TITLE_BAR_H = 37.5;
 export const STATUS_BAR_H = 22.5;
 
 export const EDITOR_MIN_W = 320;

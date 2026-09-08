@@ -44,9 +44,9 @@ export function Toaster() {
               if (!open) dismiss(t.id);
             }}
             className={cn(
-              "pointer-events-auto flex gap-3 rounded-lg border border-border-strong bg-popover p-3",
+              "pointer-events-auto flex gap-3 rounded-lg border border-border bg-popover p-3",
               hasDetails ? "items-start" : "items-center",
-              "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-right-2 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:slide-out-to-right-2",
+              "ui-overlay-motion data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-right-2 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:slide-out-to-right-2",
               "data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=cancel]:translate-x-0 data-[swipe=cancel]:transition-transform data-[swipe=end]:animate-out data-[swipe=end]:slide-out-to-right-full",
             )}
           >

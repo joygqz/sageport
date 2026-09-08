@@ -413,9 +413,19 @@ export interface AiToolCall {
   arguments: unknown;
 }
 
+export interface AiImageAttachment {
+  id: string;
+  name: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  data: string;
+  width: number;
+  height: number;
+}
+
 export interface AiChatMessage {
   role: AiRole;
   content?: string;
+  images?: AiImageAttachment[];
 
   toolCalls?: AiToolCall[];
 
@@ -502,35 +512,13 @@ export interface SyncVersion {
 
 export type SshStatusKind = "connecting" | "connected" | "closed" | "error";
 
-export interface SshStatusEvent {
-  id: string;
-
-  attempt: number;
+export interface TerminalStreamStatus {
   status: SshStatusKind;
   message?: string;
-
   code?: string;
 }
 
-export interface SshDataEvent {
-  id: string;
-
-  attempt: number;
-
-  data: string;
-}
-
-export interface PtyDataEvent {
-  id: string;
-  attempt: number;
-  data: string;
-}
-
-export interface PtyExitEvent {
-  id: string;
-  attempt: number;
-  code: number;
-}
+export type TerminalStreamEvent = ArrayBuffer | TerminalStreamStatus;
 
 export type HostKeyStatus = "unknown" | "changed";
 export type HostKeyDecision = "reject" | "once" | "remember";

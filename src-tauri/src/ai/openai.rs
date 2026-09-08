@@ -84,6 +84,17 @@ fn message_to_json(m: &ChatMessage) -> Value {
         "content".into(),
         json!(m.content.clone().unwrap_or_default()),
     );
+    if m.role == Role::User && !m.images.is_empty() {
+        let mut parts = Vec::new();
+        if let Some(text) = m.content.as_ref().filter(|text| !text.is_empty()) {
+            parts.push(json!({ "type": "text", "text": text }));
+        }
+        parts.extend(m.images.iter().map(|image| json!({
+            "type": "image_url",
+            "image_url": { "url": format!("data:{};base64,{}", image.mime_type, image.data), "detail": "auto" },
+        })));
+        obj.insert("content".into(), json!(parts));
+    }
     if !m.tool_calls.is_empty() {
         let calls: Vec<Value> = m
             .tool_calls
@@ -296,6 +307,7 @@ mod tests {
                 tool_call_id: Some("call-1".into()),
                 tool_error: Some(true),
                 untrusted_source: Some(true),
+                images: vec![],
             }],
             &[],
             4096,
@@ -320,6 +332,7 @@ mod tests {
                 tool_call_id: None,
                 tool_error: None,
                 untrusted_source: None,
+                images: vec![],
             }],
             &[],
             4096,
@@ -352,5 +365,18 @@ mod tests {
             )
             .expect_err("stream error");
         assert_eq!(error.to_string(), "provider overloaded");
+    }
+    #[test]
+    fn includes_user_images_in_provider_content() {
+        let message: ChatMessage = serde_json::from_value(json!({
+            "role": "user", "content": "Explain this screenshot",
+            "images": [{ "id": "image-1", "name": "screen.png", "mimeType": "image/png", "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=", "width": 1, "height": 1 }]
+        })).unwrap();
+        let body = request_body("vision-model", "system", None, &[message], &[], 4096);
+        assert_eq!(body["messages"][1]["content"][1]["type"], "image_url");
+        assert!(body["messages"][1]["content"][1]["image_url"]["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/png;base64,"));
     }
 }

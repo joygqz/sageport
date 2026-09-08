@@ -31,7 +31,7 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
 ];
 
 const ACTIVITY_BUTTON_CLASS = cn(
-  "flex w-full items-center justify-center px-0.5 py-3.5 transition-colors",
+  "flex h-[var(--activitybar-width)] w-full shrink-0 items-center justify-center transition-colors",
   INTERACTIVE_FOCUS_CLASS,
 );
 

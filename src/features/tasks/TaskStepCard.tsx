@@ -49,7 +49,12 @@ export function TaskStepCard({
 
   useEffect(() => {
     if (autoScroll) {
-      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      cardRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+        block: "nearest",
+      });
     }
   }, [autoScroll]);
 

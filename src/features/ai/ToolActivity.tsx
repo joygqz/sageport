@@ -32,17 +32,16 @@ import { useTabsStore } from "@/workbench/tabs";
 
 type ToolLogItem = Extract<AgentLogItem, { kind: "tool" }>;
 
-const HIDDEN_APPROVAL_KEYS = new Set(["password", "passphrase", "privateKey"]);
+const HIDDEN_APPROVAL_KEYS = new Set([
+  "password",
+  "passphrase",
+  "privateKey",
+  "apiKey",
+]);
 
 function approvalValue(key: string, value: unknown): unknown {
   if (HIDDEN_APPROVAL_KEYS.has(key)) {
     return value === null || value === undefined ? value : "[provided]";
-  }
-  if (key === "content" && typeof value === "string") {
-    return `[${value.length} characters]`;
-  }
-  if (typeof value === "string" && value.length > 4096) {
-    return `${value.slice(0, 4096)}… [${value.length - 4096} more characters]`;
   }
   if (Array.isArray(value)) return value.map((item) => approvalValue("", item));
   if (value && typeof value === "object") {
@@ -143,6 +142,7 @@ export function ToolActivity({
         <span className="min-w-0 flex-1 truncate text-muted-foreground">
           {label}
         </span>
+        <span className="sr-only">{t(`ai.status.${item.status}`)}</span>
         <StatusIcon status={item.status} />
         {expanded ? (
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
@@ -153,22 +153,20 @@ export function ToolActivity({
 
       {expanded && (
         <div className="min-w-0 space-y-1.5 px-2.5 pb-2 pt-0.5">
+          {targetSessionId && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Server className="size-3.5 shrink-0" />
+              <span>
+                {t("ai.commandTarget", {
+                  name: targetName,
+                })}
+              </span>
+            </div>
+          )}
           {command && (
-            <>
-              {targetSessionId && (
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Server className="size-3.5 shrink-0" />
-                  <span>
-                    {t("ai.commandTarget", {
-                      name: targetName,
-                    })}
-                  </span>
-                </div>
-              )}
-              <pre className="max-h-32 max-w-full select-text overflow-y-auto whitespace-pre-wrap break-all rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
-                {command}
-              </pre>
-            </>
+            <pre className="max-h-32 max-w-full select-text overflow-y-auto whitespace-pre-wrap break-all rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
+              {command}
+            </pre>
           )}
           {!command && transfer && (
             <pre className="max-h-32 max-w-full select-text overflow-y-auto whitespace-pre-wrap break-all rounded bg-terminal-background p-1.5 font-mono text-2xs text-terminal-foreground">
@@ -186,10 +184,10 @@ export function ToolActivity({
             </pre>
           )}
           {item.status === "awaiting-approval" && (
-            <div className="flex min-w-0 items-center gap-2 pt-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 pt-1">
               <span className="mr-auto flex min-w-0 items-center gap-1 text-warning">
                 <ShieldAlert className="size-3.5 shrink-0" />
-                <span className="truncate">
+                <span className="break-words">
                   {t(TOOL_CONFIRM_KEYS[item.name] ?? "ai.confirmAction")}
                 </span>
               </span>
@@ -206,7 +204,7 @@ export function ToolActivity({
                 className="h-[var(--compact-control-size)] shrink-0 px-2"
                 onClick={() => onApprove(item.id)}
               >
-                {t("ai.approve")}
+                {label}
               </Button>
             </div>
           )}

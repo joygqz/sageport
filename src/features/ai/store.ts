@@ -4,7 +4,9 @@ import { detectLocale } from "@/i18n/config";
 import { translate } from "@/i18n/translate";
 import { ipc } from "@/lib/ipc";
 import { errorMessage, toast } from "@/lib/toast";
-import type { AiSessionSummary } from "@/types/models";
+import type { AiSessionSummary, AiImageAttachment } from "@/types/models";
+import { imageHistoryError } from "./images";
+import { targetPaneId, useTabsStore } from "@/workbench/tabs";
 import { runAgentLoop, type RunnerHost } from "./runner";
 import {
   buildLogFromHistory,
@@ -52,6 +54,7 @@ interface AiStoreState {
     autoApprove: boolean,
     enabledTools: string[],
     maxHistoryTokens?: number | null,
+    images?: AiImageAttachment[],
   ) => Promise<void>;
 
   resume: (
@@ -143,6 +146,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     autoApprove: boolean,
     enabledTools: string[],
     maxHistoryTokens?: number | null,
+    defaultTerminalId = targetPaneId(useTabsStore.getState()),
   ) => {
     try {
       await runAgentLoop(
@@ -152,6 +156,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         autoApprove,
         enabledTools,
         maxHistoryTokens,
+        defaultTerminalId,
       );
     } catch (err) {
       const message = errorMessage(err);
@@ -313,11 +318,13 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       autoApprove,
       enabledTools,
       maxHistoryTokens,
+      images = [],
     ) => {
+      const defaultTerminalId = targetPaneId(useTabsStore.getState());
       const trimmed = prompt.trim();
       const runtime = get().runtime[sessionId];
       if (
-        !trimmed ||
+        (!trimmed && images.length === 0) ||
         trimmed.length > MAX_AI_PROMPT_CHARS ||
         !model ||
         !runtime ||
@@ -326,8 +333,15 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         return;
       }
 
+      const imageError = imageHistoryError(runtime.history, images);
+      if (imageError) {
+        toast.error(t("ai.error"), t(imageError));
+        return;
+      }
       const isFirstTurn = runtime.history.length === 0;
-      const title = isFirstTurn ? deriveTitle(trimmed) : null;
+      const title = isFirstTurn
+        ? deriveTitle(trimmed || t("ai.images.chatTitle"))
+        : null;
 
       patch(sessionId, (r) => ({
         ...r,
@@ -336,9 +350,9 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         stepLimitReached: false,
         log: [
           ...r.log,
-          { id: crypto.randomUUID(), kind: "user", content: trimmed },
+          { id: crypto.randomUUID(), kind: "user", content: trimmed, images },
         ],
-        history: [...r.history, { role: "user", content: trimmed }],
+        history: [...r.history, { role: "user", content: trimmed, images }],
       }));
       await persist(sessionId, title);
       await runLoop(
@@ -347,6 +361,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         autoApprove,
         enabledTools,
         maxHistoryTokens,
+        defaultTerminalId,
       );
     },
 

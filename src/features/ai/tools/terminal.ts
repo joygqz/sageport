@@ -76,6 +76,7 @@ export function sessionNotConnectedError(pane: TerminalPane): string {
 
 export function prepareTerminalTarget(
   args: Record<string, unknown>,
+  requireConnected = true,
 ): PreparedCall {
   const requested =
     typeof args.sessionId === "string" ? args.sessionId : undefined;
@@ -83,7 +84,7 @@ export function prepareTerminalTarget(
   if (!pane) {
     return { args, preflightError: noTerminalSessionError(requested) };
   }
-  if (pane.status !== "connected") {
+  if (requireConnected && pane.status !== "connected") {
     return {
       args: { ...args, sessionId: pane.id },
       preflightError: sessionNotConnectedError(pane),
@@ -126,7 +127,10 @@ async function waitForSettledOutput(
   isCancelled: () => boolean = () => false,
   waitForPrompt = false,
   initialOutput = "",
-): Promise<string> {
+): Promise<{
+  output: string;
+  observation: "prompt-observed" | "output-settled" | "timed-out" | "stopped";
+}> {
   const settleGap = 700;
   const pollInterval = 200;
   const start = Date.now();
@@ -137,7 +141,7 @@ async function waitForSettledOutput(
 
   while (Date.now() - start < timeoutMs) {
     const current = readTerminalContext(id, MAX_TERMINAL_READ_LINES) ?? "";
-    if (isCancelled()) return current;
+    if (isCancelled()) return { output: current, observation: "stopped" };
     if (current !== last) {
       last = current;
       lastChangeAt = Date.now();
@@ -148,14 +152,14 @@ async function waitForSettledOutput(
       current !== initialOutput &&
       isShellPromptLine(lastLine)
     ) {
-      break;
+      return { output: current, observation: "prompt-observed" };
     }
     if (!waitForPrompt && Date.now() - lastChangeAt >= settleGap) {
-      break;
+      return { output: current, observation: "output-settled" };
     }
     await sleep(pollInterval);
   }
-  return last;
+  return { output: last, observation: "timed-out" };
 }
 
 function listSessions(): ToolExecutionResult {
@@ -230,6 +234,11 @@ export async function executeTerminalCommand(
   if (!session) return toolFailure(noTerminalSessionError(requested));
   const before = readTerminalContext(pane.id, MAX_TERMINAL_READ_LINES) ?? "";
   const promptBefore = before.split("\n").at(-1) ?? "";
+  if (context.isCancelled?.()) {
+    return toolFailure(
+      "Error: the assistant run was stopped before the command started.",
+    );
+  }
   session.sendCommand(command);
   const after = await waitForSettledOutput(
     pane.id,
@@ -244,12 +253,13 @@ export async function executeTerminalCommand(
     );
   }
 
-  const diff = newOutput(before, after).trim();
-  if (diff) return toolSuccess(diff);
   return toolSuccess(
-    after
-      ? "(the command produced no new output)"
-      : "(the command produced no output)",
+    JSON.stringify({
+      output: newOutput(before, after.output).trim(),
+      observation: after.observation,
+      exitCode: null,
+      note: "This is a live terminal snapshot, not a verified command result. A prompt or quiet output does not prove success. If completion is uncertain, inspect the terminal before sending another command; do not rerun the command just because the wait ended.",
+    }),
   );
 }
 
@@ -354,7 +364,9 @@ async function sendTerminalInput(
   if (pane.status !== "connected")
     return toolFailure(sessionNotConnectedError(pane));
   const data = str(args, "data");
-  getSession(pane.id)?.send(data);
+  const session = getSession(pane.id);
+  if (!session) return toolFailure(noTerminalSessionError(pane.id));
+  session.send(data);
   useTabsStore.getState().focusPane(pane.id);
   return toolSuccess(
     `Sent ${data.length} character(s) to terminal ${pane.id}.`,
@@ -447,13 +459,14 @@ export const terminalTools: AiTool[] = [
     requiresApproval: true,
     alwaysRequireApproval: true,
     untrustedResult: true,
+    prepare: (args) => prepareTerminalTarget(args, false),
     execute: async (args) => readOutput(args),
   },
   {
     spec: {
       name: "run_terminal_command",
       description:
-        "Run a command in a live terminal and return settled output. This requires user approval in supervised mode and runs automatically in autonomous mode. Omit sessionId for the Current terminal; never ask to reconfirm it. Results beyond ~30K characters are truncated in the middle (head and tail kept). To read a file or log with thousands of lines completely, first count its lines, then page through it with `sed -n 'START,ENDp' FILE` in consecutive chunks of about 200 lines; continue until the requested range is covered and never treat a truncated result as a complete file.",
+        "Run a command in a live terminal and return an output snapshot with an observation status. No exit code is available; quiet output or a detected prompt does not prove success. This requires user approval in supervised mode and runs automatically in autonomous mode. Omit sessionId for the Current terminal; never ask to reconfirm it. Results beyond ~30K characters are truncated in the middle (head and tail kept). To read a file or log with thousands of lines completely, first count its lines, then page through it with `sed -n 'START,ENDp' FILE` in consecutive chunks of about 200 lines; continue until the requested range is covered and never treat a truncated result as a complete file.",
       parameters: {
         type: "object",
         properties: {
@@ -513,6 +526,7 @@ export const terminalTools: AiTool[] = [
     },
     icon: History,
     labelKey: "ai.tool.searchCommandHistory",
+    untrustedResult: true,
     execute: async (args) => searchHistory(args),
   },
   {
@@ -532,6 +546,7 @@ export const terminalTools: AiTool[] = [
     },
     icon: History,
     labelKey: "ai.tool.listCommandHistory",
+    untrustedResult: true,
     execute: async (args) => listCommandHistory(args),
   },
   {
@@ -602,6 +617,7 @@ export const terminalTools: AiTool[] = [
     icon: TerminalIcon,
     labelKey: "ai.tool.sendTerminalInput",
     requiresApproval: true,
+    prepare: (args) => prepareTerminalTarget(args, true),
     execute: async (args) => sendTerminalInput(args),
   },
   {
@@ -679,6 +695,7 @@ export const terminalTools: AiTool[] = [
     icon: TerminalIcon,
     labelKey: "ai.tool.splitTerminal",
     requiresApproval: true,
+    prepare: (args) => prepareTerminalTarget(args, false),
     execute: async (args) => splitTerminal(args),
   },
   {
@@ -694,6 +711,7 @@ export const terminalTools: AiTool[] = [
     icon: TerminalIcon,
     labelKey: "ai.tool.closeTerminal",
     requiresApproval: true,
+    prepare: (args) => prepareTerminalTarget(args, false),
     execute: async (args) => closeTerminal(args),
   },
   {
@@ -709,6 +727,7 @@ export const terminalTools: AiTool[] = [
     icon: TerminalIcon,
     labelKey: "ai.tool.focusTerminal",
     requiresApproval: true,
+    prepare: (args) => prepareTerminalTarget(args, false),
     execute: async (args) => focusTerminal(args),
   },
   {
@@ -724,6 +743,7 @@ export const terminalTools: AiTool[] = [
     icon: TerminalIcon,
     labelKey: "ai.tool.reconnectTerminal",
     requiresApproval: true,
+    prepare: (args) => prepareTerminalTarget(args, false),
     execute: async (args) => reconnectTerminal(args),
   },
 ];

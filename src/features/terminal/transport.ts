@@ -1,6 +1,8 @@
+import { Channel } from "@tauri-apps/api/core";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
 import { ipc } from "@/lib/ipc";
+import type { TerminalStreamEvent } from "@/types/models";
 import type { TerminalStatus } from "@/workbench/tabs";
 
 export interface TerminalStatusUpdate {
@@ -20,33 +22,52 @@ export interface TerminalTransport {
   ): Promise<UnlistenFn>;
 }
 
-function decodeBase64(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+function streamTransport(
+  connect: (
+    dims: { cols: number; rows: number },
+    onEvent: Channel<TerminalStreamEvent>,
+  ) => Promise<void>,
+  operations: Pick<TerminalTransport, "send" | "resize" | "disconnect">,
+): TerminalTransport {
+  let onData: ((bytes: Uint8Array) => void) | undefined;
+  let onStatus: ((update: TerminalStatusUpdate) => void) | undefined;
+
+  return {
+    ...operations,
+    connect: (dims) =>
+      connect(
+        dims,
+        new Channel<TerminalStreamEvent>((event) => {
+          if (event instanceof ArrayBuffer) onData?.(new Uint8Array(event));
+          else onStatus?.(event);
+        }),
+      ),
+    disconnect: () => {
+      onData = undefined;
+      onStatus = undefined;
+      return operations.disconnect();
+    },
+    onData: (handler) => {
+      onData = handler;
+      return Promise.resolve(() => {
+        if (onData === handler) onData = undefined;
+      });
+    },
+    onStatus: (handler) => {
+      onStatus = handler;
+      return Promise.resolve(() => {
+        if (onStatus === handler) onStatus = undefined;
+      });
+    },
+  };
 }
 
-function sshLikeTransport(
-  sessionId: string,
-  attempt: number,
-  connect: (dims: { cols: number; rows: number }) => Promise<void>,
-): TerminalTransport {
+function sshOperations(sessionId: string, attempt: number) {
   return {
-    connect,
-    send: (data) => ipc.ssh.send(sessionId, attempt, data),
-    resize: (cols, rows) => ipc.ssh.resize(sessionId, attempt, cols, rows),
+    send: (data: string) => ipc.ssh.send(sessionId, attempt, data),
+    resize: (cols: number, rows: number) =>
+      ipc.ssh.resize(sessionId, attempt, cols, rows),
     disconnect: () => ipc.ssh.disconnect(sessionId, attempt),
-    onData: (handler) =>
-      ipc.ssh.onData((e) => {
-        if (e.id === sessionId && e.attempt === attempt)
-          handler(decodeBase64(e.data));
-      }),
-    onStatus: (handler) =>
-      ipc.ssh.onStatus((e) => {
-        if (e.id === sessionId && e.attempt === attempt)
-          handler({ status: e.status, message: e.message, code: e.code });
-      }),
   };
 }
 
@@ -55,8 +76,10 @@ export function sshTransport(
   hostId: string,
   attempt: number,
 ): TerminalTransport {
-  return sshLikeTransport(sessionId, attempt, ({ cols, rows }) =>
-    ipc.ssh.connect({ sessionId, attempt, hostId, cols, rows }),
+  return streamTransport(
+    ({ cols, rows }, onEvent) =>
+      ipc.ssh.connect({ sessionId, attempt, hostId, cols, rows, onEvent }),
+    sshOperations(sessionId, attempt),
   );
 }
 
@@ -65,8 +88,17 @@ export function sshAdhocTransport(
   attempt: number,
   target: { host: string; port: number; username: string },
 ): TerminalTransport {
-  return sshLikeTransport(sessionId, attempt, ({ cols, rows }) =>
-    ipc.ssh.connectAdhoc({ sessionId, attempt, ...target, cols, rows }),
+  return streamTransport(
+    ({ cols, rows }, onEvent) =>
+      ipc.ssh.connectAdhoc({
+        sessionId,
+        attempt,
+        ...target,
+        cols,
+        rows,
+        onEvent,
+      }),
+    sshOperations(sessionId, attempt),
   );
 }
 
@@ -74,26 +106,13 @@ export function localTransport(
   sessionId: string,
   attempt: number,
 ): TerminalTransport {
-  let onStatus: ((update: TerminalStatusUpdate) => void) | undefined;
-  return {
-    connect: async ({ cols, rows }) => {
-      await ipc.pty.open({ sessionId, attempt, cols, rows });
-      onStatus?.({ status: "connected" });
+  return streamTransport(
+    ({ cols, rows }, onEvent) =>
+      ipc.pty.open({ sessionId, attempt, cols, rows, onEvent }),
+    {
+      send: (data) => ipc.pty.write(sessionId, attempt, data),
+      resize: (cols, rows) => ipc.pty.resize(sessionId, attempt, cols, rows),
+      disconnect: () => ipc.pty.close(sessionId, attempt),
     },
-    send: (data) => ipc.pty.write(sessionId, attempt, data),
-    resize: (cols, rows) => ipc.pty.resize(sessionId, attempt, cols, rows),
-    disconnect: () => ipc.pty.close(sessionId, attempt),
-    onData: (handler) =>
-      ipc.pty.onData((e) => {
-        if (e.id === sessionId && e.attempt === attempt)
-          handler(decodeBase64(e.data));
-      }),
-    onStatus: (handler) => {
-      onStatus = handler;
-      return ipc.pty.onExit((e) => {
-        if (e.id === sessionId && e.attempt === attempt)
-          handler({ status: "closed" });
-      });
-    },
-  };
+  );
 }

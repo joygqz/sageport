@@ -66,6 +66,7 @@ describe("locale parity", () => {
       "Google",
       "I",
       "ID",
+      "JPEG",
       "JSON",
       "L",
       "MB",
@@ -81,6 +82,7 @@ describe("locale parity", () => {
       "P-384",
       "P-521",
       "PEM",
+      "PNG",
       "R",
       "R2",
       "S3",
@@ -92,6 +94,7 @@ describe("locale parity", () => {
       "Synology",
       "URL",
       "WebDAV",
+      "WebP",
     ]);
     const invalid = leafEntries(en).flatMap(([key, value]) => {
       const firstClause = value.split(/[.!?]/, 1)[0];

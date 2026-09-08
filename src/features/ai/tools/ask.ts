@@ -111,10 +111,14 @@ function automaticTerminalSelectionResult(
 
 function prepareAskUser(
   args: Record<string, unknown>,
-  meta: { userPrompt: string },
+  meta: { userPrompt: string; defaultTerminalId?: string | null },
 ): PreparedCall {
   const selection = defaultTerminalOption(args, meta.userPrompt);
-  if (selection) {
+  if (
+    selection &&
+    (meta.defaultTerminalId === undefined ||
+      selection.tab.id === meta.defaultTerminalId)
+  ) {
     return {
       args,
       automaticResult: automaticTerminalSelectionResult(

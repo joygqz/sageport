@@ -553,6 +553,7 @@ export const hostTools: AiTool[] = [
     icon: TerminalIcon,
     labelKey: "ai.tool.runCommandOnHosts",
     requiresApproval: true,
+    untrustedResult: true,
     execute: runCommandOnHosts,
   },
   {

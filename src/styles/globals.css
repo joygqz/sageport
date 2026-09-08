@@ -44,14 +44,17 @@
   --border-subtle: color-mix(in oklch, var(--border) 68%, transparent);
   --border-strong: color-mix(in oklch, var(--input) 55%, var(--border));
 
-  --radius: 0.625rem;
-  --titlebar-height: 3rem;
-  --workbench-bar-height: 2.75rem;
+  --radius: 0.5rem;
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  --titlebar-height: 2.5rem;
+  --workbench-bar-height: 2.25rem;
   --compact-toolbar-height: 2.25rem;
   --workbench-tab-height: calc(var(--workbench-bar-height) - 0.5rem);
   --compact-tab-height: calc(var(--compact-toolbar-height) - 0.5rem);
   --statusbar-height: 1.5rem;
-  --activitybar-width: 3rem;
+  --activitybar-width: 2.75rem;
   --panel-gutter: 0.75rem;
   --toolbar-control-size: 1.75rem;
   --compact-control-size: 1.5rem;
@@ -85,6 +88,8 @@
 }
 
 @theme inline {
+  --default-transition-duration: var(--motion-fast);
+  --default-transition-timing-function: var(--motion-ease);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -258,16 +263,6 @@
   }
 }
 
-@keyframes ai-thinking-scan {
-  0% {
-    background-position: 140% 50%;
-  }
-  72%,
-  100% {
-    background-position: -40% 50%;
-  }
-}
-
 @keyframes connection-progress {
   0% {
     transform: translateX(-120%);
@@ -280,7 +275,24 @@
   }
 }
 
+.ui-overlay-motion {
+  animation-duration: var(--motion-normal);
+  animation-timing-function: var(--motion-ease);
+}
+
+.ui-overlay-motion[data-state="closed"] {
+  animation-duration: var(--motion-fast);
+  animation-timing-function: ease-in;
+}
+
 @layer components {
+  .ui-progress-fill {
+    width: 100%;
+    height: 100%;
+    transform-origin: left;
+    transition: transform var(--motion-normal) linear;
+  }
+
   .ui-surface-card {
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius);
@@ -364,9 +376,8 @@
     background: var(--color-surface);
     color: var(--color-primary-foreground);
     transition:
-      background-color 120ms ease,
-      border-color 120ms ease,
-      box-shadow 120ms ease;
+      background-color var(--motion-fast) var(--motion-ease),
+      border-color var(--motion-fast) var(--motion-ease);
   }
 
   .ui-checkbox::before {
@@ -384,10 +395,9 @@
   }
 
   .ui-checkbox:focus-visible {
-    outline: none;
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
     border-color: var(--color-ring);
-    box-shadow: 0 0 0 3px
-      color-mix(in oklch, var(--color-ring) 30%, transparent);
   }
 
   .ui-checkbox:checked,
@@ -412,33 +422,9 @@
     opacity: 0.5;
   }
 
-  .ai-thinking-shimmer {
+  .ai-thinking-label {
     display: inline-block;
     color: var(--color-muted-foreground);
-    background-image: linear-gradient(
-      105deg,
-      var(--color-muted-foreground) 36%,
-      color-mix(
-          in oklch,
-          var(--color-foreground) 72%,
-          var(--color-muted-foreground)
-        )
-        48%,
-      var(--color-foreground) 50%,
-      color-mix(
-          in oklch,
-          var(--color-foreground) 72%,
-          var(--color-muted-foreground)
-        )
-        52%,
-      var(--color-muted-foreground) 64%
-    );
-    background-position: 140% 50%;
-    background-size: 250% 100%;
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: ai-thinking-scan 2s ease-in-out infinite;
   }
 }
 
@@ -447,15 +433,11 @@
   *::before,
   *::after {
     scroll-behavior: auto !important;
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-
-  .ai-thinking-shimmer {
-    background: none;
-    animation: none;
-    -webkit-text-fill-color: currentColor;
   }
 }
 
@@ -483,7 +465,7 @@
   .bookmark-action {
     pointer-events: auto;
     margin-left: 0;
-    width: 1.5rem;
+    width: 2.25rem;
     height: 1.5rem;
     opacity: 0.8;
   }

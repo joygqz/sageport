@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use tauri::{AppHandle, State};
+use tauri::{ipc::Channel, AppHandle, State};
 
 use crate::domain::{auth, Host};
 use crate::error::{AppError, AppResult};
@@ -55,6 +55,7 @@ fn validate_input(data: &str) -> AppResult<()> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn ssh_connect(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -63,6 +64,7 @@ pub async fn ssh_connect(
     host_id: String,
     cols: u32,
     rows: u32,
+    on_event: Channel,
 ) -> AppResult<()> {
     validate_connection_input(&session_id, cols, rows)?;
     let Some(reservation) = state.ssh.reserve(session_id.clone(), attempt) else {
@@ -92,9 +94,13 @@ pub async fn ssh_connect(
         startup_command,
     };
 
-    state
-        .ssh
-        .start(app, state.connection_prompts.clone(), params, reservation);
+    state.ssh.start(
+        app,
+        state.connection_prompts.clone(),
+        params,
+        reservation,
+        on_event,
+    );
     Ok(())
 }
 
@@ -110,6 +116,7 @@ pub async fn ssh_connect_adhoc(
     username: String,
     cols: u32,
     rows: u32,
+    on_event: Channel,
 ) -> AppResult<()> {
     validate_connection_input(&session_id, cols, rows)?;
     let Some(reservation) = state.ssh.reserve(session_id.clone(), attempt) else {
@@ -163,9 +170,13 @@ pub async fn ssh_connect_adhoc(
         rows,
         startup_command: None,
     };
-    state
-        .ssh
-        .start(app, state.connection_prompts.clone(), params, reservation);
+    state.ssh.start(
+        app,
+        state.connection_prompts.clone(),
+        params,
+        reservation,
+        on_event,
+    );
     Ok(())
 }
 

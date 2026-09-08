@@ -5,6 +5,7 @@ import { applyTerminalFontSize } from "@/features/terminal/sessions";
 import { ipc } from "@/lib/ipc";
 import { IS_MACOS } from "@/lib/platform";
 import { normalizeZoomLevel } from "./appearance";
+import { TITLE_BAR_H } from "./layout-sizing";
 
 export { ZOOM_LEVEL_MAX, ZOOM_LEVEL_MIN } from "./appearance";
 
@@ -25,8 +26,6 @@ export function terminalFontSize(): number {
   );
 }
 
-const TITLE_BAR_REM = 3;
-
 const TRAFFIC_LIGHT_X = 13;
 
 const BASE_ROOT_FONT_PX = 15;
@@ -37,7 +36,7 @@ export function syncTrafficLights() {
     getComputedStyle(document.documentElement).fontSize,
   );
   const scale = rootFontPx / BASE_ROOT_FONT_PX;
-  const height = TITLE_BAR_REM * rootFontPx;
+  const height = TITLE_BAR_H * scale;
   void ipc.window
     .setTrafficLightInset(TRAFFIC_LIGHT_X * scale, height)
     .catch(() => {});

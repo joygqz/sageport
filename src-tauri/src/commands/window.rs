@@ -3,7 +3,7 @@ use crate::error::{AppError, AppResult};
 #[cfg(target_os = "macos")]
 const DEFAULT_INSET_X: f64 = 13.0;
 #[cfg(target_os = "macos")]
-const DEFAULT_INSET_HEIGHT: f64 = 33.75;
+const DEFAULT_INSET_HEIGHT: f64 = 37.5;
 
 const MAX_TRAFFIC_LIGHT_INSET: f64 = 256.0;
 

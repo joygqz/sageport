@@ -33,8 +33,6 @@ import type {
   KeyFile,
   MonitorStatsEvent,
   PortForward,
-  PtyDataEvent,
-  PtyExitEvent,
   PortForwardInput,
   ProxyProfile,
   ProxyProfileInput,
@@ -50,11 +48,10 @@ import type {
   TaskInput,
   TaskRunEvent,
   TaskRunHistoryEntry,
-  SshDataEvent,
+  TerminalStreamEvent,
   SshKey,
   SshKeyGenerateInput,
   SshKeyInput,
-  SshStatusEvent,
   SyncConnectOutcome,
   SyncOAuthEvent,
   SyncProviderKind,
@@ -227,6 +224,7 @@ export const ipc = {
       hostId: string;
       cols: number;
       rows: number;
+      onEvent: Channel<TerminalStreamEvent>;
     }) => invoke<void>("ssh_connect", params),
     connectAdhoc: (params: {
       sessionId: string;
@@ -236,6 +234,7 @@ export const ipc = {
       username: string;
       cols: number;
       rows: number;
+      onEvent: Channel<TerminalStreamEvent>;
     }) => invoke<void>("ssh_connect_adhoc", params),
     send: (sessionId: string, attempt: number, data: string) =>
       invoke<void>("ssh_send", { sessionId, attempt, data }),
@@ -250,10 +249,6 @@ export const ipc = {
       invoke<void>("ssh_password_respond", { promptId, password }),
     pendingPasswords: () =>
       invoke<PasswordPromptEvent[]>("ssh_password_pending"),
-    onData: (handler: (e: SshDataEvent) => void): Promise<UnlistenFn> =>
-      listen<SshDataEvent>("ssh://data", (event) => handler(event.payload)),
-    onStatus: (handler: (e: SshStatusEvent) => void): Promise<UnlistenFn> =>
-      listen<SshStatusEvent>("ssh://status", (event) => handler(event.payload)),
     onHostKey: (handler: (e: HostKeyEvent) => void): Promise<UnlistenFn> =>
       listen<HostKeyEvent>("ssh://host-key", (event) => handler(event.payload)),
     onHostKeyClosed: (
@@ -281,6 +276,7 @@ export const ipc = {
       attempt: number;
       cols: number;
       rows: number;
+      onEvent: Channel<TerminalStreamEvent>;
     }) => invoke<void>("pty_open", params),
     write: (sessionId: string, attempt: number, data: string) =>
       invoke<void>("pty_write", { sessionId, attempt, data }),
@@ -288,10 +284,6 @@ export const ipc = {
       invoke<void>("pty_resize", { sessionId, attempt, cols, rows }),
     close: (sessionId: string, attempt?: number) =>
       invoke<void>("pty_close", { sessionId, attempt }),
-    onData: (handler: (e: PtyDataEvent) => void): Promise<UnlistenFn> =>
-      listen<PtyDataEvent>("pty://data", (event) => handler(event.payload)),
-    onExit: (handler: (e: PtyExitEvent) => void): Promise<UnlistenFn> =>
-      listen<PtyExitEvent>("pty://exit", (event) => handler(event.payload)),
   },
   clipboard: {
     saveImage: () => invoke<string | null>("clipboard_save_image"),

@@ -234,10 +234,12 @@ function UpdateStatusCard({
           >
             <div
               className={cn(
-                "h-full rounded-full bg-primary transition-[width] duration-300",
-                progress === null && "w-1/3 animate-pulse",
+                "ui-progress-fill bg-primary",
+                progress === null && "animate-pulse",
               )}
-              style={progress === null ? undefined : { width: `${progress}%` }}
+              style={{
+                transform: `scaleX(${progress === null ? 1 / 3 : Math.max(0, Math.min(progress, 100)) / 100})`,
+              }}
             />
           </div>
         )}

@@ -14,7 +14,7 @@ export const PANEL_LIST_ICON_CLASS =
   "flex size-[var(--toolbar-control-size)] shrink-0 items-center justify-center rounded-md border border-border-subtle bg-muted text-muted-foreground";
 
 export const PANEL_LIST_ACTION_CLASS =
-  "panel-list-action pointer-events-none -ml-2 flex h-6 w-0 shrink-0 items-center justify-center overflow-hidden rounded-md text-muted-foreground opacity-0 transition-[background-color,color,opacity] hover:bg-accent hover:text-foreground group-hover:pointer-events-auto group-hover:ml-0 group-hover:w-6 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:ml-0 group-focus-within:w-6 group-focus-within:opacity-100";
+  "panel-list-action pointer-events-none flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md text-muted-foreground opacity-0 transition-[background-color,color,opacity] hover:bg-accent hover:text-foreground group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100";
 
 export function PanelHeader({
   title,

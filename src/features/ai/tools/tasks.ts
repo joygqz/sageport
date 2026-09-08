@@ -391,6 +391,7 @@ export const taskTools: AiTool[] = [
     },
     icon: History,
     labelKey: "ai.tool.listTaskRuns",
+    untrustedResult: true,
     execute: async (args) => listTaskRuns(args),
   },
   {

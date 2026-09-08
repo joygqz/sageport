@@ -1,6 +1,7 @@
 mod anthropic;
 mod openai;
 
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::OnceLock;
@@ -53,10 +54,59 @@ pub struct ToolCall {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ImageAttachment {
+    pub id: String,
+    pub name: String,
+    pub mime_type: String,
+    pub data: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl ImageAttachment {
+    pub fn validate(&self) -> AppResult<()> {
+        const MAX_BYTES: usize = 1024 * 1024;
+        if self.id.len() > 128
+            || self.name.len() > 1024
+            || self.width == 0
+            || self.height == 0
+            || self.width > 1568
+            || self.height > 1568
+            || self.data.len() > MAX_BYTES.div_ceil(3) * 4
+        {
+            return Err(AppError::Invalid(
+                "image attachment exceeds the size limits".into(),
+            ));
+        }
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&self.data)
+            .map_err(|_| {
+                AppError::Invalid("image attachment contains invalid base64 data".into())
+            })?;
+        let valid = match self.mime_type.as_str() {
+            "image/png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+            "image/jpeg" => bytes.starts_with(&[0xff, 0xd8, 0xff]),
+            "image/webp" => bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP"),
+            _ => false,
+        };
+        if !valid || bytes.len() > MAX_BYTES {
+            return Err(AppError::Invalid(
+                "choose a valid PNG, JPEG, or WebP image under 1 MB after resizing".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub role: Role,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<ImageAttachment>,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<ToolCall>,

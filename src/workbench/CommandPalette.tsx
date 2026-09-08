@@ -40,7 +40,7 @@ export function CommandPalette({
           className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center px-4 pt-12"
         >
           <DialogPrimitive.Content
-            className="pointer-events-auto relative w-full max-w-[36rem] overflow-hidden rounded-lg border border-border-strong bg-popover text-popover-foreground outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2"
+            className="pointer-events-auto relative w-full max-w-[36rem] overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground outline-none"
             aria-describedby={undefined}
           >
             <DialogPrimitive.Title className="sr-only">

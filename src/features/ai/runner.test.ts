@@ -73,6 +73,61 @@ beforeEach(() => {
 });
 
 describe("runAgentLoop", () => {
+  it("does not execute when stop arrives immediately after approval", async () => {
+    chat.mockResolvedValueOnce({
+      toolCalls: [
+        {
+          id: "call-stop",
+          name: "save_snippet",
+          arguments: { name: "test", command: "uptime" },
+        },
+      ],
+    });
+    const run = harness();
+    run.host.requestApproval = vi.fn(async () => {
+      run.host.patch("session", (state) => ({ ...state, stopRequested: true }));
+      return true;
+    });
+    await runAgentLoop(run.host, "session", "model", false, ["save_snippet"]);
+    expect(executeTool).not.toHaveBeenCalled();
+    expect(run.state().history.at(-1)?.content).toContain(
+      "before the call executed",
+    );
+  });
+
+  it("protects operations influenced by older command history without provenance flags", async () => {
+    const initial = runtime();
+    initial.history.push(
+      {
+        role: "assistant",
+        toolCalls: [
+          {
+            id: "old",
+            name: "run_command_on_hosts",
+            arguments: { hostIds: ["h1"], command: "cat log" },
+          },
+        ],
+      },
+      { role: "tool", toolCallId: "old", content: "untrusted output" },
+      { role: "user", content: "continue" },
+    );
+    const run = harness(initial);
+    chat
+      .mockResolvedValueOnce({
+        toolCalls: [
+          {
+            id: "new",
+            name: "save_snippet",
+            arguments: { name: "test", command: "uptime" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "done" });
+    await runAgentLoop(run.host, "session", "model", true, ["save_snippet"]);
+    expect(run.host.requestApproval).toHaveBeenCalledTimes(1);
+    expect(executeTool).not.toHaveBeenCalled();
+  });
+
   it("sends only core tools by default", async () => {
     chat.mockResolvedValue({ content: "done" });
     const run = harness();
@@ -415,12 +470,34 @@ describe("runAgentLoop", () => {
     expect(executeTool).toHaveBeenCalledTimes(1);
     expect(executeTool).toHaveBeenCalledWith(
       "read_terminal_output",
-      {},
+      { sessionId: "terminal-1" },
       expect.any(Object),
     );
   });
 
   it("keeps untrusted tool history behind manual approval on later runs", async () => {
+    useTabsStore.setState({
+      tabs: [
+        {
+          kind: "terminal",
+          id: "terminal-1",
+          activePaneId: "terminal-1",
+          layout: { type: "leaf", paneId: "terminal-1" },
+          panes: [
+            {
+              id: "terminal-1",
+              target: "ssh",
+              hostId: "host-1",
+              title: "Production",
+              status: "connected",
+              attempt: 0,
+            },
+          ],
+        },
+      ],
+      activeId: "terminal-1",
+      lastPaneId: "terminal-1",
+    });
     chat
       .mockResolvedValueOnce({
         toolCalls: [
@@ -469,7 +546,7 @@ describe("runAgentLoop", () => {
     expect(executeTool).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps an approved command pinned to the pane focused before approval", async () => {
+  it("pins the command target before inference and keeps it through approval", async () => {
     useTabsStore.setState({
       tabs: [
         {
@@ -510,14 +587,17 @@ describe("runAgentLoop", () => {
       lastPaneId: "pane-left",
     });
     chat
-      .mockResolvedValueOnce({
-        toolCalls: [
-          {
-            id: "call-1",
-            name: "run_terminal_command",
-            arguments: { command: "uptime" },
-          },
-        ],
+      .mockImplementationOnce(async () => {
+        useTabsStore.getState().focusPane("pane-right");
+        return {
+          toolCalls: [
+            {
+              id: "call-1",
+              name: "run_terminal_command",
+              arguments: { command: "uptime" },
+            },
+          ],
+        };
       })
       .mockResolvedValueOnce({ content: "Done." });
     executeTool.mockResolvedValue({ content: "ok", isError: false });

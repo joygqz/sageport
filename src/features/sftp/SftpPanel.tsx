@@ -327,10 +327,12 @@ function OperationStrip() {
             >
               <div
                 className={cn(
-                  "h-full rounded-full bg-primary transition-[width]",
+                  "ui-progress-fill bg-primary",
                   indeterminate && "animate-pulse",
                 )}
-                style={{ width: `${indeterminate ? 100 : pct}%` }}
+                style={{
+                  transform: `scaleX(${indeterminate ? 1 : Math.max(0, Math.min(pct, 100)) / 100})`,
+                }}
               />
             </div>
             {item.kind === "delete" && (
