@@ -101,7 +101,7 @@ async fn decrypt_setting(
 
 fn open(key: &[u8], context: &str, value: &str) -> AppResult<String> {
     let invalid = || AppError::Crypto(format!("legacy encrypted value is unreadable: {context}"));
-    let encoded = value.strip_prefix(PREFIX).ok_or_else(&invalid)?;
+    let encoded = value.strip_prefix(PREFIX).ok_or_else(invalid)?;
     let bytes = STANDARD.decode(encoded).map_err(|_| invalid())?;
     if bytes.len() < NONCE_LEN + 16 {
         return Err(invalid());
