@@ -54,9 +54,9 @@ describe("themes", () => {
     }
   });
 
-  it("provides four complete, paired theme families", () => {
-    expect(THEME_FAMILIES).toHaveLength(4);
-    expect(THEMES).toHaveLength(8);
+  it("provides three complete, paired theme families", () => {
+    expect(THEME_FAMILIES).toHaveLength(3);
+    expect(THEMES).toHaveLength(6);
     expect(new Set(THEMES.map((theme) => theme.id)).size).toBe(THEMES.length);
     expect(getTheme(DEFAULT_THEME_ID).id).toBe(DEFAULT_THEME_ID);
 
@@ -183,11 +183,22 @@ describe("themes", () => {
     ).toBe("midnight-dark");
   });
 
+  it("preserves the mode when migrating retired Dracula preferences", () => {
+    for (const mode of ["system", "light", "dark"] as const) {
+      expect(parseThemePreference(`dracula:${mode}`)).toEqual({
+        familyId: "modern",
+        mode,
+      });
+    }
+    expect(getTheme("dracula-light").id).toBe("modern-light");
+    expect(getTheme("dracula-dark").id).toBe("modern-dark");
+  });
+
   it("maps retired theme ids to the closest new family", () => {
     expect(getTheme("dark-modern").id).toBe("modern-dark");
     expect(getTheme("one-dark").id).toBe("graphite-dark");
     expect(getTheme("light-modern").id).toBe("modern-light");
-    expect(getTheme("dracula").id).toBe("dracula-dark");
-    expect(getTheme("solarized-light").id).toBe("dracula-light");
+    expect(getTheme("dracula").id).toBe("modern-dark");
+    expect(getTheme("solarized-light").id).toBe("modern-light");
   });
 });

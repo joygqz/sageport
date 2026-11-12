@@ -27,10 +27,10 @@ export function parseThemePreference(value: string | null): ThemePreference {
   const [familyId, mode] = value.split(":");
   if (
     familyId &&
-    getThemeFamily(familyId).id === familyId &&
+    (getThemeFamily(familyId).id === familyId || familyId === "dracula") &&
     isThemeMode(mode)
   ) {
-    return { familyId, mode };
+    return { familyId: getThemeFamily(familyId).id, mode };
   }
 
   return preferenceFromThemeId(value);

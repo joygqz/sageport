@@ -40,7 +40,6 @@ const THEME_DESCRIPTION_KEYS: Record<string, TKey> = {
   modern: "settings.general.theme.familyModern",
   midnight: "settings.general.theme.familyMidnight",
   graphite: "settings.general.theme.familyGraphite",
-  dracula: "settings.general.theme.familyDracula",
 };
 
 export function GeneralSection() {

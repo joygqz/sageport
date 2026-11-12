@@ -155,6 +155,9 @@ pub fn update_menu(app: &AppHandle, data: TrayMenuData) -> tauri::Result<()> {
 }
 
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
+    #[cfg(all(debug_assertions, target_os = "macos"))]
+    reapply_dev_dock_icon();
+
     let menu = build_menu(app, &initial_data(app))?;
 
     let builder = TrayIconBuilder::with_id("main")

@@ -46,8 +46,11 @@ fn sanitize_theme(value: &str) -> Option<String> {
         "github-dark" | "dark-modern" | "tokyo-night" => "midnight:dark",
         "github-light" | "light-modern" => "midnight:light",
         "one-dark-pro" | "one-dark" => "graphite:dark",
-        "dracula" => "dracula:dark",
-        "catppuccin-latte" | "solarized-light" => "dracula:light",
+        "dracula" | "dracula-dark" | "dracula:dark" => "modern:dark",
+        "dracula:system" => "modern:system",
+        "catppuccin-latte" | "solarized-light" | "dracula-light" | "dracula:light" => {
+            "modern:light"
+        }
         value if is_current_theme(value) => value,
         _ => return None,
     };
@@ -58,7 +61,7 @@ fn is_current_theme(value: &str) -> bool {
     let Some((family, mode)) = value.split_once(':') else {
         return false;
     };
-    matches!(family, "midnight" | "graphite" | "dracula")
+    matches!(family, "modern" | "midnight" | "graphite")
         && matches!(mode, "system" | "light" | "dark")
 }
 
@@ -299,7 +302,12 @@ mod tests {
         assert_eq!(migrated.value, "midnight:dark");
 
         let migrated = sanitize(&setting("general.theme", "dracula")).unwrap();
-        assert_eq!(migrated.value, "dracula:dark");
+        assert_eq!(migrated.value, "modern:dark");
+
+        for mode in ["system", "light", "dark"] {
+            let migrated = sanitize(&setting("general.theme", &format!("dracula:{mode}"))).unwrap();
+            assert_eq!(migrated.value, format!("modern:{mode}"));
+        }
     }
 
     #[test]
