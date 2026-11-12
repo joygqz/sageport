@@ -44,6 +44,7 @@ jobs:
             -s \
             -k "$KEYCHAIN_PASSWORD" \
             "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
 
           SIGNING_IDENTITY="$(
             security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
