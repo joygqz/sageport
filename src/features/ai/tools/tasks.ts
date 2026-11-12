@@ -87,7 +87,7 @@ function planLine(step: TaskStep): string {
     case "localCommand":
     case "remoteCommand": {
       const cwd = step.cwd ? ` (in ${step.cwd})` : "";
-      return `${STEP_LABEL[step.type]}: ${step.command}${cwd}`;
+      return `${STEP_LABEL[step.type]}: ${step.command}${cwd} (shell: ${step.shell ?? (step.type === "remoteCommand" ? "sh" : "platform default")}, timeout: ${step.timeoutSeconds ?? 300}s)`;
     }
     case "upload":
       return `upload: ${step.localPath} → ${step.remotePath}`;
@@ -350,11 +350,12 @@ const STEP_SCHEMA = {
   items: { type: "object" },
   description:
     "Ordered steps. Each object is exactly one of: " +
-    "{type:'localCommand', command, cwd?, retries?}; " +
-    "{type:'remoteCommand', command, cwd?, retries?}; " +
+    "{type:'localCommand', command, cwd?, shell?, timeoutSeconds?, retries?}; " +
+    "{type:'remoteCommand', command, cwd?, shell?, timeoutSeconds?, retries?}; " +
     "{type:'upload', localPath, remotePath, retries?}; " +
     "{type:'download', remotePath, localPath, retries?}. " +
     "retries (default 0, max 10) is how many extra attempts to make if the step fails. " +
+    "shell is sh, bash, or zsh for remote commands, with cmd and powershell also available for local commands. Unix shells stop on unhandled errors. bash and zsh also enable pipefail. timeoutSeconds is 1 to 86400, default 300. Each step runs in a separate non-interactive shell. Local relative paths resolve from the home folder. " +
     "Commands are limited to 32000 characters and paths to 4000. " +
     "All commands and paths are literal; there are no runtime variables.",
 } as const;

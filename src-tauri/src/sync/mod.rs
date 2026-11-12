@@ -1051,6 +1051,8 @@ mod tests {
                 steps: vec![crate::domain::TaskStep::LocalCommand {
                     cwd: None,
                     command: "true".into(),
+                    shell: None,
+                    timeout_seconds: None,
                     retries: 0,
                 }],
                 schedule: Some("0 3 * * *".into()),

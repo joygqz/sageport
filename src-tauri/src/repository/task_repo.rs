@@ -48,10 +48,25 @@ fn normalize_optional(
 }
 
 fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
+    let (shell, timeout) = step.command_options();
+    if !(1..=86400).contains(&timeout) {
+        return Err(AppError::Invalid(
+            "command timeout must be between 1 and 86400 seconds".into(),
+        ));
+    }
+    if matches!(step, TaskStep::RemoteCommand { .. })
+        && shell.is_some_and(|shell| !shell.is_posix())
+    {
+        return Err(AppError::Invalid(
+            "remote commands require sh, bash, or zsh".into(),
+        ));
+    }
     let step = match step {
         TaskStep::LocalCommand {
             cwd,
             command,
+            shell,
+            timeout_seconds,
             retries,
         } => {
             let command = command.trim().to_string();
@@ -64,12 +79,16 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
             TaskStep::LocalCommand {
                 cwd: normalize_optional(cwd, MAX_PATH_CHARS, "task working directory is too long")?,
                 command,
+                shell,
+                timeout_seconds,
                 retries: retries.min(MAX_RETRIES),
             }
         }
         TaskStep::RemoteCommand {
             cwd,
             command,
+            shell,
+            timeout_seconds,
             retries,
         } => {
             let command = command.trim().to_string();
@@ -82,6 +101,8 @@ fn normalize_step(step: TaskStep) -> AppResult<TaskStep> {
             TaskStep::RemoteCommand {
                 cwd: normalize_optional(cwd, MAX_PATH_CHARS, "task working directory is too long")?,
                 command,
+                shell,
+                timeout_seconds,
                 retries: retries.min(MAX_RETRIES),
             }
         }
@@ -297,6 +318,8 @@ mod tests {
         TaskStep::LocalCommand {
             cwd: Some("  ~/proj  ".into()),
             command: command.into(),
+            shell: None,
+            timeout_seconds: None,
             retries: 0,
         }
     }
@@ -381,6 +404,39 @@ mod tests {
         let mut bad_cron = input("Backup");
         bad_cron.schedule = Some("99 * * * *".into());
         assert!(normalize(bad_cron).is_err());
+    }
+
+    #[test]
+    fn validates_command_shells_and_timeouts() {
+        for seconds in [0, 86401] {
+            let step = TaskStep::LocalCommand {
+                cwd: None,
+                command: "true".into(),
+                shell: None,
+                timeout_seconds: Some(seconds),
+                retries: 0,
+            };
+            assert!(normalize_step(step).is_err());
+        }
+        let step = TaskStep::RemoteCommand {
+            cwd: None,
+            command: "true".into(),
+            shell: Some(crate::domain::TaskShell::Powershell),
+            timeout_seconds: None,
+            retries: 0,
+        };
+        assert!(normalize_step(step).is_err());
+        let step = TaskStep::RemoteCommand {
+            cwd: None,
+            command: "true".into(),
+            shell: Some(crate::domain::TaskShell::Bash),
+            timeout_seconds: Some(3600),
+            retries: 0,
+        };
+        assert_eq!(
+            normalize_step(step).unwrap().command_options(),
+            (Some(crate::domain::TaskShell::Bash), 3600)
+        );
     }
 
     #[tokio::test]

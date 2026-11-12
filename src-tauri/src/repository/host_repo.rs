@@ -671,6 +671,8 @@ mod tests {
                 steps: vec![TaskStep::LocalCommand {
                     cwd: None,
                     command: "echo ready".into(),
+                    shell: None,
+                    timeout_seconds: None,
                     retries: 0,
                 }],
                 schedule: None,

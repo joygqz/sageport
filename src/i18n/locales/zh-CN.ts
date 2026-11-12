@@ -726,7 +726,17 @@ export const zhCN: Dictionary = {
       retries: "失败重试次数",
       retriesHint: "重试可能重复执行失败命令已完成的更改",
       workingDir: "工作目录",
-      workingDirPlaceholder: "~/project（可选）",
+      workingDirPlaceholder: "~",
+      shell: "Shell",
+      localShellDefault: "系统默认",
+      remoteShellDefault: "默认（sh）",
+      timeout: "超时时间（秒）",
+      timeoutHint: "设置为 1 至 86400 秒，默认为 300 秒。",
+      localPathHint:
+        "本地相对路径以用户主目录为基准。工作目录留空时使用主目录。",
+      remotePathHint: "远程相对路径以远程用户主目录为基准。",
+      commandHint:
+        "每个步骤使用独立的非交互式 shell，目录和环境变量的更改不会传递到下一步。Unix shell 遇到未处理的错误会停止。选择 bash 或 zsh 可检查管道各阶段的失败。需要提权时请使用 sudo -n。",
       command: "命令",
       localCommandPlaceholder: "pnpm build",
       remoteCommandPlaceholder: "sudo systemctl reload nginx",

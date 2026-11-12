@@ -148,3 +148,17 @@ describe("run coordination", () => {
     expect(ipc.tasks.run).not.toHaveBeenCalled();
   });
 });
+
+it("replaces the output snapshot without duplicating earlier logs", async () => {
+  vi.mocked(ipc.tasks.run).mockImplementationOnce(
+    async (_id, _hostId, onEvent) => {
+      onEvent({ stepIndex: 0, status: "output", chunk: "old output" });
+      onEvent({ stepIndex: 0, status: "output", chunk: "latest error tail" });
+      onEvent({ stepIndex: 0, status: "error", exitCode: 1 });
+      throw new Error("failed");
+    },
+  );
+  const finished = await useTaskRunStore.getState().startRun(task(), "h1")
+    .completion;
+  expect(finished?.stepStates[0].log).toBe("latest error tail");
+});

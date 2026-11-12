@@ -1,4 +1,5 @@
 mod ai;
+mod command_output;
 mod commands;
 mod crypto;
 mod db;

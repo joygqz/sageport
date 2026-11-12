@@ -290,11 +290,15 @@ export interface SnippetInput {
   description?: string | null;
 }
 
+export type TaskShell = "sh" | "bash" | "zsh" | "cmd" | "powershell";
+
 export type TaskStep =
   | {
       type: "localCommand";
       cwd?: string;
       command: string;
+      shell?: TaskShell;
+      timeoutSeconds?: number;
       retries?: number;
     }
   | {
@@ -313,6 +317,8 @@ export type TaskStep =
       type: "remoteCommand";
       cwd?: string;
       command: string;
+      shell?: TaskShell;
+      timeoutSeconds?: number;
       retries?: number;
     };
 
@@ -342,7 +348,7 @@ export interface TaskInput {
 }
 
 export type TaskRunStatus =
-  "start" | "log" | "done" | "error" | "skipped" | "cancelled";
+  "start" | "log" | "output" | "done" | "error" | "skipped" | "cancelled";
 
 export interface TaskRunEvent {
   stepIndex: number;

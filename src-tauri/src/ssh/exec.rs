@@ -21,6 +21,7 @@ pub async fn exec_capture_limited(
 ) -> AppResult<ExecOutput> {
     let channel = handle.channel_open_session().await?;
     channel.exec(true, command).await?;
+    channel.eof().await?;
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -33,6 +34,11 @@ pub async fn exec_capture_limited(
             }
             Some(ChannelMsg::ExtendedData { data, ext: 1 }) => {
                 append_limited(&mut stderr, &stdout, &data, max_output_bytes)?
+            }
+            Some(ChannelMsg::Failure) => {
+                return Err(AppError::Other(
+                    "server rejected the command execution request".into(),
+                ))
             }
             Some(ChannelMsg::ExitStatus { exit_status }) => code = Some(exit_status as i32),
             Some(ChannelMsg::ExitSignal { signal_name, .. }) => {
@@ -52,15 +58,15 @@ pub async fn exec_capture_limited(
     })
 }
 
-pub async fn exec_stream<F>(
-    handle: &Handle<ClientHandler>,
+pub async fn exec_stream<H, F>(
+    handle: &Handle<H>,
     command: &str,
-    max_output_bytes: usize,
     mut on_chunk: F,
     cancel: &crate::sftp::TransferCancel,
     timeout: std::time::Duration,
 ) -> AppResult<i32>
 where
+    H: russh::client::Handler,
     F: FnMut(String),
 {
     let deadline = tokio::time::sleep(timeout);
@@ -86,9 +92,23 @@ where
         let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.close()).await;
         return Err(error);
     }
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => {
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.signal(russh::Sig::KILL)).await;
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.close()).await;
+            return Err(AppError::Cancelled);
+        }
+        _ = &mut deadline => {
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.signal(russh::Sig::KILL)).await;
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.close()).await;
+            return Err(AppError::Timeout("remote command timed out".into()));
+        }
+        result = channel.eof() => result?,
+    }
     let mut code = None;
-    let mut forwarded = 0usize;
-    let mut truncated = false;
+    let mut stdout = crate::command_output::Utf8Decoder::default();
+    let mut stderr = crate::command_output::Utf8Decoder::default();
     loop {
         let message = tokio::select! {
             biased;
@@ -105,14 +125,22 @@ where
             message = channel.wait() => message,
         };
         match message {
-            Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, ext: 1 }) => {
-                forward_chunk(
-                    &mut on_chunk,
-                    &data,
-                    max_output_bytes,
-                    &mut forwarded,
-                    &mut truncated,
-                );
+            Some(ChannelMsg::Data { data }) => {
+                let chunk = stdout.push(&data);
+                if !chunk.is_empty() {
+                    on_chunk(chunk);
+                }
+            }
+            Some(ChannelMsg::ExtendedData { data, ext: 1 }) => {
+                let chunk = stderr.push(&data);
+                if !chunk.is_empty() {
+                    on_chunk(chunk);
+                }
+            }
+            Some(ChannelMsg::Failure) => {
+                return Err(AppError::Other(
+                    "server rejected the command execution request".into(),
+                ))
             }
             Some(ChannelMsg::ExitStatus { exit_status }) => code = Some(exit_status as i32),
             Some(ChannelMsg::ExitSignal { signal_name, .. }) => {
@@ -124,37 +152,16 @@ where
             _ => {}
         }
     }
+    for chunk in [stdout.finish(), stderr.finish()] {
+        if !chunk.is_empty() {
+            on_chunk(chunk);
+        }
+    }
     require_exit_status(code)
 }
 
 fn require_exit_status(code: Option<i32>) -> AppResult<i32> {
     code.ok_or_else(|| AppError::Other("remote command closed without an exit status".into()))
-}
-
-fn forward_chunk<F>(
-    on_chunk: &mut F,
-    data: &[u8],
-    max_output_bytes: usize,
-    forwarded: &mut usize,
-    truncated: &mut bool,
-) where
-    F: FnMut(String),
-{
-    if *forwarded >= max_output_bytes {
-        if !*truncated {
-            *truncated = true;
-            on_chunk("\n…(output truncated)…\n".to_string());
-        }
-        return;
-    }
-    let remaining = max_output_bytes - *forwarded;
-    let slice = if data.len() > remaining {
-        &data[..remaining]
-    } else {
-        data
-    };
-    *forwarded += slice.len();
-    on_chunk(String::from_utf8_lossy(slice).into_owned());
 }
 
 fn append_limited(
@@ -196,3 +203,7 @@ mod tests {
         assert!(append_limited(&mut stdout, &stderr, b"9", 8).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "exec/tests.rs"]
+mod stream_tests;

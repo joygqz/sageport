@@ -40,6 +40,32 @@ pub struct TaskInput {
     pub schedule_enabled: bool,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskShell {
+    Sh,
+    Bash,
+    Zsh,
+    Cmd,
+    Powershell,
+}
+
+impl TaskShell {
+    pub fn executable(self) -> &'static str {
+        match self {
+            Self::Sh => "sh",
+            Self::Bash => "bash",
+            Self::Zsh => "zsh",
+            Self::Cmd => "cmd",
+            Self::Powershell => "powershell",
+        }
+    }
+
+    pub fn is_posix(self) -> bool {
+        matches!(self, Self::Sh | Self::Bash | Self::Zsh)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(
     tag = "type",
@@ -51,6 +77,10 @@ pub enum TaskStep {
         #[serde(default)]
         cwd: Option<String>,
         command: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        shell: Option<TaskShell>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_seconds: Option<u64>,
         #[serde(default)]
         retries: u32,
     },
@@ -70,12 +100,32 @@ pub enum TaskStep {
         #[serde(default)]
         cwd: Option<String>,
         command: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        shell: Option<TaskShell>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_seconds: Option<u64>,
         #[serde(default)]
         retries: u32,
     },
 }
 
 impl TaskStep {
+    pub fn command_options(&self) -> (Option<TaskShell>, u64) {
+        match self {
+            Self::LocalCommand {
+                shell,
+                timeout_seconds,
+                ..
+            }
+            | Self::RemoteCommand {
+                shell,
+                timeout_seconds,
+                ..
+            } => (*shell, timeout_seconds.unwrap_or(300)),
+            _ => (None, 300),
+        }
+    }
+
     pub fn retries(&self) -> u32 {
         match self {
             TaskStep::LocalCommand { retries, .. }
@@ -99,6 +149,8 @@ mod tests {
         let step = TaskStep::RemoteCommand {
             cwd: Some("/srv".into()),
             command: "systemctl reload nginx".into(),
+            shell: None,
+            timeout_seconds: None,
             retries: 3,
         };
         let json = serde_json::to_string(&step).unwrap();

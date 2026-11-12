@@ -118,6 +118,9 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           total: undefined,
         });
         break;
+      case "output":
+        patchStep(requestId, event.stepIndex, { log: event.chunk ?? "" });
+        break;
       case "log":
         if (event.chunk) {
           patchStep(requestId, event.stepIndex, (step) => ({

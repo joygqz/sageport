@@ -747,7 +747,17 @@ export const en = {
       retries: "Retry attempts",
       retriesHint: "Retries can repeat changes made by a failed command",
       workingDir: "Working directory",
-      workingDirPlaceholder: "~/project (optional)",
+      workingDirPlaceholder: "~",
+      shell: "Shell",
+      localShellDefault: "System default",
+      remoteShellDefault: "Default (sh)",
+      timeout: "Timeout in seconds",
+      timeoutHint: "Use 1 to 86400 seconds. The default is 300 seconds.",
+      localPathHint:
+        "Local paths resolve from your home folder. An empty working directory uses your home folder.",
+      remotePathHint: "Relative paths resolve from the remote home folder.",
+      commandHint:
+        "Each step uses a separate non-interactive shell. The local default is sh on Unix and cmd on Windows. Directory and environment changes do not carry over. Unix shells stop on unhandled errors. Choose bash or zsh to detect failures throughout a pipeline. Use sudo -n when elevated access is required.",
       command: "Command",
       localCommandPlaceholder: "pnpm build",
       remoteCommandPlaceholder: "sudo systemctl reload nginx",

@@ -10,11 +10,12 @@ import {
   Input,
   INTERACTIVE_FOCUS_CLASS,
   Textarea,
+  Select,
   Tooltip,
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
-import type { TaskStep } from "@/types/models";
+import type { TaskStep, TaskShell } from "@/types/models";
 import { MAX_STEP_RETRIES, STEP_META, stepSummary } from "./steps";
 
 interface TaskStepCardProps {
@@ -209,7 +210,14 @@ function StepFields({
     case "remoteCommand":
       return (
         <>
-          <Field label={t("tasks.form.workingDir")}>
+          <Field
+            label={t("tasks.form.workingDir")}
+            hint={t(
+              step.type === "localCommand"
+                ? "tasks.form.localPathHint"
+                : "tasks.form.remotePathHint",
+            )}
+          >
             <Input
               value={step.cwd ?? ""}
               disabled={disabled}
@@ -219,7 +227,61 @@ function StepFields({
               onChange={(e) => onChange({ ...step, cwd: e.target.value })}
             />
           </Field>
-          <Field label={t("tasks.form.command")} required>
+          <Field label={t("tasks.form.shell")}>
+            <Select
+              value={step.shell ?? "default"}
+              disabled={disabled}
+              onValueChange={(value) =>
+                onChange({
+                  ...step,
+                  shell: value === "default" ? undefined : (value as TaskShell),
+                })
+              }
+              options={[
+                {
+                  value: "default",
+                  label: t(
+                    step.type === "localCommand"
+                      ? "tasks.form.localShellDefault"
+                      : "tasks.form.remoteShellDefault",
+                  ),
+                },
+                ...(
+                  (step.type === "remoteCommand"
+                    ? ["sh", "bash", "zsh"]
+                    : ["sh", "bash", "zsh", "cmd", "powershell"]) as TaskShell[]
+                ).map((shell) => ({ value: shell, label: shell })),
+              ]}
+            />
+          </Field>
+          <Field
+            label={t("tasks.form.timeout")}
+            hint={t("tasks.form.timeoutHint")}
+          >
+            <Input
+              type="number"
+              min={1}
+              max={86400}
+              step={1}
+              value={step.timeoutSeconds ?? ""}
+              placeholder="300"
+              disabled={disabled}
+              onChange={(event) =>
+                onChange({
+                  ...step,
+                  timeoutSeconds:
+                    event.target.value === ""
+                      ? undefined
+                      : Number(event.target.value),
+                })
+              }
+            />
+          </Field>
+          <Field
+            label={t("tasks.form.command")}
+            hint={t("tasks.form.commandHint")}
+            required
+          >
             <Textarea
               rows={2}
               value={step.command}
@@ -239,11 +301,15 @@ function StepFields({
     case "upload":
       return (
         <>
-          <Field label={t("tasks.form.localSource")} required>
+          <Field
+            label={t("tasks.form.localSource")}
+            hint={t("tasks.form.localPathHint")}
+            required
+          >
             <Input
               value={step.localPath}
               disabled={disabled}
-              placeholder="./dist"
+              placeholder="~/project/dist"
               className={inputClass}
               maxLength={4 * 1024}
               onChange={(e) => onChange({ ...step, localPath: e.target.value })}
@@ -278,7 +344,11 @@ function StepFields({
               }
             />
           </Field>
-          <Field label={t("tasks.form.localDest")} required>
+          <Field
+            label={t("tasks.form.localDest")}
+            hint={t("tasks.form.localPathHint")}
+            required
+          >
             <Input
               value={step.localPath}
               disabled={disabled}

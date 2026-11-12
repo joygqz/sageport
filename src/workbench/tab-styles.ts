@@ -1,8 +1,8 @@
 export const WORKBENCH_TAB_CLASS =
-  "group relative flex h-[var(--workbench-tab-height)] w-fit max-w-52 gap-1.5 pl-3 pr-1.5 shrink-0 cursor-pointer touch-none select-none items-center rounded-b-md bg-[var(--tab-background)] text-xs outline-none [--tab-background:var(--color-surface)] transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 has-[[data-slot=tabs-trigger]:focus-visible]:ring-2 has-[[data-slot=tabs-trigger]:focus-visible]:ring-inset has-[[data-slot=tabs-trigger]:focus-visible]:ring-ring/45";
+  "group relative flex h-[var(--workbench-tab-height)] w-fit max-w-52 gap-1.5 pl-3 pr-1.5 shrink-0 cursor-pointer touch-none select-none items-center rounded-b-md bg-[var(--tab-background)] text-xs outline-none [--tab-background:var(--color-surface)] transition-colors focus-visible:underline underline-offset-4";
 
 export const WORKBENCH_TAB_TRIGGER_CLASS =
-  "flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-b-md text-left outline-none";
+  "flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-b-md text-left outline-none focus-visible:underline underline-offset-4";
 
 export const WORKBENCH_TAB_LABEL_CLASS = "min-w-0 max-w-36 truncate text-left";
 

@@ -35,7 +35,7 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
         localPath: "~/project/dist",
         remotePath: "/var/www/myapp",
       },
-      { type: "remoteCommand", command: "sudo systemctl reload nginx" },
+      { type: "remoteCommand", command: "sudo -n systemctl reload nginx" },
     ],
   },
   {
@@ -54,7 +54,7 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
         localPath: "~/project/target/myapp.jar",
         remotePath: "/opt/myapp/myapp.jar",
       },
-      { type: "remoteCommand", command: "sudo systemctl restart myapp" },
+      { type: "remoteCommand", command: "sudo -n systemctl restart myapp" },
     ],
   },
   {
@@ -91,7 +91,7 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
         localPath: "~/config",
         remotePath: "/etc/myapp",
       },
-      { type: "remoteCommand", command: "sudo systemctl reload myapp" },
+      { type: "remoteCommand", command: "sudo -n systemctl reload myapp" },
     ],
   },
   {

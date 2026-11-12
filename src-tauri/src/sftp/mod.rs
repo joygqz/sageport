@@ -133,7 +133,7 @@ pub struct SftpConnectParams {
 }
 
 pub struct Conn {
-    ssh: SshConnection,
+    ssh: Arc<SshConnection>,
     session: SftpSession,
     host_label: String,
     tar_available: OnceCell<bool>,
@@ -143,28 +143,6 @@ pub struct Conn {
 impl Conn {
     pub fn session(&self) -> &SftpSession {
         &self.session
-    }
-
-    pub async fn exec_stream<F>(
-        &self,
-        command: &str,
-        max_output_bytes: usize,
-        on_chunk: F,
-        cancel: &TransferCancel,
-        timeout: std::time::Duration,
-    ) -> AppResult<i32>
-    where
-        F: FnMut(String),
-    {
-        crate::ssh::exec::exec_stream(
-            &self.ssh.handle,
-            command,
-            max_output_bytes,
-            on_chunk,
-            cancel,
-            timeout,
-        )
-        .await
     }
 
     pub async fn exec(&self, command: &str) -> AppResult<String> {
@@ -382,38 +360,21 @@ impl SftpManager {
         self.get(id)?.exec(command).await
     }
 
-    pub async fn exec_stream<F>(
-        &self,
-        id: &str,
-        command: &str,
-        max_output_bytes: usize,
-        on_chunk: F,
-        cancel: &TransferCancel,
-        timeout: std::time::Duration,
-    ) -> AppResult<i32>
-    where
-        F: FnMut(String),
-    {
-        self.get(id)?
-            .exec_stream(command, max_output_bytes, on_chunk, cancel, timeout)
-            .await
-    }
-
-    pub async fn connect_now(
+    pub async fn attach_ssh(
         &self,
         app: &AppHandle,
-        prompts: &ConnectionPrompts,
-        params: SftpConnectParams,
+        id: &str,
+        host_label: &str,
+        ssh: Arc<SshConnection>,
         cancel: &TransferCancel,
     ) -> AppResult<()> {
-        let id = params.connection_id.clone();
         let conn = tokio::select! {
             biased;
             _ = cancel.cancelled() => return Err(AppError::Cancelled),
-            result = open(app, prompts, &params) => result?,
+            result = open_sftp(ssh, host_label.to_string()) => result?,
         };
-        self.conns.lock().insert(id.clone(), Arc::new(conn));
-        emit_status(app, &id, "connected", None);
+        self.conns.lock().insert(id.to_string(), Arc::new(conn));
+        emit_status(app, id, "connected", None);
         Ok(())
     }
 
@@ -430,7 +391,11 @@ async fn open(
     prompts: &ConnectionPrompts,
     params: &SftpConnectParams,
 ) -> AppResult<Conn> {
-    let ssh = establish(app, prompts, &params.connection_id, &params.hops).await?;
+    let ssh = Arc::new(establish(app, prompts, &params.connection_id, &params.hops).await?);
+    open_sftp(ssh, params.host_label.clone()).await
+}
+
+async fn open_sftp(ssh: Arc<SshConnection>, host_label: String) -> AppResult<Conn> {
     let session = tokio::time::timeout(SUBSYSTEM_OPEN_TIMEOUT, async {
         let channel = ssh.handle.channel_open_session().await?;
         channel.request_subsystem(true, "sftp").await?;
@@ -441,7 +406,7 @@ async fn open(
     Ok(Conn {
         ssh,
         session,
-        host_label: params.host_label.clone(),
+        host_label,
         tar_available: OnceCell::new(),
         delete_slots: Arc::new(Semaphore::new(MAX_CONCURRENT_DELETE_REQUESTS)),
     })

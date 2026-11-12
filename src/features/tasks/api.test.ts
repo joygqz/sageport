@@ -48,3 +48,21 @@ it("rejects malformed history records before rendering or summarizing", () => {
     expect(parseTaskRunSteps(JSON.stringify([record]))).toEqual([]);
   }
 });
+
+it("validates command settings from storage", () => {
+  const step = {
+    type: "remoteCommand",
+    command: "true",
+    shell: "bash",
+    timeoutSeconds: 3600,
+  };
+  expect(parse([step])).toEqual([step]);
+  for (const changes of [
+    { shell: "powershell" },
+    { timeoutSeconds: 0 },
+    { timeoutSeconds: 86401 },
+    { timeoutSeconds: 1.5 },
+  ]) {
+    expect(parse([{ ...step, ...changes }])).toEqual([]);
+  }
+});

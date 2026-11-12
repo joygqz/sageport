@@ -1,6 +1,6 @@
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
@@ -8,21 +8,22 @@ use tauri::{AppHandle, State};
 use tokio::io::AsyncReadExt;
 use tokio::task::JoinSet;
 
-use crate::domain::{Task, TaskInput, TaskStep};
+use crate::domain::{Task, TaskInput, TaskShell, TaskStep};
 use crate::error::{AppError, AppResult};
 use crate::repository::task_repo;
 use crate::repository::task_run_repo::{self, TaskRunRow};
 use crate::sftp::path::{parent_remote, sh_quote};
-use crate::sftp::{self, base_name, Endpoint, SftpConnectParams, TransferCancel, TransferRequest};
+use crate::sftp::{self, base_name, Endpoint, TransferCancel, TransferRequest};
 use crate::state::AppState;
 
 const MAX_ID_BYTES: usize = 128;
-const COMMAND_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
 const KILL_DRAIN_GRACE: Duration = Duration::from_secs(3);
 const CONNECT_ATTEMPTS: usize = 2;
 const CONNECT_RETRY_BACKOFF: Duration = Duration::from_millis(500);
 const STEP_RETRY_BACKOFF: Duration = Duration::from_secs(2);
-const STEP_OUTPUT_CAP: usize = 512 * 1024;
+const STEP_OUTPUT_CAP: usize = 200 * 1024;
+const OUTPUT_INTERVAL: Duration = Duration::from_millis(100);
 const MAX_MESSAGE_CHARS: usize = 2000;
 
 #[tauri::command]
@@ -138,26 +139,98 @@ impl TaskRunEvent {
     }
 }
 
+#[derive(Default)]
+struct StepOutput {
+    tail: String,
+    dirty: bool,
+    last_emit: Option<Instant>,
+}
+
 #[derive(Clone)]
 struct TaskEvents {
     channel: Channel<TaskRunEvent>,
     logs: Arc<parking_lot::Mutex<Vec<String>>>,
+    outputs: Arc<parking_lot::Mutex<Vec<StepOutput>>>,
+}
+
+struct OutputPump(tokio::task::JoinHandle<()>);
+
+impl Drop for OutputPump {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 impl TaskEvents {
+    fn new(channel: Channel<TaskRunEvent>, count: usize) -> Self {
+        Self {
+            channel,
+            logs: Arc::new(parking_lot::Mutex::new(vec![String::new(); count])),
+            outputs: Arc::new(parking_lot::Mutex::new(
+                (0..count).map(|_| StepOutput::default()).collect(),
+            )),
+        }
+    }
+
+    fn pump(&self) -> OutputPump {
+        let events = self.clone();
+        OutputPump(tokio::spawn(async move {
+            let mut timer = tokio::time::interval(OUTPUT_INTERVAL);
+            loop {
+                timer.tick().await;
+                let count = events.outputs.lock().len();
+                for index in 0..count {
+                    let _ = events.flush(index);
+                }
+            }
+        }))
+    }
+
+    fn flush(&self, index: usize) -> tauri::Result<()> {
+        let event = {
+            let mut outputs = self.outputs.lock();
+            let Some(output) = outputs.get_mut(index) else {
+                return Ok(());
+            };
+            if !output.dirty {
+                return Ok(());
+            }
+            output.dirty = false;
+            output.last_emit = Some(Instant::now());
+            TaskRunEvent {
+                step_index: index,
+                status: "output".into(),
+                chunk: Some(output.tail.clone()),
+                exit_code: None,
+                message: None,
+            }
+        };
+        self.channel.send(event)
+    }
+
     fn send(&self, event: TaskRunEvent) -> tauri::Result<()> {
         if let Some(chunk) = &event.chunk {
             if let Some(log) = self.logs.lock().get_mut(event.step_index) {
-                log.push_str(chunk);
-                if log.len() > 8192 {
-                    let mut start = log.len() - 8192;
-                    while !log.is_char_boundary(start) {
-                        start += 1;
-                    }
-                    log.drain(..start);
-                }
+                crate::command_output::append_tail(log, chunk, 8192);
             }
+            let due = {
+                let mut outputs = self.outputs.lock();
+                let Some(output) = outputs.get_mut(event.step_index) else {
+                    return Ok(());
+                };
+                crate::command_output::append_tail(&mut output.tail, chunk, STEP_OUTPUT_CAP);
+                output.dirty = true;
+                output
+                    .last_emit
+                    .is_none_or(|last| last.elapsed() >= OUTPUT_INTERVAL)
+            };
+            return if due {
+                self.flush(event.step_index)
+            } else {
+                Ok(())
+            };
         }
+        self.flush(event.step_index)?;
         self.channel.send(event)
     }
 }
@@ -364,10 +437,8 @@ pub async fn tasks_run(
     )
     .await?;
 
-    let on_event = TaskEvents {
-        channel: on_event,
-        logs: Arc::new(parking_lot::Mutex::new(vec![String::new(); steps.len()])),
-    };
+    let on_event = TaskEvents::new(on_event, steps.len());
+    let _output_pump = on_event.pump();
     let mut outcomes = all_skipped(steps.len());
     let outcome = run_all(
         &app,
@@ -422,10 +493,8 @@ async fn run_all(
     outcomes: &mut [StepOutcome],
     expected_host_updated_at: Option<&str>,
 ) -> AppResult<()> {
-    let needs_remote = steps.iter().any(TaskStep::needs_remote);
     let conn_id = format!("task-run-{request_id}");
-
-    if needs_remote {
+    let target = if steps.iter().any(TaskStep::needs_remote) {
         validate_id(host_id, "host")?;
         let host = crate::repository::host_repo::get(&state.db, host_id).await?;
         if expected_host_updated_at != Some(host.updated_at.as_str()) {
@@ -433,43 +502,124 @@ async fn run_all(
                 "target host changed before execution; review the task and run it again".into(),
             ));
         }
-        let hops = super::ssh::build_hops(state, &host).await?;
-        connect_task_session(app, state, &conn_id, host.label, hops, cancel).await?;
-    }
-
-    let result = execute_steps(
-        app, state, &conn_id, steps, request_id, cancel, on_event, outcomes,
+        Some(TaskTarget {
+            label: host.label.clone(),
+            hops: super::ssh::build_hops(state, &host).await?,
+        })
+    } else {
+        None
+    };
+    let mut session = TaskSession {
+        id: conn_id.clone(),
+        target,
+        ssh: None,
+        sftp_ready: false,
+    };
+    let _cleanup = TaskSessionCleanup {
+        app,
+        state,
+        id: conn_id,
+    };
+    execute_steps(
+        app,
+        state,
+        &mut session,
+        steps,
+        request_id,
+        cancel,
+        on_event,
+        outcomes,
     )
-    .await;
+    .await
+}
 
-    if needs_remote {
-        state.sftp.disconnect(app, &conn_id);
+struct TaskTarget {
+    label: String,
+    hops: Vec<crate::ssh::Hop>,
+}
+
+struct TaskSession {
+    id: String,
+    target: Option<TaskTarget>,
+    ssh: Option<Arc<crate::ssh::SshConnection>>,
+    sftp_ready: bool,
+}
+
+struct TaskSessionCleanup<'a> {
+    app: &'a AppHandle,
+    state: &'a AppState,
+    id: String,
+}
+
+impl Drop for TaskSessionCleanup<'_> {
+    fn drop(&mut self) {
+        self.state.sftp.disconnect(self.app, &self.id);
     }
-    result
+}
+
+impl TaskSession {
+    async fn ensure_ssh(
+        &mut self,
+        app: &AppHandle,
+        state: &AppState,
+        cancel: &Arc<TransferCancel>,
+    ) -> AppResult<Arc<crate::ssh::SshConnection>> {
+        if self.ssh.as_ref().is_some_and(|ssh| ssh.handle.is_closed()) {
+            state.sftp.disconnect(app, &self.id);
+            self.ssh = None;
+            self.sftp_ready = false;
+        }
+        if let Some(ssh) = &self.ssh {
+            return Ok(ssh.clone());
+        }
+        let target = self
+            .target
+            .as_ref()
+            .ok_or_else(|| AppError::Invalid("task has no remote target".into()))?;
+        let ssh = connect_task_session(app, state, &self.id, &target.hops, cancel).await?;
+        self.ssh = Some(ssh.clone());
+        Ok(ssh)
+    }
+
+    async fn ensure_sftp(
+        &mut self,
+        app: &AppHandle,
+        state: &AppState,
+        cancel: &Arc<TransferCancel>,
+    ) -> AppResult<()> {
+        let ssh = self.ensure_ssh(app, state, cancel).await?;
+        if !self.sftp_ready {
+            let target = self
+                .target
+                .as_ref()
+                .ok_or_else(|| AppError::Invalid("task has no remote target".into()))?;
+            state
+                .sftp
+                .attach_ssh(app, &self.id, &target.label, ssh, cancel)
+                .await?;
+            self.sftp_ready = true;
+        }
+        Ok(())
+    }
 }
 
 async fn connect_task_session(
     app: &AppHandle,
     state: &AppState,
     conn_id: &str,
-    host_label: String,
-    hops: Vec<crate::ssh::Hop>,
+    hops: &[crate::ssh::Hop],
     cancel: &Arc<TransferCancel>,
-) -> AppResult<()> {
+) -> AppResult<Arc<crate::ssh::SshConnection>> {
     let mut attempt = 0;
     loop {
         attempt += 1;
-        let params = SftpConnectParams {
-            connection_id: conn_id.to_string(),
-            host_label: host_label.clone(),
-            hops: hops.clone(),
+        let result = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Err(AppError::Cancelled),
+            result = crate::ssh::establish(app, &state.connection_prompts, conn_id, hops) => result,
         };
-        match state
-            .sftp
-            .connect_now(app, &state.connection_prompts, params, cancel)
-            .await
-        {
-            Ok(()) => return Ok(()),
+        match result {
+            Ok(ssh) => return Ok(Arc::new(ssh)),
             Err(err) => {
                 if attempt >= CONNECT_ATTEMPTS
                     || cancel.is_cancelled()
@@ -495,7 +645,7 @@ fn is_retryable_connect(err: &AppError) -> bool {
 async fn execute_steps(
     app: &AppHandle,
     state: &AppState,
-    conn_id: &str,
+    session: &mut TaskSession,
     steps: &[TaskStep],
     request_id: &str,
     cancel: &Arc<TransferCancel>,
@@ -515,7 +665,7 @@ async fn execute_steps(
         let _ = on_event.send(TaskRunEvent::simple(index, "start"));
 
         let result = run_step_with_retries(
-            app, state, conn_id, request_id, index, step, cancel, on_event,
+            app, state, session, request_id, index, step, cancel, on_event,
         )
         .await;
         match result {
@@ -575,7 +725,7 @@ async fn execute_steps(
 async fn run_step_with_retries(
     app: &AppHandle,
     state: &AppState,
-    conn_id: &str,
+    session: &mut TaskSession,
     request_id: &str,
     index: usize,
     step: &TaskStep,
@@ -586,12 +736,15 @@ async fn run_step_with_retries(
     let mut attempt: u32 = 0;
     loop {
         match run_step(
-            app, state, conn_id, request_id, index, step, cancel, on_event,
+            app, state, session, request_id, index, step, cancel, on_event,
         )
         .await
         {
             StepResult::Failed { exit, message } => {
-                if attempt >= max_retries || cancel.is_cancelled() {
+                if cancel.is_cancelled() {
+                    return StepResult::Cancelled;
+                }
+                if attempt >= max_retries {
                     return StepResult::Failed { exit, message };
                 }
                 attempt += 1;
@@ -618,7 +771,7 @@ async fn run_step_with_retries(
 async fn run_step(
     app: &AppHandle,
     state: &AppState,
-    conn_id: &str,
+    session: &mut TaskSession,
     request_id: &str,
     index: usize,
     step: &TaskStep,
@@ -627,28 +780,50 @@ async fn run_step(
 ) -> StepResult {
     match step {
         TaskStep::LocalCommand { cwd, command, .. } => command_result(
-            run_local_command(index, cwd.as_deref(), command, cancel, on_event).await,
-        ),
-        TaskStep::RemoteCommand { cwd, command, .. } => command_result(
-            run_remote_command(
-                state,
-                conn_id,
+            run_local_command(
                 index,
                 cwd.as_deref(),
                 command,
+                CommandOptions::from(step),
                 cancel,
                 on_event,
             )
             .await,
         ),
+        TaskStep::RemoteCommand { cwd, command, .. } => {
+            match session.ensure_ssh(app, state, cancel).await {
+                Ok(ssh) => command_result(
+                    run_remote_command(
+                        &ssh,
+                        index,
+                        cwd.as_deref(),
+                        command,
+                        CommandOptions::from(step),
+                        cancel,
+                        on_event,
+                    )
+                    .await,
+                ),
+                Err(error) => command_result(Err(error)),
+            }
+        }
         TaskStep::Upload { .. } | TaskStep::Download { .. } => {
-            match run_transfer(app, state, conn_id, request_id, index, step, cancel).await {
+            let result = async {
+                session.ensure_sftp(app, state, cancel).await?;
+                run_transfer(app, state, &session.id, request_id, index, step, cancel).await
+            }
+            .await;
+            match result {
                 Ok(()) => StepResult::Success(None),
                 Err(AppError::Cancelled) => StepResult::Cancelled,
-                Err(error) => StepResult::Failed {
-                    exit: None,
-                    message: error.to_string(),
-                },
+                Err(error) => {
+                    state.sftp.disconnect(app, &session.id);
+                    session.sftp_ready = false;
+                    StepResult::Failed {
+                        exit: None,
+                        message: error.to_string(),
+                    }
+                }
             }
         }
     }
@@ -669,33 +844,80 @@ fn command_result(result: AppResult<i32>) -> StepResult {
     }
 }
 
-fn shell_command(command: &str) -> tokio::process::Command {
+#[derive(Clone, Copy)]
+struct CommandOptions {
+    shell: Option<TaskShell>,
+    timeout: Duration,
+}
+
+impl Default for CommandOptions {
+    fn default() -> Self {
+        Self {
+            shell: None,
+            timeout: Duration::from_secs(300),
+        }
+    }
+}
+
+impl From<&TaskStep> for CommandOptions {
+    fn from(step: &TaskStep) -> Self {
+        let (shell, seconds) = step.command_options();
+        Self {
+            shell,
+            timeout: Duration::from_secs(seconds),
+        }
+    }
+}
+
+fn shell_command(command: &str, shell: Option<TaskShell>) -> AppResult<tokio::process::Command> {
+    let shell = shell.unwrap_or(if cfg!(windows) {
+        TaskShell::Cmd
+    } else {
+        TaskShell::Sh
+    });
+    if !cfg!(windows) && !shell.is_posix() {
+        return Err(AppError::Invalid(
+            "this shell is only available on Windows; choose sh, bash, or zsh".into(),
+        ));
+    }
+    let executable = if shell == TaskShell::Sh && cfg!(unix) {
+        "/bin/sh"
+    } else {
+        shell.executable()
+    };
+    let mut cmd = tokio::process::Command::new(executable);
+    match shell {
+        TaskShell::Sh => {
+            cmd.args(["-e", "-c", command]);
+        }
+        TaskShell::Bash | TaskShell::Zsh => {
+            cmd.args(["-e", "-o", "pipefail", "-c", command]);
+        }
+        TaskShell::Cmd => {
+            cmd.args(["/D", "/S", "/C", command]);
+        }
+        TaskShell::Powershell => {
+            cmd.args(["-NoProfile", "-NonInteractive", "-Command", &format!("$ErrorActionPreference = 'Stop'; & {{\n{command}\n}}; if (-not $?) {{ exit 1 }}")]);
+        }
+    }
     #[cfg(windows)]
     {
-        let mut cmd = tokio::process::Command::new("cmd");
-        cmd.arg("/C").arg(command);
-        cmd
+        cmd.creation_flags(0x08000000);
     }
-    #[cfg(not(windows))]
-    {
-        let mut cmd = tokio::process::Command::new("sh");
-        cmd.arg("-c").arg(command);
-        cmd
-    }
+    Ok(cmd)
 }
 
 async fn run_local_command(
     index: usize,
     cwd: Option<&str>,
     command: &str,
+    options: CommandOptions,
     cancel: &Arc<TransferCancel>,
     on_event: &TaskEvents,
 ) -> AppResult<i32> {
-    let mut builder = shell_command(command);
+    let mut builder = shell_command(command, options.shell)?;
     builder.kill_on_drop(true);
-    if let Some(dir) = cwd {
-        builder.current_dir(expand_local_tilde(dir));
-    }
+    builder.current_dir(resolve_local_path(cwd.unwrap_or("~"))?);
     crate::shell_env::apply(&mut builder).await;
     builder
         .stdin(Stdio::null())
@@ -707,6 +929,7 @@ async fn run_local_command(
         .map_err(|e| AppError::Other(format!("could not start local command: {e}")))?;
 
     let process_group = child.id();
+    let mut process_guard = LocalProcessGroup(process_group);
     let mut readers = JoinSet::new();
     if let Some(stdout) = child.stdout.take() {
         readers.spawn(forward_reader(stdout, index, on_event.clone()));
@@ -723,7 +946,7 @@ async fn run_local_command(
     let outcome = tokio::select! {
         biased;
         _ = cancel.cancelled() => Stop::Cancelled,
-        _ = tokio::time::sleep(COMMAND_TIMEOUT) => Stop::TimedOut,
+        _ = tokio::time::sleep(options.timeout) => Stop::TimedOut,
         status = child.wait() => Stop::Done(status),
     };
     match outcome {
@@ -745,7 +968,7 @@ async fn run_local_command(
                 biased;
                 _ = cancel.cancelled() => Err(AppError::Cancelled),
                 result = tokio::time::timeout(KILL_DRAIN_GRACE, drain(&mut readers)) => {
-                    result.map_err(|_| AppError::Timeout("local command output did not close; redirect background process output".into()))
+                    result.map_err(|_| AppError::Timeout("local command output did not close; redirect background process output".into())).and_then(|result| result)
                 }
             };
             if drained.is_err() {
@@ -753,8 +976,19 @@ async fn run_local_command(
                 readers.abort_all();
             }
             drained?;
+            if status.success() {
+                process_guard.0 = None;
+            }
             Ok(exit_code(status))
         }
+    }
+}
+
+struct LocalProcessGroup(Option<u32>);
+
+impl Drop for LocalProcessGroup {
+    fn drop(&mut self) {
+        kill_process_group(self.0);
     }
 }
 
@@ -797,7 +1031,7 @@ async fn kill_process_tree(child: &mut tokio::process::Child) {
     let _ = child.start_kill();
 }
 
-async fn drain_bounded(readers: &mut JoinSet<()>) {
+async fn drain_bounded(readers: &mut JoinSet<AppResult<()>>) {
     let _ = tokio::time::timeout(KILL_DRAIN_GRACE, drain(readers)).await;
 }
 
@@ -816,36 +1050,44 @@ fn exit_code(status: std::process::ExitStatus) -> i32 {
     }
 }
 
-async fn drain(readers: &mut JoinSet<()>) {
-    while readers.join_next().await.is_some() {}
+async fn drain(readers: &mut JoinSet<AppResult<()>>) -> AppResult<()> {
+    let mut failure = None;
+    while let Some(result) = readers.join_next().await {
+        let error = match result {
+            Ok(Ok(())) => None,
+            Ok(Err(error)) => Some(error),
+            Err(error) => Some(AppError::Other(format!(
+                "command output reader failed: {error}"
+            ))),
+        };
+        if failure.is_none() {
+            failure = error;
+        }
+    }
+    failure.map_or(Ok(()), Err)
 }
 
-async fn forward_reader<R>(mut reader: R, index: usize, on_event: TaskEvents)
+async fn forward_reader<R>(mut reader: R, index: usize, on_event: TaskEvents) -> AppResult<()>
 where
     R: tokio::io::AsyncRead + Unpin,
 {
     let mut buf = [0u8; 8 * 1024];
-    let mut forwarded = 0usize;
-    let mut truncated = false;
+    let mut decoder = crate::command_output::Utf8Decoder::default();
     loop {
-        match reader.read(&mut buf).await {
-            Ok(0) | Err(_) => break,
-            Ok(n) => {
-                if forwarded >= STEP_OUTPUT_CAP {
-                    if !truncated {
-                        truncated = true;
-                        let _ = on_event
-                            .send(TaskRunEvent::log(index, "\n…(output truncated)…\n".into()));
-                    }
-                    continue;
-                }
-                let take = (STEP_OUTPUT_CAP - forwarded).min(n);
-                forwarded += take;
-                let chunk = String::from_utf8_lossy(&buf[..take]).into_owned();
-                let _ = on_event.send(TaskRunEvent::log(index, chunk));
-            }
+        let count = reader.read(&mut buf).await?;
+        if count == 0 {
+            break;
+        }
+        let chunk = decoder.push(&buf[..count]);
+        if !chunk.is_empty() {
+            let _ = on_event.send(TaskRunEvent::log(index, chunk));
         }
     }
+    let remaining = decoder.finish();
+    if !remaining.is_empty() {
+        let _ = on_event.send(TaskRunEvent::log(index, remaining));
+    }
+    Ok(())
 }
 
 fn wrap_remote_command(cwd: Option<&str>, command: &str) -> String {
@@ -865,29 +1107,33 @@ fn wrap_remote_command(cwd: Option<&str>, command: &str) -> String {
 }
 
 async fn run_remote_command(
-    state: &AppState,
-    conn_id: &str,
+    ssh: &crate::ssh::SshConnection,
     index: usize,
     cwd: Option<&str>,
     command: &str,
+    options: CommandOptions,
     cancel: &Arc<TransferCancel>,
     on_event: &TaskEvents,
 ) -> AppResult<i32> {
-    let wrapped = wrap_remote_command(cwd, command);
+    let script = wrap_remote_command(cwd, command);
+    let shell = options.shell.unwrap_or(TaskShell::Sh);
+    let flags = if matches!(shell, TaskShell::Bash | TaskShell::Zsh) {
+        "-e -o pipefail"
+    } else {
+        "-e"
+    };
+    let wrapped = format!("{} {flags} -c {}", shell.executable(), sh_quote(&script));
     let channel = on_event.clone();
-    state
-        .sftp
-        .exec_stream(
-            conn_id,
-            &wrapped,
-            STEP_OUTPUT_CAP,
-            move |chunk| {
-                let _ = channel.send(TaskRunEvent::log(index, chunk));
-            },
-            cancel,
-            COMMAND_TIMEOUT,
-        )
-        .await
+    crate::ssh::exec::exec_stream(
+        &ssh.handle,
+        &wrapped,
+        move |chunk| {
+            let _ = channel.send(TaskRunEvent::log(index, chunk));
+        },
+        cancel,
+        options.timeout,
+    )
+    .await
 }
 
 async fn run_transfer(
@@ -899,20 +1145,33 @@ async fn run_transfer(
     step: &TaskStep,
     cancel: &Arc<TransferCancel>,
 ) -> AppResult<()> {
+    let remote_path = match step {
+        TaskStep::Upload { remote_path, .. } | TaskStep::Download { remote_path, .. } => {
+            if remote_path == "~" || remote_path.starts_with("~/") {
+                let home = state.sftp.realpath(conn_id, ".").await?;
+                if remote_path == "~" {
+                    home
+                } else {
+                    crate::sftp::path::join_remote(&home, &remote_path[2..])
+                }
+            } else {
+                remote_path.clone()
+            }
+        }
+        _ => return Err(AppError::Invalid("not a transfer step".into())),
+    };
     let (source, dest_dir, target_name) = match step {
-        TaskStep::Upload {
-            local_path,
-            remote_path,
-            ..
-        } => {
-            let name = base_name(remote_path);
+        TaskStep::Upload { local_path, .. } => {
+            let name = base_name(&remote_path);
             let source = Endpoint {
                 connection_id: None,
-                path: expand_local_tilde(local_path),
+                path: resolve_local_path(local_path)?
+                    .to_string_lossy()
+                    .into_owned(),
             };
             let dest_dir = Endpoint {
                 connection_id: Some(conn_id.to_string()),
-                path: parent_remote(remote_path),
+                path: parent_remote(&remote_path),
             };
             (source, dest_dir, name)
         }
@@ -921,7 +1180,7 @@ async fn run_transfer(
             local_path,
             ..
         } => {
-            let (dir, name) = split_local_path(&expand_local_tilde(local_path))?;
+            let (dir, name) = split_local_path(&resolve_local_path(local_path)?.to_string_lossy())?;
             let source = Endpoint {
                 connection_id: Some(conn_id.to_string()),
                 path: remote_path.clone(),
@@ -982,6 +1241,20 @@ fn expand_local_tilde(path: &str) -> String {
     path.to_string()
 }
 
+fn resolve_local_path(path: &str) -> AppResult<std::path::PathBuf> {
+    let expanded = std::path::PathBuf::from(expand_local_tilde(path));
+    if expanded.is_absolute() {
+        return Ok(expanded);
+    }
+    let home = home_dir().ok_or_else(|| {
+        AppError::Invalid("could not find the home folder; use an absolute path".into())
+    })?;
+    if path == "~" || path.starts_with("~/") {
+        return Err(AppError::Invalid("could not expand the home folder".into()));
+    }
+    Ok(std::path::PathBuf::from(home).join(expanded))
+}
+
 fn split_local_path(path: &str) -> AppResult<(String, String)> {
     let p = std::path::Path::new(path);
     let name = p
@@ -1001,10 +1274,7 @@ mod tests {
     use super::*;
 
     fn events() -> TaskEvents {
-        TaskEvents {
-            channel: Channel::new(|_| Ok(())),
-            logs: Arc::new(parking_lot::Mutex::new(vec![String::new()])),
-        }
+        TaskEvents::new(Channel::new(|_| Ok(())), 1)
     }
 
     #[tokio::test]
@@ -1044,6 +1314,7 @@ mod tests {
                 0,
                 None,
                 "sleep 30 &",
+                CommandOptions::default(),
                 &Arc::new(TransferCancel::new()),
                 &events(),
             ),
@@ -1064,7 +1335,14 @@ mod tests {
         });
         let result = tokio::time::timeout(
             Duration::from_secs(2),
-            run_local_command(0, None, "sleep 30", &cancel, &events()),
+            run_local_command(
+                0,
+                None,
+                "sleep 30",
+                CommandOptions::default(),
+                &cancel,
+                &events(),
+            ),
         )
         .await
         .unwrap();
@@ -1074,6 +1352,7 @@ mod tests {
             0,
             None,
             "printf failure >&2; exit 7",
+            CommandOptions::default(),
             &Arc::new(TransferCancel::new()),
             &output,
         )
@@ -1109,6 +1388,120 @@ mod tests {
         assert!(output.stdout.is_empty());
         assert!(wrap_remote_command(Some("~/project dir"), "true")
             .starts_with("cd -- \"$HOME\"/'project dir' && {"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn commands_stop_on_errors_and_support_pipeline_checks() {
+        for (shell, command) in [
+            (None, "false; printf unexpected"),
+            (Some(TaskShell::Bash), "false | cat; printf unexpected"),
+        ] {
+            let output = events();
+            let result = run_local_command(
+                0,
+                None,
+                command,
+                CommandOptions {
+                    shell,
+                    ..Default::default()
+                },
+                &Arc::new(TransferCancel::new()),
+                &output,
+            )
+            .await
+            .unwrap();
+            assert_ne!(result, 0);
+            assert!(output.logs.lock()[0].is_empty());
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn command_timeout_is_configurable() {
+        let result = run_local_command(
+            0,
+            None,
+            "sleep 30",
+            CommandOptions {
+                timeout: Duration::from_millis(50),
+                ..Default::default()
+            },
+            &Arc::new(TransferCancel::new()),
+            &events(),
+        )
+        .await;
+        assert!(matches!(result, Err(AppError::Timeout(_))));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn preserves_error_tail_after_large_output() {
+        let output = events();
+        let code = run_local_command(
+            0,
+            None,
+            "head -c 600000 /dev/zero | tr '\\0' x; printf final-error; exit 9",
+            CommandOptions::default(),
+            &Arc::new(TransferCancel::new()),
+            &output,
+        )
+        .await
+        .unwrap();
+        output.flush(0).unwrap();
+        assert_eq!(code, 9);
+        assert!(output.logs.lock()[0].ends_with("final-error"));
+        let outputs = output.outputs.lock();
+        assert!(outputs[0].tail.ends_with("final-error"));
+        assert!(outputs[0].tail.len() <= STEP_OUTPUT_CAP);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn uses_the_home_folder_and_closes_command_input() {
+        let output = events();
+        let code = run_local_command(
+            0,
+            None,
+            "pwd; cat",
+            CommandOptions::default(),
+            &Arc::new(TransferCancel::new()),
+            &output,
+        )
+        .await
+        .unwrap();
+        assert_eq!(code, 0);
+        assert_eq!(
+            std::path::PathBuf::from(output.logs.lock()[0].trim()),
+            std::path::PathBuf::from(home_dir().unwrap())
+        );
+        assert_eq!(
+            resolve_local_path("project/dist").unwrap(),
+            std::path::PathBuf::from(home_dir().unwrap()).join("project/dist")
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn allows_explicitly_redirected_background_processes() {
+        let output = events();
+        let code = run_local_command(
+            0,
+            None,
+            "sleep 30 >/dev/null 2>&1 & printf '%s' \"$!\"",
+            CommandOptions::default(),
+            &Arc::new(TransferCancel::new()),
+            &output,
+        )
+        .await
+        .unwrap();
+        assert_eq!(code, 0);
+        let pid: i32 = output.logs.lock()[0].parse().unwrap();
+        let alive = unsafe { libc::kill(pid, 0) == 0 };
+        unsafe {
+            libc::kill(pid, libc::SIGKILL);
+        }
+        assert!(alive);
     }
 
     #[test]

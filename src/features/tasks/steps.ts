@@ -75,6 +75,18 @@ export function isTaskStep(value: unknown): value is TaskStep {
     case "localCommand":
     case "remoteCommand":
       return (
+        (step.shell === undefined ||
+          step.shell === null ||
+          (typeof step.shell === "string" &&
+            (step.type === "remoteCommand"
+              ? ["sh", "bash", "zsh"]
+              : ["sh", "bash", "zsh", "cmd", "powershell"]
+            ).includes(step.shell))) &&
+        (step.timeoutSeconds === undefined ||
+          step.timeoutSeconds === null ||
+          (Number.isInteger(step.timeoutSeconds) &&
+            (step.timeoutSeconds as number) >= 1 &&
+            (step.timeoutSeconds as number) <= 86400)) &&
         text(step.command, 32 * 1024) &&
         (step.cwd === undefined ||
           step.cwd === null ||
