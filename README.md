@@ -4,9 +4,9 @@
 
 # Sageport
 
-**One workspace for every server you run.**
+**A unified workspace for SSH server management**
 
-Terminal, file transfer, monitoring, port forwarding, and scheduled automation — in a single free, open-source desktop app that talks plain SSH.
+Manage terminal sessions, file transfers, resource monitoring, port forwarding, and scheduled workflows in one free, open-source desktop application.
 
 [![Latest release](https://img.shields.io/github/v/release/joygqz/sageport)](https://github.com/joygqz/sageport/releases/latest)
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE)
@@ -18,72 +18,72 @@ English · [简体中文](README.zh-CN.md)
 
 ![Sageport workbench](docs/screenshot.png)
 
-## Why Sageport
+## Overview
 
-Server work usually means a pile of tools: a terminal here, an SFTP client there, cron scripts on some box, a notes file full of commands, and a key manager you half trust. Sageport folds all of that into one VS Code-style workspace.
+Sageport is a free, open-source desktop application for SSH-based server management. It brings terminal sessions, SFTP file transfer, resource monitoring, port forwarding, and task automation into a unified workspace.
 
-| You are juggling…            | Sageport gives you                                         |
-| ---------------------------- | ---------------------------------------------------------- |
-| A terminal per server        | Tabs, split panes, and broadcast input across servers      |
-| A separate SFTP client       | A two-pane file browser with drag-and-drop and remote edit |
-| Deploy scripts and cron jobs | Visual tasks with schedules, retries, and run history      |
-| `htop` over SSH              | Live CPU, memory, disk, and network — no agent             |
-| A notes file of commands     | Snippets with variables, runnable across many hosts        |
-| `ssh -L` incantations        | One-click port forwarding, auto-start included             |
+| Capability          | Description                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| Terminal sessions   | Manage multiple connections with tabs, split panes, and broadcast input               |
+| File management     | Transfer files between local and remote systems and edit remote files in place        |
+| Task automation     | Coordinate commands and file transfers with schedules, retries, and execution history |
+| Resource monitoring | View CPU, memory, disk, and network metrics over SSH                                  |
+| Command snippets    | Reuse parameterized commands across one or more hosts                                 |
+| Port forwarding     | Manage local, remote, and dynamic SSH tunnels                                         |
 
-Three principles run through everything:
+- **Agentless access.** Connect through standard SSH and SFTP without installing a Sageport agent on remote hosts.
+- **Local data storage.** Host configurations, credentials, settings, and execution history are stored on your device. No Sageport account or hosted service is required.
+- **Explicit authorization.** Host key verification, destructive action confirmations, and AI approval controls help you review sensitive operations.
 
-- **Nothing to install on your servers.** Sageport speaks standard SSH and SFTP. If `ssh` works, Sageport works.
-- **Local-first.** No account, no cloud service. Hosts, keys, history, and settings live in a database on your device.
-- **You stay in charge.** Unknown host keys, destructive actions, and AI operations all ask before they act.
-
-## Feature tour
+## Features
 
 ### Terminal
 
-Tabs and split panes, one-click reconnect, scrollback search, and command autocomplete. Broadcast mode types into every connected terminal at once — ideal for fleet-wide changes. In a hurry, type `user@host` in the command palette to connect without saving anything.
+Manage SSH sessions with tabs and split panes. Reconnect sessions, search terminal scrollback, and use command autocomplete. Broadcast input to multiple connected terminals for coordinated operations. For an ad hoc connection, enter `user@host` in the command palette without creating a saved host.
 
-### File transfer
+### File management
 
-A two-pane browser puts your machine and the server side by side: drag and drop to transfer, filter and sort large directories instantly, and open remote files in a syntax-highlighted Monaco editor that saves straight back to the server. Recursive deletes scan first, run in parallel, and show live progress — even on huge trees. Every transfer is logged with both endpoints.
+Browse local and remote directories side by side, transfer files with drag and drop, and filter or sort directory contents. Edit remote files in the integrated Monaco editor with syntax highlighting and save changes directly to the server. Recursive deletion includes a preliminary scan, parallel execution, and progress reporting. Transfer records include source and destination details.
 
-### Automation
+### Task automation
 
-Chain steps into a task: run a local build, upload the artifacts, restart the service — each step a local command, upload, download, or remote command. Start from a template (frontend release, backend release, database backup, config push, log collection) or from scratch. Give flaky steps automatic retries, watch live output per step, and audit every run in a persistent history.
+Define multi-step workflows using local commands, uploads, downloads, and remote commands. Built-in templates cover frontend and backend deployments, database backups, configuration distribution, and log collection. Configure step retries, inspect live output, and review persistent execution history.
 
-Put a task on a cron schedule and it runs by itself. Closing the window doesn't stop anything: Sageport keeps working from the system tray, where upcoming runs and active port forwards stay one click away.
+Schedule tasks with cron expressions. Scheduled execution requires Sageport to remain running, either with an open window or in the system tray. The tray menu provides access to upcoming tasks and active port forwards.
 
 ### Hosts and credentials
 
-Group hosts however you think about them, share logins across hosts with reusable identities, and reach machines behind a bastion through jump-host chains. Import everything you already have from `~/.ssh/config` in one step. Generate, import, and manage SSH keys inside the app.
+Organize hosts into groups, reuse credentials through shared identities, and connect through jump-host chains. Import host configurations from `~/.ssh/config`, and generate, import, or manage SSH keys within the application.
 
-### Monitoring
+### Resource monitoring
 
-Open the monitor on any connected host for live CPU, memory, disk, and network charts — gathered over the existing SSH session, with nothing to deploy.
+View live CPU, memory, disk, and network charts for connected hosts. Metrics are collected through the existing SSH session without deploying a monitoring agent.
 
-### Snippets and batch runs
+### Command snippets
 
-Save the commands you keep retyping, with `{{variable}}` placeholders filled in at run time. Run a snippet on one host or across many at once, with per-host output and status.
+Save reusable commands with `{{variable}}` placeholders and supply values at execution time. Run snippets on individual hosts or across multiple hosts, with separate output and execution status for each host.
 
 ### Port forwarding
 
-Local, remote, and dynamic (SOCKS) forwards, defined once and started with a click — through jump hosts too. Mark a forward to auto-start and your database GUI or internal dashboard is always reachable.
+Configure local, remote, and dynamic (SOCKS) SSH forwarding, including connections through jump hosts. Start and stop tunnels from the workspace, or enable automatic startup for configured forwards.
 
 ### AI assistant
 
-Bring your own provider — any OpenAI- or Anthropic-compatible endpoint — and the assistant can see your workbench, suggest and run commands, manage files, and build automation tasks for you. It operates under a strict approval model: reading terminal or remote file content always requires consent, every other action waits for your approval unless you enable autonomous mode, and even then it pauses again after touching untrusted content.
+Configure an OpenAI- or Anthropic-compatible API endpoint with your own credentials and model. The assistant can use workspace context, propose and execute commands, manage files, and create automation tasks.
+
+Reading terminal or remote file content requires approval. Other operations follow the configured approval policy. Autonomous mode allows eligible operations to run automatically, while operations influenced by untrusted content require renewed approval.
 
 ### Sync and backup
 
-Optionally sync your setup between devices through GitHub Gist, Google Drive, OneDrive, WebDAV, or S3 — encrypted with your passphrase before anything leaves the device. Prefer to stay offline? Export a single encrypted backup file.
+Optionally synchronize configuration across devices using GitHub Gist, Google Drive, OneDrive, WebDAV, or S3. Sync data is encrypted locally with your passphrase before upload. For offline backup, export an encrypted backup file.
 
-### The workbench
+### Workspace
 
-A command palette for everything, keyboard shortcuts throughout, light and dark themes, English and 简体中文 interfaces, and a JSON settings editor with schema validation for those who would rather type than click.
+Access features through the command palette and keyboard shortcuts. The interface supports light and dark themes, English and Simplified Chinese, and a JSON settings editor with schema validation.
 
-## Install
+## Installation
 
-Download from the [latest release](https://github.com/joygqz/sageport/releases/latest):
+Download a package from the [latest release](https://github.com/joygqz/sageport/releases/latest):
 
 | Platform                        | Package                             |
 | ------------------------------- | ----------------------------------- |
@@ -91,49 +91,54 @@ Download from the [latest release](https://github.com/joygqz/sageport/releases/l
 | Windows (64-bit)                | `.exe` installer or portable `.zip` |
 | Linux (64-bit)                  | `.AppImage` or `.deb`               |
 
-Installed builds update themselves — new versions install right from the app.
+Installed builds support in-app updates.
 
-**Portable mode (Windows).** The portable `.zip` installs nothing: unzip anywhere — a USB drive included — and every setting, host, key, and record lives in the `data` folder next to `Sageport.exe`. Move the folder, and your whole setup moves with it. Portable builds do not self-update or register for startup, and anyone holding the folder can read the credentials inside, so guard the drive itself.
+**Windows portable mode.** Extract the portable `.zip` and run `Sageport.exe` without installation. Settings, host configurations, keys, and records are stored in the adjacent `data` directory and move with the application folder. Portable builds do not support automatic updates or startup registration. Credentials in this directory are readable by anyone with file access, so protect the folder and its storage device.
 
 ## Quick start
 
-1. **Add a server.** Press <kbd>⌘</kbd> <kbd>N</kbd> and enter the address, username, and password or key — or import your `~/.ssh/config` hosts in one go.
-2. **Connect.** Click the host in the sidebar, or press <kbd>⌘</kbd> <kbd>P</kbd> and type its name.
-3. **Move files.** Press <kbd>⌘</kbd> <kbd>J</kbd> and drag files between the two panes.
-4. **Automate something.** Open the Tasks view, pick a template, point it at your host, and run it. Once you trust it, add a schedule and let the tray take it from there.
+1. **Add a host.** Press <kbd>⌘</kbd> <kbd>N</kbd> and enter the address, username, and authentication credentials, or import hosts from `~/.ssh/config`.
+2. **Connect to a host.** Select a host in the sidebar, or press <kbd>⌘</kbd> <kbd>P</kbd> and search for its name.
+3. **Transfer files.** Press <kbd>⌘</kbd> <kbd>J</kbd> to open the file browser, then drag files between the local and remote panes.
+4. **Create an automation task.** Open the Tasks view, select a template, configure the target host, and run the task. Review the result before adding a schedule.
 
-On Windows and Linux, read <kbd>⌘</kbd> as <kbd>Ctrl</kbd>.
+Use <kbd>Ctrl</kbd> instead of <kbd>⌘</kbd> on Windows and Linux.
 
-## FAQ
+## Frequently asked questions
 
-**Do I need to install anything on my servers?**
-No. Sageport uses standard SSH and SFTP. Monitoring runs ordinary commands over the existing session.
+**Does Sageport require a remote agent?**
+No. Connections use standard SSH and SFTP. Resource monitoring runs system commands through the existing SSH session.
 
-**Where is my data stored?**
-In a local database on your device. There is no Sageport cloud and no account. Note that passwords and keys are stored unencrypted in that database — anything that can read your user files can read them, so protect the device itself.
+**Where is application data stored?**
+Sageport stores application data in a local database and does not require an account or a Sageport cloud service. Passwords and keys are stored unencrypted in the database. Protect access to your device and user files.
 
-**Do scheduled tasks run when the app is closed?**
-They run as long as Sageport is running — in the window or minimized to the tray. Closing the window hides it to the tray and keeps schedules alive; quitting from the tray menu stops everything. Every run is recorded locally either way.
+**Do scheduled tasks run after closing the window?**
+Closing the window keeps Sageport running in the system tray, so scheduled tasks continue. Exiting the application from the tray stops scheduled execution. Execution history is stored locally.
 
-**Is the sync passphrase recoverable?**
-No. Backups are encrypted with your passphrase before upload, the provider never sees it, and the developer cannot recover it. Keep a copy somewhere safe.
+**Can a lost sync passphrase be recovered?**
+No. Sync and backup data is encrypted locally before upload. The storage provider does not receive your passphrase, and the developer cannot recover it. Store the passphrase securely.
 
-**Which AI providers work?**
-Any endpoint that speaks the OpenAI or Anthropic API — commercial or self-hosted. You supply the base URL, key, and model; nothing about your servers is sent anywhere unless the assistant is asked to look, and reads of terminal or file content always require your approval.
+**Which AI providers are supported?**
+Sageport supports OpenAI- and Anthropic-compatible API endpoints, including commercial and self-hosted services. Configure the base URL, API key, and model in the application. Requests are sent to your configured provider, and reading terminal or remote file content requires approval.
 
 ## Build from source
 
-You need [Node.js](https://nodejs.org) with [pnpm](https://pnpm.io), a [Rust toolchain](https://rustup.rs), and the [Tauri 2 prerequisites](https://tauri.app/start/prerequisites/) for your platform.
+Install [Node.js](https://nodejs.org), [pnpm](https://pnpm.io), a [Rust toolchain](https://rustup.rs), and the [Tauri 2 prerequisites](https://tauri.app/start/prerequisites/) for your platform.
 
 ```sh
 pnpm install
-pnpm tauri dev     # run the app in development
-pnpm tauri build   # produce a release bundle
+pnpm tauri dev
 ```
 
-`pnpm test` runs the frontend suite; `cargo test` inside `src-tauri` runs the backend suite.
+Create a release bundle:
 
-Under the hood: a Rust core (russh, SQLite via sqlx, tokio) behind a React 19 + TypeScript workbench (xterm.js, Monaco, Tailwind), packaged with Tauri 2.
+```sh
+pnpm tauri build
+```
+
+Run the frontend test suite with `pnpm test`. Run the backend test suite with `cargo test` from the `src-tauri` directory.
+
+Sageport uses a Rust backend with russh, sqlx, SQLite, and tokio, and a React 19 and TypeScript frontend with xterm.js, Monaco, and Tailwind. The desktop application is packaged with Tauri 2.
 
 ## License
 
