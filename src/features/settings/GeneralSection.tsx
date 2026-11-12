@@ -37,6 +37,7 @@ import { SettingsGroup, SETTINGS_GROUP_STACK_CLASS } from "./SettingsGroup";
 import { HighlightRulesSettings } from "./HighlightRulesSettings";
 
 const THEME_DESCRIPTION_KEYS: Record<string, TKey> = {
+  modern: "settings.general.theme.familyModern",
   midnight: "settings.general.theme.familyMidnight",
   graphite: "settings.general.theme.familyGraphite",
   dracula: "settings.general.theme.familyDracula",

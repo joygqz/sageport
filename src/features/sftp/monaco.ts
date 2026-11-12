@@ -34,25 +34,28 @@ export function applyEditorTheme(theme: ThemeDefinition) {
   monaco.editor.defineTheme(EDITOR_THEME, {
     base: theme.appearance === "dark" ? "vs-dark" : "vs",
     inherit: true,
-    rules: [
-      {
-        token: "comment",
-        foreground: token(terminal.brightBlack),
-        fontStyle: "italic",
-      },
-      { token: "string", foreground: token(terminal.green) },
-      { token: "number", foreground: token(terminal.yellow) },
-      { token: "keyword", foreground: token(terminal.magenta) },
-      { token: "type", foreground: token(terminal.cyan) },
-      { token: "type.identifier", foreground: token(terminal.cyan) },
-      { token: "function", foreground: token(terminal.blue) },
-      { token: "tag", foreground: token(terminal.red) },
-      { token: "attribute.name", foreground: token(terminal.yellow) },
-      { token: "invalid", foreground: token(terminal.red) },
-    ],
+    rules:
+      theme.familyId === "modern"
+        ? []
+        : [
+            {
+              token: "comment",
+              foreground: token(terminal.brightBlack),
+              fontStyle: "italic",
+            },
+            { token: "string", foreground: token(terminal.green) },
+            { token: "number", foreground: token(terminal.yellow) },
+            { token: "keyword", foreground: token(terminal.magenta) },
+            { token: "type", foreground: token(terminal.cyan) },
+            { token: "type.identifier", foreground: token(terminal.cyan) },
+            { token: "function", foreground: token(terminal.blue) },
+            { token: "tag", foreground: token(terminal.red) },
+            { token: "attribute.name", foreground: token(terminal.yellow) },
+            { token: "invalid", foreground: token(terminal.red) },
+          ],
     colors: {
-      "editor.background": terminal.background,
-      "editor.foreground": terminal.foreground,
+      "editor.background": colors.background,
+      "editor.foreground": colors.foreground,
       "editorCursor.foreground": terminal.cursor,
       "editor.selectionBackground": terminal.selectionBackground,
       "editor.selectionHighlightBackground": `${colors.primary}33`,
@@ -75,7 +78,7 @@ export function applyEditorTheme(theme: ThemeDefinition) {
       "editorSuggestWidget.selectedForeground": colors.listActiveForeground,
       "editorHoverWidget.background": colors.popover,
       "editorHoverWidget.border": colors.border,
-      "input.background": colors.surface,
+      "input.background": colors.inputBackground,
       "input.foreground": colors.foreground,
       "input.border": colors.input,
       focusBorder: colors.ring,
@@ -96,7 +99,7 @@ export function applyEditorTheme(theme: ThemeDefinition) {
       "scrollbarSlider.background": `${colors.mutedForeground}4d`,
       "scrollbarSlider.hoverBackground": `${colors.mutedForeground}80`,
       "scrollbarSlider.activeBackground": `${colors.mutedForeground}99`,
-      "minimap.background": terminal.background,
+      "minimap.background": colors.background,
     },
   });
   monaco.editor.setTheme(EDITOR_THEME);

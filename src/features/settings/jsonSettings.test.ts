@@ -15,7 +15,7 @@ describe("JSON settings", () => {
   it("omits default values", () => {
     const values = createJsonSettingsValues({
       locale: "en",
-      theme: "midnight:dark",
+      theme: defaults["general.theme"],
       fontFamily: "",
       zoomLevel: 0,
       keybindings: {},

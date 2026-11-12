@@ -37,6 +37,8 @@ export interface ThemeColors {
 
   border: string;
   input: string;
+  inputBackground: string;
+  primaryHover: string;
   ring: string;
 
   listHover: string;

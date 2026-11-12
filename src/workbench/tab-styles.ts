@@ -23,7 +23,7 @@ export const WORKBENCH_ITEM_INACTIVE_CLASS =
   "text-muted-foreground hover:bg-list-hover hover:text-foreground";
 
 export const WORKBENCH_TAB_ACTIVE_CLASS =
-  "font-medium text-list-active-foreground ring-1 ring-inset ring-border-subtle [--tab-background:var(--color-tab-active)]";
+  "font-medium text-foreground before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-primary [--tab-background:var(--color-tab-active)]";
 
 export const WORKBENCH_TAB_INACTIVE_CLASS =
   "text-muted-foreground hover:text-foreground hover:[--tab-background:var(--color-list-hover)]";

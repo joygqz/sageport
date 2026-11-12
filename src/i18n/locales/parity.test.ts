@@ -56,6 +56,7 @@ describe("locale parity", () => {
       "AWS",
       "CONNECT",
       "CPU",
+      "Code",
       "D",
       "Docker",
       "Drive",
@@ -93,6 +94,7 @@ describe("locale parity", () => {
       "Sageport",
       "Synology",
       "URL",
+      "VS",
       "WebDAV",
       "WebP",
     ]);

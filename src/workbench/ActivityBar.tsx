@@ -16,10 +16,7 @@ import { useI18n, type TKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type Activity } from "./layout";
 import { useOverlayStore } from "./overlays";
-import {
-  WORKBENCH_ITEM_ACTIVE_CLASS,
-  WORKBENCH_ITEM_INACTIVE_CLASS,
-} from "./tab-styles";
+import { WORKBENCH_ITEM_INACTIVE_CLASS } from "./tab-styles";
 
 const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
   { id: "hosts", icon: Server, labelKey: "activityBar.hosts" },
@@ -62,7 +59,7 @@ export const ActivityBar = memo(function ActivityBar() {
                   ACTIVITY_BUTTON_CLASS,
                   "relative",
                   active
-                    ? WORKBENCH_ITEM_ACTIVE_CLASS
+                    ? "bg-surface text-foreground before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:bg-primary"
                     : WORKBENCH_ITEM_INACTIVE_CLASS,
                 )}
               >

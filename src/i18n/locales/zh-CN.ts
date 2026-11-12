@@ -1200,6 +1200,7 @@ export const zhCN: Dictionary = {
         modeLight: "浅色",
         modeDark: "深色",
         family: "主题系列",
+        familyModern: "中性色界面搭配 VS Code 蓝色强调色",
         familyMidnight: "专注终端工作的深海军蓝",
         familyGraphite: "层级清晰的专业中性灰",
         familyDracula: "深邃紫色搭配鲜明的终端强调色",

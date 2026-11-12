@@ -10,10 +10,10 @@ export const GHOST_ICON_BUTTON_CLASS = `${INTERACTIVE_FOCUS_CLASS} flex size-[va
 
 export const CONTROL_INTERACTION_CLASS = `${CONTROL_BORDER_CLASS} ${CONTROL_FOCUS_CLASS}`;
 
-export const CONTROL_BASE_CLASS = `w-full rounded-md border bg-surface-raised text-foreground transition-colors placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-danger aria-[invalid=true]:focus-visible:ring-danger/35 ${CONTROL_INTERACTION_CLASS}`;
+export const CONTROL_BASE_CLASS = `w-full rounded-md border bg-input-background text-foreground transition-colors placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-danger aria-[invalid=true]:focus-visible:ring-danger/35 ${CONTROL_INTERACTION_CLASS}`;
 
 export const CONTROL_CONTAINER_CLASS =
-  "rounded-md border border-border-strong bg-surface-raised transition-colors hover:border-ring/70 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/35";
+  "rounded-md border border-border-strong bg-input-background transition-colors hover:border-ring/70 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/35";
 
 export const POPOVER_CONTENT_CLASS =
   "z-50 min-w-40 overflow-hidden rounded-lg border border-border bg-popover p-1.5 text-popover-foreground ui-overlay-motion data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1";

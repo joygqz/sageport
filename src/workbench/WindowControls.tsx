@@ -48,7 +48,7 @@ export function WindowControls() {
   };
 
   const buttonClass = cn(
-    "flex h-full w-11 items-center justify-center text-surface-foreground/70 transition-colors hover:bg-black/[0.06] dark:hover:bg-white/10",
+    "flex h-full w-11 items-center justify-center text-surface-foreground/70 transition-colors hover:bg-list-hover",
     INTERACTIVE_FOCUS_CLASS,
   );
 

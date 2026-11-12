@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { parseThemePreference, serializeThemePreference } from "./apply";
+
 import {
   DEFAULT_THEME_ID,
   getTheme,
@@ -26,9 +28,35 @@ function contrast(a: string, b: string): number {
 }
 
 describe("themes", () => {
-  it("provides three complete, paired theme families", () => {
-    expect(THEME_FAMILIES).toHaveLength(3);
-    expect(THEMES).toHaveLength(6);
+  it("defaults to Modern while preserving saved family and mode preferences", () => {
+    expect(parseThemePreference(null)).toEqual({
+      familyId: "modern",
+      mode: "dark",
+    });
+    expect(getTheme(undefined).id).toBe("modern-dark");
+    expect(getTheme("unknown").id).toBe("modern-dark");
+    expect(parseThemePreference("dark-modern")).toEqual({
+      familyId: "modern",
+      mode: "dark",
+    });
+    expect(parseThemePreference("light-modern")).toEqual({
+      familyId: "modern",
+      mode: "light",
+    });
+
+    for (const family of THEME_FAMILIES) {
+      for (const mode of ["system", "light", "dark"] as const) {
+        const preference = { familyId: family.id, mode };
+        expect(
+          parseThemePreference(serializeThemePreference(preference)),
+        ).toEqual(preference);
+      }
+    }
+  });
+
+  it("provides four complete, paired theme families", () => {
+    expect(THEME_FAMILIES).toHaveLength(4);
+    expect(THEMES).toHaveLength(8);
     expect(new Set(THEMES.map((theme) => theme.id)).size).toBe(THEMES.length);
     expect(getTheme(DEFAULT_THEME_ID).id).toBe(DEFAULT_THEME_ID);
 
@@ -73,6 +101,12 @@ describe("themes", () => {
           "primary control",
         ],
         [theme.colors.link, theme.colors.background, "link text"],
+        [theme.colors.foreground, theme.colors.inputBackground, "input text"],
+        [
+          theme.colors.primaryForeground,
+          theme.colors.primaryHover,
+          "primary hover",
+        ],
         [
           theme.colors.secondaryForeground,
           theme.colors.secondary,
@@ -150,9 +184,9 @@ describe("themes", () => {
   });
 
   it("maps retired theme ids to the closest new family", () => {
-    expect(getTheme("dark-modern").id).toBe("midnight-dark");
+    expect(getTheme("dark-modern").id).toBe("modern-dark");
     expect(getTheme("one-dark").id).toBe("graphite-dark");
-    expect(getTheme("light-modern").id).toBe("midnight-light");
+    expect(getTheme("light-modern").id).toBe("modern-light");
     expect(getTheme("dracula").id).toBe("dracula-dark");
     expect(getTheme("solarized-light").id).toBe("dracula-light");
   });

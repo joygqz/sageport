@@ -1234,6 +1234,7 @@ export const en = {
         modeLight: "Light",
         modeDark: "Dark",
         family: "Theme family",
+        familyModern: "Neutral surfaces with VS Code blue accents",
         familyMidnight: "Focused navy for terminal work",
         familyGraphite: "Neutral gray with crisp hierarchy",
         familyDracula: "Deep purple with vivid terminal accents",
