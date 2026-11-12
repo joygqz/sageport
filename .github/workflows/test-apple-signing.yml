@@ -1,0 +1,111 @@
+name: Test Apple signing
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  certificate:
+    name: Validate certificate and sign executable
+    runs-on: macos-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Import Developer ID Application certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required Actions secret: $name"
+              exit 1
+            fi
+          done
+
+          CERTIFICATE_PATH="$RUNNER_TEMP/apple-test-certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/apple-test-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          SIGNING_IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+              | awk '/"Developer ID Application:/ { print $2; exit }'
+          )"
+          if [[ -z "$SIGNING_IDENTITY" ]]; then
+            echo "::error::No valid Developer ID Application identity found. Check that the P12 includes the private key and an unexpired certificate."
+            exit 1
+          fi
+          printf 'APPLE_TEST_SIGNING_IDENTITY=%s\n' "$SIGNING_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Sign and verify test executable
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          TEST_EXECUTABLE="$RUNNER_TEMP/apple-signing-test"
+          printf 'int main(void) { return 0; }\n' | xcrun clang -x c - -o "$TEST_EXECUTABLE"
+          codesign --force --options runtime --timestamp \
+            --keychain "$RUNNER_TEMP/apple-test-signing.keychain-db" \
+            --sign "$APPLE_TEST_SIGNING_IDENTITY" "$TEST_EXECUTABLE"
+          codesign --verify --strict --verbose=2 "$TEST_EXECUTABLE"
+
+          if [[ -n "$APPLE_TEAM_ID" ]]; then
+            SIGNED_TEAM_ID="$(codesign --display --verbose=4 "$TEST_EXECUTABLE" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+            if [[ "$SIGNED_TEAM_ID" != "$APPLE_TEAM_ID" ]]; then
+              echo "::error::The signing certificate does not match APPLE_TEAM_ID."
+              exit 1
+            fi
+          fi
+          echo "Certificate import, private key access, timestamping, and signature verification passed." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete test certificate and keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/apple-test-signing.keychain-db"
+          if [[ -f "$KEYCHAIN_PATH" ]]; then
+            security delete-keychain "$KEYCHAIN_PATH"
+          fi
+          rm -f "$RUNNER_TEMP/apple-test-certificate.p12" "$RUNNER_TEMP/apple-signing-test"
+
+  notarization:
+    name: Validate notarization credentials
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - name: Authenticate with Apple notary service
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required Actions secret: $name"
+              exit 1
+            fi
+          done
+
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --output-format json > /dev/null
+          echo "Apple notary service authentication passed. No application was submitted." >> "$GITHUB_STEP_SUMMARY"
