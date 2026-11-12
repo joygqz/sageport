@@ -55,6 +55,28 @@ describe("dueTasks", () => {
     expect(result.state.t1.lastRun).toBe(now.toISOString());
   });
 
+  it.each(["invalid", new Date(2026, 0, 2).toISOString()])(
+    "recovers from an invalid or future baseline: %s",
+    (lastRun) => {
+      const now = new Date(2026, 0, 1, 12, 0, 0);
+      const result = dueTasks(
+        now,
+        [task({})],
+        { t1: { lastRun, sig: "* * * * *" } },
+        never,
+      );
+      expect(result.fire).toHaveLength(0);
+      expect(result.state.t1.lastRun).toBe(now.toISOString());
+      const next = dueTasks(
+        new Date(now.getTime() + 60_000),
+        [task({})],
+        result.state,
+        never,
+      );
+      expect(next.fire.map((item) => item.id)).toEqual(["t1"]);
+    },
+  );
+
   it("fires and collapses missed runs into one catch-up", () => {
     const now = new Date(2026, 0, 1, 12, 0, 0);
     const prev: ScheduleState = {

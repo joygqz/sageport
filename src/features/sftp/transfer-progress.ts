@@ -57,7 +57,9 @@ export function updateTransferProgress(
   const speedBps =
     measuringTransfer && elapsedSeconds >= 0.25
       ? transferredSinceStart / elapsedSeconds
-      : current.speedBps;
+      : enteredTransferPhase || restarted
+        ? 0
+        : current.speedBps;
   const remaining = Math.max(0, event.total - event.transferred);
   const etaSeconds =
     event.total > 0 && speedBps > 0 ? remaining / speedBps : null;

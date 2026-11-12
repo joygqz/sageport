@@ -36,6 +36,17 @@ describe("transfer progress", () => {
     expect(preparing.etaSeconds).toBeNull();
   });
 
+  it("clears the previous rate when a transfer restarts", () => {
+    const pending = pendingTransfer(event(0), "source", "dest", 1_000);
+    const active = updateTransferProgress(pending, event(500), 2_000);
+    const restarted = updateTransferProgress(active, event(0), 3_000);
+    expect(restarted.speedBps).toBe(0);
+    expect(restarted.etaSeconds).toBeNull();
+    const resumed = updateTransferProgress(restarted, event(100), 4_000);
+    expect(resumed.speedBps).toBe(100);
+    expect(resumed.etaSeconds).toBe(9);
+  });
+
   it("formats compact ETAs", () => {
     expect(formatEta(4.1)).toBe("5s");
     expect(formatEta(61)).toBe("2m");

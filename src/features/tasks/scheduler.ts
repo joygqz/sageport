@@ -53,12 +53,19 @@ export function dueTasks(
     }
     const sig = task.schedule;
     const prev = previous[task.id];
-    if (!prev || prev.sig !== sig) {
+    const lastRun = prev ? new Date(prev.lastRun) : null;
+    if (
+      !prev ||
+      prev.sig !== sig ||
+      !lastRun ||
+      !Number.isFinite(lastRun.getTime()) ||
+      lastRun.getTime() > now.getTime()
+    ) {
       state[task.id] = { lastRun: nowIso, sig };
       continue;
     }
 
-    const next = nextCronTime(sig, new Date(prev.lastRun));
+    const next = nextCronTime(sig, lastRun);
     if (!next || next.getTime() > now.getTime()) {
       state[task.id] = prev;
       continue;

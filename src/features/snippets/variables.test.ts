@@ -51,6 +51,18 @@ describe("substitute", () => {
     expect(substitute("echo {{x}}", {})).toBe("echo ");
   });
 
+  it("uses defaults for variable names inherited from Object", () => {
+    expect(
+      substitute(
+        "{{toString:text}} {{constructor:build}} {{__proto__:root}}",
+        {},
+      ),
+    ).toBe("text build root");
+    expect(substitute("{{toString}}", { toString: "provided" })).toBe(
+      "provided",
+    );
+  });
+
   it("uses one canonical default for repeated variables", () => {
     expect(substitute("{{host}} {{host:web}} {{host}}", { host: "" })).toBe(
       "web web web",

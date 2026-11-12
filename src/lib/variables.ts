@@ -31,7 +31,7 @@ export function substitute(
     ]),
   );
   return text.replace(PATTERN, (_, name: string, fallback?: string) => {
-    const provided = values[name];
+    const provided = Object.hasOwn(values, name) ? values[name] : undefined;
     if (provided !== undefined && provided.trim() !== "") return provided;
     return defaults.get(name) ?? (fallback ?? "").trim();
   });
