@@ -44,8 +44,8 @@ base64 = "0.23"
 png = "0.18"
 zeroize = "1"
 
-russh = "0.64.1"
-russh-sftp = "2.3.0"
+russh = "0.65.1"
+russh-sftp = "3.0.1"
 
 ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "ecdsa", "p256", "p384", "p521", "encryption", "std", "getrandom"] }
 
@@ -54,13 +54,13 @@ flate2 = "1"
 
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "form", "rustls"] }
 
-parking_lot = "0.12"
+parking_lot = "0.13"
 
 async-trait = "0.1"
 sha2 = "0.11"
 url = "2"
 quick-xml = "0.42"
-rusty-s3 = "0.10"
+rusty-s3 = "0.11"
 portable-pty = "0.9.0"
 dunce = "1"
 glob = "0.3"

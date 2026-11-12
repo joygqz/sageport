@@ -4,4 +4,5 @@ allowBuilds:
 minimumReleaseAge: 0
 
 overrides:
-  dompurify: ^3.4.14
+  dompurify: ^3.4.17
+  minimatch@10: ^11.0.1

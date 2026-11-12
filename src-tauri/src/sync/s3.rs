@@ -115,7 +115,7 @@ impl ObjectStore for S3Store {
                 Some(RemoteObject {
                     id: name.clone(),
                     name,
-                    size: Some(obj.size),
+                    size: obj.size,
                 })
             }));
             match parsed.next_continuation_token {
