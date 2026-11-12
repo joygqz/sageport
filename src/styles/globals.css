@@ -21,7 +21,7 @@
   --secondary-foreground: #cccccc;
   --muted: #2b2b2b;
   --muted-foreground: #9d9d9d;
-  --accent: #383838;
+  --accent: var(--list-hover);
   --accent-foreground: #ffffff;
   --destructive: #b52020;
   --destructive-foreground: #ffffff;
@@ -34,10 +34,10 @@
   --input-background: #313131;
   --primary-hover: #026ec1;
   --ring: #0088ef;
-  --list-hover: #2a2d2e;
-  --list-active: #37373d;
+  --list-hover: #313131;
+  --list-active: var(--list-hover);
   --list-active-foreground: #ffffff;
-  --tab-active: var(--background);
+  --tab-active: var(--list-active);
   --terminal-background: #1f1f1f;
   --terminal-foreground: #cccccc;
 

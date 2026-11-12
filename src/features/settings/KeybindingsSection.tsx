@@ -214,8 +214,8 @@ export function KeybindingsSection() {
                           "flex h-[var(--control-height-sm)] min-w-36 items-center justify-center rounded-md border px-2 text-xs transition-colors",
                           INTERACTIVE_FOCUS_CLASS,
                           editing
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border-strong bg-surface hover:bg-muted",
+                            ? "border-primary bg-list-active text-foreground"
+                            : "border-border-strong bg-surface hover:bg-list-hover",
                         )}
                       >
                         {editing ? (

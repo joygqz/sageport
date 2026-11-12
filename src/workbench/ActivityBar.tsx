@@ -28,7 +28,7 @@ const ACTIVITIES: { id: Activity; icon: LucideIcon; labelKey: TKey }[] = [
 ];
 
 const ACTIVITY_BUTTON_CLASS = cn(
-  "flex h-[var(--activitybar-width)] w-full shrink-0 items-center justify-center transition-colors",
+  "my-1.5 flex size-[calc(var(--activitybar-width)-0.75rem)] shrink-0 items-center justify-center rounded-md transition-colors",
   INTERACTIVE_FOCUS_CLASS,
 );
 
@@ -42,7 +42,7 @@ export const ActivityBar = memo(function ActivityBar() {
   return (
     <nav
       aria-label={t("activityBar.navigation")}
-      className="activity-rail flex w-[var(--activitybar-width)] shrink-0 flex-col items-center justify-between gap-3 overflow-y-auto border-r border-border-subtle bg-surface-sunken"
+      className="activity-rail flex w-[var(--activitybar-width)] shrink-0 flex-col items-center justify-between gap-3 overflow-x-hidden overflow-y-auto bg-surface-sunken shadow-[inset_-1px_0_0_var(--border-subtle)]"
     >
       <div className="flex w-full flex-col items-center">
         {ACTIVITIES.map((item) => {
@@ -57,9 +57,8 @@ export const ActivityBar = memo(function ActivityBar() {
                 aria-pressed={active}
                 className={cn(
                   ACTIVITY_BUTTON_CLASS,
-                  "relative",
                   active
-                    ? "bg-surface text-foreground before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:bg-primary"
+                    ? "bg-list-active text-list-active-foreground"
                     : WORKBENCH_ITEM_INACTIVE_CLASS,
                 )}
               >

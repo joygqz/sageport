@@ -251,7 +251,7 @@ export function QuestionPrompt({
                     "border border-border-subtle bg-surface-raised text-foreground hover:bg-list-hover",
                   )
                 : option === selected
-                  ? "bg-primary/10 text-foreground"
+                  ? "bg-list-active text-foreground"
                   : "text-muted-foreground opacity-60",
             )}
           >

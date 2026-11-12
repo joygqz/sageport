@@ -24,6 +24,7 @@ export interface SelectProps extends React.AriaAttributes {
   autoFocus?: boolean;
   showChevron?: boolean;
   className?: string;
+  wrapperClassName?: string;
 }
 
 export function Select({
@@ -40,13 +41,14 @@ export function Select({
   autoFocus,
   showChevron = true,
   className,
+  wrapperClassName,
   ...ariaProps
 }: SelectProps) {
   const showPlaceholder =
     placeholder !== undefined && !options.some((option) => option.value === "");
 
   return (
-    <div className="relative w-full">
+    <div className={cn("relative w-full", wrapperClassName)}>
       <select
         id={id}
         title={title}

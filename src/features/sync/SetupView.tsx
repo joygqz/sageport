@@ -105,7 +105,7 @@ export function SetupView({ status }: { status: SyncStatus }) {
                 "flex min-w-0 flex-col gap-1.5 rounded-lg border bg-surface-raised p-3 text-left transition-colors",
                 CONTROL_FOCUS_CLASS,
                 active
-                  ? "border-primary bg-primary/8 ring-2 ring-primary/20"
+                  ? "border-primary bg-list-active ring-2 ring-primary/20"
                   : cn(CONTROL_BORDER_CLASS, "hover:bg-list-hover"),
               )}
             >

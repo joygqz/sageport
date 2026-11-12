@@ -215,7 +215,7 @@ function HostCard({
       className={cn(
         "group flex flex-col gap-2.5 rounded-lg border border-border-subtle bg-surface-raised p-2.5 text-left transition-colors hover:border-border-strong hover:bg-list-hover",
         INTERACTIVE_FOCUS_CLASS,
-        active && "border-primary/60 bg-list-active/45",
+        active && "border-primary/60 bg-list-active",
       )}
     >
       <div className="flex w-full flex-col gap-0.5">

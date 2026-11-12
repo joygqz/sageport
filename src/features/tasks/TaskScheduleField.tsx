@@ -60,7 +60,7 @@ export function TaskScheduleField({
                 data-active={schedule.trim() === preset.expr}
                 className={cn(
                   INTERACTIVE_FOCUS_CLASS,
-                  "rounded-md border border-border bg-surface px-2 py-1 text-2xs text-muted-foreground transition-colors hover:border-ring/60 hover:bg-list-hover data-[active=true]:border-primary/40 data-[active=true]:bg-primary/10 data-[active=true]:text-link",
+                  "rounded-md border border-border bg-surface px-2 py-1 text-2xs text-muted-foreground transition-colors hover:border-ring/60 hover:bg-list-hover data-[active=true]:border-primary/40 data-[active=true]:bg-list-active data-[active=true]:text-link",
                 )}
               >
                 {t(PRESET_LABELS[preset.id])}

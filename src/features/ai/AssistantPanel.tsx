@@ -614,7 +614,8 @@ export function AssistantPanel({ width }: { width: number }) {
                   title={t("ai.modelLabel")}
                   disabled={models.length === 0}
                   showChevron={false}
-                  className="h-[var(--toolbar-control-size)] w-auto min-w-0 max-w-[70%] border-0 bg-transparent px-2 text-xs hover:bg-accent focus-visible:ring-0"
+                  wrapperClassName="w-auto min-w-0 max-w-[70%] flex-1"
+                  className="h-[var(--toolbar-control-size)] min-w-0 truncate border-0 bg-transparent px-2 text-xs hover:bg-accent focus-visible:ring-0"
                 />
                 <div className="ml-auto flex items-center gap-1.5">
                   {pending ? (

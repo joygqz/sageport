@@ -64,7 +64,7 @@ export const TitleBar = memo(function TitleBar() {
         type="button"
         onClick={() => openPalette("quick")}
         className={cn(
-          "flex h-[var(--compact-control-size)] min-w-0 items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface-sunken px-2.5 text-xs text-muted-foreground transition-colors hover:border-border-strong hover:bg-background hover:text-foreground",
+          "flex h-[var(--compact-control-size)] min-w-0 items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface-sunken px-2.5 text-xs text-muted-foreground transition-colors hover:border-border-strong hover:bg-list-hover hover:text-foreground",
           CONTROL_INTERACTION_CLASS,
         )}
       >

@@ -38,7 +38,7 @@ export function SegmentedControl<T extends string>({
             "min-h-[var(--toolbar-control-size)] rounded-sm px-3 py-1 text-sm transition-colors",
             INTERACTIVE_FOCUS_CLASS,
             "text-muted-foreground hover:bg-list-hover hover:text-foreground",
-            "data-[state=checked]:bg-surface-raised data-[state=checked]:font-medium data-[state=checked]:text-foreground",
+            "data-[state=checked]:bg-list-active data-[state=checked]:font-medium data-[state=checked]:text-foreground",
           )}
         >
           {option.label}

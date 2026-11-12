@@ -55,6 +55,8 @@ import {
   WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
   WORKBENCH_TAB_DROP_INDICATOR_CLASS,
   WORKBENCH_TAB_INACTIVE_CLASS,
+  WORKBENCH_TAB_TRIGGER_CLASS,
+  WORKBENCH_TAB_LABEL_CLASS,
 } from "@/workbench/tab-styles";
 import { FileList } from "./FileList";
 import { BookmarkMenu } from "./BookmarkMenu";
@@ -336,7 +338,7 @@ export function FilePane({ side }: { side: PaneSide }) {
             el.scrollLeft += e.deltaY;
           }}
           className={cn(
-            "scrollbar-none flex h-[var(--compact-toolbar-height)] shrink-0 items-center overflow-x-auto border-b border-border-subtle bg-surface",
+            "scrollbar-none flex h-[var(--workbench-bar-height)] shrink-0 items-center overflow-x-auto overflow-y-hidden bg-surface shadow-[inset_0_-1px_0_var(--border-subtle)]",
             pane.tabs.length > 0 && "gap-1",
             WORKBENCH_COMPACT_TAB_STRIP_GUTTER_CLASS,
           )}
@@ -696,7 +698,6 @@ function SftpTabItem({
           }}
           className={cn(
             WORKBENCH_TAB_CLASS,
-            "h-[var(--compact-tab-height)] w-fit min-w-24 max-w-44 gap-1.5 px-2",
             dragged && "opacity-50",
             active
               ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
@@ -705,7 +706,7 @@ function SftpTabItem({
         >
           <TabsTrigger
             value={tab.id}
-            className={`flex min-w-0 flex-1 items-center justify-start gap-1.5 self-stretch rounded-md text-left ${INTERACTIVE_FOCUS_CLASS}`}
+            className={cn(WORKBENCH_TAB_TRIGGER_CLASS, INTERACTIVE_FOCUS_CLASS)}
             onKeyDown={(event) => {
               if (
                 event.altKey &&
@@ -718,9 +719,9 @@ function SftpTabItem({
           >
             <span className="relative flex shrink-0 items-center justify-center">
               {tab.kind === "local" ? (
-                <HardDrive className="size-3" />
+                <HardDrive className="size-3.5" />
               ) : (
-                <Server className="size-3" />
+                <Server className="size-3.5" />
               )}
               <span
                 className={cn(
@@ -729,7 +730,7 @@ function SftpTabItem({
                 )}
               />
             </span>
-            <span className="min-w-0 max-w-28 truncate text-left">{label}</span>
+            <span className={WORKBENCH_TAB_LABEL_CLASS}>{label}</span>
           </TabsTrigger>
           <button
             data-tab-close
@@ -742,11 +743,10 @@ function SftpTabItem({
             }}
             className={cn(
               WORKBENCH_TAB_CLOSE_CLASS,
-              "size-4",
               !active && WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
             )}
           >
-            <X className="size-3" />
+            <X className="size-3.5" />
           </button>
         </div>
       </ContextMenuTrigger>
@@ -799,9 +799,9 @@ function SftpTabDragGhost({
     >
       <span className="relative flex shrink-0 items-center justify-center">
         {tab.kind === "local" ? (
-          <HardDrive className="size-3" />
+          <HardDrive className="size-3.5" />
         ) : (
-          <Server className="size-3" />
+          <Server className="size-3.5" />
         )}
         <span
           className={cn(
@@ -857,7 +857,7 @@ function PathBar({ side, tab }: { side: PaneSide; tab: SftpTab }) {
         setValue(displayedPath);
         scrollToEnd();
       }}
-      className="ml-1 h-[var(--compact-row-height)] min-w-0 flex-1 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-surface-raised focus-visible:bg-surface-raised focus-visible:text-foreground"
+      className="ml-1 h-[var(--compact-row-height)] min-w-0 flex-1 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-list-hover focus-visible:bg-list-hover focus-visible:text-foreground"
     />
   );
 }

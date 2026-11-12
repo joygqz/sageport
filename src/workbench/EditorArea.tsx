@@ -54,6 +54,8 @@ import {
   WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
   WORKBENCH_TAB_DROP_INDICATOR_CLASS,
   WORKBENCH_TAB_INACTIVE_CLASS,
+  WORKBENCH_TAB_TRIGGER_CLASS,
+  WORKBENCH_TAB_LABEL_CLASS,
   WORKBENCH_TAB_STRIP_GUTTER_CLASS,
 } from "./tab-styles";
 import {
@@ -664,7 +666,6 @@ function TabItem({
           }}
           className={cn(
             WORKBENCH_TAB_CLASS,
-            "h-[var(--workbench-tab-height)] w-fit min-w-24 max-w-52 gap-2 px-3",
             dragged && "opacity-50",
             active
               ? cn(WORKBENCH_TAB_ACTIVE_CLASS, "z-10")
@@ -673,10 +674,7 @@ function TabItem({
         >
           <TabsTrigger
             value={tab.id}
-            className={cn(
-              "flex min-w-0 flex-1 items-center justify-start gap-2 self-stretch rounded-md text-left",
-              INTERACTIVE_FOCUS_CLASS,
-            )}
+            className={cn(WORKBENCH_TAB_TRIGGER_CLASS, INTERACTIVE_FOCUS_CLASS)}
             onKeyDown={(e) => {
               if (
                 !e.altKey ||
@@ -703,7 +701,7 @@ function TabItem({
               <FileText className="size-3.5 shrink-0" />
             )}
 
-            <span className="min-w-0 max-w-36 truncate text-left">{title}</span>
+            <span className={WORKBENCH_TAB_LABEL_CLASS}>{title}</span>
 
             {tab.kind === "terminal" && tab.panes.length > 1 && (
               <span className="shrink-0 rounded-sm bg-accent px-1 font-mono text-[10px] leading-4 text-muted-foreground">
@@ -730,7 +728,6 @@ function TabItem({
             aria-label={t("editor.closeTab")}
             className={cn(
               WORKBENCH_TAB_CLOSE_CLASS,
-              "size-5",
               !active && WORKBENCH_TAB_CLOSE_INACTIVE_CLASS,
             )}
           >
