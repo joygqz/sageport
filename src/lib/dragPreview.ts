@@ -17,7 +17,7 @@ export function layoutDragPreview({
   sourceHeight,
   viewportWidth,
   viewportHeight,
-  maxWidth = 352,
+  maxWidth = 240,
   offset = 12,
   margin = 8,
 }: DragPreviewLayoutOptions) {

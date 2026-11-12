@@ -24,7 +24,7 @@ pub async fn exec_capture_limited(
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut code = 0i32;
+    let mut code = None;
     let mut channel = channel;
     loop {
         match channel.wait().await {
@@ -34,7 +34,12 @@ pub async fn exec_capture_limited(
             Some(ChannelMsg::ExtendedData { data, ext: 1 }) => {
                 append_limited(&mut stderr, &stdout, &data, max_output_bytes)?
             }
-            Some(ChannelMsg::ExitStatus { exit_status }) => code = exit_status as i32,
+            Some(ChannelMsg::ExitStatus { exit_status }) => code = Some(exit_status as i32),
+            Some(ChannelMsg::ExitSignal { signal_name, .. }) => {
+                return Err(AppError::Other(format!(
+                    "remote command terminated by signal {signal_name:?}"
+                )));
+            }
             Some(ChannelMsg::Close) | None => break,
             _ => {}
         }
@@ -43,7 +48,7 @@ pub async fn exec_capture_limited(
     Ok(ExecOutput {
         stdout: String::from_utf8_lossy(&stdout).into_owned(),
         stderr: String::from_utf8_lossy(&stderr).into_owned(),
-        code,
+        code: require_exit_status(code)?,
     })
 }
 
@@ -52,19 +57,54 @@ pub async fn exec_stream<F>(
     command: &str,
     max_output_bytes: usize,
     mut on_chunk: F,
+    cancel: &crate::sftp::TransferCancel,
+    timeout: std::time::Duration,
 ) -> AppResult<i32>
 where
     F: FnMut(String),
 {
-    let channel = handle.channel_open_session().await?;
-    channel.exec(true, command).await?;
-
-    let mut code = 0i32;
+    let deadline = tokio::time::sleep(timeout);
+    tokio::pin!(deadline);
+    let mut channel = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return Err(AppError::Cancelled),
+        _ = &mut deadline => return Err(AppError::Timeout("remote command timed out".into())),
+        channel = handle.channel_open_session() => channel?,
+    };
+    let started = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => Err(AppError::Cancelled),
+        _ = &mut deadline => Err(AppError::Timeout("remote command timed out".into())),
+        result = channel.exec(true, command) => result.map_err(AppError::from),
+    };
+    if let Err(error) = started {
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            channel.signal(russh::Sig::KILL),
+        )
+        .await;
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.close()).await;
+        return Err(error);
+    }
+    let mut code = None;
     let mut forwarded = 0usize;
     let mut truncated = false;
-    let mut channel = channel;
     loop {
-        match channel.wait().await {
+        let message = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => {
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.signal(russh::Sig::KILL)).await;
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.close()).await;
+                return Err(AppError::Cancelled);
+            }
+            _ = &mut deadline => {
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.signal(russh::Sig::KILL)).await;
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(1), channel.close()).await;
+                return Err(AppError::Timeout("remote command timed out".into()));
+            }
+            message = channel.wait() => message,
+        };
+        match message {
             Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, ext: 1 }) => {
                 forward_chunk(
                     &mut on_chunk,
@@ -74,12 +114,21 @@ where
                     &mut truncated,
                 );
             }
-            Some(ChannelMsg::ExitStatus { exit_status }) => code = exit_status as i32,
+            Some(ChannelMsg::ExitStatus { exit_status }) => code = Some(exit_status as i32),
+            Some(ChannelMsg::ExitSignal { signal_name, .. }) => {
+                return Err(AppError::Other(format!(
+                    "remote command terminated by signal {signal_name:?}"
+                )));
+            }
             Some(ChannelMsg::Close) | None => break,
             _ => {}
         }
     }
-    Ok(code)
+    require_exit_status(code)
+}
+
+fn require_exit_status(code: Option<i32>) -> AppResult<i32> {
+    code.ok_or_else(|| AppError::Other("remote command closed without an exit status".into()))
 }
 
 fn forward_chunk<F>(
@@ -128,7 +177,14 @@ fn append_limited(
 
 #[cfg(test)]
 mod tests {
-    use super::append_limited;
+    use super::{append_limited, require_exit_status};
+
+    #[test]
+    fn requires_an_explicit_remote_exit_status() {
+        assert!(require_exit_status(None).is_err());
+        assert_eq!(require_exit_status(Some(0)).unwrap(), 0);
+        assert_eq!(require_exit_status(Some(7)).unwrap(), 7);
+    }
 
     #[test]
     fn limits_combined_command_output() {

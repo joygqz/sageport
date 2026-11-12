@@ -2,6 +2,9 @@ use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
+    #[error("{0}")]
+    Shared(std::sync::Arc<AppError>),
+
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -82,6 +85,7 @@ impl AppError {
 
     pub fn code(&self) -> &'static str {
         match self {
+            AppError::Shared(error) => error.code(),
             AppError::Database(_) | AppError::Migration(_) => "database",
             AppError::Ssh(russh::Error::UnknownKey) => "host_key",
             AppError::Ssh(russh::Error::ConnectionTimeout) => "timeout",
@@ -155,6 +159,9 @@ impl Serialize for AppError {
     where
         S: serde::Serializer,
     {
+        if let AppError::Shared(error) = self {
+            return error.serialize(serializer);
+        }
         use serde::ser::SerializeStruct;
         let mut state = serializer.serialize_struct("AppError", 3)?;
         state.serialize_field("code", self.code())?;

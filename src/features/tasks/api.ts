@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ipc } from "@/lib/ipc";
-import type { Task, TaskInput, TaskStep } from "@/types/models";
+import type {
+  Task,
+  TaskInput,
+  TaskStep,
+  TaskRunStepRecord,
+} from "@/types/models";
+
+import { isTaskStep } from "./steps";
 
 export const tasksKey = ["tasks"] as const;
 export const taskRunsKey = ["tasks", "runs"] as const;
@@ -9,7 +16,34 @@ export const taskRunsKey = ["tasks", "runs"] as const;
 export function parseTaskSteps(task: Task): TaskStep[] {
   try {
     const parsed = JSON.parse(task.steps);
-    return Array.isArray(parsed) ? (parsed as TaskStep[]) : [];
+    return Array.isArray(parsed) &&
+      parsed.length <= 50 &&
+      parsed.every(isTaskStep)
+      ? parsed
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function parseTaskRunSteps(raw: string): TaskRunStepRecord[] {
+  try {
+    const records: unknown = JSON.parse(raw);
+    if (!Array.isArray(records) || records.length > 50) return [];
+    return records.every(
+      (record) =>
+        record &&
+        typeof record === "object" &&
+        isTaskStep(record.step) &&
+        ["pending", "done", "error", "skipped", "cancelled"].includes(
+          record.status,
+        ) &&
+        (record.exitCode === undefined || Number.isInteger(record.exitCode)) &&
+        (record.message === undefined || typeof record.message === "string") &&
+        (record.log === undefined || typeof record.log === "string"),
+    )
+      ? records
+      : [];
   } catch {
     return [];
   }

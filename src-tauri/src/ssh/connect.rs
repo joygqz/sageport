@@ -6,12 +6,12 @@ use russh::client::{self, AuthResult, Config, Handle, KeyboardInteractiveAuthRes
 use russh::keys::{decode_secret_key, PrivateKeyWithHashAlg};
 use russh::MethodKind;
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{oneshot, watch};
 
 use super::agent;
 use super::agent::AgentAuth;
 use super::handler::ClientHandler;
-use super::handler::ForwardedTcpIp;
+use super::handler::ForwardedTcpIpRoute;
 use super::{
     AuthMethod, ConnectionPrompts, Hop, PasswordPromptClosedEvent, PasswordPromptEvent,
     PasswordPrompts, PendingPasswordPrompt, EVENT_PASSWORD, EVENT_PASSWORD_CLOSED,
@@ -66,7 +66,7 @@ pub async fn establish(
     session_id: &str,
     hops: &[Hop],
 ) -> AppResult<SshConnection> {
-    establish_with_forwarded_tcpip(app, prompts, session_id, hops, None).await
+    establish_with_forwarded_tcpip(app, prompts, session_id, hops, None, None).await
 }
 
 pub async fn establish_with_forwarded_tcpip(
@@ -74,7 +74,8 @@ pub async fn establish_with_forwarded_tcpip(
     prompts: &ConnectionPrompts,
     session_id: &str,
     hops: &[Hop],
-    forwarded_tcpip: Option<mpsc::Sender<ForwardedTcpIp>>,
+    forwarded_tcpip: Option<ForwardedTcpIpRoute>,
+    shutdown: Option<watch::Receiver<bool>>,
 ) -> AppResult<SshConnection> {
     if hops.is_empty() {
         return Err(AppError::Invalid("no host to connect to".into()));
@@ -97,6 +98,7 @@ pub async fn establish_with_forwarded_tcpip(
             host: hop.host.clone(),
             port: hop.port,
             host_key_activity,
+            shutdown: shutdown.clone(),
             forwarded_tcpip: (index + 1 == hops.len())
                 .then(|| forwarded_tcpip.clone())
                 .flatten(),

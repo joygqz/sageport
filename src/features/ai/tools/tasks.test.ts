@@ -165,3 +165,34 @@ describe("list_task_runs", () => {
     expect(result.content).toContain("No runs recorded");
   });
 });
+
+describe("task approvals", () => {
+  it("rejects a task changed after the approval preview", async () => {
+    mocks.list.mockResolvedValue([task({})]);
+    const runTool = taskTools.find((entry) => entry.spec.name === "run_task")!;
+    const prepared = await runTool.prepare!(
+      { taskId: "t1" },
+      { userPrompt: "run backup" },
+    );
+    mocks.list.mockResolvedValue([
+      task({
+        revision: 2,
+        steps: JSON.stringify([
+          { type: "localCommand", command: "echo changed" },
+        ]),
+      }),
+    ]);
+    const result = await runTool.execute!(prepared.args, {});
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("changed after approval");
+  });
+
+  it("requires approval for changes that can enable automatic execution", () => {
+    for (const name of ["save_task", "update_task", "run_task"]) {
+      expect(
+        taskTools.find((entry) => entry.spec.name === name)
+          ?.alwaysRequireApproval,
+      ).toBe(true);
+    }
+  });
+});

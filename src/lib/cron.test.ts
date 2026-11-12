@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { isValidCron, nextCronTime, parseCron } from "./cron";
 
@@ -92,4 +92,22 @@ describe("nextCronTime", () => {
     expect(nextCronTime("0 0 30 2 *", new Date(2026, 0, 1))).toBeNull();
     expect(nextCronTime("not a cron", new Date(2026, 0, 1))).toBeNull();
   });
+});
+
+it("rejects an invalid starting date", () => {
+  expect(nextCronTime("* * * * *", new Date(Number.NaN))).toBeNull();
+});
+
+it("advances through both daylight-saving transitions", () => {
+  vi.stubEnv("TZ", "America/New_York");
+  try {
+    expect(
+      nextCronTime("0 1 * * *", new Date("2026-11-01T01:59:00-04:00")),
+    ).toEqual(new Date("2026-11-01T01:00:00-05:00"));
+    expect(
+      nextCronTime("30 2 * * *", new Date("2026-03-08T01:59:00-05:00")),
+    ).toEqual(new Date("2026-03-09T02:30:00-04:00"));
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

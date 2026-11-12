@@ -144,6 +144,8 @@ export type ForwardStatusKind =
   "starting" | "active" | "reconnecting" | "error" | "stopped";
 
 export interface ForwardStatusEvent {
+  connectionFailures?: number;
+  lastConnectionError?: string;
   forwardId: string;
   status: ForwardStatusKind;
   message?: string;
@@ -339,7 +341,8 @@ export interface TaskInput {
   scheduleEnabled?: boolean;
 }
 
-export type TaskRunStatus = "start" | "log" | "done" | "error" | "skipped";
+export type TaskRunStatus =
+  "start" | "log" | "done" | "error" | "skipped" | "cancelled";
 
 export interface TaskRunEvent {
   stepIndex: number;
@@ -351,9 +354,11 @@ export interface TaskRunEvent {
 
 export type TaskRunResultStatus = "running" | "done" | "error" | "cancelled";
 
-export type TaskRunStepStatus = "pending" | "done" | "error" | "skipped";
+export type TaskRunStepStatus =
+  "pending" | "done" | "error" | "skipped" | "cancelled";
 
 export interface TaskRunStepRecord {
+  log?: string;
   step: TaskStep;
   status: TaskRunStepStatus;
   exitCode?: number;

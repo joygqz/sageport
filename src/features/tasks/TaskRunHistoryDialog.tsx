@@ -1,3 +1,4 @@
+import { parseTaskRunSteps } from "./api";
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -162,15 +163,6 @@ export function TaskRunHistoryDialog({
   );
 }
 
-function parseSteps(steps: string): TaskRunStepRecord[] {
-  try {
-    const parsed = JSON.parse(steps);
-    return Array.isArray(parsed) ? (parsed as TaskRunStepRecord[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 function RunRow({
   entry,
   onDelete,
@@ -180,7 +172,7 @@ function RunRow({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const steps = useMemo(() => parseSteps(entry.steps), [entry.steps]);
+  const steps = useMemo(() => parseTaskRunSteps(entry.steps), [entry.steps]);
   const duration = runDuration(entry);
 
   return (
@@ -265,17 +257,27 @@ function StepRow({ record }: { record: TaskRunStepRecord }) {
   const meta = STEP_META[record.step.type];
   const Icon = meta.icon;
   return (
-    <li className="flex items-center gap-2 px-3 py-2">
-      <StepStatusIcon status={record.status} />
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="shrink-0 text-xs font-medium">{t(meta.labelKey)}</span>
-      <span className="min-w-0 flex-1 truncate font-mono text-2xs text-muted-foreground">
-        {stepSummary(record.step)}
-      </span>
-      {record.exitCode !== undefined && record.exitCode !== 0 && (
-        <span className="shrink-0 font-mono text-2xs text-danger">
-          exit {record.exitCode}
+    <li className="px-3 py-2">
+      <div className="flex items-center gap-2">
+        <StepStatusIcon status={record.status} />
+        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="shrink-0 text-xs font-medium">{t(meta.labelKey)}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-2xs text-muted-foreground">
+          {stepSummary(record.step)}
         </span>
+        {record.exitCode !== undefined && record.exitCode !== 0 && (
+          <span className="shrink-0 font-mono text-2xs text-danger">
+            exit {record.exitCode}
+          </span>
+        )}
+      </div>
+      {record.message && (
+        <p className="mt-2 text-2xs text-danger">{record.message}</p>
+      )}
+      {record.log && (
+        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-2xs">
+          {record.log}
+        </pre>
       )}
     </li>
   );
@@ -287,6 +289,7 @@ function StepStatusIcon({ status }: { status: TaskRunStepStatus }) {
       return <CheckCircle2 className="size-3.5 shrink-0 text-success" />;
     case "error":
       return <XCircle className="size-3.5 shrink-0 text-danger" />;
+    case "cancelled":
     case "skipped":
       return (
         <CircleSlash className="size-3.5 shrink-0 text-muted-foreground" />

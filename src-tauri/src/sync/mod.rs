@@ -125,7 +125,10 @@ pub async fn export_snapshot(pool: &SqlitePool) -> AppResult<VaultSnapshot> {
     let identities = fetch_all::<Identity, _>(&mut *tx, "identities").await?;
     let keys = fetch_all::<SshKey, _>(&mut *tx, "keys").await?;
     let snippets = fetch_all::<Snippet, _>(&mut *tx, "snippets").await?;
-    let tasks = fetch_all::<Task, _>(&mut *tx, "tasks").await?;
+    let mut tasks = fetch_all::<Task, _>(&mut *tx, "tasks").await?;
+    for task in &mut tasks {
+        task.schedule_enabled = false;
+    }
     let port_forwards = fetch_all::<PortForward, _>(&mut *tx, "port_forwards").await?;
     let proxy_profiles = fetch_all::<ProxyProfile, _>(&mut *tx, "proxy_profiles").await?;
     let sftp_bookmarks = fetch_all::<SftpBookmark, _>(&mut *tx, "sftp_bookmarks").await?;
@@ -931,13 +934,17 @@ where
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name, description = excluded.description, host_id = excluded.host_id,
-           steps = excluded.steps, schedule = excluded.schedule, schedule_enabled = excluded.schedule_enabled,
+           schedule_enabled = CASE
+             WHEN tasks.steps = excluded.steps AND tasks.host_id IS excluded.host_id
+               AND tasks.schedule IS excluded.schedule AND excluded.deleted_at IS NULL
+             THEN tasks.schedule_enabled ELSE 0 END,
+           steps = excluded.steps, schedule = excluded.schedule,
            updated_at = excluded.updated_at,
            deleted_at = excluded.deleted_at, revision = excluded.revision
          WHERE excluded.updated_at > tasks.updated_at",
     )
     .bind(&t.id).bind(&t.name).bind(&t.description).bind(&t.host_id).bind(&t.steps)
-    .bind(&t.schedule).bind(t.schedule_enabled)
+    .bind(&t.schedule).bind(false)
     .bind(&t.created_at).bind(&t.updated_at).bind(&t.deleted_at).bind(t.revision)
     .execute(executor).await?;
     Ok(())
@@ -1030,6 +1037,56 @@ mod tests {
             value: value.to_string(),
             updated_at: BACKUP_TIMESTAMP.to_string(),
         }
+    }
+
+    #[tokio::test]
+    async fn schedules_are_local_and_remote_execution_changes_pause_them() {
+        let pool = test_pool().await;
+        let mut task = crate::repository::task_repo::create(
+            &pool,
+            crate::domain::TaskInput {
+                name: "Backup".into(),
+                description: None,
+                host_id: None,
+                steps: vec![crate::domain::TaskStep::LocalCommand {
+                    cwd: None,
+                    command: "true".into(),
+                    retries: 0,
+                }],
+                schedule: Some("0 3 * * *".into()),
+                schedule_enabled: true,
+            },
+        )
+        .await
+        .unwrap();
+        let snapshot = export_snapshot(&pool).await.unwrap();
+        assert!(!snapshot.tasks[0].schedule_enabled);
+        let second = test_pool().await;
+        merge_task(&second, &task).await.unwrap();
+        assert!(
+            !crate::repository::task_repo::get(&second, &task.id)
+                .await
+                .unwrap()
+                .schedule_enabled
+        );
+        task.updated_at = "2098-01-01T00:00:00Z".into();
+        task.schedule_enabled = false;
+        merge_task(&pool, &task).await.unwrap();
+        assert!(
+            crate::repository::task_repo::get(&pool, &task.id)
+                .await
+                .unwrap()
+                .schedule_enabled
+        );
+        task.updated_at = "2099-01-01T00:00:00Z".into();
+        task.steps = "[{\"type\":\"localCommand\",\"command\":\"echo changed\"}]".into();
+        merge_task(&pool, &task).await.unwrap();
+        assert!(
+            !crate::repository::task_repo::get(&pool, &task.id)
+                .await
+                .unwrap()
+                .schedule_enabled
+        );
     }
 
     #[tokio::test]

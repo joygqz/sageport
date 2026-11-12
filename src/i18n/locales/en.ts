@@ -114,6 +114,7 @@ export const en = {
     new: "New port forward",
     start: "Start",
     stop: "Stop",
+    connectionFailures: "Failed connections: {count}",
     starting: "Starting…",
     reconnecting: "Reconnecting · attempt {attempt}",
     startError: "Failed to start port forward",
@@ -744,6 +745,7 @@ export const en = {
       moveDown: "Move down",
       removeStep: "Remove step",
       retries: "Retry attempts",
+      retriesHint: "Retries can repeat changes made by a failed command",
       workingDir: "Working directory",
       workingDirPlaceholder: "~/project (optional)",
       command: "Command",
@@ -763,6 +765,7 @@ export const en = {
       run: "Run",
       runAgain: "Run again",
       cancel: "Cancel run",
+      cancelError: "Could not cancel the task. Try again.",
       progress: "Step {done} / {total}",
       succeeded: "Completed",
       failed: "Failed",
@@ -773,7 +776,8 @@ export const en = {
     },
     schedule: {
       enable: "Run on a schedule",
-      enableHint: "Automatically run this task while the app is open",
+      enableHint:
+        "Run on this device while the app is open, using its time zone. Runs missed by more than one minute are skipped. Enable separately on each device.",
       preset: {
         hourly: "Hourly",
         every6h: "Every 6 hours",

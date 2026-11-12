@@ -79,6 +79,7 @@ async fn save_connection_with_snapshot(
     mode: SnapshotMode,
 ) -> AppResult<()> {
     let connection = serde_json::to_string(conn)?;
+    let _forward_configuration = state.forwards.configuration.write().await;
     let previous = state.forwards.active_specs();
     let mut tx = state.db.begin().await?;
     match mode {
@@ -654,6 +655,7 @@ pub async fn sync_file_import(
     let envelope = tokio::task::spawn_blocking(move || sync::read_envelope_file(&path))
         .await
         .map_err(|e| AppError::Other(format!("backup file read task failed: {e}")))??;
+    let _forward_configuration = state.forwards.configuration.write().await;
     let previous = state.forwards.active_specs();
     sync::restore_encrypted(&state.db, &envelope, &passphrase).await?;
     forwards::reconcile_running_forwards(&app, previous);
@@ -665,6 +667,7 @@ async fn import_snapshot(
     state: &AppState,
     snapshot: &sync::VaultSnapshot,
 ) -> AppResult<()> {
+    let _forward_configuration = state.forwards.configuration.write().await;
     let previous = state.forwards.active_specs();
     sync::import_snapshot(&state.db, snapshot).await?;
     forwards::reconcile_running_forwards(app, previous);

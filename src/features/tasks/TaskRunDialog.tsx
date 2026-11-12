@@ -42,7 +42,7 @@ export function TaskRunDialog({
       width="w-[var(--dialog-width-xl)]"
       title={t("tasks.run.title")}
     >
-      {task && <RunBody task={task} onClose={onClose} />}
+      {task && <RunBody key={task.id} task={task} onClose={onClose} />}
     </FormDialog>
   );
 }
@@ -59,9 +59,8 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
   const steps = useMemo(() => parseTaskSteps(task), [task]);
   const needsHost = useMemo(() => taskNeedsRemote(steps), [steps]);
 
-  const existing = useMemo(
-    () => selectRunningRunForTask(useTaskRunStore.getState().runs, task.id),
-    [task.id],
+  const existing = useTaskRunStore((state) =>
+    selectRunningRunForTask(state.runs, task.id),
   );
 
   const hostId = existing?.hostId ?? task.hostId ?? "";
@@ -69,22 +68,26 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
   const [requestId, setRequestId] = useState<string | null>(
     existing?.requestId ?? null,
   );
+  if (!requestId && existing) setRequestId(existing.requestId);
+  const activeRequestId = requestId ?? existing?.requestId ?? null;
   const run = useTaskRunStore((s) =>
-    requestId ? s.runs[requestId] : undefined,
+    activeRequestId ? s.runs[activeRequestId] : undefined,
   );
   const running = run?.status === "running";
 
   useEffect(() => {
-    if (!requestId) return;
-    attach(requestId);
+    if (!activeRequestId) return;
+    attach(activeRequestId);
     return () => {
-      detach(requestId);
-      const current = useTaskRunStore.getState().runs[requestId];
-      if (current && current.status !== "running") dismissRun(requestId);
+      detach(activeRequestId);
+      const current = useTaskRunStore.getState().runs[activeRequestId];
+      if (current && current.status !== "running") dismissRun(activeRequestId);
     };
-  }, [requestId, attach, detach, dismissRun]);
+  }, [activeRequestId, attach, detach, dismissRun]);
 
-  const canRun = !needsHost || Boolean(hostId);
+  const canRun =
+    steps.length > 0 &&
+    (!needsHost || hosts.some((host) => host.id === hostId));
 
   const onRun = () => {
     if (!canRun || running) return;
@@ -173,7 +176,7 @@ function RunBody({ task, onClose }: { task: Task; onClose: () => void }) {
         {running ? (
           <Button
             variant="destructive"
-            onClick={() => requestId && cancelRun(requestId)}
+            onClick={() => activeRequestId && cancelRun(activeRequestId)}
           >
             <Square className="size-4" />
             {t("tasks.run.cancel")}
@@ -208,7 +211,7 @@ function RunSummary({ run }: { run: TaskRun | undefined }) {
   const { t } = useI18n();
   if (!run) return <div className="mr-auto" />;
   const done = run.stepStates.filter((s) =>
-    ["done", "error", "skipped"].includes(s.status),
+    ["done", "error", "skipped", "cancelled"].includes(s.status),
   ).length;
   const label =
     run.status === "running"
@@ -257,6 +260,8 @@ function StepRow({
       <button
         type="button"
         onClick={() => body && setOpen((o) => !o)}
+        aria-expanded={body ? open : undefined}
+        disabled={!body}
         className={cn(
           "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
           body ? "hover:bg-list-hover" : "cursor-default",
@@ -290,7 +295,7 @@ function StepRow({
           {body}
         </pre>
       )}
-      {status === "error" && state?.message && !body && (
+      {status === "error" && state?.message && (
         <p className="border-t border-border px-3 py-2 text-2xs text-danger">
           {state.message}
         </p>
@@ -335,6 +340,7 @@ function StatusIcon({
       return <CheckCircle2 className="size-3.5 shrink-0 text-success" />;
     case "error":
       return <XCircle className="size-3.5 shrink-0 text-danger" />;
+    case "cancelled":
     case "skipped":
       return (
         <CircleSlash className="size-3.5 shrink-0 text-muted-foreground" />

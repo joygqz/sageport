@@ -37,6 +37,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
+import { layoutDragPreview } from "@/lib/dragPreview";
 import { useDragCursor } from "@/lib/pointerDrag";
 import { errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -674,7 +675,7 @@ function TabItem({
         >
           <TabsTrigger
             value={tab.id}
-            className={cn(WORKBENCH_TAB_TRIGGER_CLASS, INTERACTIVE_FOCUS_CLASS)}
+            className={WORKBENCH_TAB_TRIGGER_CLASS}
             onKeyDown={(e) => {
               if (
                 !e.altKey ||
@@ -799,12 +800,14 @@ function TabDragGhost({
     <div
       aria-hidden="true"
       className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-list-active px-2.5 text-xs text-list-active-foreground"
-      style={{
-        left: dragState.clientX,
-        top: dragState.clientY,
-        width: dragState.rect.width,
-        height: dragState.rect.height,
-      }}
+      style={layoutDragPreview({
+        pointerX: dragState.clientX,
+        pointerY: dragState.clientY,
+        sourceWidth: dragState.rect.width,
+        sourceHeight: dragState.rect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      })}
     >
       {tab.kind === "terminal" ? (
         <span className="relative flex shrink-0 items-center justify-center">

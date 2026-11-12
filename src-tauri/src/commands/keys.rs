@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::path::PathBuf;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::domain::{SshKeyGenerateInput, SshKeyInput, SshKeyView};
 use crate::error::{AppError, AppResult};
@@ -147,11 +147,16 @@ pub async fn keys_create(state: State<'_, AppState>, input: SshKeyInput) -> AppR
 
 #[tauri::command]
 pub async fn keys_update(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     input: SshKeyInput,
 ) -> AppResult<SshKeyView> {
-    Ok(key_repo::update(&state.db, &id, input).await?.into())
+    let _configuration = state.forwards.configuration.write().await;
+    let previous = state.forwards.active_specs();
+    let updated = key_repo::update(&state.db, &id, input).await?;
+    super::forwards::reconcile_running_forwards(&app, previous);
+    Ok(updated.into())
 }
 
 #[tauri::command]

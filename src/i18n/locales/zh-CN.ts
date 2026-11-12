@@ -111,6 +111,7 @@ export const zhCN: Dictionary = {
     new: "新建端口转发",
     start: "启动",
     stop: "停止",
+    connectionFailures: "连接失败次数：{count}",
     starting: "正在启动…",
     reconnecting: "正在重连 · 第 {attempt} 次",
     startError: "启动端口转发失败",
@@ -723,6 +724,7 @@ export const zhCN: Dictionary = {
       moveDown: "下移",
       removeStep: "移除步骤",
       retries: "失败重试次数",
+      retriesHint: "重试可能重复执行失败命令已完成的更改",
       workingDir: "工作目录",
       workingDirPlaceholder: "~/project（可选）",
       command: "命令",
@@ -742,6 +744,7 @@ export const zhCN: Dictionary = {
       run: "运行",
       runAgain: "再次运行",
       cancel: "取消运行",
+      cancelError: "无法取消任务，请重试。",
       progress: "第 {done} / {total} 步",
       succeeded: "已完成",
       failed: "运行失败",
@@ -752,7 +755,8 @@ export const zhCN: Dictionary = {
     },
     schedule: {
       enable: "按计划运行",
-      enableHint: "应用打开时自动运行此任务",
+      enableHint:
+        "仅在本设备应用打开时运行，使用本设备时区。错过超过一分钟的运行将跳过，请在各设备上单独启用。",
       preset: {
         hourly: "每小时",
         every6h: "每 6 小时",

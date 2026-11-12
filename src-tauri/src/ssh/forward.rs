@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -9,12 +9,12 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, watch};
 use tokio::task::JoinSet;
 use tokio::time::{Instant, MissedTickBehavior};
 
-use super::connect::{establish, establish_with_forwarded_tcpip, SshConnection};
-use super::handler::ForwardedTcpIp;
+use super::connect::{establish_with_forwarded_tcpip, SshConnection};
+use super::handler::{ForwardedTcpIp, ForwardedTcpIpRoute};
 use super::{ConnectionPrompts, Hop};
 use crate::error::{AppError, AppResult};
 
@@ -22,6 +22,7 @@ pub const EVENT_STATUS: &str = "forward://status";
 
 const BIND_TIMEOUT: Duration = Duration::from_secs(10);
 const CHANNEL_OPEN_TIMEOUT: Duration = Duration::from_secs(15);
+const REMOTE_CANCEL_TIMEOUT: Duration = Duration::from_secs(2);
 const SOCKS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
 const CONNECTION_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 const RECONNECT_DELAY_MAX: Duration = Duration::from_secs(30);
@@ -56,11 +57,40 @@ pub struct StatusEvent {
     pub reconnect_attempt: Option<u32>,
     pub generation: u64,
     pub sequence: u64,
+    pub connection_failures: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_connection_error: Option<String>,
+}
+
+type ReadyResult = Option<Result<(), Arc<AppError>>>;
+
+pub struct PendingForward(watch::Receiver<ReadyResult>);
+
+impl PendingForward {
+    pub async fn wait(mut self) -> AppResult<()> {
+        self.0
+            .wait_for(Option::is_some)
+            .await
+            .map_err(|_| AppError::Cancelled)?
+            .as_ref()
+            .unwrap()
+            .clone()
+            .map_err(AppError::Shared)
+    }
+}
+
+struct ForwardReady(watch::Sender<ReadyResult>);
+
+impl ForwardReady {
+    fn send(self, result: AppResult<()>) {
+        let _ = self.0.send(Some(result.map_err(Arc::new)));
+    }
 }
 
 struct ActiveForward {
     generation: u64,
     spec: ForwardSpec,
+    ready: watch::Receiver<ReadyResult>,
     shutdown: watch::Sender<bool>,
     finished: watch::Receiver<bool>,
 }
@@ -78,6 +108,9 @@ pub struct ForwardManager {
     next_generation: Arc<AtomicU64>,
     next_sequence: Arc<AtomicU64>,
     lifecycle: Arc<AtomicU64>,
+    operations: Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>,
+    pub configuration: tokio::sync::RwLock<()>,
+    auto_start_suppressed: Mutex<HashSet<String>>,
 }
 
 impl ForwardManager {
@@ -101,16 +134,50 @@ impl ForwardManager {
         self.runtime.lock().values().cloned().collect()
     }
 
-    pub async fn start(
+    pub async fn operation(&self, id: &str) -> tokio::sync::OwnedMutexGuard<()> {
+        let operation = {
+            let mut operations = self.operations.lock();
+            operations.retain(|_, operation| operation.strong_count() > 0);
+            match operations.get(id).and_then(Weak::upgrade) {
+                Some(operation) => operation,
+                None => {
+                    let operation = Arc::new(tokio::sync::Mutex::new(()));
+                    operations.insert(id.to_string(), Arc::downgrade(&operation));
+                    operation
+                }
+            }
+        };
+        operation.lock_owned().await
+    }
+
+    pub fn suppress_auto_start(&self, id: &str) {
+        self.auto_start_suppressed.lock().insert(id.to_string());
+    }
+
+    pub fn allows_auto_start(&self, id: &str) -> bool {
+        !self.auto_start_suppressed.lock().contains(id)
+    }
+
+    pub fn lifecycle(&self) -> u64 {
+        self.lifecycle.load(Ordering::Acquire)
+    }
+
+    pub async fn prepare_start(
         &self,
         app: AppHandle,
         prompts: ConnectionPrompts,
         spec: ForwardSpec,
-    ) -> AppResult<()> {
-        let lifecycle = self.lifecycle.load(Ordering::Acquire);
+        lifecycle: u64,
+    ) -> AppResult<PendingForward> {
+        if self.lifecycle() != lifecycle {
+            return Err(AppError::Cancelled);
+        }
         loop {
-            if self.active.lock().contains_key(&spec.id) {
-                return Ok(());
+            if let Some(entry) = self.active.lock().get(&spec.id) {
+                if entry.spec != spec {
+                    return Err(AppError::Conflict("port forward is running with different settings; stop it before starting it again".into()));
+                }
+                return Ok(PendingForward(entry.ready.clone()));
             }
             let retiring = self
                 .retiring
@@ -130,11 +197,14 @@ impl ForwardManager {
         let generation = self.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let (finished_tx, finished_rx) = watch::channel(false);
-        let (ready_tx, ready_rx) = oneshot::channel();
+        let (ready_tx, ready_rx) = watch::channel(None);
         {
             let mut active = self.active.lock();
-            if active.contains_key(&spec.id) {
-                return Ok(());
+            if let Some(entry) = active.get(&spec.id) {
+                if entry.spec != spec {
+                    return Err(AppError::Conflict("port forward is running with different settings; stop it before starting it again".into()));
+                }
+                return Ok(PendingForward(entry.ready.clone()));
             }
             if self.lifecycle.load(Ordering::Acquire) != lifecycle {
                 return Err(AppError::Cancelled);
@@ -144,6 +214,7 @@ impl ForwardManager {
                 ActiveForward {
                     generation,
                     spec: spec.clone(),
+                    ready: ready_rx.clone(),
                     shutdown: shutdown_tx,
                     finished: finished_rx,
                 },
@@ -159,19 +230,43 @@ impl ForwardManager {
         };
         reporter.emit("starting", None, None);
 
-        let active = self.active.clone();
+        let completion = ForwardTaskCompletion {
+            active: self.active.clone(),
+            id: spec.id.clone(),
+            generation,
+            finished: finished_tx,
+            reporter: reporter.clone(),
+            completed: false,
+        };
         tokio::spawn(async move {
-            run_forward(spec.clone(), prompts, shutdown_rx, ready_tx, reporter).await;
-            remove_finished(&active, &spec.id, generation);
-            let _ = finished_tx.send(true);
+            let mut completion = completion;
+            run_forward(
+                spec.clone(),
+                prompts,
+                shutdown_rx,
+                ForwardReady(ready_tx),
+                reporter,
+            )
+            .await;
+            completion.completed = true;
         });
 
-        ready_rx.await.unwrap_or(Err(AppError::Cancelled))
+        Ok(PendingForward(ready_rx))
     }
 
     pub async fn stop(&self, id: &str) -> bool {
         let entry = self.retire(id, |_| true);
         let Some(entry) = entry else {
+            let retiring = self
+                .retiring
+                .lock()
+                .get(id)
+                .map(|entry| (entry.generation, entry.finished.clone()));
+            if let Some((generation, finished)) = retiring {
+                wait_finished(finished).await;
+                clear_retiring(&self.retiring, id, generation);
+                return true;
+            }
             return false;
         };
         let _ = entry.shutdown.send(true);
@@ -212,9 +307,10 @@ impl ForwardManager {
     }
 
     pub fn stop_all(&self) {
+        let mut active = self.active.lock();
         self.lifecycle.fetch_add(1, Ordering::AcqRel);
-        let entries = self.active.lock().drain().collect::<Vec<_>>();
         let mut retiring = self.retiring.lock();
+        let entries = active.drain().collect::<Vec<_>>();
         for (id, entry) in entries {
             let _ = entry.shutdown.send(true);
             retiring.insert(
@@ -228,6 +324,7 @@ impl ForwardManager {
     }
 
     pub fn forget(&self, id: &str) {
+        self.auto_start_suppressed.lock().remove(id);
         self.runtime.lock().remove(id);
     }
 
@@ -250,6 +347,31 @@ impl ForwardManager {
     }
 }
 
+struct ForwardTaskCompletion {
+    active: Arc<Mutex<HashMap<String, ActiveForward>>>,
+    id: String,
+    generation: u64,
+    finished: watch::Sender<bool>,
+    reporter: StatusReporter,
+    completed: bool,
+}
+
+impl Drop for ForwardTaskCompletion {
+    fn drop(&mut self) {
+        if !self.completed {
+            self.reporter.emit(
+                "error",
+                Some(&AppError::Other(
+                    "port forward task ended unexpectedly; start the port forward again".into(),
+                )),
+                None,
+            );
+        }
+        remove_finished(&self.active, &self.id, self.generation);
+        let _ = self.finished.send(true);
+    }
+}
+
 #[derive(Clone)]
 struct StatusReporter {
     app: AppHandle,
@@ -269,9 +391,77 @@ impl StatusReporter {
             reconnect_attempt,
             generation: self.generation,
             sequence: self.next_sequence.fetch_add(1, Ordering::Relaxed) + 1,
+            connection_failures: 0,
+            last_connection_error: None,
         };
-        self.runtime.lock().insert(self.id.clone(), event.clone());
+        let mut runtime = self.runtime.lock();
+        if !store_event(&mut runtime, &event) {
+            return;
+        }
+        let event = runtime.get(&self.id).unwrap().clone();
+        drop(runtime);
         let _ = self.app.emit(EVENT_STATUS, event);
+    }
+}
+
+fn store_event(runtime: &mut HashMap<String, StatusEvent>, event: &StatusEvent) -> bool {
+    if runtime.get(&event.forward_id).is_some_and(|current| {
+        current.generation > event.generation
+            || (current.generation == event.generation && current.sequence >= event.sequence)
+    }) {
+        return false;
+    }
+    let mut event = event.clone();
+    if let Some(current) = runtime
+        .get(&event.forward_id)
+        .filter(|current| current.generation == event.generation)
+    {
+        event.connection_failures = current.connection_failures;
+        event.last_connection_error = current.last_connection_error.clone();
+    }
+    runtime.insert(event.forward_id.clone(), event);
+    true
+}
+
+#[derive(Default)]
+struct ConnectionDiagnostics {
+    failures: u64,
+    last_error: Option<String>,
+}
+
+impl ConnectionDiagnostics {
+    fn observe(&mut self, result: Option<Result<AppResult<()>, tokio::task::JoinError>>) {
+        let error = match result {
+            Some(Ok(Err(error))) => error.to_string(),
+            Some(Err(error)) => format!("port forward connection task failed: {error}"),
+            _ => return,
+        };
+        self.record(error);
+    }
+
+    fn record(&mut self, error: String) {
+        self.failures = self.failures.saturating_add(1);
+        self.last_error = Some(error);
+    }
+
+    fn flush(&mut self, reporter: &StatusReporter) {
+        let Some(error) = self.last_error.take() else {
+            return;
+        };
+        let mut runtime = reporter.runtime.lock();
+        let Some(event) = runtime
+            .get_mut(&reporter.id)
+            .filter(|event| event.generation == reporter.generation)
+        else {
+            return;
+        };
+        event.connection_failures = event.connection_failures.saturating_add(self.failures);
+        self.failures = 0;
+        event.last_connection_error = Some(error);
+        event.sequence = reporter.next_sequence.fetch_add(1, Ordering::Relaxed) + 1;
+        let event = event.clone();
+        drop(runtime);
+        let _ = reporter.app.emit(EVENT_STATUS, event);
     }
 }
 
@@ -305,7 +495,7 @@ async fn run_forward(
     spec: ForwardSpec,
     prompts: ConnectionPrompts,
     shutdown: watch::Receiver<bool>,
-    ready: oneshot::Sender<AppResult<()>>,
+    ready: ForwardReady,
     reporter: StatusReporter,
 ) {
     if spec.kind == kind::REMOTE {
@@ -319,7 +509,7 @@ async fn run_local_forward(
     spec: ForwardSpec,
     prompts: ConnectionPrompts,
     mut shutdown: watch::Receiver<bool>,
-    ready: oneshot::Sender<AppResult<()>>,
+    ready: ForwardReady,
     reporter: StatusReporter,
 ) {
     let listener = tokio::select! {
@@ -328,19 +518,19 @@ async fn run_local_forward(
             Ok(Err(error)) => {
                 let error = bind_error(&spec, error);
                 reporter.emit("error", Some(&error), None);
-                let _ = ready.send(Err(error));
+                ready.send(Err(error));
                 return;
             }
             Err(_) => {
                 let error = AppError::Timeout(format!("binding {}:{} timed out", spec.bind_host, spec.bind_port));
                 reporter.emit("error", Some(&error), None);
-                let _ = ready.send(Err(error));
+                ready.send(Err(error));
                 return;
             }
         },
         _ = wait_for_shutdown(&mut shutdown) => {
             reporter.emit("stopped", None, None);
-            let _ = ready.send(Err(AppError::Cancelled));
+            ready.send(Err(AppError::Cancelled));
             return;
         }
     };
@@ -359,7 +549,7 @@ async fn run_local_forward(
                 send_ready(&mut ready, Err(AppError::Cancelled));
                 return;
             }
-            Err(error) if !was_active => {
+            Err(error) if !was_active || !retryable_connection_error(&error) => {
                 reporter.emit("error", Some(&error), None);
                 send_ready(&mut ready, Err(error));
                 return;
@@ -367,7 +557,12 @@ async fn run_local_forward(
             Err(error) => {
                 reconnect_attempt = reconnect_attempt.saturating_add(1);
                 reporter.emit("reconnecting", Some(&error), Some(reconnect_attempt));
-                if wait_local_retry(&listener, retry_delay(reconnect_attempt), &mut shutdown).await
+                if wait_local_retry(
+                    &listener,
+                    jittered_retry_delay(reconnect_attempt),
+                    &mut shutdown,
+                )
+                .await
                 {
                     reporter.emit("stopped", None, None);
                     return;
@@ -379,15 +574,22 @@ async fn run_local_forward(
         was_active = true;
         reporter.emit("active", None, None);
         send_ready(&mut ready, Ok(()));
-        match run_local_session(&listener, connection, &spec, &mut shutdown).await {
+        let session_started = Instant::now();
+        match run_local_session(&listener, connection, &spec, &mut shutdown, &reporter).await {
             SessionEnd::Stopped => {
                 reporter.emit("stopped", None, None);
                 return;
             }
             SessionEnd::Lost(error) => {
-                reconnect_attempt = 1;
+                reconnect_attempt =
+                    next_reconnect_attempt(reconnect_attempt, session_started.elapsed());
                 reporter.emit("reconnecting", Some(&error), Some(reconnect_attempt));
-                if wait_local_retry(&listener, retry_delay(reconnect_attempt), &mut shutdown).await
+                if wait_local_retry(
+                    &listener,
+                    jittered_retry_delay(reconnect_attempt),
+                    &mut shutdown,
+                )
+                .await
                 {
                     reporter.emit("stopped", None, None);
                     return;
@@ -404,17 +606,25 @@ async fn establish_while_listening(
     spec: &ForwardSpec,
     shutdown: &mut watch::Receiver<bool>,
 ) -> AppResult<Arc<SshConnection>> {
-    let connection = establish(app, prompts, &spec.id, &spec.hops);
+    let connection = establish_with_forwarded_tcpip(
+        app,
+        prompts,
+        &spec.id,
+        &spec.hops,
+        None,
+        Some(shutdown.clone()),
+    );
     tokio::pin!(connection);
     loop {
         tokio::select! {
+            biased;
+            _ = wait_for_shutdown(shutdown) => return Err(AppError::Cancelled),
             result = &mut connection => return result.map(Arc::new),
             accepted = listener.accept() => {
                 if let Ok((stream, _)) = accepted {
                     let _ = stream.set_nodelay(true);
                 }
             }
-            _ = wait_for_shutdown(shutdown) => return Err(AppError::Cancelled),
         }
     }
 }
@@ -449,8 +659,10 @@ async fn run_local_session(
     connection: Arc<SshConnection>,
     spec: &ForwardSpec,
     shutdown: &mut watch::Receiver<bool>,
+    reporter: &StatusReporter,
 ) -> SessionEnd {
     let mut connections = JoinSet::new();
+    let mut diagnostics = ConnectionDiagnostics::default();
     let mut connection_check = tokio::time::interval_at(
         Instant::now() + CONNECTION_CHECK_INTERVAL,
         CONNECTION_CHECK_INTERVAL,
@@ -459,30 +671,40 @@ async fn run_local_session(
     let result = loop {
         tokio::select! {
             accepted = listener.accept() => match accepted {
-                Ok((stream, peer)) if connections.len() < MAX_FORWARD_CONNECTIONS => {
+                Ok((stream, peer)) => {
+                    while let Some(result) = connections.try_join_next() {
+                        diagnostics.observe(Some(result));
+                    }
+                    if connections.len() >= MAX_FORWARD_CONNECTIONS {
+                        diagnostics.record("port forward connection limit reached; close an existing connection and try again".into());
+                        continue;
+                    }
                     let _ = stream.set_nodelay(true);
                     let connection = connection.clone();
                     let spec = spec.clone();
-                    connections.spawn(async move { serve_local_connection(connection, spec, stream, peer).await });
+                    connections.spawn(async move { serve_local_connection(&connection.handle, spec, stream, peer).await });
                 }
-                Ok(_) => {}
                 Err(error) => break SessionEnd::Lost(AppError::Io(error)),
             },
             _ = wait_for_shutdown(shutdown) => break SessionEnd::Stopped,
             _ = connection_check.tick() => {
+                diagnostics.flush(reporter);
                 if connection.handle.is_closed() {
                     break SessionEnd::Lost(AppError::Network("SSH connection for port forward was closed".into()));
                 }
             }
-            _ = connections.join_next(), if !connections.is_empty() => {}
+            result = connections.join_next(), if !connections.is_empty() => {
+                diagnostics.observe(result);
+            }
         }
     };
+    diagnostics.flush(reporter);
     connections.shutdown().await;
     result
 }
 
-async fn serve_local_connection(
-    connection: Arc<SshConnection>,
+async fn serve_local_connection<H: russh::client::Handler>(
+    handle: &russh::client::Handle<H>,
     spec: ForwardSpec,
     mut stream: TcpStream,
     peer: SocketAddr,
@@ -503,7 +725,7 @@ async fn serve_local_connection(
     };
     let opened = tokio::time::timeout(
         CHANNEL_OPEN_TIMEOUT,
-        connection.handle.channel_open_direct_tcpip(
+        handle.channel_open_direct_tcpip(
             target_host,
             target_port as u32,
             peer.ip().to_string(),
@@ -521,17 +743,17 @@ async fn serve_local_connection(
         }
         Err(_) => {
             if dynamic {
-                let _ = socks5_reply(&mut stream, 0x06).await;
+                let _ = socks5_reply(&mut stream, 0x01).await;
             }
             return Err(AppError::Timeout(
                 "opening the forwarded SSH channel timed out".into(),
             ));
         }
     };
+    let mut channel = channel.into_stream();
     if dynamic {
         socks5_reply(&mut stream, 0x00).await?;
     }
-    let mut channel = channel.into_stream();
     tokio::io::copy_bidirectional(&mut stream, &mut channel).await?;
     Ok(())
 }
@@ -540,19 +762,19 @@ async fn run_remote_forward(
     spec: ForwardSpec,
     prompts: ConnectionPrompts,
     mut shutdown: watch::Receiver<bool>,
-    ready: oneshot::Sender<AppResult<()>>,
+    ready: ForwardReady,
     reporter: StatusReporter,
 ) {
     let Some(target_host) = spec.target_host.clone() else {
         let error = AppError::Invalid("missing remote forward target host".into());
         reporter.emit("error", Some(&error), None);
-        let _ = ready.send(Err(error));
+        ready.send(Err(error));
         return;
     };
     let Some(target_port) = spec.target_port else {
         let error = AppError::Invalid("missing remote forward target port".into());
         reporter.emit("error", Some(&error), None);
-        let _ = ready.send(Err(error));
+        ready.send(Err(error));
         return;
     };
 
@@ -561,9 +783,18 @@ async fn run_remote_forward(
     let mut reconnect_attempt = 0u32;
     loop {
         let (forwarded_tx, forwarded_rx) = mpsc::channel(MAX_FORWARD_CONNECTIONS);
+        let requested = Arc::new(AtomicBool::new(false));
+        let route = ForwardedTcpIpRoute {
+            port: spec.bind_port,
+            sender: forwarded_tx,
+            requested: requested.clone(),
+            capacity: Arc::new(tokio::sync::Semaphore::new(MAX_FORWARD_CONNECTIONS)),
+        };
+        let connection_shutdown = shutdown.clone();
         let connection = tokio::select! {
-            result = establish_with_forwarded_tcpip(&reporter.app, &prompts, &spec.id, &spec.hops, Some(forwarded_tx)) => result.map(Arc::new),
+            biased;
             _ = wait_for_shutdown(&mut shutdown) => Err(AppError::Cancelled),
+            result = establish_with_forwarded_tcpip(&reporter.app, &prompts, &spec.id, &spec.hops, Some(route), Some(connection_shutdown)) => result.map(Arc::new),
         };
         let connection = match connection {
             Ok(connection) => connection,
@@ -572,7 +803,7 @@ async fn run_remote_forward(
                 send_ready(&mut ready, Err(AppError::Cancelled));
                 return;
             }
-            Err(error) if !was_active => {
+            Err(error) if !was_active || !retryable_connection_error(&error) => {
                 reporter.emit("error", Some(&error), None);
                 send_ready(&mut ready, Err(error));
                 return;
@@ -580,7 +811,7 @@ async fn run_remote_forward(
             Err(error) => {
                 reconnect_attempt = reconnect_attempt.saturating_add(1);
                 reporter.emit("reconnecting", Some(&error), Some(reconnect_attempt));
-                if wait_retry(retry_delay(reconnect_attempt), &mut shutdown).await {
+                if wait_retry(jittered_retry_delay(reconnect_attempt), &mut shutdown).await {
                     reporter.emit("stopped", None, None);
                     return;
                 }
@@ -588,6 +819,7 @@ async fn run_remote_forward(
             }
         };
 
+        requested.store(true, Ordering::Release);
         let registration = tokio::select! {
             result = tokio::time::timeout(
                 CHANNEL_OPEN_TIMEOUT,
@@ -603,6 +835,9 @@ async fn run_remote_forward(
             },
             _ = wait_for_shutdown(&mut shutdown) => Err(AppError::Cancelled),
         };
+        if registration.is_err() {
+            requested.store(false, Ordering::Release);
+        }
         match registration {
             Ok(()) => {}
             Err(AppError::Cancelled) => {
@@ -610,15 +845,17 @@ async fn run_remote_forward(
                 send_ready(&mut ready, Err(AppError::Cancelled));
                 return;
             }
-            Err(error) if !was_active => {
+            Err(error) if !was_active || !retryable_connection_error(&error) => {
                 reporter.emit("error", Some(&error), None);
                 send_ready(&mut ready, Err(error));
                 return;
             }
             Err(error) => {
+                drop(connection);
+                drop(forwarded_rx);
                 reconnect_attempt = reconnect_attempt.saturating_add(1);
                 reporter.emit("reconnecting", Some(&error), Some(reconnect_attempt));
-                if wait_retry(retry_delay(reconnect_attempt), &mut shutdown).await {
+                if wait_retry(jittered_retry_delay(reconnect_attempt), &mut shutdown).await {
                     reporter.emit("stopped", None, None);
                     return;
                 }
@@ -629,31 +866,35 @@ async fn run_remote_forward(
         was_active = true;
         reporter.emit("active", None, None);
         send_ready(&mut ready, Ok(()));
+        let session_started = Instant::now();
         let end = run_remote_session(
             connection.clone(),
             forwarded_rx,
-            &spec,
             &target_host,
             target_port,
             &mut shutdown,
+            &reporter,
         )
         .await;
+        requested.store(false, Ordering::Release);
         let _ = tokio::time::timeout(
-            CHANNEL_OPEN_TIMEOUT,
+            REMOTE_CANCEL_TIMEOUT,
             connection
                 .handle
                 .cancel_tcpip_forward(spec.bind_host.clone(), spec.bind_port as u32),
         )
         .await;
+        drop(connection);
         match end {
             SessionEnd::Stopped => {
                 reporter.emit("stopped", None, None);
                 return;
             }
             SessionEnd::Lost(error) => {
-                reconnect_attempt = 1;
+                reconnect_attempt =
+                    next_reconnect_attempt(reconnect_attempt, session_started.elapsed());
                 reporter.emit("reconnecting", Some(&error), Some(reconnect_attempt));
-                if wait_retry(retry_delay(reconnect_attempt), &mut shutdown).await {
+                if wait_retry(jittered_retry_delay(reconnect_attempt), &mut shutdown).await {
                     reporter.emit("stopped", None, None);
                     return;
                 }
@@ -665,12 +906,13 @@ async fn run_remote_forward(
 async fn run_remote_session(
     connection: Arc<SshConnection>,
     mut forwarded: mpsc::Receiver<ForwardedTcpIp>,
-    spec: &ForwardSpec,
     target_host: &str,
     target_port: u16,
     shutdown: &mut watch::Receiver<bool>,
+    reporter: &StatusReporter,
 ) -> SessionEnd {
     let mut connections = JoinSet::new();
+    let mut diagnostics = ConnectionDiagnostics::default();
     let mut connection_check = tokio::time::interval_at(
         Instant::now() + CONNECTION_CHECK_INTERVAL,
         CONNECTION_CHECK_INTERVAL,
@@ -682,29 +924,43 @@ async fn run_remote_session(
                 let Some(incoming) = incoming else {
                     break SessionEnd::Lost(AppError::Network("SSH connection for remote port forward was closed".into()));
                 };
-                if incoming.connected_port != spec.bind_port as u32 || connections.len() >= MAX_FORWARD_CONNECTIONS {
-                    continue;
-                }
-                let _ = (&incoming.connected_address, &incoming.originator_address, incoming.originator_port);
                 let host = target_host.to_string();
                 connections.spawn(async move {
-                    let mut local = connect_target(&host, target_port).await?;
-                    let mut remote = incoming.channel.into_stream();
-                    tokio::io::copy_bidirectional(&mut local, &mut remote).await?;
-                    Ok::<(), AppError>(())
+                    serve_remote_connection(incoming, &host, target_port).await
                 });
             }
             _ = wait_for_shutdown(shutdown) => break SessionEnd::Stopped,
             _ = connection_check.tick() => {
+                diagnostics.flush(reporter);
                 if connection.handle.is_closed() {
                     break SessionEnd::Lost(AppError::Network("SSH connection for remote port forward was closed".into()));
                 }
             }
-            _ = connections.join_next(), if !connections.is_empty() => {}
+            result = connections.join_next(), if !connections.is_empty() => {
+                diagnostics.observe(result);
+            }
         }
     };
+    diagnostics.flush(reporter);
     connections.shutdown().await;
     result
+}
+
+async fn serve_remote_connection(incoming: ForwardedTcpIp, host: &str, port: u16) -> AppResult<()> {
+    let ForwardedTcpIp {
+        stream,
+        permit: _permit,
+    } = incoming;
+    relay_remote_stream(stream, host, port).await
+}
+
+async fn relay_remote_stream<S>(mut remote: S, host: &str, port: u16) -> AppResult<()>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    let mut local = connect_target(host, port).await?;
+    tokio::io::copy_bidirectional(&mut local, &mut remote).await?;
+    Ok(())
 }
 
 async fn connect_target(host: &str, port: u16) -> AppResult<TcpStream> {
@@ -742,7 +998,7 @@ async fn wait_retry(delay: Duration, shutdown: &mut watch::Receiver<bool>) -> bo
     }
 }
 
-async fn wait_for_shutdown(shutdown: &mut watch::Receiver<bool>) {
+pub(super) async fn wait_for_shutdown(shutdown: &mut watch::Receiver<bool>) {
     if *shutdown.borrow() {
         return;
     }
@@ -753,21 +1009,44 @@ async fn wait_for_shutdown(shutdown: &mut watch::Receiver<bool>) {
     }
 }
 
+fn retryable_connection_error(error: &AppError) -> bool {
+    matches!(error.code(), "network" | "dns" | "timeout" | "io")
+}
+
+fn next_reconnect_attempt(previous: u32, active_for: Duration) -> u32 {
+    if active_for >= RECONNECT_DELAY_MAX {
+        1
+    } else {
+        previous.saturating_add(1)
+    }
+}
+
+fn jittered_retry_delay(attempt: u32) -> Duration {
+    retry_delay(attempt)
+        .mul_f64(rand::random_range(0.8..=1.2))
+        .min(RECONNECT_DELAY_MAX)
+}
+
 fn retry_delay(attempt: u32) -> Duration {
     let exponent = attempt.saturating_sub(1).min(5);
     Duration::from_secs(1u64 << exponent).min(RECONNECT_DELAY_MAX)
 }
 
-fn send_ready(ready: &mut Option<oneshot::Sender<AppResult<()>>>, result: AppResult<()>) {
+fn send_ready(ready: &mut Option<ForwardReady>, result: AppResult<()>) {
     if let Some(ready) = ready.take() {
-        let _ = ready.send(result);
+        ready.send(result);
     }
 }
 
 fn bind_error(spec: &ForwardSpec, error: std::io::Error) -> AppError {
-    if spec.bind_port < 1024 {
+    if spec.bind_port < 1024 && error.kind() == std::io::ErrorKind::PermissionDenied {
         AppError::Other(format!(
             "could not listen on {}:{} ({error}). Choose a port above 1023 or grant permission to bind privileged ports",
+            spec.bind_host, spec.bind_port
+        ))
+    } else if error.kind() == std::io::ErrorKind::AddrInUse {
+        AppError::Other(format!(
+            "could not listen on {}:{} because the address is in use; stop the other listener or choose a different address or port",
             spec.bind_host, spec.bind_port
         ))
     } else {
@@ -865,151 +1144,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn forward_spec(target_port: u16) -> ForwardSpec {
-        ForwardSpec {
-            id: "forward".into(),
-            kind: "local".into(),
-            bind_host: "127.0.0.1".into(),
-            bind_port: 8080,
-            target_host: Some("localhost".into()),
-            target_port: Some(target_port),
-            hops: Vec::new(),
-        }
-    }
-
-    #[tokio::test]
-    async fn socks5_parses_domain_connect_without_premature_success() {
-        let (mut client, mut server) = tokio::io::duplex(256);
-        let client_task = tokio::spawn(async move {
-            client.write_all(&[0x05, 0x01, 0x00]).await.unwrap();
-            let mut method_reply = [0u8; 2];
-            client.read_exact(&mut method_reply).await.unwrap();
-            assert_eq!(method_reply, [0x05, 0x00]);
-            let host = b"example.com";
-            let mut request = vec![0x05, 0x01, 0x00, 0x03, host.len() as u8];
-            request.extend_from_slice(host);
-            request.extend_from_slice(&8080u16.to_be_bytes());
-            client.write_all(&request).await.unwrap();
-            let mut reply = [0u8; 10];
-            assert!(
-                tokio::time::timeout(Duration::from_millis(20), client.read_exact(&mut reply))
-                    .await
-                    .is_err()
-            );
-        });
-        assert_eq!(
-            socks5_request(&mut server).await.unwrap(),
-            ("example.com".into(), 8080)
-        );
-        client_task.await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn socks5_rejects_unoffered_authentication_method() {
-        let (mut client, mut server) = tokio::io::duplex(64);
-        let client_task = tokio::spawn(async move {
-            client.write_all(&[0x05, 0x01, 0x02]).await.unwrap();
-            let mut reply = [0u8; 2];
-            client.read_exact(&mut reply).await.unwrap();
-            assert_eq!(reply, [0x05, 0xff]);
-        });
-        assert!(socks5_request(&mut server).await.is_err());
-        client_task.await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn socks5_rejects_unsupported_commands_and_zero_ports() {
-        for request in [
-            [0x05, 0x02, 0x00, 0x01, 127, 0, 0, 1, 0, 80],
-            [0x05, 0x01, 0x00, 0x01, 127, 0, 0, 1, 0, 0],
-        ] {
-            let (mut client, mut server) = tokio::io::duplex(64);
-            let client_task = tokio::spawn(async move {
-                client.write_all(&[0x05, 0x01, 0x00]).await.unwrap();
-                let mut method_reply = [0u8; 2];
-                client.read_exact(&mut method_reply).await.unwrap();
-                client.write_all(&request).await.unwrap();
-                let mut reply = [0u8; 10];
-                client.read_exact(&mut reply).await.unwrap();
-                assert_ne!(reply[1], 0x00);
-            });
-            assert!(socks5_request(&mut server).await.is_err());
-            client_task.await.unwrap();
-        }
-    }
-
-    #[test]
-    fn reconnect_delay_uses_bounded_exponential_backoff() {
-        assert_eq!(retry_delay(1), Duration::from_secs(1));
-        assert_eq!(retry_delay(2), Duration::from_secs(2));
-        assert_eq!(retry_delay(6), Duration::from_secs(30));
-        assert_eq!(retry_delay(30), Duration::from_secs(30));
-    }
-
-    #[test]
-    fn old_generation_cannot_remove_replacement() {
-        let active = Mutex::new(HashMap::new());
-        let (shutdown, _) = watch::channel(false);
-        let (_, finished) = watch::channel(false);
-        active.lock().insert(
-            "forward".into(),
-            ActiveForward {
-                generation: 2,
-                spec: forward_spec(80),
-                shutdown,
-                finished,
-            },
-        );
-
-        remove_finished(&active, "forward", 1);
-        assert_eq!(active.lock().get("forward").unwrap().generation, 2);
-        remove_finished(&active, "forward", 2);
-        assert!(!active.lock().contains_key("forward"));
-    }
-
-    #[test]
-    fn stop_all_cancels_active_forwards_and_invalidates_starts() {
-        let manager = ForwardManager::new();
-        let lifecycle = manager.lifecycle.load(Ordering::Acquire);
-        let (shutdown, shutdown_rx) = watch::channel(false);
-        let (_, finished) = watch::channel(false);
-        manager.active.lock().insert(
-            "forward".into(),
-            ActiveForward {
-                generation: 1,
-                spec: forward_spec(80),
-                shutdown,
-                finished,
-            },
-        );
-
-        manager.stop_all();
-
-        assert!(manager.active.lock().is_empty());
-        assert!(*shutdown_rx.borrow());
-        assert_ne!(manager.lifecycle.load(Ordering::Acquire), lifecycle);
-    }
-
-    #[tokio::test]
-    async fn conditional_stop_leaves_replacement_running() {
-        let manager = ForwardManager::new();
-        let current = forward_spec(80);
-        let (shutdown, _) = watch::channel(false);
-        let (_, finished) = watch::channel(false);
-        manager.active.lock().insert(
-            current.id.clone(),
-            ActiveForward {
-                generation: 1,
-                spec: current.clone(),
-                shutdown,
-                finished,
-            },
-        );
-
-        assert!(!manager.stop_if_spec(&forward_spec(81)).await);
-        assert!(manager.active_specs().iter().any(|spec| spec == &current));
-    }
-}
+mod tests;

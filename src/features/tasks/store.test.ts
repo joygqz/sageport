@@ -6,6 +6,7 @@ vi.mock("@/lib/ipc", () => ({
       run: vi.fn(() => Promise.resolve()),
       cancelRun: vi.fn(() => Promise.resolve()),
     },
+    hosts: { get: vi.fn(() => Promise.resolve({ updatedAt: "now" })) },
     sftp: {
       onTransfer: vi.fn(() => Promise.resolve(() => {})),
     },
@@ -95,7 +96,7 @@ describe("task runs", () => {
     expect(run.status).toBe("cancelled");
     expect(run.stepStates.map((step) => step.status)).toEqual([
       "done",
-      "skipped",
+      "cancelled",
     ]);
   });
 
@@ -118,5 +119,32 @@ describe("task runs", () => {
       "error",
       "skipped",
     ]);
+  });
+});
+
+describe("run coordination", () => {
+  it("reuses the active run rather than launching the same task twice", async () => {
+    let finish!: () => void;
+    vi.mocked(ipc.tasks.run).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = useTaskRunStore.getState().startRun(task(), "h1");
+    const second = useTaskRunStore.getState().startRun(task(), "h1");
+    expect(first.requestId).toBe(second.requestId);
+    expect(first.completion).toBe(second.completion);
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    finish();
+    await first.completion;
+  });
+
+  it("cancels a queued run before dispatching it", async () => {
+    vi.mocked(ipc.tasks.run).mockClear();
+    const started = useTaskRunStore.getState().startRun(task(), "h1");
+    useTaskRunStore.getState().cancelRun(started.requestId);
+    expect((await started.completion)?.status).toBe("cancelled");
+    expect(ipc.tasks.run).not.toHaveBeenCalled();
   });
 });

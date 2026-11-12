@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::domain::{IdentityInput, IdentityView};
 use crate::error::{AppError, AppResult};
@@ -36,11 +36,16 @@ pub async fn identities_create(
 
 #[tauri::command]
 pub async fn identities_update(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     input: IdentityInput,
 ) -> AppResult<IdentityView> {
-    Ok(identity_repo::update(&state.db, &id, input).await?.into())
+    let _configuration = state.forwards.configuration.write().await;
+    let previous = state.forwards.active_specs();
+    let updated = identity_repo::update(&state.db, &id, input).await?;
+    super::forwards::reconcile_running_forwards(&app, previous);
+    Ok(updated.into())
 }
 
 #[tauri::command]

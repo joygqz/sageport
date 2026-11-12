@@ -13,7 +13,7 @@ describe("layoutDragPreview", () => {
         viewportWidth: 1992,
         viewportHeight: 505,
       }),
-    ).toEqual({ left: 139, top: 110, width: 352, height: 28 });
+    ).toEqual({ left: 139, top: 110, width: 240, height: 28 });
   });
 
   it("keeps the preview inside the right and bottom edges", () => {

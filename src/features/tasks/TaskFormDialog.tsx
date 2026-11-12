@@ -182,6 +182,9 @@ function TaskFormBody({
   const [description, setDescription] = useState(task?.description ?? "");
   const [hostId, setHostId] = useState(task?.hostId ?? "");
   const [steps, setSteps] = useState<TaskStep[]>(draft.steps);
+  const [stepIds, setStepIds] = useState(() =>
+    draft.steps.map(() => crypto.randomUUID()),
+  );
   const [scheduleEnabled, setScheduleEnabled] = useState(
     task?.scheduleEnabled ?? false,
   );
@@ -196,10 +199,19 @@ function TaskFormBody({
   const updateStep = (index: number, next: TaskStep) =>
     setSteps((prev) => prev.map((step, i) => (i === index ? next : step)));
 
-  const removeStep = (index: number) =>
+  const removeStep = (index: number) => {
     setSteps((prev) => prev.filter((_, i) => i !== index));
+    setStepIds((prev) => prev.filter((_, i) => i !== index));
+  };
 
-  const moveStep = (index: number, direction: -1 | 1) =>
+  const moveStep = (index: number, direction: -1 | 1) => {
+    setStepIds((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
     setSteps((prev) => {
       const target = index + direction;
       if (target < 0 || target >= prev.length) return prev;
@@ -207,11 +219,13 @@ function TaskFormBody({
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+  };
 
   const addStep = (type: (typeof STEP_TYPES)[number]) => {
     setOpenStepIndex(steps.length);
     setAddedStepIndex(steps.length);
     setSteps((prev) => [...prev, newStep(type)]);
+    setStepIds((prev) => [...prev, crypto.randomUUID()]);
   };
 
   const submit = async () => {
@@ -296,6 +310,7 @@ function TaskFormBody({
 
       <StepsSection
         steps={steps}
+        stepIds={stepIds}
         openIndex={openStepIndex}
         addedIndex={addedStepIndex}
         onAdd={addStep}
@@ -309,6 +324,7 @@ function TaskFormBody({
 
 function StepsSection({
   steps,
+  stepIds,
   openIndex,
   addedIndex,
   onAdd,
@@ -317,6 +333,7 @@ function StepsSection({
   onMove,
 }: {
   steps: TaskStep[];
+  stepIds: string[];
   openIndex: number | null;
   addedIndex: number | null;
   onAdd: (type: TaskStepType) => void;
@@ -361,7 +378,7 @@ function StepsSection({
         <div className="ui-divided-list">
           {steps.map((step, index) => (
             <TaskStepCard
-              key={index}
+              key={stepIds[index]}
               step={step}
               index={index}
               total={steps.length}

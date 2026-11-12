@@ -7,7 +7,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { parseTaskSteps } from "@/features/tasks/api";
+import { parseTaskSteps, parseTaskRunSteps } from "@/features/tasks/api";
 import { taskNeedsRemote } from "@/features/tasks/steps";
 import { useTaskRunStore, type TaskRun } from "@/features/tasks/store";
 import { isValidCron, nextCronTime } from "@/lib/cron";
@@ -16,7 +16,6 @@ import type {
   Task,
   TaskInput,
   TaskRunHistoryEntry,
-  TaskRunStepRecord,
   TaskStep,
 } from "@/types/models";
 import { invalidateTasks } from "./cache";
@@ -45,6 +44,7 @@ interface ResolvedRun {
   task: Task;
   hostId: string;
   hostLabel?: string;
+  hostUpdatedAt?: string;
   steps: TaskStep[];
 }
 
@@ -63,6 +63,7 @@ async function resolveRun(
   const steps = parseTaskSteps(task);
   const hostId = task.hostId ?? "";
   let hostLabel: string | undefined;
+  let hostUpdatedAt: string | undefined;
   if (taskNeedsRemote(steps)) {
     if (!hostId) {
       return {
@@ -71,12 +72,14 @@ async function resolveRun(
       };
     }
     try {
-      hostLabel = (await ipc.hosts.get(hostId)).label;
+      const host = await ipc.hosts.get(hostId);
+      hostLabel = `${host.label} (${host.address}:${host.port})`;
+      hostUpdatedAt = host.updatedAt;
     } catch {
       return { error: `Error: no host with id "${hostId}".` };
     }
   }
-  return { task, hostId, hostLabel, steps };
+  return { task, hostId, hostLabel, hostUpdatedAt, steps };
 }
 
 function planLine(step: TaskStep): string {
@@ -119,7 +122,7 @@ function summarizeRun(run: TaskRun): string {
         : "";
     return head + detail;
   });
-  return `Task "${run.taskName}" — ${run.status}\n\n${lines.join("\n\n")}`;
+  return `Task "${run.taskName}" — ${run.status}${run.error ? `\n${run.error}` : ""}\n\n${lines.join("\n\n")}`;
 }
 
 async function listTasks(): Promise<ToolExecutionResult> {
@@ -154,17 +157,8 @@ async function listTasks(): Promise<ToolExecutionResult> {
   );
 }
 
-function parseRunSteps(steps: string): TaskRunStepRecord[] {
-  try {
-    const parsed = JSON.parse(steps);
-    return Array.isArray(parsed) ? (parsed as TaskRunStepRecord[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 function summarizeRunEntry(entry: TaskRunHistoryEntry) {
-  const steps = parseRunSteps(entry.steps).map((record, index) => {
+  const steps = parseTaskRunSteps(entry.steps).map((record, index) => {
     const exit =
       record.exitCode !== undefined && record.exitCode !== 0
         ? ` (exit ${record.exitCode})`
@@ -193,7 +187,7 @@ async function listTaskRuns(
     requested !== undefined
       ? Math.min(Math.max(1, Math.trunc(requested)), 100)
       : 20;
-  const entries = await ipc.tasks.runsList();
+  const entries = await ipc.tasks.runsList(1000);
   const filtered = taskId
     ? entries.filter((entry) => entry.taskId === taskId)
     : entries;
@@ -215,7 +209,14 @@ async function prepareRunTask(
   const resolved = await resolveRun(args);
   if ("error" in resolved) return { args, preflightError: resolved.error };
   return {
-    args: { ...args, hostId: resolved.hostId, command: buildPlan(resolved) },
+    args: {
+      ...args,
+      hostId: resolved.hostId,
+      command: buildPlan(resolved),
+      approvedRevision: resolved.task.revision,
+      approvedSteps: resolved.task.steps,
+      approvedHostUpdatedAt: resolved.hostUpdatedAt,
+    },
   };
 }
 
@@ -225,13 +226,23 @@ async function runTask(
 ): Promise<ToolExecutionResult> {
   const resolved = await resolveRun(args);
   if ("error" in resolved) return toolFailure(resolved.error);
+  if (
+    args.approvedRevision !== resolved.task.revision ||
+    args.approvedSteps !== resolved.task.steps ||
+    args.hostId !== resolved.hostId ||
+    args.approvedHostUpdatedAt !== resolved.hostUpdatedAt
+  ) {
+    return toolFailure(
+      "Error: the task changed after approval. Review and approve it again.",
+    );
+  }
   if (context.isCancelled?.()) {
     return toolFailure("Error: the assistant run was stopped.");
   }
 
   const { requestId, completion } = useTaskRunStore
     .getState()
-    .startRun(resolved.task, resolved.hostId);
+    .startRun(resolved.task, resolved.hostId, resolved.hostUpdatedAt);
 
   let cancelInFlight = false;
   const timer = globalThis.setInterval(() => {
@@ -248,7 +259,9 @@ async function runTask(
     globalThis.clearInterval(timer);
   }
   if (!run) return toolFailure("Error: the task run produced no result.");
-  return toolSuccess(summarizeRun(run));
+  return run.status === "done"
+    ? toolSuccess(summarizeRun(run))
+    : toolFailure(summarizeRun(run));
 }
 
 function taskInputFromArgs(
@@ -348,7 +361,7 @@ const STEP_SCHEMA = {
 
 const SCHEDULE_DESCRIPTION =
   "5-field cron expression (minute hour day month weekday) to run the task " +
-  "automatically while the app is open, e.g. '0 3 * * *' daily at 03:00, " +
+  "automatically on this device while the app is open, using its time zone, e.g. '0 3 * * *' daily at 03:00, " +
   "'0 */6 * * *' every 6 hours, '0 9 * * 1-5' weekdays at 09:00. Scheduled runs " +
   "use the task's fixed host with no prompts, so a scheduled task with remote " +
   "steps needs a fixed host.";
@@ -453,6 +466,7 @@ export const taskTools: AiTool[] = [
     icon: Save,
     labelKey: "ai.tool.saveTask",
     requiresApproval: true,
+    alwaysRequireApproval: true,
     execute: async (args) => saveTask(args),
   },
   {
@@ -491,6 +505,7 @@ export const taskTools: AiTool[] = [
     icon: SquarePen,
     labelKey: "ai.tool.updateTask",
     requiresApproval: true,
+    alwaysRequireApproval: true,
     execute: async (args) => updateTask(args),
   },
   {

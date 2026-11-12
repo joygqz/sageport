@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio::time;
@@ -75,11 +75,16 @@ pub async fn hosts_create(state: State<'_, AppState>, input: HostInput) -> AppRe
 
 #[tauri::command]
 pub async fn hosts_update(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     input: HostInput,
 ) -> AppResult<HostView> {
-    Ok(host_repo::update(&state.db, &id, input).await?.into())
+    let _configuration = state.forwards.configuration.write().await;
+    let previous = state.forwards.active_specs();
+    let updated = host_repo::update(&state.db, &id, input).await?;
+    super::forwards::reconcile_running_forwards(&app, previous);
+    Ok(updated.into())
 }
 
 #[tauri::command]

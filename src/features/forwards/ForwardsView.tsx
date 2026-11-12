@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Network,
   Pencil,
@@ -8,9 +8,6 @@ import {
   Square,
   Trash2,
 } from "lucide-react";
-
-import { useHostKeyStore } from "@/features/terminal/host-key";
-import { usePasswordPromptStore } from "@/features/terminal/password-prompt";
 
 import {
   Button,
@@ -58,6 +55,9 @@ export function ForwardsView() {
   }>({ open: false, forward: null });
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
+  const [stoppingIds, setStoppingIds] = useState<Set<string>>(() => new Set());
+  const operations = useRef(new Map<string, symbol>());
+  const stopRequests = useRef(new Set<string>());
   const [query, setQuery] = useState("");
   const searching = query.trim().length > 0;
 
@@ -75,30 +75,35 @@ export function ForwardsView() {
   };
 
   const toggle = async (forward: PortForward) => {
-    if (pendingIds.has(forward.id)) return;
+    if (stopRequests.current.has(forward.id)) return;
+    const stopping = isActive(forward.id) || operations.current.has(forward.id);
+    const operation = Symbol();
+    operations.current.set(forward.id, operation);
     setPendingIds((current) => new Set(current).add(forward.id));
-    if (isActive(forward.id)) {
-      useHostKeyStore.getState().rejectSession(forward.id);
-      usePasswordPromptStore.getState().cancelSession(forward.id);
-      try {
-        await ipc.forwards.stop(forward.id);
-      } catch (err) {
-        toast.error(t("forwards.stopError"), errorMessage(err));
-      } finally {
+    if (stopping) {
+      stopRequests.current.add(forward.id);
+      setStoppingIds((current) => new Set(current).add(forward.id));
+    }
+    try {
+      if (stopping) await ipc.forwards.stop(forward.id);
+      else await ipc.forwards.start(forward.id);
+    } catch (err) {
+      if (errorCode(err) !== "cancelled") {
+        toast.error(
+          t(stopping ? "forwards.stopError" : "forwards.startError"),
+          errorMessage(err),
+        );
+      }
+    } finally {
+      if (operations.current.get(forward.id) === operation) {
+        operations.current.delete(forward.id);
+        stopRequests.current.delete(forward.id);
         setPendingIds((current) => {
           const next = new Set(current);
           next.delete(forward.id);
           return next;
         });
-      }
-    } else {
-      try {
-        await ipc.forwards.start(forward.id);
-      } catch (err) {
-        if (errorCode(err) === "cancelled") return;
-        toast.error(t("forwards.startError"), errorMessage(err));
-      } finally {
-        setPendingIds((current) => {
+        setStoppingIds((current) => {
           const next = new Set(current);
           next.delete(forward.id);
           return next;
@@ -193,13 +198,16 @@ export function ForwardsView() {
           />
         ) : (
           filteredForwards.map((forward) => {
-            const active = isActive(forward.id);
+            const active = isActive(forward.id) || pendingIds.has(forward.id);
             const errored = runtime[forward.id]?.status === "error";
             const reconnecting = runtime[forward.id]?.status === "reconnecting";
             const statusMessage = errored
               ? runtime[forward.id]?.message
               : undefined;
-            const statusDetails = runtime[forward.id]?.message;
+            const failureCount = runtime[forward.id]?.connectionFailures ?? 0;
+            const connectionError = runtime[forward.id]?.lastConnectionError;
+            const statusDetails =
+              runtime[forward.id]?.message ?? connectionError;
             const pending = pendingIds.has(forward.id);
             return (
               <ContextMenu key={forward.id}>
@@ -245,6 +253,7 @@ export function ForwardsView() {
                           "truncate text-2xs text-muted-foreground",
                           !statusMessage && "font-mono",
                           errored && "text-danger",
+                          !errored && failureCount > 0 && "text-warning",
                         )}
                       >
                         {statusMessage ??
@@ -255,7 +264,11 @@ export function ForwardsView() {
                                   attempt:
                                     runtime[forward.id]?.reconnectAttempt ?? 1,
                                 })
-                              : describeForward(forward))}
+                              : failureCount > 0
+                                ? t("forwards.connectionFailures", {
+                                    count: failureCount,
+                                  })
+                                : describeForward(forward))}
                       </p>
                     </div>
                     <Tooltip
@@ -266,7 +279,7 @@ export function ForwardsView() {
                       <button
                         type="button"
                         onClick={() => void toggle(forward)}
-                        disabled={pending}
+                        disabled={stoppingIds.has(forward.id)}
                         className={PANEL_LIST_ACTION_CLASS}
                         aria-label={
                           active ? t("forwards.stop") : t("forwards.start")

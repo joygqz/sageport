@@ -142,6 +142,12 @@ export function TaskStepCard({
               onChange={(retries) => onChange({ ...step, retries })}
             />
           </div>
+          {(step.type === "localCommand" || step.type === "remoteCommand") &&
+            (step.retries ?? 0) > 0 && (
+              <p className="text-2xs text-warning">
+                {t("tasks.form.retriesHint")}
+              </p>
+            )}
         </div>
       </CollapsibleContent>
     </Collapsible>

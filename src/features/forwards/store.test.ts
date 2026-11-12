@@ -85,4 +85,29 @@ describe("forward runtime state", () => {
     useForwardStore.getState().remove("forward");
     expect(useForwardStore.getState().runtime.forward).toBeUndefined();
   });
+  it("rejects late events from older generations and preserves connection diagnostics", () => {
+    useForwardStore.setState({ runtime: {} });
+    useForwardStore.getState().apply({
+      ...event("active", 10),
+      generation: 2,
+      connectionFailures: 3,
+      lastConnectionError: "connection refused",
+    });
+    useForwardStore.getState().apply({ ...event("error", 11), generation: 1 });
+    expect(useForwardStore.getState().runtime.forward).toMatchObject({
+      status: "active",
+      generation: 2,
+      connectionFailures: 3,
+      lastConnectionError: "connection refused",
+    });
+    useForwardStore
+      .getState()
+      .apply({ ...event("starting", 12), generation: 3 });
+    expect(
+      useForwardStore.getState().runtime.forward?.connectionFailures,
+    ).toBeUndefined();
+    expect(
+      useForwardStore.getState().runtime.forward?.lastConnectionError,
+    ).toBeUndefined();
+  });
 });

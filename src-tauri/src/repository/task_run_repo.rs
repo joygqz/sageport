@@ -50,8 +50,8 @@ pub async fn create(
     .await?;
     sqlx::query(
         "DELETE FROM task_runs
-         WHERE id NOT IN (
-           SELECT id FROM task_runs ORDER BY started_at DESC, id DESC LIMIT ?
+         WHERE status != 'running' AND id NOT IN (
+           SELECT id FROM task_runs WHERE status != 'running' ORDER BY started_at DESC, id DESC LIMIT ?
          )",
     )
     .bind(MAX_HISTORY_ENTRIES)
@@ -69,6 +69,7 @@ pub async fn finish(
     steps_json: &str,
 ) -> AppResult<()> {
     let ts = now();
+    let mut tx = pool.begin().await?;
     sqlx::query(
         "UPDATE task_runs
          SET status = ?, message = ?, steps = ?, finished_at = ?
@@ -79,8 +80,17 @@ pub async fn finish(
     .bind(steps_json)
     .bind(&ts)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+    sqlx::query(
+        "DELETE FROM task_runs WHERE status != 'running' AND id NOT IN (
+           SELECT id FROM task_runs WHERE status != 'running' ORDER BY started_at DESC, id DESC LIMIT ?
+         )",
+    )
+    .bind(MAX_HISTORY_ENTRIES)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -222,15 +232,33 @@ mod tests {
     #[tokio::test]
     async fn caps_stored_runs_at_the_history_limit() {
         let pool = test_pool().await;
-        for i in 0..(MAX_HISTORY_ENTRIES + 5) {
+        create(
+            &pool,
+            "protected-running",
+            "task-2",
+            "Active task",
+            None,
+            None,
+            "[]",
+            1,
+        )
+        .await
+        .unwrap();
+        for i in 0..(MAX_HISTORY_ENTRIES + 6) {
             let id = format!("run-{i:04}");
             create(&pool, &id, "task-1", "Deploy", None, None, "[]", 0)
                 .await
                 .unwrap();
+            finish(&pool, &id, "done", None, "[]").await.unwrap();
         }
         assert_eq!(
             list(&pool, MAX_HISTORY_ENTRIES + 100).await.unwrap().len() as i64,
-            MAX_HISTORY_ENTRIES
+            MAX_HISTORY_ENTRIES + 1
         );
+        assert!(list(&pool, MAX_HISTORY_ENTRIES + 100)
+            .await
+            .unwrap()
+            .iter()
+            .any(|row| row.id == "protected-running" && row.status == "running"));
     }
 }

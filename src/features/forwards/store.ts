@@ -8,6 +8,8 @@ interface ForwardRuntime {
   message?: string;
   code?: string;
   reconnectAttempt?: number;
+  connectionFailures?: number;
+  lastConnectionError?: string;
   generation: number;
   sequence: number;
 }
@@ -25,6 +27,8 @@ function fromEvent(event: ForwardStatusEvent): ForwardRuntime {
     message: event.message,
     code: event.code,
     reconnectAttempt: event.reconnectAttempt,
+    connectionFailures: event.connectionFailures,
+    lastConnectionError: event.lastConnectionError,
     generation: event.generation,
     sequence: event.sequence,
   };
@@ -35,7 +39,12 @@ export const useForwardStore = create<ForwardState>((set) => ({
   apply: (event) =>
     set((state) => {
       const current = state.runtime[event.forwardId];
-      if (current && current.sequence >= event.sequence) return state;
+      if (
+        current &&
+        (current.generation > event.generation ||
+          current.sequence >= event.sequence)
+      )
+        return state;
       return {
         runtime: {
           ...state.runtime,

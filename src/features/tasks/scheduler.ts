@@ -11,6 +11,7 @@ import { selectRunningRunForTask, useTaskRunStore } from "./store";
 
 const STORAGE_KEY = "sageport.task-schedule-runs";
 const TICK_MS = 30 * 1000;
+const MAX_SCHEDULE_DELAY_MS = 60 * 1000;
 
 export type SkipReason = "noHost";
 
@@ -51,7 +52,7 @@ export function dueTasks(
     ) {
       continue;
     }
-    const sig = task.schedule;
+    const sig = `${task.schedule}|${task.revision}|${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
     const prev = previous[task.id];
     const lastRun = prev ? new Date(prev.lastRun) : null;
     if (
@@ -65,13 +66,16 @@ export function dueTasks(
       continue;
     }
 
-    const next = nextCronTime(sig, lastRun);
+    const next = nextCronTime(task.schedule, lastRun);
     if (!next || next.getTime() > now.getTime()) {
       state[task.id] = prev;
       continue;
     }
-    if (isRunning(task.id)) {
-      state[task.id] = prev;
+    if (
+      now.getTime() - next.getTime() > MAX_SCHEDULE_DELAY_MS ||
+      isRunning(task.id)
+    ) {
+      state[task.id] = { lastRun: nowIso, sig };
       continue;
     }
     const skip = preflightSkip(task);

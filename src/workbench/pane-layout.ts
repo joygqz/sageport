@@ -41,11 +41,8 @@ export function splitLayout(
     );
     if (index !== -1) {
       const children = [...layout.children];
-      const sizes = [...layout.sizes];
-      const half = sizes[index] / 2;
-      sizes[index] = half;
       children.splice(index + 1, 0, leafLayout(newPaneId));
-      sizes.splice(index + 1, 0, half);
+      const sizes = children.map(() => 1 / children.length);
       return { ...layout, children, sizes };
     }
   }

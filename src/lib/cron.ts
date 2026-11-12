@@ -99,11 +99,10 @@ export function nextCronTime(
   from: Date,
 ): Date | null {
   const fields = typeof expr === "string" ? parseCron(expr) : expr;
-  if (!fields) return null;
+  if (!fields || !Number.isFinite(from.getTime())) return null;
 
   const date = new Date(from);
-  date.setSeconds(0, 0);
-  date.setMinutes(date.getMinutes() + 1);
+  date.setTime(Math.floor(from.getTime() / 60_000) * 60_000 + 60_000);
 
   const horizon = from.getFullYear() + 5;
   while (date.getFullYear() <= horizon) {
@@ -118,11 +117,11 @@ export function nextCronTime(
       continue;
     }
     if (!fields.hour.has(date.getHours())) {
-      date.setHours(date.getHours() + 1, 0, 0, 0);
+      date.setTime(date.getTime() + 60_000);
       continue;
     }
     if (!fields.minute.has(date.getMinutes())) {
-      date.setMinutes(date.getMinutes() + 1, 0, 0);
+      date.setTime(date.getTime() + 60_000);
       continue;
     }
     return date;

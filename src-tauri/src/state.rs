@@ -54,6 +54,8 @@ pub struct AppState {
 
     pub task_cancels: Mutex<HashMap<String, Arc<TransferCancel>>>,
 
+    pub active_tasks: Mutex<HashMap<String, String>>,
+
     request_generation: AtomicU64,
 
     pub sync_oauth: Mutex<SyncOAuthSlot>,
@@ -76,6 +78,7 @@ impl AppState {
             ai_cancels: Mutex::new(HashMap::new()),
             batch_cancels: Mutex::new(HashMap::new()),
             task_cancels: Mutex::new(HashMap::new()),
+            active_tasks: Mutex::new(HashMap::new()),
             request_generation: AtomicU64::new(0),
             sync_oauth: Mutex::new(SyncOAuthSlot::default()),
             sync_operation: tokio::sync::Mutex::new(()),

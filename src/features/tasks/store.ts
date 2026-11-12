@@ -7,6 +7,7 @@ import { queryClient } from "@/lib/query";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
 import type { Task, TaskRunEvent, TaskStep } from "@/types/models";
 import { parseTaskSteps, taskRunsKey } from "./api";
+import { taskNeedsRemote } from "./steps";
 
 function t(
   key: Parameters<typeof translate>[1],
@@ -15,7 +16,8 @@ function t(
   return translate(detectLocale(), key, params);
 }
 
-export type StepStatus = "pending" | "running" | "done" | "error" | "skipped";
+export type StepStatus =
+  "pending" | "running" | "done" | "error" | "skipped" | "cancelled";
 
 export type RunStatus = "running" | "done" | "error" | "cancelled";
 
@@ -58,7 +60,11 @@ export interface StartedRun {
 interface TaskRunState {
   runs: Record<string, TaskRun>;
   attachedId: string | null;
-  startRun: (task: Task, hostId: string) => StartedRun;
+  startRun: (
+    task: Task,
+    hostId: string,
+    expectedHostUpdatedAt?: string,
+  ) => StartedRun;
   cancelRun: (requestId: string) => void;
   dismissRun: (requestId: string) => void;
   attach: (requestId: string) => void;
@@ -73,6 +79,10 @@ export function selectRunningRunForTask(
     (run) => run.taskId === taskId && run.status === "running",
   );
 }
+
+const pendingCancellations = new Set<string>();
+const cancelTimers = new Map<string, ReturnType<typeof setInterval>>();
+const completions = new Map<string, Promise<TaskRun | undefined>>();
 
 let transferBridged = false;
 let transferBridgePromise: Promise<void> | null = null;
@@ -102,7 +112,11 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
   const applyEvent = (requestId: string, event: TaskRunEvent) => {
     switch (event.status) {
       case "start":
-        patchStep(requestId, event.stepIndex, { status: "running" });
+        patchStep(requestId, event.stepIndex, {
+          status: "running",
+          transferred: undefined,
+          total: undefined,
+        });
         break;
       case "log":
         if (event.chunk) {
@@ -124,6 +138,9 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           message: event.message,
         });
         break;
+      case "cancelled":
+        patchStep(requestId, event.stepIndex, { status: "cancelled" });
+        break;
       case "skipped":
         patchStep(requestId, event.stepIndex, { status: "skipped" });
         break;
@@ -141,9 +158,11 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
             ? "error"
             : status;
       const stepStates = run.stepStates.map((step) =>
-        step.status === "pending" || step.status === "running"
-          ? { ...step, status: "skipped" as const }
-          : step,
+        step.status === "running" && status === "cancelled"
+          ? { ...step, status: "cancelled" as const }
+          : step.status === "pending" || step.status === "running"
+            ? { ...step, status: "skipped" as const }
+            : step,
       );
       return {
         runs: {
@@ -215,7 +234,15 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
     runs: {},
     attachedId: null,
 
-    startRun: (task, hostId) => {
+    startRun: (task, hostId, expectedHostUpdatedAt) => {
+      const existing = selectRunningRunForTask(get().runs, task.id);
+      if (existing) {
+        return {
+          requestId: existing.requestId,
+          completion:
+            completions.get(existing.requestId) ?? Promise.resolve(existing),
+        };
+      }
       const requestId = crypto.randomUUID();
       const steps = parseTaskSteps(task);
       const run: TaskRun = {
@@ -235,11 +262,22 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           await ensureTransferBridge().catch((error) =>
             console.warn("Failed to initialize task transfer progress:", error),
           );
+          const hostUpdatedAt =
+            expectedHostUpdatedAt ??
+            (taskNeedsRemote(steps)
+              ? (await ipc.hosts.get(hostId)).updatedAt
+              : undefined);
+          if (pendingCancellations.has(requestId)) {
+            throw Object.assign(new Error("cancelled"), { code: "cancelled" });
+          }
           await ipc.tasks.run(
             task.id,
             hostId,
             (event) => applyEvent(requestId, event),
             requestId,
+            task.revision,
+            task.steps,
+            hostUpdatedAt,
           );
           finalize(requestId, "done");
         } catch (err) {
@@ -247,21 +285,39 @@ export const useTaskRunStore = create<TaskRunState>((set, get) => {
           if (!cancelled) failRun(requestId, errorMessage(err));
           finalize(requestId, cancelled ? "cancelled" : "error");
         }
+        pendingCancellations.delete(requestId);
+        clearInterval(cancelTimers.get(requestId));
+        cancelTimers.delete(requestId);
+        completions.delete(requestId);
         void queryClient.invalidateQueries({ queryKey: taskRunsKey });
         const finished = get().runs[requestId];
         reportBackgroundCompletion(requestId);
         return finished;
       })();
 
+      completions.set(requestId, completion);
       return { requestId, completion };
     },
 
     cancelRun: (requestId) => {
-      void ipc.tasks.cancelRun(requestId).catch(() => {});
+      if (get().runs[requestId]?.status !== "running") return;
+      pendingCancellations.add(requestId);
+      if (cancelTimers.has(requestId)) return;
+      let reported = false;
+      const sendCancel = () => {
+        void ipc.tasks.cancelRun(requestId).catch((error) => {
+          if (!reported)
+            toast.error(t("tasks.run.cancelError"), errorMessage(error));
+          reported = true;
+        });
+      };
+      cancelTimers.set(requestId, setInterval(sendCancel, 200));
+      sendCancel();
     },
 
     dismissRun: (requestId) =>
       set((state) => {
+        if (state.runs[requestId]?.status === "running") return state;
         const rest = { ...state.runs };
         delete rest[requestId];
         return {

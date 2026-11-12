@@ -72,6 +72,8 @@ async function listForwards(): Promise<ToolExecutionResult> {
             state?.status === "reconnecting"
               ? state.reconnectAttempt
               : undefined,
+          connectionFailures: state?.connectionFailures ?? 0,
+          lastConnectionError: state?.lastConnectionError,
           autoStart: Boolean(f.autoStart),
         };
       }),

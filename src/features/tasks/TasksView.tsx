@@ -287,7 +287,7 @@ function TaskRowAction({ task, onOpen }: { task: Task; onOpen: () => void }) {
 
   if (run) {
     const done = run.stepStates.filter((step) =>
-      ["done", "error", "skipped"].includes(step.status),
+      ["done", "error", "skipped", "cancelled"].includes(step.status),
     ).length;
     return (
       <Tooltip content={t("tasks.run.running")}>

@@ -31,7 +31,17 @@ describe("splitLayout", () => {
     expect(layoutPaneIds(layout)).toEqual(["a", "b"]);
   });
 
-  it("inserts a sibling when the direction matches, halving the source size", () => {
+  it.each(["row", "column"] as const)(
+    "equally sizes siblings when adding a third pane along %s",
+    (direction) => {
+      const initial = split(leafLayout("a"), "a", "b", direction);
+      const layout = split(initial, "b", "c", direction);
+      expect(layoutPaneIds(layout)).toEqual(["a", "b", "c"]);
+      expect(layout).toMatchObject({ sizes: [1 / 3, 1 / 3, 1 / 3] });
+    },
+  );
+
+  it("equally sizes siblings when inserting into a resized split", () => {
     let layout = split(leafLayout("a"), "a", "b", "row");
     layout = resizeSplitNode(
       layout,
@@ -41,7 +51,9 @@ describe("splitLayout", () => {
     layout = split(layout, "a", "c", "row");
     expect(layoutPaneIds(layout)).toEqual(["a", "c", "b"]);
     expect((layout as Extract<PaneLayout, { type: "split" }>).sizes).toEqual([
-      0.3, 0.3, 0.4,
+      1 / 3,
+      1 / 3,
+      1 / 3,
     ]);
   });
 

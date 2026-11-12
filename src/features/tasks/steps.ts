@@ -55,3 +55,35 @@ export function stepSummary(step: TaskStep): string {
       return `${step.remotePath || "—"} → ${step.localPath || "—"}`;
   }
 }
+
+export function isTaskStep(value: unknown): value is TaskStep {
+  if (!value || typeof value !== "object") return false;
+  const step = value as Record<string, unknown>;
+  if (
+    step.retries !== undefined &&
+    (!Number.isInteger(step.retries) ||
+      (step.retries as number) < 0 ||
+      (step.retries as number) > MAX_STEP_RETRIES)
+  )
+    return false;
+  const text = (field: unknown, max: number) =>
+    typeof field === "string" &&
+    field.trim().length > 0 &&
+    !field.includes("\0") &&
+    [...field].length <= max;
+  switch (step.type) {
+    case "localCommand":
+    case "remoteCommand":
+      return (
+        text(step.command, 32 * 1024) &&
+        (step.cwd === undefined ||
+          step.cwd === null ||
+          text(step.cwd, 4 * 1024))
+      );
+    case "upload":
+    case "download":
+      return text(step.localPath, 4 * 1024) && text(step.remotePath, 4 * 1024);
+    default:
+      return false;
+  }
+}

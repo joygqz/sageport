@@ -150,11 +150,21 @@ impl Conn {
         command: &str,
         max_output_bytes: usize,
         on_chunk: F,
+        cancel: &TransferCancel,
+        timeout: std::time::Duration,
     ) -> AppResult<i32>
     where
         F: FnMut(String),
     {
-        crate::ssh::exec::exec_stream(&self.ssh.handle, command, max_output_bytes, on_chunk).await
+        crate::ssh::exec::exec_stream(
+            &self.ssh.handle,
+            command,
+            max_output_bytes,
+            on_chunk,
+            cancel,
+            timeout,
+        )
+        .await
     }
 
     pub async fn exec(&self, command: &str) -> AppResult<String> {
@@ -378,12 +388,14 @@ impl SftpManager {
         command: &str,
         max_output_bytes: usize,
         on_chunk: F,
+        cancel: &TransferCancel,
+        timeout: std::time::Duration,
     ) -> AppResult<i32>
     where
         F: FnMut(String),
     {
         self.get(id)?
-            .exec_stream(command, max_output_bytes, on_chunk)
+            .exec_stream(command, max_output_bytes, on_chunk, cancel, timeout)
             .await
     }
 

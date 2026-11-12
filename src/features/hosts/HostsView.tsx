@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/empty-state";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
+import { layoutDragPreview } from "@/lib/dragPreview";
 import { useDragCursor } from "@/lib/pointerDrag";
 import { cn } from "@/lib/utils";
 import { errorDescription, errorMessage, toast } from "@/lib/toast";
@@ -1056,12 +1057,14 @@ function HostDragGhost({ dragState }: { dragState: HostDragState }) {
     <div
       aria-hidden="true"
       className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95"
-      style={{
-        left: dragState.clientX,
-        top: dragState.clientY,
-        width: dragState.rect.width,
-        height: dragState.rect.height,
-      }}
+      style={layoutDragPreview({
+        pointerX: dragState.clientX,
+        pointerY: dragState.clientY,
+        sourceWidth: dragState.rect.width,
+        sourceHeight: dragState.rect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      })}
     >
       <HostSystemIcon os={host.osHint} />
       <div className="min-w-0 flex-1">
@@ -1080,12 +1083,14 @@ function GroupDragGhost({ dragState }: { dragState: GroupDragState }) {
     <div
       aria-hidden="true"
       className="pointer-events-none fixed z-[1001] flex items-center gap-2 rounded-md border border-border-strong bg-popover px-2 py-1.5 text-sm text-popover-foreground opacity-95"
-      style={{
-        left: dragState.clientX,
-        top: dragState.clientY,
-        width: dragState.rect.width,
-        height: dragState.rect.height,
-      }}
+      style={layoutDragPreview({
+        pointerX: dragState.clientX,
+        pointerY: dragState.clientY,
+        sourceWidth: dragState.rect.width,
+        sourceHeight: dragState.rect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      })}
     >
       <Folder className="size-4 shrink-0 text-link" />
       <p className="truncate">{dragState.group.name}</p>

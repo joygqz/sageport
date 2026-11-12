@@ -2,7 +2,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use tokio::io::AsyncReadExt;
@@ -138,6 +138,30 @@ impl TaskRunEvent {
     }
 }
 
+#[derive(Clone)]
+struct TaskEvents {
+    channel: Channel<TaskRunEvent>,
+    logs: Arc<parking_lot::Mutex<Vec<String>>>,
+}
+
+impl TaskEvents {
+    fn send(&self, event: TaskRunEvent) -> tauri::Result<()> {
+        if let Some(chunk) = &event.chunk {
+            if let Some(log) = self.logs.lock().get_mut(event.step_index) {
+                log.push_str(chunk);
+                if log.len() > 8192 {
+                    let mut start = log.len() - 8192;
+                    while !log.is_char_boundary(start) {
+                        start += 1;
+                    }
+                    log.drain(..start);
+                }
+            }
+        }
+        self.channel.send(event)
+    }
+}
+
 enum StepResult {
     Success(Option<i32>),
     Failed { exit: Option<i32>, message: String },
@@ -186,13 +210,14 @@ struct TaskRunStepRecord<'a> {
     exit_code: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
+    log: String,
 }
 
 fn all_skipped(len: usize) -> Vec<StepOutcome> {
     vec![StepOutcome::skipped(); len]
 }
 
-fn steps_json(steps: &[TaskStep], outcomes: &[StepOutcome]) -> String {
+fn steps_json(steps: &[TaskStep], outcomes: &[StepOutcome], logs: &[String]) -> String {
     let records: Vec<TaskRunStepRecord> = steps
         .iter()
         .enumerate()
@@ -203,6 +228,7 @@ fn steps_json(steps: &[TaskStep], outcomes: &[StepOutcome]) -> String {
                 status: outcome.map_or("pending", |o| o.status),
                 exit_code: outcome.and_then(|o| o.exit_code),
                 message: outcome.and_then(|o| o.message.clone()),
+                log: logs.get(index).cloned().unwrap_or_default(),
             }
         })
         .collect();
@@ -234,6 +260,64 @@ fn validate_id(id: &str, label: &str) -> AppResult<()> {
     Ok(())
 }
 
+struct ActiveTaskRun<'a> {
+    state: &'a AppState,
+    task_id: String,
+    request_id: String,
+}
+
+impl Drop for ActiveTaskRun<'_> {
+    fn drop(&mut self) {
+        self.state.task_cancels.lock().remove(&self.request_id);
+        self.state.active_tasks.lock().remove(&self.task_id);
+    }
+}
+
+fn register_run<'a>(
+    state: &'a AppState,
+    id: &str,
+    request_id: &str,
+    cancel: Arc<TransferCancel>,
+) -> AppResult<ActiveTaskRun<'a>> {
+    let mut active = state.active_tasks.lock();
+    let mut cancels = state.task_cancels.lock();
+    if active.contains_key(id) || cancels.contains_key(request_id) {
+        return Err(AppError::Conflict("this task is already running".into()));
+    }
+    active.insert(id.to_string(), request_id.to_string());
+    cancels.insert(request_id.to_string(), cancel);
+    Ok(ActiveTaskRun {
+        state,
+        task_id: id.to_string(),
+        request_id: request_id.to_string(),
+    })
+}
+
+fn validate_run_snapshot(
+    task: &Task,
+    host_id: &str,
+    expected_revision: i64,
+    expected_steps: &str,
+) -> AppResult<()> {
+    if task.revision != expected_revision
+        || task.steps != expected_steps
+        || task.host_id.as_deref().unwrap_or("") != host_id
+    {
+        return Err(AppError::Conflict(
+            "task changed before execution; review the task and run it again".into(),
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRunExpectation {
+    revision: i64,
+    steps: String,
+    host_updated_at: Option<String>,
+}
+
 #[tauri::command]
 pub async fn tasks_run(
     app: AppHandle,
@@ -242,38 +326,48 @@ pub async fn tasks_run(
     host_id: String,
     request_id: String,
     on_event: Channel<TaskRunEvent>,
+    expected: TaskRunExpectation,
 ) -> AppResult<()> {
     validate_id(&id, "task")?;
     validate_id(&request_id, "task request")?;
 
+    let cancel = Arc::new(TransferCancel::new());
+    let _active_run = register_run(&state, &id, &request_id, cancel.clone())?;
     let task = task_repo::get(&state.db, &id).await?;
+    validate_run_snapshot(&task, &host_id, expected.revision, &expected.steps)?;
     let steps: Vec<TaskStep> = task
         .parse_steps()
         .map_err(|e| AppError::Invalid(format!("stored task steps are invalid: {e}")))?;
-
-    let cancel = Arc::new(TransferCancel::new());
-    {
-        let mut cancels = state.task_cancels.lock();
-        if cancels.contains_key(&request_id) {
-            return Err(AppError::Invalid("this task run is already active".into()));
-        }
-        cancels.insert(request_id.clone(), cancel.clone());
+    task_repo::normalize(TaskInput {
+        name: task.name.clone(),
+        description: task.description.clone(),
+        host_id: task.host_id.clone(),
+        steps: steps.clone(),
+        schedule: task.schedule.clone(),
+        schedule_enabled: task.schedule_enabled,
+    })?;
+    if cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
     }
 
     let host_label = resolve_host_label(&state, &host_id).await;
     let host_ref = Some(host_id.trim()).filter(|value| !value.is_empty());
-    let _ = task_run_repo::create(
+    task_run_repo::create(
         &state.db,
         &request_id,
         &id,
         &task.name,
         host_ref,
         host_label.as_deref(),
-        &steps_json(&steps, &[]),
+        &steps_json(&steps, &[], &[]),
         steps.len() as i64,
     )
-    .await;
+    .await?;
 
+    let on_event = TaskEvents {
+        channel: on_event,
+        logs: Arc::new(parking_lot::Mutex::new(vec![String::new(); steps.len()])),
+    };
     let mut outcomes = all_skipped(steps.len());
     let outcome = run_all(
         &app,
@@ -284,10 +378,9 @@ pub async fn tasks_run(
         &cancel,
         &on_event,
         &mut outcomes,
+        expected.host_updated_at.as_deref(),
     )
     .await;
-
-    state.task_cancels.lock().remove(&request_id);
 
     let (status, message) = match &outcome {
         Err(AppError::Cancelled) => ("cancelled", None),
@@ -295,16 +388,17 @@ pub async fn tasks_run(
         Ok(()) if outcomes.iter().any(|o| o.status == "error") => ("error", None),
         Ok(()) => ("done", None),
     };
-    let _ = task_run_repo::finish(
+    let history_steps = steps_json(&steps, &outcomes, &on_event.logs.lock());
+    let history_result = task_run_repo::finish(
         &state.db,
         &request_id,
         status,
         message.as_deref(),
-        &steps_json(&steps, &outcomes),
+        &history_steps,
     )
     .await;
 
-    outcome
+    outcome.and(history_result)
 }
 
 #[tauri::command]
@@ -324,8 +418,9 @@ async fn run_all(
     steps: &[TaskStep],
     request_id: &str,
     cancel: &Arc<TransferCancel>,
-    on_event: &Channel<TaskRunEvent>,
+    on_event: &TaskEvents,
     outcomes: &mut [StepOutcome],
+    expected_host_updated_at: Option<&str>,
 ) -> AppResult<()> {
     let needs_remote = steps.iter().any(TaskStep::needs_remote);
     let conn_id = format!("task-run-{request_id}");
@@ -333,6 +428,11 @@ async fn run_all(
     if needs_remote {
         validate_id(host_id, "host")?;
         let host = crate::repository::host_repo::get(&state.db, host_id).await?;
+        if expected_host_updated_at != Some(host.updated_at.as_str()) {
+            return Err(AppError::Conflict(
+                "target host changed before execution; review the task and run it again".into(),
+            ));
+        }
         let hops = super::ssh::build_hops(state, &host).await?;
         connect_task_session(app, state, &conn_id, host.label, hops, cancel).await?;
     }
@@ -399,10 +499,11 @@ async fn execute_steps(
     steps: &[TaskStep],
     request_id: &str,
     cancel: &Arc<TransferCancel>,
-    on_event: &Channel<TaskRunEvent>,
+    on_event: &TaskEvents,
     outcomes: &mut [StepOutcome],
 ) -> AppResult<()> {
     let mut cancelled = false;
+    let mut failure = None;
     let mut skip_from: Option<usize> = None;
 
     for (index, step) in steps.iter().enumerate() {
@@ -439,14 +540,17 @@ async fn execute_steps(
                     status: "error".into(),
                     chunk: None,
                     exit_code: exit,
-                    message: Some(message),
+                    message: Some(message.clone()),
                 });
+                failure = Some(message);
                 skip_from = Some(index + 1);
                 break;
             }
             StepResult::Cancelled => {
+                outcomes[index].status = "cancelled";
+                let _ = on_event.send(TaskRunEvent::simple(index, "cancelled"));
                 cancelled = true;
-                skip_from = Some(index);
+                skip_from = Some(index + 1);
                 break;
             }
         }
@@ -460,6 +564,8 @@ async fn execute_steps(
 
     if cancelled {
         Err(AppError::Cancelled)
+    } else if let Some(message) = failure {
+        Err(AppError::Other(message))
     } else {
         Ok(())
     }
@@ -474,7 +580,7 @@ async fn run_step_with_retries(
     index: usize,
     step: &TaskStep,
     cancel: &Arc<TransferCancel>,
-    on_event: &Channel<TaskRunEvent>,
+    on_event: &TaskEvents,
 ) -> StepResult {
     let max_retries = step.retries();
     let mut attempt: u32 = 0;
@@ -489,6 +595,7 @@ async fn run_step_with_retries(
                     return StepResult::Failed { exit, message };
                 }
                 attempt += 1;
+                let _ = on_event.send(TaskRunEvent::simple(index, "start"));
                 let _ = on_event.send(TaskRunEvent::log(
                     index,
                     format!(
@@ -516,7 +623,7 @@ async fn run_step(
     index: usize,
     step: &TaskStep,
     cancel: &Arc<TransferCancel>,
-    on_event: &Channel<TaskRunEvent>,
+    on_event: &TaskEvents,
 ) -> StepResult {
     match step {
         TaskStep::LocalCommand { cwd, command, .. } => command_result(
@@ -582,9 +689,10 @@ async fn run_local_command(
     cwd: Option<&str>,
     command: &str,
     cancel: &Arc<TransferCancel>,
-    on_event: &Channel<TaskRunEvent>,
+    on_event: &TaskEvents,
 ) -> AppResult<i32> {
     let mut builder = shell_command(command);
+    builder.kill_on_drop(true);
     if let Some(dir) = cwd {
         builder.current_dir(expand_local_tilde(dir));
     }
@@ -598,6 +706,7 @@ async fn run_local_command(
         .spawn()
         .map_err(|e| AppError::Other(format!("could not start local command: {e}")))?;
 
+    let process_group = child.id();
     let mut readers = JoinSet::new();
     if let Some(stdout) = child.stdout.take() {
         readers.spawn(forward_reader(stdout, index, on_event.clone()));
@@ -632,7 +741,18 @@ async fn run_local_command(
         }
         Stop::Done(status) => {
             let status = status?;
-            drain(&mut readers).await;
+            let drained = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => Err(AppError::Cancelled),
+                result = tokio::time::timeout(KILL_DRAIN_GRACE, drain(&mut readers)) => {
+                    result.map_err(|_| AppError::Timeout("local command output did not close; redirect background process output".into()))
+                }
+            };
+            if drained.is_err() {
+                kill_process_group(process_group);
+                readers.abort_all();
+            }
+            drained?;
             Ok(exit_code(status))
         }
     }
@@ -650,14 +770,20 @@ fn set_process_group(builder: &mut tokio::process::Command) {
     }
 }
 
-async fn kill_process_tree(child: &mut tokio::process::Child) {
-    let pid = child.id();
+fn kill_process_group(pid: Option<u32>) {
     #[cfg(unix)]
     if let Some(pid) = pid {
         unsafe {
             libc::kill(-(pid as i32), libc::SIGKILL);
         }
     }
+    #[cfg(not(unix))]
+    let _ = pid;
+}
+
+async fn kill_process_tree(child: &mut tokio::process::Child) {
+    let pid = child.id();
+    kill_process_group(pid);
     #[cfg(windows)]
     if let Some(pid) = pid {
         let _ = tokio::process::Command::new("taskkill")
@@ -694,7 +820,7 @@ async fn drain(readers: &mut JoinSet<()>) {
     while readers.join_next().await.is_some() {}
 }
 
-async fn forward_reader<R>(mut reader: R, index: usize, on_event: Channel<TaskRunEvent>)
+async fn forward_reader<R>(mut reader: R, index: usize, on_event: TaskEvents)
 where
     R: tokio::io::AsyncRead + Unpin,
 {
@@ -722,6 +848,22 @@ where
     }
 }
 
+fn wrap_remote_command(cwd: Option<&str>, command: &str) -> String {
+    match cwd {
+        Some(dir) => {
+            let quoted = if dir == "~" {
+                "\"$HOME\"".to_string()
+            } else if let Some(relative) = dir.strip_prefix("~/") {
+                format!("\"$HOME\"/{}", sh_quote(relative))
+            } else {
+                sh_quote(dir)
+            };
+            format!("cd -- {quoted} && {{\n{command}\n}}")
+        }
+        None => command.to_string(),
+    }
+}
+
 async fn run_remote_command(
     state: &AppState,
     conn_id: &str,
@@ -729,25 +871,23 @@ async fn run_remote_command(
     cwd: Option<&str>,
     command: &str,
     cancel: &Arc<TransferCancel>,
-    on_event: &Channel<TaskRunEvent>,
+    on_event: &TaskEvents,
 ) -> AppResult<i32> {
-    let wrapped = match cwd {
-        Some(dir) => format!("cd -- {} && {}", sh_quote(dir), command),
-        None => command.to_string(),
-    };
+    let wrapped = wrap_remote_command(cwd, command);
     let channel = on_event.clone();
-    let stream = state
+    state
         .sftp
-        .exec_stream(conn_id, &wrapped, STEP_OUTPUT_CAP, move |chunk| {
-            let _ = channel.send(TaskRunEvent::log(index, chunk));
-        });
-    tokio::select! {
-        biased;
-        _ = cancel.cancelled() => Err(AppError::Cancelled),
-        result = tokio::time::timeout(COMMAND_TIMEOUT, stream) => {
-            result.map_err(|_| AppError::Timeout("remote command timed out".into()))?
-        }
-    }
+        .exec_stream(
+            conn_id,
+            &wrapped,
+            STEP_OUTPUT_CAP,
+            move |chunk| {
+                let _ = channel.send(TaskRunEvent::log(index, chunk));
+            },
+            cancel,
+            COMMAND_TIMEOUT,
+        )
+        .await
 }
 
 async fn run_transfer(
@@ -859,6 +999,117 @@ fn split_local_path(path: &str) -> AppResult<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn events() -> TaskEvents {
+        TaskEvents {
+            channel: Channel::new(|_| Ok(())),
+            logs: Arc::new(parking_lot::Mutex::new(vec![String::new()])),
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_overlapping_tasks_and_releases_registration() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .connect_lazy("sqlite::memory:")
+            .unwrap();
+        let state = AppState::new(pool);
+        let first =
+            register_run(&state, "task-1", "run-1", Arc::new(TransferCancel::new())).unwrap();
+        assert!(register_run(&state, "task-1", "run-2", Arc::new(TransferCancel::new())).is_err());
+        assert!(register_run(&state, "task-2", "run-1", Arc::new(TransferCancel::new())).is_err());
+        drop(first);
+        assert!(state.task_cancels.lock().is_empty());
+        assert!(register_run(&state, "task-1", "run-2", Arc::new(TransferCancel::new())).is_ok());
+    }
+
+    #[test]
+    fn rejects_changed_execution_snapshots() {
+        let task: Task = serde_json::from_value(serde_json::json!({
+            "id": "t1", "name": "Task", "hostId": "h1", "steps": "[]",
+            "createdAt": "", "updatedAt": "", "revision": 2
+        }))
+        .unwrap();
+        assert!(validate_run_snapshot(&task, "h1", 2, "[]").is_ok());
+        assert!(validate_run_snapshot(&task, "h1", 1, "[]").is_err());
+        assert!(validate_run_snapshot(&task, "h2", 2, "[]").is_err());
+        assert!(validate_run_snapshot(&task, "h1", 2, "changed").is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn bounds_output_drain_after_shell_exit() {
+        let result = tokio::time::timeout(
+            Duration::from_secs(5),
+            run_local_command(
+                0,
+                None,
+                "sleep 30 &",
+                &Arc::new(TransferCancel::new()),
+                &events(),
+            ),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(result, Err(AppError::Timeout(_))));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cancels_local_process_and_captures_failure_output() {
+        let cancel = Arc::new(TransferCancel::new());
+        let trigger = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            trigger.cancel();
+        });
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            run_local_command(0, None, "sleep 30", &cancel, &events()),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(result, Err(AppError::Cancelled)));
+        let output = events();
+        let code = run_local_command(
+            0,
+            None,
+            "printf failure >&2; exit 7",
+            &Arc::new(TransferCancel::new()),
+            &output,
+        )
+        .await
+        .unwrap();
+        assert_eq!(code, 7);
+        assert_eq!(output.logs.lock()[0], "failure");
+    }
+
+    #[test]
+    fn caps_history_logs_at_utf8_boundaries() {
+        let output = events();
+        output
+            .send(TaskRunEvent::log(0, "中文".repeat(5000)))
+            .unwrap();
+        let logs = output.logs.lock();
+        assert!(logs[0].len() <= 8192);
+        assert!(!logs[0].contains('\u{fffd}'));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_remote_directory_change_prevents_every_command() {
+        let wrapped = wrap_remote_command(
+            Some("/sageport-nonexistent-directory"),
+            "printf unexpected; true\nprintf unexpected",
+        );
+        let output = std::process::Command::new("sh")
+            .args(["-c", &wrapped])
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        assert!(wrap_remote_command(Some("~/project dir"), "true")
+            .starts_with("cd -- \"$HOME\"/'project dir' && {"));
+    }
 
     #[test]
     fn validates_run_ids() {

@@ -31,7 +31,6 @@ import {
   ContextMenuTrigger,
   EmptyState,
   Input,
-  INTERACTIVE_FOCUS_CLASS,
   Tabs,
   TabsContent,
   TabsList,
@@ -41,6 +40,7 @@ import {
 } from "@/components/ui";
 import { useI18n } from "@/i18n";
 import { ipc } from "@/lib/ipc";
+import { layoutDragPreview } from "@/lib/dragPreview";
 import { useDragCursor } from "@/lib/pointerDrag";
 import { errorCode, errorMessage, toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -706,7 +706,7 @@ function SftpTabItem({
         >
           <TabsTrigger
             value={tab.id}
-            className={cn(WORKBENCH_TAB_TRIGGER_CLASS, INTERACTIVE_FOCUS_CLASS)}
+            className={WORKBENCH_TAB_TRIGGER_CLASS}
             onKeyDown={(event) => {
               if (
                 event.altKey &&
@@ -790,12 +790,14 @@ function SftpTabDragGhost({
     <div
       aria-hidden="true"
       className="pointer-events-none fixed z-[1001] flex items-center gap-1.5 rounded-md border border-border-strong bg-list-active px-2 text-xs text-list-active-foreground opacity-95"
-      style={{
-        left: dragState.clientX,
-        top: dragState.clientY,
-        width: dragState.rect.width,
-        height: dragState.rect.height,
-      }}
+      style={layoutDragPreview({
+        pointerX: dragState.clientX,
+        pointerY: dragState.clientY,
+        sourceWidth: dragState.rect.width,
+        sourceHeight: dragState.rect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      })}
     >
       <span className="relative flex shrink-0 items-center justify-center">
         {tab.kind === "local" ? (

@@ -167,7 +167,10 @@ export const ipc = {
       id: string,
       hostId: string,
       onEvent: (e: TaskRunEvent) => void,
-      requestId = crypto.randomUUID(),
+      requestId: string,
+      expectedRevision: number,
+      expectedSteps: string,
+      expectedHostUpdatedAt?: string,
     ) => {
       const channel = new Channel<TaskRunEvent>();
       channel.onmessage = onEvent;
@@ -176,6 +179,11 @@ export const ipc = {
         hostId,
         requestId,
         onEvent: channel,
+        expected: {
+          revision: expectedRevision,
+          steps: expectedSteps,
+          hostUpdatedAt: expectedHostUpdatedAt,
+        },
       });
     },
     cancelRun: (requestId: string) =>

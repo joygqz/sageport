@@ -65,12 +65,18 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     steps: [
       {
         type: "remoteCommand",
-        command: "pg_dump mydb | gzip > /tmp/mydb.sql.gz",
+        command:
+          'backup=$(mktemp /tmp/mydb.XXXXXX.dump) && if pg_dump -Fc -f "$backup" mydb; then mv -f -- "$backup" /tmp/mydb.dump; else rm -f -- "$backup"; exit 1; fi',
+      },
+      {
+        type: "localCommand",
+        command:
+          'mkdir -p ~/backups && if [ -f ~/backups/mydb.dump ]; then mv -- ~/backups/mydb.dump ~/backups/"mydb.$(date -u +%Y%m%dT%H%M%SZ).$$.dump"; fi',
       },
       {
         type: "download",
-        remotePath: "/tmp/mydb.sql.gz",
-        localPath: "~/backups/mydb.sql.gz",
+        remotePath: "/tmp/mydb.dump",
+        localPath: "~/backups/mydb.dump",
       },
     ],
   },
@@ -98,6 +104,7 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
         type: "remoteCommand",
         command: "tar -czf /tmp/logs.tar.gz -C /var/log myapp",
       },
+      { type: "localCommand", command: "mkdir -p ~/logs" },
       {
         type: "download",
         remotePath: "/tmp/logs.tar.gz",
